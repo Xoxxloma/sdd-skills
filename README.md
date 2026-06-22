@@ -1,29 +1,29 @@
 # product-skills
 
-Набор переиспользуемых скиллов для конвейера **«понять большое приложение → предложить улучшения → оформить требования → системные требования → план реализации»**. Работает на любом большом приложении (в т.ч. из множества микросервисов), провайдер-независим, рассчитан на перенос в отдельный контур.
+Набор скиллов для конвейера **«понять большую систему → найти улучшения / оформить фичу → специфицировать → реализовать»**. Работает на любом большом приложении (в т.ч. из множества сервисов/папок).
+
+Скиллы запускаются в **отдельном product-репозитории** (рабочий каталог = CWD): туда пишутся база знаний, бэклог и папки фич. **Анализируемая система — отдельно**, передаётся путём и read-only; единственное исключение — `implement-feature`, который пишет код в неё по пути из `system/manifest.yaml`.
 
 ## Что внутри (`skills/`)
 
 | Скилл | Делает | Вход → Выход |
 |---|---|---|
-| **product-skills** | Точка входа/диспетчер: карта команд, «где ты сейчас» по состоянию `product/`, подсказка следующего шага; при `--init` создаёт `product/manifest.yaml`. Стадии не исполняет. | — |
-| **system-map** | Понимание всей системы: по агенту на сервис параллельно → карточки + синтез + граф зависимостей + каталог возможностей. Кэшируется, обновляется инкрементально. | `manifest.yaml` → `system/` |
-| **propose-improvements** | Бэклог «малых рычажных» улучшений по линзам (UX/UI, надёжность, перф, observability, DX). Для фронтов запускает **impeccable**. | `system/` → `backlog/improvements.md` (IMP-NNN) |
-| **vision-audit** | *(опц., стратегия)* Аудит сверху вниз: соответствие видению (R/Y/G) + классификация SDLC-исходов + исследование возможностей (веб/конкуренты). | `vision/` + `system/` → `vision/vision-audit.md` (OPP-NNN) |
-| **vision-to-backlog** | Мост: переносит выжившие OPP-NNN в общий бэклог как IMP (та же нумерация, линза `strategy`). | `vision/vision-audit.md` → `backlog/improvements.md` |
-| **draft-requirement** | Разворачивает выбранный IMP в бизнес/тех-требование (BR/TR). | IMP-NNN → `requirements/REQ-NNN.md` |
-| **system-requirements** | Из REQ — системные требования: функц. (EARS) + нефункц. + интерфейсы/данные + критерии приёмки (Gherkin). | REQ-NNN → `system-requirements/SYS-NNN.md` |
-| **implementation-plan** | Из SYS — план: файлы/сервисы, контракты+миграции, тесты, rollout, риски, разбивка задач (Jira-ready). | SYS-NNN → `plans/PLAN-NNN.md` |
-| **product-pipeline** | Оркестратор: гонит цепочку / возобновляет с любой стадии, ведёт `traceability.md`, останавливается на ревью. | — |
-| **impeccable** | Сторонний скилл аудита/дизайна UI (Apache-2.0). Используется `propose-improvements` для UI-линзы. | — |
+| **system-map** | Кеш-база знаний по системе: по агенту на сервис параллельно → карточки + синтез + граф зависимостей + `manifest.yaml`. Инкрементальна. | `<target-path>` → `system/` |
+| **propose-improvements** | Аудит системы по трём трекам: **тех.качество** + **UX (impeccable)** + **новые фичи (vision)**. Каждое улучшение — отдельный БТ-файл. | `system/` → `backlog/F-N.feature.md` |
+| **design-feature** | Человеко-ориентированный сосед: из брифа человека (с уточняющими вопросами) оформляет один БТ того же формата. | бриф → `backlog/F-N.feature.md` |
+| **spec-feature** | Из БТ (номер `F-N` / путь / бриф) — EARS-требования + атомарный план; создаёт папку фичи с тремя файлами. | `F-N`/путь/бриф → `features/F-N/{feature,requirements,plan}.md` |
+| **implement-feature** | Реализация по плану: одна задача за раз, тест на каждый поведенческий R-id, цикл самокоррекции. Пишет код в анализируемую систему. | `features/F-N/` → код в системе |
+| **impeccable** | Сторонний скилл аудита/дизайна UI (Apache-2.0). Используется `propose-improvements` для UX-трека. | — |
 
-## Быстрый старт (правильный запуск)
+Сквозной номер фичи **`F-N`** тянется из бэклога в папку фичи без изменения: `backlog/F-7.feature.md → features/F-7/`.
+
+## Быстрый старт
 
 ### 0. Пререквизиты
-- AI-харнесс с поддержкой скиллов: **Claude Code** (и совместимые — Cursor/Gemini/Codex и т.п., у каждого свой каталог скиллов).
+- AI-харнесс с поддержкой скиллов: **Claude Code** (и совместимые — у каждого свой каталог скиллов).
 - **Node.js ≥ 18** — нужен только для скриптов/CLI **impeccable**; остальные скиллы работают без него.
-- **WebSearch** — опционально, только для `vision-audit` (исследование возможностей); без него запускать с `--no-web` (деградация на анализ по `COMPETITORS.md`). Новых зависимостей не добавляет.
-- Доступ на **чтение** к папкам сервисов, которые будем анализировать.
+- **WebSearch** — опционально, только для трека «новые фичи» в `propose-improvements`; без него — флаг `--no-web` (деградация на анализ по карте + `COMPETITORS.md`).
+- Доступ на **чтение** к папке(ам) анализируемой системы.
 
 ### 1. Установить скиллы
 Скопировать содержимое `skills/` в каталог скиллов среды:
@@ -33,67 +33,53 @@ cp -r skills/*  <harness>/.claude/skills/        # Claude Code
 ```
 
 ### 2. Проверить, что подхватились
-В харнессе должны стать доступны команды:
-`/product-skills`, `/system-map`, `/propose-improvements`, `/vision-audit`, `/vision-to-backlog`, `/draft-requirement`, `/system-requirements`, `/implementation-plan`, `/product-pipeline`, `/impeccable`.
-(В Claude Code — открыть список скиллов или просто начать вызывать `/product-skills` для ориентации. После копирования может потребоваться перезапуск/`/skills` reload.)
+Должны стать доступны команды:
+`/system-map`, `/propose-improvements`, `/design-feature`, `/spec-feature`, `/implement-feature`, `/impeccable`.
 
-### 3. Описать сервисы — `product/manifest.yaml`
-Проще всего — `/product-skills --init`: создаст `product/manifest.yaml` из образца, останется вписать пути. Либо вручную (образец — **`skills/product-skills/reference/manifest.example.yaml`**):
-```yaml
-services:
-  - { name: orders,   path: /abs/path/orders,   type: backend }
-  - { name: payments, path: /abs/path/payments, type: backend }
-  - { name: web,      path: /abs/path/web,       type: frontend }
+### 3. Запустить (по стадиям)
 ```
-Если manifest не создать — `system-map` при первом запуске сам спросит папки сервисов.
+/system-map /abs/path/to/system     # база знаний          → system/  (+ manifest.yaml)
+/propose-improvements                # бэклог БТ аудитом    → backlog/F-N.feature.md
+# или, для конкретной идеи человека:
+/design-feature "хочу <фичу> …"      # один БТ из брифа     → backlog/F-N.feature.md
 
-### 4. Запустить
-**Весь конвейер** (с остановками на ревью между стадиями):
+/spec-feature F-7                    # требования + план    → features/F-7/{feature,requirements,plan}.md
+/implement-feature F-7               # реализация по плану  → код в анализируемой системе
 ```
-/product-pipeline
-```
-**Или по стадиям** (рекомендуется для контроля):
-```
-/system-map                     # карта системы            → product/system/
-/vision-audit --lite --no-web   # (опц.) стратег. аудит    → product/vision/vision-audit.md (OPP-NNN)
-/vision-to-backlog              # (опц.) OPP → бэклог      → product/backlog/improvements.md (IMP, линза strategy)
-/propose-improvements           # бэклог идей              → product/backlog/improvements.md
-/draft-requirement IMP-007      # требование (BR/TR)       → product/requirements/REQ-007.md
-/system-requirements REQ-007    # системные требования     → product/system-requirements/SYS-007.md
-/implementation-plan SYS-007    # план реализации          → product/plans/PLAN-007.md
-```
-Все артефакты пишутся в `./product/` (или передайте свой путь первым аргументом скилла).
+Между стадиями — **гейты на человека**: какой `F-N` вести дальше и утверждение спеки/плана решает человек. Все артефакты (кроме кода) пишутся в текущий каталог.
 
-> **Только чтение исходников.** Скиллы читают код сервисов и пишут исключительно в рабочий каталог `product/` — ничего в анализируемых репозиториях не меняют.
+> **Read-only на исходники анализируемой системы.** Скиллы `system-map` / `propose-improvements` / `design-feature` / `spec-feature` пишут только в рабочий каталог (CWD). Код в систему пишет **только** `implement-feature` — по пути из `system/manifest.yaml`, никогда в CWD.
 >
-> **impeccable** обычно ставится онлайн (`npx impeccable skills install`); здесь вложен **офлайн-копией** для закрытого контура (обновление при сети — `npx impeccable skills update`). CLI-детектор анти-паттернов требует `npx impeccable …`; в полностью закрытом контуре работает анализ по reference-инструкциям, CLI — опционально.
+> **impeccable** обычно ставится онлайн (`npx impeccable skills install`); здесь вложен офлайн-копией для закрытого контура (обновление при сети — `npx impeccable skills update`). CLI-детектор анти-паттернов требует `npx impeccable …`; в закрытом контуре работает анализ по reference-инструкциям.
 
 ## Рабочий стол артефактов (контракт между стадиями)
 
-Все стадии читают артефакт предыдущей и пишут свой — в один рабочий каталог (по умолчанию `./product/`, можно передать путь):
+Каждая стадия читает базу знаний `system/` и артефакт предыдущей, пишет свой — в один рабочий каталог (CWD):
 
 ```
-product/
-  manifest.yaml              # сервис: name → path (+ type: backend|frontend|fullstack|lib, repo?)
-  system/
-    system-map.md            # синтез: каталог возможностей, сквозные сценарии
-    services/<svc>.md        # карточка на сервис
-    dependency-graph.mmd     # mermaid
-  backlog/improvements.md    # IMP-001… (тактика из propose-improvements + стратегия из vision-to-backlog, линза strategy)
-  vision/                    # (опц.) стратегическая стадия
-    VISION.md  SDLC_REFERENCE.md  COMPETITORS.md   # входы (шаблоны — в skills/vision-audit/reference/)
-    vision-audit.md          # Part A/B + OPP-NNN + таблица OPP→IMP
-  requirements/REQ-NNN.md
-  system-requirements/SYS-NNN.md
-  plans/PLAN-NNN.md
-  traceability.md            # матрица IMP ↔ REQ ↔ SYS ↔ PLAN
-  .cache/map-state.json      # хэш/commit на сервис → инкрементальное обновление
+system/
+  system-map.md            # синтез: каталог возможностей, сквозные сценарии
+  services/<svc>.md        # карточка на сервис
+  dependency-graph.mmd     # mermaid
+  manifest.yaml            # ВЫХОД system-map: targetRoot + services[]{name,path,type} — где живёт код
+.cache/map-state.json      # хэш/commit на сервис → инкрементальное обновление
+backlog/
+  F-1.feature.md           # БТ-кандидаты (один файл на улучшение; propose-improvements + design-feature)
+  index.md                 # (опц.) priority-таблица
+features/
+  F-1/
+    feature.md             # БТ (канон после промоушена)
+    requirements.md        # EARS-требования (R-1…)
+    plan.md                # план задач (T-1…)
+VISION.md  COMPETITORS.md  # (опц.) входы трека «новые фичи» в propose-improvements
 ```
+Анализируемая система — в другом месте (абсолютные пути в `system/manifest.yaml`).
 
-### Сквозные ID и трассируемость
-Цепочка тянется по номеру: `IMP-007 → REQ-007 → SYS-007 → PLAN-007`. Это позволяет позже механически экспортировать в Jira (`REQ→Epic`, `SYS-функц.→Story`, критерии приёмки→AC, `PLAN`-задачи→Sub-tasks). `traceability.md` — единый индекс связей.
+### Нумерация и промоушен (`F-N`)
+Единое пространство `F-N`. Следующий номер = `max(N)+1` по **сканированию обоих** `backlog/*.feature.md` и `features/F-*/`. Существующие **никогда не перенумеровываются**. `propose-improvements` и `design-feature` запускать **последовательно** (не параллельно — иначе коллизия номеров). При промоушене `spec-feature` сохраняет номер и помечает исходный `backlog/F-N.feature.md` как `status: promoted` (канон — в `features/F-N/`).
+
+### GIGACODE / правила стека
+`spec-feature` и `implement-feature` читают контекст модели и гейты из `GIGACODE.md` (если в проекте есть свой) либо из вложенного донора `GIGACODE_BASE.md`, и правила стека из `rules/react-ts.md` (или `.gigacode/rules/react-ts.md`). Свой `GIGACODE.md` заводится переносом недостающих блоков из `GIGACODE_BASE.md`.
 
 ## Памятка по стадиям
-`system-map` → `propose-improvements` → (выбор IMP) → `draft-requirement` → `system-requirements` → `implementation-plan`. Сквозной номер сохраняется: `IMP-007 → REQ-007 → SYS-007 → PLAN-007`. Оркестратор `product-pipeline` гонит это с гейтами и ведёт `traceability.md`.
-
-> **(Опц.) Стратегическая ветка.** После `system-map` можно запустить `vision-audit` → `vision-to-backlog`: аудит сверху вниз (соответствие видению + разрывы SDLC) даёт возможности `OPP-NNN`, а мост заносит их в **тот же** `improvements.md` как `IMP` (линза `strategy`, продолжая нумерацию). Так стратегические идеи (сверху вниз) и тактические из `propose-improvements` (снизу вверх) сходятся в один бэклог и дальше идут по общей цепочке `REQ→SYS→PLAN`. Связь возможности с бэклогом видна в поле `Evidence` каждого IMP (ссылка на `OPP-NNN`).
+`system-map <path>` → `propose-improvements` (или `design-feature "<бриф>"`) → `spec-feature F-N` → `implement-feature F-N`. Сквозной номер `F-N` сохраняется на всём пути.
