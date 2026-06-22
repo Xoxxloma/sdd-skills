@@ -9,6 +9,12 @@ risk: low | med
 impact: low | med | high
 ---
 
+<!-- BUSINESS REQUIREMENT — business language only: WHAT the user/business gets and WHY, never HOW.
+     Do NOT write code identifiers (component/class/function/variable/store/hook names), file paths,
+     API signatures/endpoints, or state fields. Do NOT add sections beyond the ones below
+     (no "How it works", "before/after", "Affected files", "API", "Scope of work").
+     Implementation detail is produced later by spec-feature. Remove this comment when filling in. -->
+
 # F-N — <short title>
 
 ## Context / Problem
