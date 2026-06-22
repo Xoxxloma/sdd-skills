@@ -1,0 +1,41 @@
+# Example of system/manifest.yaml — the file system-map PRODUCES (not an input you write).
+# system-map writes it into the product workspace after mapping the target path.
+# Downstream skills read it to locate the real code:
+#   - implement-feature  → where to write code (targetRoot + per-service path)
+#   - propose-improvements → which services get the UI/impeccable track (type: frontend|fullstack)
+#
+# Fields:
+#   targetRoot — ABSOLUTE path passed to /system-map as its first argument.
+#   services[]
+#     name — short name (used in service-card filenames and the dependency graph)
+#     path — ABSOLUTE folder of the service (for a single app: path == targetRoot)
+#     type — backend | frontend | fullstack | lib   (frontend/fullstack → UI audit via impeccable)
+#     repo — optional repository URL (for reference)
+
+targetRoot: /abs/path/shop
+
+services:
+  - name: orders
+    path: /abs/path/shop/orders
+    type: backend
+    repo: git@example.com:team/orders.git
+
+  - name: payments
+    path: /abs/path/shop/payments
+    type: backend
+
+  - name: web
+    path: /abs/path/shop/web
+    type: frontend
+
+  - name: shared-lib
+    path: /abs/path/shop/shared-lib
+    type: lib
+
+# Single-app example (one service whose path equals targetRoot):
+#
+# targetRoot: /abs/path/dashboard
+# services:
+#   - name: dashboard
+#     path: /abs/path/dashboard
+#     type: fullstack
