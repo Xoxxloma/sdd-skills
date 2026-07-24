@@ -1,0 +1,2 @@
+Вот бизнес-требования: _skill-eval/fixtures/ARS-57/business_requirements.md
+Нужна тех.спека под разработку.
