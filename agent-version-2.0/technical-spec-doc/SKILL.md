@@ -1,5 +1,6 @@
 ---
 name: technical-spec-doc
+user-invocable: false
 description: >-
   Turns a confirmed business-requirements doc (the output of business-requirements-doc,
   a ТЗ / BRD / SRS) into ONE Markdown technical specification in Russian that two AI
@@ -18,7 +19,6 @@ description: >-
   сделай тех.спеку" or "распиши это для разработки". This skill REQUIRES a confirmed
   business-requirements document as input — if none is provided (only a vague brief or
   idea), it stops and asks for the БТ instead of proceeding.
-user-invocable: false
 ---
 
 # Technical Specification Interview (BRD → Tech Spec)

@@ -1,5 +1,8 @@
 ---
 name: analyst-workspace
+user-invocable: true
+disable-model-invocation: true
+allowed-tools: AskUserQuestion, Skill, Read, Glob, Write, Edit
 description: >-
   Единая точка входа аналитика для всего цикла продуктовой документации: бизнес-требования
   (БТ) → разбиение эпика на автономные фичи → техническая спецификация, с общим тех-фундаментом
@@ -9,9 +12,6 @@ description: >-
   когда он садится за задачу/фичу/эпик и хочет, чтобы его провели по процессу. Это
   ОРКЕСТРАТОР в основном треде (НЕ суб-агент): использует интерактивные вопросы и вызывает
   под-скиллы business-requirements-doc, task-decomposition-doc, technical-spec-doc.
-disable-model-invocation: true
-user-invocable: true
-allowed-tools: AskUserQuestion, Skill, Read, Glob, Write, Edit
 ---
 
 # Analyst Workspace — точка входа аналитика (оркестратор)

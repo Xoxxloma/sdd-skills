@@ -1,5 +1,6 @@
 ---
 name: business-requirements-doc
+user-invocable: false
 description: >-
   Gathers business requirements and writes ONE Markdown spec (BRD→SRS) in Russian.
   It MAY read the repo as evidence, but nothing enters the spec until the user
@@ -9,7 +10,6 @@ description: >-
   Use whenever someone wants to write a ТЗ / BRD /
   SRS, formalize a request, or describe a task, feature, change, or integration for
   developers.
-user-invocable: false
 ---
 
 # Business Requirements Interview (BRD → SRS)

@@ -1,5 +1,6 @@
 ---
 name: task-decomposition-doc
+user-invocable: false
 description: >-
   Splits ONE confirmed epic-level business-requirements doc (the output of
   business-requirements-doc) into several separately-shippable child slices, each a
@@ -14,7 +15,6 @@ description: >-
   idea it STOPS and points to business-requirements-doc first. Use whenever someone
   wants to break down / decompose / split / разбить an epic or large task into
   sub-tasks, slices, child stories, or shippable increments before writing tech specs.
-user-invocable: false
 ---
 
 # Task Decomposition (epic-БТ → child БТs)
