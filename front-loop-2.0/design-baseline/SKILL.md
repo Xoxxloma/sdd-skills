@@ -14,8 +14,9 @@ UI library (MUI, Ant, an internal design system) or a project token system
 color, spacing, and components. DESIGN.md captures *which* system, *how* the project
 uses and customizes it, and the project design context that cannot be read from code
 (audience, tone, brand). When no system exists at all, this skill does not invent
-one — it points to `generate-theme`. `polish-frontend` then reads this document to
-bring markup in line with the system instead of improvising.
+one — it points to `generate-theme`. Once documented, any agent reads this document
+(via the `DESIGN.md` pointer in the init file) to bring markup in line with the system
+instead of improvising.
 
 This skill never writes production code. Its deliverable is `DESIGN.md`; it also adds a
 one-block pointer to `DESIGN.md` in the project's init/context file (Step 4) and touches
@@ -44,8 +45,8 @@ Base docs directory: `docs/dev/`
 - Living design document: `docs/dev/DESIGN.md` (beside `PROJECT.md` if that exists;
   DESIGN.md is independent and does not require the rest of the pipeline)
 
-Keep this base path identical to the one used by `polish-frontend` and the rest of
-the pipeline. If you change it, change it in both skills.
+Keep this base path identical to the rest of the pipeline. If you change it, change it
+everywhere.
 
 ## Modes
 
@@ -120,8 +121,8 @@ the pipeline. If you change it, change it in both skills.
    - Local conventions layered on top (naming, file layout, how new UI is composed).
 5. Where the project hardcodes values that the system of record already provides
    (ad-hoc hex instead of a palette token, magic spacing instead of the scale),
-   note it as drift in `## Known Drift`, but do not "fix" it here — that is
-   `polish-frontend`'s job. "The system" means whichever applies: library theme,
+   note it as drift in `## Known Drift`, but do not "fix" it here — fixing is a later
+   markup edit against the system, not this skill's job. "The system" means whichever applies: library theme,
    library defaults, or project tokens. In state B, drift is values that bypass the
    library's default theme. In state C, drift is hardcoded values that bypass the
    project's own tokens/CSS variables. In state D there is no system to drift from,
@@ -133,7 +134,11 @@ the pipeline. If you change it, change it in both skills.
    confirmed.** Some things cannot be read
    from code and must come from the user: target audience and usage context, product
    tone/personality, brand constraints, and which surfaces matter most. Batch these
-   as questions with options where possible. Code tells you what was built, not who
+   as questions with options where possible, but **at most 4 questions per turn** — the
+   interface accepts no more than that, so a fifth in the same turn is silently lost. If
+   the Step 0 state confirmation or the Step 4 init-file question is still open, it counts
+   against the same four: ask the four most important first and continue next turn. Never
+   drop a question to fit a turn. Code tells you what was built, not who
    it is for — never infer this; ask. If the user declines a question, mark that
    field `TBD` rather than guessing.
 
@@ -179,6 +184,8 @@ the pipeline. If you change it, change it in both skills.
    do not invent design values. If the system lacks what you need, ask or propose the
    nearest system value. Avoid generic "AI slop": no gradient text, no cards-in-cards,
    not everything-centered, no default Inter with no intent — follow the system's own patterns.
+   When asked to fix or refactor one component/surface, change only that surface — do not
+   restyle its siblings or broaden into a refactor.
    ```
 9. Run Self-Review, then hand off.
 
@@ -257,7 +264,7 @@ defaults to the library. Keep it small.>
 
 ## Known Drift
 <hardcoded values that bypass the system of record (ad-hoc hex instead of a palette
-token, magic spacing instead of the scale), as facts to inform later polish. Not
+token, magic spacing instead of the scale), as facts to inform later cleanup. Not
 fixed here. `N/A` in state D.>
 ```
 
@@ -315,7 +322,8 @@ Before reporting done, confirm:
 3. In states A/B/C, typography/color/spacing are recorded as references to that
    system, with no invented scales. In state D, domains are `TBD` and the user was
    pointed to `generate-theme` — nothing was invented.
-4. Design context was asked, not inferred; unanswered items are `TBD`.
+4. Design context was asked, not inferred; questions went out at most four per turn with
+   none dropped to fit; unanswered items are `TBD`.
 5. The skill stayed library-agnostic — all library-specific facts live in the
    document, not hardcoded in the workflow.
 6. No production code, build/test run, or git write was performed.

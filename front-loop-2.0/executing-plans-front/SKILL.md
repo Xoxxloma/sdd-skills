@@ -48,3 +48,31 @@ Execute an approved implementation plan or plan pack inline while preserving nar
 - For frontend tasks, prefer runnable non-interactive validation expressed in the project's own tooling: its test runner, type check, lint, and production build. Name the exact repository command rather than a framework. An end-to-end or integration smoke check is optional and off by default. A manual browser look may supplement a gate but cannot be the only validation for a milestone executed inline as part of an autonomous plan.
 - Do not broaden a frontend task into an unrequested restyle, component-library swap, or broad refactor. Keep each batch to the single surface the task names.
 - After review confirms completion, point the user to `sync-project-doc` to fold the increment into `docs/dev/PROJECT.md`. Never modify `PROJECT.md` directly from this skill, and never block completion on the sync; it is a manual follow-up the user owns.
+
+## Self-Review
+
+Before reporting a task, a milestone, or the increment done, confirm:
+
+1. Every file you changed appears in the plan's touched-files inventory (or an explicit external prerequisite). A file outside it is broadened scope, not initiative.
+2. No unit was extracted into a hook, util, or wrapper the plan did not name, and nothing was split because of its length. If extraction looked warranted, it went under `## Stop/Replan Triggers` and execution stopped.
+3. `RED`/`GREEN` were followed as written; a task classified `N/A` stayed `N/A`. Nothing was re-tested, re-classified, or "improved" beyond the plan.
+4. Validation actually ran where the plan named a command, and its real outcome — not an assumed one — is recorded. Missing validation counts as incomplete work.
+5. At a milestone boundary: the gate was run and its result is under `## Milestone Status`. On a failure you stopped, recorded the trigger under `## Stop/Replan Triggers`, and reverted no further than that milestone's `Rollback Boundary`.
+6. The status companion is current on disk: canonical headings intact, `## Current Milestone` / `## Milestone Status` / `## Current Task` / `## Next Task` / `## Last Completed Command and Validation` / `## Blockers` updated in place, substantive choices under `## Decisions and Assumptions`, and a new `## Execution Log` entry appended with a real local timestamp (`YYYY-MM-DD HH:MM TZ`) — earlier entries untouched.
+7. No product-visible behavior changed outside the approved plan, and no decision was logged as a way of proceeding past something that should have stopped execution.
+8. `docs/dev/PROJECT.md` and the plan pack's own files were not edited from this skill.
+
+## Handoff
+
+Report concisely:
+
+> "Executed `<feature>`: <tasks completed> — <milestone> <passed | stopped at gate>."
+> "Files changed: <list>. Validation: <exact command run> — <result>."
+> "Status companion updated at `docs/dev/plans/<feature>/plan-status.md`."
+> "<Blockers / stop-replan trigger, or none.>"
+
+If execution stopped, say what triggered it and what the plan's `Stop/Replan Rule` calls for — do not present a stop as completion.
+
+After review confirms the increment is done, add:
+
+> "Next: run `sync-project-doc` to fold this increment into the living documents. I did not touch them."

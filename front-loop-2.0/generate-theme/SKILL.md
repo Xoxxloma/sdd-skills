@@ -1,6 +1,7 @@
 ---
 name: generate-theme
-description: Use to create a project's design theme or design tokens when no project theme exists yet, or to fully redesign an existing theme the user is unhappy with. It runs a short interview about the product and the system they want, then generates real theme/token code in the project — a library theme if a UI library is present, otherwise tokens in the project's format (Tailwind config / CSS variables). It proposes values for the user to approve before writing. This is the one skill in the set that creates design values; everything else only documents or applies them. Trigger when design-baseline reports state B (library with no project theme) or state D (no system at all), or when the user wants to generate or regenerate a theme/token system. For changing a single existing value, use polish-frontend instead.---
+description: Use to create a project's design theme or design tokens when no project theme exists yet, or to fully redesign an existing theme the user is unhappy with. It runs a short interview about the product and the system they want, then generates real theme/token code in the project — a library theme if a UI library is present, otherwise tokens in the project's format (Tailwind config / CSS variables). It proposes values for the user to approve before writing. This is the one skill in the set that creates design values; everything else only documents or applies them. Trigger when design-baseline reports state B (library with no project theme) or state D (no system at all), or when the user wants to generate or regenerate a theme/token system.
+---
 
 # Generate Theme
 
@@ -13,8 +14,10 @@ and it must stay disciplined: it generates from a short interview, proposes valu
 and writes only after the user approves.
 
 It does not touch `DESIGN.md` — after generation, `design-baseline` documents the
-result. It does not change markup or fix a single existing value — that is
-`polish-frontend`. Its deliverable is real theme/token code in the project.
+result. It does not change **markup** — that is a normal edit against the
+`docs/dev/DESIGN.md` pointer, no skill. Its deliverable is the theme/token **values**
+themselves — creating a whole system or fully regenerating one. A single isolated value
+change is a plain edit of the token file, not this skill.
 
 ## Modes
 
@@ -30,23 +33,21 @@ Choosing between them:
 - **Create vs Regenerate** is decided by whether a project theme/tokens already
   exist (none → Create; exist → Regenerate). An explicit user request to "redesign
   / rework / regenerate" forces Regenerate even when detection is ambiguous.
-- **Whether this skill applies at all** is the whole-vs-pointwise question:
-  "redesign the theme / I want a different look / I don't like the overall feel" →
-  this skill. "Change this one value / make the radius bigger / darken the border" →
-  not this skill; direct the user to `polish-frontend`. The axis is
-  restructure-vs-retune, not the number of values: changing existing values (even
-  several — "make it darker and rounder") stays `polish-frontend`; this skill is for
-  restructuring the token SET (add/remove tokens, redesign the palette/scale) or a
-  from-scratch system.
+- **Whether this skill applies at all**: this skill is for a WHOLE theme/token system —
+  creating one, or fully regenerating one for a different look. It is NOT for a single
+  isolated value change ("make the radius bigger") — that is a plain edit of the token
+  file. It is NOT for markup (re-layout a component, tokenize hardcoded values, clean up
+  slop) — that is a plain edit against the `docs/dev/DESIGN.md` pointer. A value change
+  that CASCADES (e.g. a new primary that needs the whole palette recomputed) is a
+  Regenerate and belongs here.
 
 ## Process
 
 ### Step 0 — Mode and target format
-1. Determine whether this skill applies (whole-vs-pointwise). If the request is a
-   single existing-value change, stop and point the user to `polish-frontend`.
-   Otherwise determine the mode: Create if no project theme/tokens exist, Regenerate
-   if they do — and Regenerate also when the user explicitly asks to redesign/rework
-   the theme, even if detection is ambiguous.
+1. Determine whether this skill applies (a WHOLE theme/token system — not a single value
+   change and not markup, which are plain edits). Then pick the mode: **Create** if no
+   project theme/tokens exist; **Regenerate** if they exist and the user wants a
+   fundamentally different system (also forced by an explicit "redesign/rework" request).
 2. Determine the output format from the project, not from preference — one
    principle: **write where the project's style already lives.**
    - A UI library is present → generate a theme in that library's own theme
@@ -60,16 +61,19 @@ Choosing between them:
    format before writing; if the right format only becomes clear after the
    interview, it is fine to settle it then rather than forcing it up front.
 
-### Step 1 — Interview (5 fixed questions)
-4. Ask these as one batch, with options where possible. In Regenerate, prefix with a
-   zeroth input: "Here is the current theme — what don't you like, and which
-   direction do you want?" Then the five:
+### Step 1 — Interview (5 fixed questions, at most 4 per turn)
+4. Ask with options where possible, but **at most 4 questions per turn** — the interface
+   accepts no more than that, and a fifth asked in the same turn is silently lost. So the
+   five go over two turns: 1–4, then 5. In Regenerate, the zeroth input — "Here is the
+   current theme — what don't you like, and which direction do you want?" — counts against
+   the same cap: ask it together with 1–3, then 4–5.
    1. What is the product, in one line (what it does, the domain)?
    2. Who is the audience and what tone/personality should it convey?
    3. Light, dark, or both?
    4. Is there a brand color or existing brand constraint? (hex, or "none")
    5. Density and shape: compact vs roomy, sharp vs rounded?
-   Keep it to these five. If the user volunteers more, use it; do not expand the
+   Keep it to these five (plus the Regenerate zeroth) and never drop one to fit a turn —
+   split the turns instead. If the user volunteers more, use it; do not expand the
    interview into an interrogation.
 
 ### Step 2 — Propose values (approval gate)
@@ -109,8 +113,10 @@ Choosing between them:
   format). Do not impose a format the project does not use; if ambiguous, ask.
 - In Regenerate, never silently overwrite the existing theme. Show old → new for
   each value and get approval. Flag the blast radius of shared-token changes.
-- Do not handle pointwise value changes; route those to `polish-frontend`. This
-  skill only creates or fully regenerates a system.
+- This skill creates or fully regenerates a WHOLE theme/token system. A single isolated
+  value change, and any markup change, are plain edits (the token file / a component,
+  against the `docs/dev/DESIGN.md` pointer) — not this skill. A cascading value change
+  (one value forces others to be recomputed) is a Regenerate and belongs here.
 - Do not touch `DESIGN.md`. After generation, `design-baseline` documents the new
   system. Tell the user to run it.
 - Keep the interview to the five fixed questions; do not turn it into an open-ended
@@ -123,14 +129,13 @@ Choosing between them:
 ## Self-Review
 
 Before reporting done, confirm:
-1. This skill applied (whole-system request, not pointwise — a pointwise request was
-   redirected to `polish-frontend`), and the mode was right: Create when no project
-   theme/tokens exist (including a library with no project theme), Regenerate when
-   they exist or the user explicitly asked to redesign.
+1. This skill applied (a WHOLE theme/token system request — not a single value change and
+   not markup, which are plain edits), and the mode was right: Create (no theme) or
+   Regenerate (whole redesign).
 2. Output format matches where the project's style lives (library theme / Tailwind
    / CSS variables), confirmed with the user when ambiguous.
 3. The interview was the five fixed questions (plus the Regenerate zeroth input), no
-   more.
+   more — and no turn carried more than four of them; none was dropped to fit.
 4. Values were proposed and **user-approved before any write**; in Regenerate, each
    was shown old → new (added dimensions shown as new) with no silent overwrite, and
    blast radius was flagged. If agreement took more than three rounds, the user was

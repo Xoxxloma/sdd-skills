@@ -200,14 +200,19 @@ The document has parts of different natures, and the skill must respect them:
 ## Capabilities
 <What the product can do today, as user-facing capabilities in plain language —
 inventoried from the code. This is the living part — kept current by
-sync-project-doc after each feature.>
+sync-project-doc after each feature. Every row corresponds to something actually
+present: a screen, a route, a button, a form (for rows sync adds later — a shipped
+plan's stated outcome). A capability you cannot point at is invented; leave it out.>
 | Capability | For which user/role | Notes |
 |------------|---------------------|-------|
 
 ## Business Scenarios
 <How the capabilities are used in the business — who does what, when, why; flows
-that chain capabilities. From the user, NOT reconstructed from code. `TBD` where the
-user has not described them yet.>
+that chain capabilities. From the user, NOT reconstructed from code. A row exists only
+if the user described that scenario: put a verbatim fragment of their words in `Purpose`.
+Nothing to quote → no rows at all, and the only allowed row is `| TBD | TBD | TBD | TBD |`.
+A plausible scenario assembled from screens is invention, and an analyst cannot tell it
+from a real one.>
 | Scenario | Role | Capabilities involved | Purpose |
 |----------|------|-----------------------|---------|
 
@@ -259,9 +264,10 @@ Before reporting done, confirm:
 2. The mandatory clarification gate ran: the core (product, users, entity meaning,
    scope) AND the business scenarios came from the user, not inference; declined
    items are `TBD`.
-3. Capabilities describe user-facing actions in plain language from the code;
-   scenarios were NOT reconstructed from the code — they came from the user (or are
-   `TBD`).
+3. Capabilities describe user-facing actions in plain language, and every row corresponds
+   to something actually present in the code — nothing was added that you cannot point at.
+   Scenarios were NOT reconstructed from the code: each row carries a verbatim fragment of
+   the user's words, or the section holds `TBD` only.
 4. The whole document stays in the business register — no developer language leaked
    in.
 5. `## Metadata` reflects this run for the fields this skill owns (real date, commit).

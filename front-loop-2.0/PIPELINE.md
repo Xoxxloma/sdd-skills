@@ -1,6 +1,6 @@
 # Front-Loop Pipeline — карта и шпаргалка
 
-Фронтовый SDD-пайплайн из **9 скиллов**. Три живых документа + цикл разработки фич.
+Фронтовый SDD-пайплайн из **8 скиллов**. Три живых документа + цикл разработки фич.
 **Оркестратора нет** — скиллы зовутся по имени (`/skills <name>`), поток само-секвенится
 через хендоффы в каждом скилле. Эта страница — «одна дверь»: посмотрел состояние → понял
 следующий шаг.
@@ -14,7 +14,7 @@
 | `docs/dev/DESIGN.md` (дизайн) | **design-baseline** | **sync ФЛАГает**, не пишет | design-baseline — единственный писатель |
 
 Прочие артефакты: `docs/dev/ideas.md` (только **inspire**, append-only); theme/token-**код** в
-проекте (создаёт **generate-theme**, одно значение меняет **polish-frontend**); plan pack
+проекте (создаёт/перегенеривает **generate-theme**); plan pack
 `docs/dev/plans/<feature>/` (пишет **writing-plans-front**, статус ведёт **executing-plans-front**).
 
 Каждый baseline регистрирует свой указатель (`## Project/Business Context`, `## Design System`)
@@ -34,7 +34,6 @@ flowchart TD
     GT[generate-theme] --> THEME[/theme + токены — код/]
     THEME --> DB
     DB -. "state D: системы нет" .-> GT
-    POL[polish-frontend] -. "берёт значения" .-> DES
   end
 
   subgraph LOOP["3. Цикл фичи (ядро SDD)"]
@@ -44,7 +43,6 @@ flowchart TD
     WP --> PLAN[/plan pack/]
     PLAN --> EX[executing-plans-front]
     EX --> SYNC[sync-project-doc]
-    EX -. "UI не по системе" .-> POL
     SYNC --> PROJ
     SYNC --> BUS
     SYNC -. "новый shared-компонент/токен" .-> DB
@@ -65,13 +63,12 @@ flowchart TD
 | План написан и **одобрен человеком** | **executing-plans-front** |
 | План исполнен и ревью пройдено | **sync-project-doc** (свернуть инкремент в живые доки) |
 | sync сказал «новый shared-компонент/токен» | **design-baseline Refine** (записать в DESIGN.md/Registry) |
-| Конкретный UI наверчен / не по системе / «AI-слоп» | **polish-frontend** (одна поверхность) |
-| Хочу принципиально другой облик темы целиком | **generate-theme** (regenerate) |
-| Поменять ОДНО значение существующего токена проектно | **polish-frontend** |
+| Конкретный UI наверчен / не по системе / «AI-слоп» | **обычная правка** против указателя `DESIGN.md` (скилл не нужен — контекст уже у агента) |
+| Хочу принципиально другой облик темы целиком | **generate-theme** (Regenerate) |
+| Поменять ОДНО/несколько изолированных значений токена | **обычная правка** файла токенов (скилл не нужен); а каскадная смена (новый primary → пересчёт палитры) → **generate-theme** Regenerate |
 
-Ось generate-theme ↔ polish: **restructure → generate-theme** (добавить/убрать токены, редизайн
-палитры/шкалы, новый облик); **retune → polish-frontend** (менять ЗНАЧЕНИЯ существующих токенов,
-даже несколько — «темнее и круглее»).
+Шов: **целая система токенов → generate-theme** (создать / перегенерить); **одиночное значение
+и разметка → обычная правка** (файл токенов / компонент, против указателя `DESIGN.md`) — не скилл.
 
 ## Ростер скиллов
 
@@ -79,13 +76,12 @@ flowchart TD
 |-------|-----------|-------|----------|
 | **project-baseline** | `PROJECT.md` + указатель | bootstrap/дрейф техники | → sync ведёт «Факты» |
 | **business-baseline** | `BUSINESS.md` + указатель | bootstrap/дрейф бизнеса | → sync ведёт Capabilities |
-| **design-baseline** | `DESIGN.md` + указатель | есть дизайн-система (A/B/C); нет (D) → generate-theme | → polish читает; sync флагает сюда |
-| **generate-theme** | theme/token **код** | системы нет (state B/D) или редизайн | → design-baseline документирует |
+| **design-baseline** | `DESIGN.md` + указатель | есть дизайн-система (A/B/C); нет (D) → generate-theme | указатель читает любой агент; sync флагает сюда |
+| **generate-theme** | theme/token **код** (целая система) | системы нет (B/D) или редизайн | → design-baseline документирует |
 | **inspire** | `ideas.md` (идеи) | «что строить дальше» | → writing-plans-front (вручную) |
 | **writing-plans-front** | plan pack (`plan.md` + companions) | есть одобренный дизайн/идея | → executing-plans-front (после аппрува) |
 | **executing-plans-front** | код по плану + `plan-status.md` | план одобрен | → review → напоминает про sync |
 | **sync-project-doc** | обновлённые PROJECT/BUSINESS + `.synced` | инкремент исполнен | → design-baseline Refine (если дизайн задет) |
-| **polish-frontend** | правки разметки под систему | UI не по системе / слоп | → design-baseline Refine (если сменил shared-токен) |
 
 ## Правила и грабли (что легко забыть)
 
