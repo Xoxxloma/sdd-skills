@@ -1,20 +1,7 @@
 ---
 name: task-decomposition-doc
 user-invocable: false
-description: >-
-  Splits ONE confirmed epic-level business-requirements doc (the output of
-  business-requirements-doc) into several separately-shippable child slices, each a
-  coherent GROUP of its FR-*, and writes a self-contained child БТ per slice into its
-  OWN Jira/SberTrack sub-task folder (docs/<CHILD-KEY>/business_requirements.md) so
-  technical-spec-doc can run on each child unchanged. It PARTITIONS already-confirmed
-  content and INVENTS NOTHING: every child FR and its acceptance criterion is copied
-  verbatim from the parent epic-БТ; it never creates, splits the meaning of, or adds a
-  requirement or scope the parent lacks. It reads only the epic-БТ, proposes a split,
-  and writes files only after the user confirms the slices, the real child task keys,
-  and the build order. Requires a confirmed epic-БТ present — given only a brief or
-  idea it STOPS and points to business-requirements-doc first. Use whenever someone
-  wants to break down / decompose / split / разбить an epic or large task into
-  sub-tasks, slices, child stories, or shippable increments before writing tech specs.
+description: 'Splits ONE confirmed epic-level business-requirements doc (the output of business-requirements-doc) into several separately-shippable child slices, each a coherent GROUP of its FR-*, and writes a self-contained child БТ per slice into its OWN Jira/SberTrack sub-task folder (docs/<CHILD-KEY>/business_requirements.md) so technical-spec-doc can run on each child unchanged. It PARTITIONS already-confirmed content and INVENTS NOTHING: every child FR and its acceptance criterion is copied verbatim from the parent epic-БТ; it never creates, splits the meaning of, or adds a requirement or scope the parent lacks. It reads only the epic-БТ, proposes a split, and writes files only after the user confirms the slices, the real child task keys, and the build order. Requires a confirmed epic-БТ present — given only a brief or idea it STOPS and points to business-requirements-doc first. Use whenever someone wants to break down / decompose / split / разбить an epic or large task into sub-tasks, slices, child stories, or shippable increments before writing tech specs.'
 ---
 
 # Task Decomposition (epic-БТ → child БТs)

@@ -1,15 +1,7 @@
 ---
 name: business-requirements-doc
 user-invocable: false
-description: >-
-  Gathers business requirements and writes ONE Markdown spec (BRD→SRS) in Russian.
-  It MAY read the repo as evidence, but nothing enters the spec until the user
-  confirms it: every gate is put to the user and confirmed before writing, and
-  anything unconfirmed becomes TBD. The mandatory first question is the linked
-  Jira/SberTrack task key (SMSEC-1234); without it the spec is not written.
-  Use whenever someone wants to write a ТЗ / BRD /
-  SRS, formalize a request, or describe a task, feature, change, or integration for
-  developers.
+description: 'Gathers business requirements and writes ONE Markdown spec (BRD→SRS) in Russian. It MAY read the repo as evidence, but nothing enters the spec until the user confirms it: every gate is put to the user and confirmed before writing, and anything unconfirmed becomes TBD. The mandatory first question is the linked Jira/SberTrack task key (SMSEC-1234); without it the spec is not written. Use whenever someone wants to write a ТЗ / BRD / SRS, formalize a request, or describe a task, feature, change, or integration for developers.'
 ---
 
 # Business Requirements Interview (BRD → SRS)

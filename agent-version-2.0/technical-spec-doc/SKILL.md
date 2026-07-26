@@ -1,24 +1,7 @@
 ---
 name: technical-spec-doc
 user-invocable: false
-description: >-
-  Turns a confirmed business-requirements doc (the output of business-requirements-doc,
-  a ТЗ / BRD / SRS) into ONE Markdown technical specification in Russian that two AI
-  coding agents — one frontend, one backend — can implement against with minimal
-  friction at integration and release. The spec is organized around INTERACTIONS
-  (the new/changed contracts crossing service or FE/BE boundaries), not siloed
-  BE/FE chapters. There is NO code access (analytical repo, code is spread across
-  services): NEW interactions are fully designed by the skill; anything about an
-  EXISTING service is either confirmed by the analyst (written as fact, marked
-  "подтверждено аналитиком, не по коду") or stays an assumption to validate — never
-  invented. Use whenever someone wants a technical spec / тех.спека / ТЗ на разработку /
-  dev design / implementation spec, wants to turn business requirements into something
-  developers or AI agents can build, or wants to describe a new or changed interaction
-  (contract, API, integration) between services or between frontend and backend.
-  Trigger even if they just hand over a business-requirements doc and say "теперь
-  сделай тех.спеку" or "распиши это для разработки". This skill REQUIRES a confirmed
-  business-requirements document as input — if none is provided (only a vague brief or
-  idea), it stops and asks for the БТ instead of proceeding.
+description: 'Turns a confirmed business-requirements doc (the output of business-requirements-doc, a ТЗ / BRD / SRS) into ONE Markdown technical specification in Russian that two AI coding agents — one frontend, one backend — can implement against with minimal friction at integration and release. The spec is organized around INTERACTIONS (the new/changed contracts crossing service or FE/BE boundaries), not siloed BE/FE chapters. There is NO code access (analytical repo, code is spread across services): NEW interactions are fully designed by the skill; anything about an EXISTING service is either confirmed by the analyst (written as fact, marked "подтверждено аналитиком, не по коду") or stays an assumption to validate — never invented. Use whenever someone wants a technical spec / тех.спека / ТЗ на разработку / dev design / implementation spec, wants to turn business requirements into something developers or AI agents can build, or wants to describe a new or changed interaction (contract, API, integration) between services or between frontend and backend. Trigger even if they just hand over a business-requirements doc and say "теперь сделай тех.спеку" or "распиши это для разработки". This skill REQUIRES a confirmed business-requirements document as input — if none is provided (only a vague brief or idea), it stops and asks for the БТ instead of proceeding.'
 ---
 
 # Technical Specification Interview (BRD → Tech Spec)
