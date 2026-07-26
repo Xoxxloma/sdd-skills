@@ -178,6 +178,12 @@ the number, try the БТ filename/title/header (e.g. `ARS-123`, «Задача �
 only a pre-fill: the task number is **always** asked and confirmed by the analyst in Step 3,
 never assumed from the derivation alone. It goes into the spec header.
 
+Children live **inside** their parent's folder (`docs/<EPIC-KEY>/<CHILD-KEY>/`), so if the folder
+you were pointed at contains sub-folders with their own business-requirements docs, you were handed
+an **epic**, not a leaf node. Don't pick a child yourself and don't spec the epic — ask which node
+to write. The folder-name derivation still works unchanged for a leaf: the child's folder is named
+by the child's key, however deep it sits.
+
 If no business-requirements doc is present, the entry guard above already applies: stop
 and ask for it — do not fall back to the user's brief. This step assumes the guard has
 passed and a real БТ is in hand.
@@ -449,8 +455,21 @@ that now lacks an interaction or test case.
   ````
 - **Тянущие поля.** Особенно затяни поля, которые гейтуют состояния детского фронта (null / 0 /
   код ошибки) — иначе ребёнок не разведёт `zero`/`empty`/`error_source` (§4.3).
-- **Куда пишем.** В отдельную папку фундамента, которую называет проводник (напр.
-  `_foundation/technical_specification.md` в папке эпика), **не перезатирая** спеку эпика/ребёнка.
+- **Куда пишем — собери путь, прежде чем писать.** Проводник говорит «положи в
+  `_foundation/technical_specification.md` папки эпика». Эта строка — **относительна папке
+  эпика**, и подставлять её в инструмент записи как есть нельзя: инструмент разрешит её от
+  рабочей директории, и фундамент ляжет в корень рабочей копии, где дети его по пути не найдут.
+  Механика, ровно в этом порядке:
+  1. возьми путь эпик-БТ, который тебе передали (ты уже прочитал по нему файл);
+  2. отбрось имя файла — останется папка эпика;
+  3. допиши `/_foundation/technical_specification.md`;
+  4. **назови собранный путь в ответе** и пиши именно по нему.
+
+  Пример: эпик-БТ `docs/ARS-100/business_requirements.md` → пишем в
+  `docs/ARS-100/_foundation/technical_specification.md`.
+
+  `_foundation/` встаёт на одном уровне с детскими папками, НЕ внутрь какой-то из них: #0 не
+  принадлежит ни одному ребёнку. **Не перезатирай** спеку эпика/ребёнка.
 - **Порядок.** #0 спекается и выкатывается ПЕРВЫМ; §6.1 фиксирует «фундамент раньше потребителей».
 
 ### Режим B — дочерний узел наследует контракт #0
