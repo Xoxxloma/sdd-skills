@@ -1,24 +1,7 @@
 ---
 name: technical-spec-doc
 user-invocable: false
-description: >-
-  Turns a confirmed business-requirements doc (the output of business-requirements-doc,
-  a ТЗ / BRD / SRS) into ONE Markdown technical specification in Russian that two AI
-  coding agents — one frontend, one backend — can implement against with minimal
-  friction at integration and release. The spec is organized around INTERACTIONS
-  (the new/changed contracts crossing service or FE/BE boundaries), not siloed
-  BE/FE chapters. There is NO code access (analytical repo, code is spread across
-  services): NEW interactions are fully designed by the skill; anything about an
-  EXISTING service is either confirmed by the analyst (written as fact, marked
-  "подтверждено аналитиком, не по коду") or stays an assumption to validate — never
-  invented. Use whenever someone wants a technical spec / тех.спека / ТЗ на разработку /
-  dev design / implementation spec, wants to turn business requirements into something
-  developers or AI agents can build, or wants to describe a new or changed interaction
-  (contract, API, integration) between services or between frontend and backend.
-  Trigger even if they just hand over a business-requirements doc and say "теперь
-  сделай тех.спеку" or "распиши это для разработки". This skill REQUIRES a confirmed
-  business-requirements document as input — if none is provided (only a vague brief or
-  idea), it stops and asks for the БТ instead of proceeding.
+description: 'Turns a confirmed business-requirements doc (the output of business-requirements-doc, a ТЗ / BRD / SRS) into ONE Markdown technical specification in Russian that two AI coding agents — one frontend, one backend — can implement against with minimal friction at integration and release. The spec is organized around INTERACTIONS (the new/changed contracts crossing service or FE/BE boundaries), not siloed BE/FE chapters. There is NO code access (analytical repo, code is spread across services): NEW interactions are fully designed by the skill; anything about an EXISTING service is either confirmed by the analyst (written as fact, marked "подтверждено аналитиком, не по коду") or stays an assumption to validate — never invented. Use whenever someone wants a technical spec / тех.спека / ТЗ на разработку / dev design / implementation spec, wants to turn business requirements into something developers or AI agents can build, or wants to describe a new or changed interaction (contract, API, integration) between services or between frontend and backend. Trigger even if they just hand over a business-requirements doc and say "теперь сделай тех.спеку" or "распиши это для разработки". This skill REQUIRES a confirmed business-requirements document as input — if none is provided (only a vague brief or idea), it stops and asks for the БТ instead of proceeding.'
 ---
 
 # Technical Specification Interview (BRD → Tech Spec)
@@ -194,6 +177,12 @@ folder** (the БТ's folder is named by the task number); if the folder name isn
 the number, try the БТ filename/title/header (e.g. `ARS-123`, «Задача №…»). This candidate is
 only a pre-fill: the task number is **always** asked and confirmed by the analyst in Step 3,
 never assumed from the derivation alone. It goes into the spec header.
+
+Children live **inside** their parent's folder (`docs/<EPIC-KEY>/<CHILD-KEY>/`), so if the folder
+you were pointed at contains sub-folders with their own business-requirements docs, you were handed
+an **epic**, not a leaf node. Don't pick a child yourself and don't spec the epic — ask which node
+to write. The folder-name derivation still works unchanged for a leaf: the child's folder is named
+by the child's key, however deep it sits.
 
 If no business-requirements doc is present, the entry guard above already applies: stop
 and ask for it — do not fall back to the user's brief. This step assumes the guard has
@@ -466,8 +455,21 @@ that now lacks an interaction or test case.
   ````
 - **Тянущие поля.** Особенно затяни поля, которые гейтуют состояния детского фронта (null / 0 /
   код ошибки) — иначе ребёнок не разведёт `zero`/`empty`/`error_source` (§4.3).
-- **Куда пишем.** В отдельную папку фундамента, которую называет проводник (напр.
-  `_foundation/technical_specification.md` в папке эпика), **не перезатирая** спеку эпика/ребёнка.
+- **Куда пишем — собери путь, прежде чем писать.** Проводник говорит «положи в
+  `_foundation/technical_specification.md` папки эпика». Эта строка — **относительна папке
+  эпика**, и подставлять её в инструмент записи как есть нельзя: инструмент разрешит её от
+  рабочей директории, и фундамент ляжет в корень рабочей копии, где дети его по пути не найдут.
+  Механика, ровно в этом порядке:
+  1. возьми путь эпик-БТ, который тебе передали (ты уже прочитал по нему файл);
+  2. отбрось имя файла — останется папка эпика;
+  3. допиши `/_foundation/technical_specification.md`;
+  4. **назови собранный путь в ответе** и пиши именно по нему.
+
+  Пример: эпик-БТ `docs/ARS-100/business_requirements.md` → пишем в
+  `docs/ARS-100/_foundation/technical_specification.md`.
+
+  `_foundation/` встаёт на одном уровне с детскими папками, НЕ внутрь какой-то из них: #0 не
+  принадлежит ни одному ребёнку. **Не перезатирай** спеку эпика/ребёнка.
 - **Порядок.** #0 спекается и выкатывается ПЕРВЫМ; §6.1 фиксирует «фундамент раньше потребителей».
 
 ### Режим B — дочерний узел наследует контракт #0

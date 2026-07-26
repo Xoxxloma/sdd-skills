@@ -1,20 +1,7 @@
 ---
 name: task-decomposition-doc
 user-invocable: false
-description: >-
-  Splits ONE confirmed epic-level business-requirements doc (the output of
-  business-requirements-doc) into several separately-shippable child slices, each a
-  coherent GROUP of its FR-*, and writes a self-contained child БТ per slice into its
-  OWN Jira/SberTrack sub-task folder (docs/<CHILD-KEY>/business_requirements.md) so
-  technical-spec-doc can run on each child unchanged. It PARTITIONS already-confirmed
-  content and INVENTS NOTHING: every child FR and its acceptance criterion is copied
-  verbatim from the parent epic-БТ; it never creates, splits the meaning of, or adds a
-  requirement or scope the parent lacks. It reads only the epic-БТ, proposes a split,
-  and writes files only after the user confirms the slices, the real child task keys,
-  and the build order. Requires a confirmed epic-БТ present — given only a brief or
-  idea it STOPS and points to business-requirements-doc first. Use whenever someone
-  wants to break down / decompose / split / разбить an epic or large task into
-  sub-tasks, slices, child stories, or shippable increments before writing tech specs.
+description: 'Splits ONE confirmed epic-level business-requirements doc (the output of business-requirements-doc) into several separately-shippable child slices, each a coherent GROUP of its FR-*, and writes a self-contained child БТ per slice into its OWN Jira/SberTrack sub-task folder (docs/<EPIC-KEY>/<CHILD-KEY>/business_requirements.md) so technical-spec-doc can run on each child unchanged. It PARTITIONS already-confirmed content and INVENTS NOTHING: every child FR and its acceptance criterion is copied verbatim from the parent epic-БТ; it never creates, splits the meaning of, or adds a requirement or scope the parent lacks. It reads only the epic-БТ, proposes a split, and writes files only after the user confirms the slices, the real child task keys, and the build order. Requires a confirmed epic-БТ present — given only a brief or idea it STOPS and points to business-requirements-doc first. Use whenever someone wants to break down / decompose / split / разбить an epic or large task into sub-tasks, slices, child stories, or shippable increments before writing tech specs.'
 ---
 
 # Task Decomposition (epic-БТ → child БТs)
@@ -44,10 +31,11 @@ the "distribute, never invent" discipline right is the entire job.
 4. **Пиши файлы, ТОЛЬКО когда реестр слайсов чист:** каждый дочерний ключ = реальный
    `SMSEC-1234` (regex `^[A-Z][A-Z0-9]+-\d+$`, ≠ эпику, уникален), split подтверждён,
    покрытие сходится, порядок задан. Ни одного ❓.
-5. **Дочерний БТ самодостаточен.** Общий бизнес-контекст (§1.0–1.3, §2.1–2.3, §5.1–5.3)
-   КОПИРУЕТСЯ из эпика; слайс несёт свой поднабор FR + свои критерии + свой scope in/out;
-   в шапке frontmatter `parent: <EPIC-KEY>`. `technical-spec-doc` потом работает по каждой
-   папке БЕЗ изменений.
+5. **Дочерний БТ самодостаточен и живёт ВНУТРИ папки эпика** —
+   `docs/<EPIC-KEY>/<CHILD-KEY>/business_requirements.md`, подпапкой, а не сиблингом эпика.
+   Общий бизнес-контекст (§1.0–1.3, §2.1–2.3, §5.1–5.3) КОПИРУЕТСЯ из эпика; слайс несёт свой
+   поднабор FR + свои критерии + свой scope in/out; в шапке frontmatter `parent: <EPIC-KEY>`.
+   `technical-spec-doc` потом работает по каждой папке БЕЗ изменений.
 
 Остальная часть скилла разворачивает эти правила. Если правило ниже кажется противоречащим
 этому списку — прав список.
@@ -91,7 +79,7 @@ FR-* + критерии приёмки Дано–Когда–Тогда).
 
 Из ОДНОГО подтверждённого эпик-БТ произвести: (а) индекс декомпозиции
 `docs/<EPIC-KEY>/decomposition.md` и (б) по одному самодостаточному дочернему БТ на слайс
-в `docs/<CHILD-KEY>/business_requirements.md`, так чтобы `technical-spec-doc` мог быть
+в `docs/<EPIC-KEY>/<CHILD-KEY>/business_requirements.md`, так чтобы `technical-spec-doc` мог быть
 запущен по каждой дочерней папке без единой правки. Каждый слайс — связная группа FR
 (отдельно поставляемый deliverable, покрывающий FE+BE вместе), а не под-требование.
 
@@ -227,12 +215,21 @@ FR-* + критерии приёмки Дано–Когда–Тогда).
 ### Step 4 — Запись артефактов
 Когда реестр чист, напиши (см. «Output»):
 - индекс `docs/<EPIC-KEY>/decomposition.md`;
-- по одному `docs/<CHILD-KEY>/business_requirements.md` на слайс.
+- по одному `docs/<EPIC-KEY>/<CHILD-KEY>/business_requirements.md` на слайс.
 
-Создай папку `docs/<CHILD-KEY>/`, если её нет. **Якорь пути — папка эпика:** дети кладутся
-рядом с `docs/<EPIC-KEY>/`, тем же уровнем, а не относительно текущей директории. Эпик-БТ ты
-уже прочитал по конкретному пути — от него и отсчитывай. НЕ редактируй эпик-БТ и другие файлы
-репозитория. Покажи индекс в чате И сохрани файлы, затем дай пути.
+Создай папку `docs/<EPIC-KEY>/<CHILD-KEY>/`, если её нет. **Якорь пути — папка эпика: дети
+кладутся ВНУТРЬ неё, подпапками.** Не рядом с ней, не тем же уровнем и не относительно текущей
+директории. Эпик-БТ ты уже прочитал по конкретному пути — от него и отсчитывай: путь ребёнка =
+папка эпик-БТ + `/<CHILD-KEY>/`. Это дописывание сегмента к уже известному пути, а не «поднимись
+на уровень и спустись обратно».
+
+Почему именно внутрь: эпик и его дети — одно дерево, и всё состояние эпика (этот индекс,
+`_foundation/`, спеки детей) должно читаться из ОДНОЙ папки. Дети, разъехавшиеся по корню
+`docs/`, превращают вопрос «что по эпику осталось?» в поиск по всему репозиторию — а между
+стадиями контекст чистят, и единственная память процесса — диск.
+
+НЕ редактируй эпик-БТ и другие файлы репозитория. Покажи индекс в чате И сохрани файлы, затем
+дай пути.
 
 ### Step 5 — Self-Review (before handoff) — construction-time проверки
 Проверь и почини всё, что не проходит:
@@ -243,7 +240,7 @@ FR-* + критерии приёмки Дано–Когда–Тогда).
    Пересечение владельцев (без пометки `shared`) = пусто. Сквозные — ровно те, что отметил
    пользователь.
 3. **Ключи.** Каждый детский ключ реальный, матчит regex, ≠ эпику, уникален; путь
-   `docs/<CHILD-KEY>/business_requirements.md`; в шапке `parent: <EPIC-KEY>`.
+   `docs/<EPIC-KEY>/<CHILD-KEY>/business_requirements.md`; в шапке `parent: <EPIC-KEY>`.
 4. **Самодостаточность.** Каждый детский БТ несёт скопированный SHARED-контекст + ровно
    свой поднабор FR + совпадающие критерии + свой scope in/out. Валиден как вход
    `technical-spec-doc` (есть проблема/потребители/ценность/приоритет/роли/FR-*+критерии).
@@ -255,7 +252,7 @@ FR-* + критерии приёмки Дано–Когда–Тогда).
 
 ### Step 6 — Handoff
 Коротко: путь индекса, список детских папок с ключами, порядок сборки, и следующий шаг —
-«по каждой папке `docs/<CHILD-KEY>/` запусти `technical-spec-doc`». Если в эпик-БТ были
+«по каждой папке `docs/<EPIC-KEY>/<CHILD-KEY>/` запусти `technical-spec-doc`». Если в эпик-БТ были
 унаследованные TBD/⚠️ — назови, в какие слайсы они попали, и предложи закрыть их на стороне
 эпика через `business-requirements-doc`.
 
@@ -310,8 +307,8 @@ children:
 ## Дочерние слайсы
 | # | Ключ | Название слайса | Владеет FR-* | Сквозные (унасл.) | Зависит от | Папка |
 |---|------|-----------------|--------------|-------------------|------------|-------|
-| 1 | <CHILD-KEY-1> | [A] | FR-1, FR-2 | — | — | docs/<CHILD-KEY-1>/ |
-| 2 | <CHILD-KEY-2> | [B] | FR-3 | FR-4 | <CHILD-KEY-1> | docs/<CHILD-KEY-2>/ |
+| 1 | <CHILD-KEY-1> | [A] | FR-1, FR-2 | — | — | docs/<EPIC-KEY>/<CHILD-KEY-1>/ |
+| 2 | <CHILD-KEY-2> | [B] | FR-3 | FR-4 | <CHILD-KEY-1> | docs/<EPIC-KEY>/<CHILD-KEY-2>/ |
 
 ## Трассировка: эпик-FR → ребёнок (каждый FR — ровно один владелец; сквозные помечены)
 | Эпик FR | Формулировка (кратко) | Владелец-слайс | Также в (shared) |
@@ -327,11 +324,11 @@ children:
 2. <CHILD-KEY-2> ([B]) — после <CHILD-KEY-1> (зависимость).
 
 ## Следующий шаг
-По каждой папке `docs/<CHILD-KEY>/` запусти `technical-spec-doc` — он читает детский БТ,
+По каждой папке `docs/<EPIC-KEY>/<CHILD-KEY>/` запусти `technical-spec-doc` — он читает детский БТ,
 берёт номер задачи из имени папки и пишет `technical_specification.md` рядом.
 ````
 
-### 2) Дочерний БТ — `docs/<CHILD-KEY>/business_requirements.md`
+### 2) Дочерний БТ — `docs/<EPIC-KEY>/<CHILD-KEY>/business_requirements.md`
 
 Держи ТОЧНО тот же скелет секций, что и `business_requirements.md` (иначе `technical-spec-doc`
 не пройдёт precondition). Правила по секциям:
@@ -400,6 +397,7 @@ shared_fr: []              # сквозные FR, включённые по ре
 
 **Только после подтверждения** (split, ключи `ARS-58`/`ARS-59`, порядок) Agent выводит
 реестр, убеждается что покрытие сходится (FR-1..5 присвоены, ❓ нет), и пишет
-`docs/ARS-57/decomposition.md` + `docs/ARS-58/business_requirements.md` (FR-1,2,3) +
-`docs/ARS-59/business_requirements.md` (FR-4,5) — каждый с общим контекстом из эпика
-дословно и `parent: ARS-57`. Затем говорит: по каждой папке запусти `technical-spec-doc`.
+`docs/ARS-57/decomposition.md` + `docs/ARS-57/ARS-58/business_requirements.md` (FR-1,2,3) +
+`docs/ARS-57/ARS-59/business_requirements.md` (FR-4,5) — дети ВНУТРИ папки эпика, каждый с
+общим контекстом из эпика дословно и `parent: ARS-57`. Затем говорит: по каждой папке запусти
+`technical-spec-doc`.

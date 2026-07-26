@@ -1,5 +1,5 @@
-Эпик ARS-80 разбит на три ребёнка:
-- A = счётчик активных пользователей (FR-1, FR-2) — _skill-eval/fixtures/ARS-81/business_requirements.md
-- B = модалка с графиком активности (FR-3, FR-4) — _skill-eval/fixtures/ARS-82/business_requirements.md
-- C = выгрузка сводки активности (FR-5) — _skill-eval/fixtures/ARS-83/business_requirements.md
+Эпик ARS-100 разбит на три ребёнка (папка эпика — _skill-eval/fixtures/ARS-100/):
+- A = счётчик активных пользователей (FR-1, FR-2) — _skill-eval/fixtures/ARS-100/ARS-101/business_requirements.md
+- B = модалка с графиком активности (FR-3, FR-4) — _skill-eval/fixtures/ARS-100/ARS-102/business_requirements.md
+- C = выгрузка сводки активности (FR-5) — _skill-eval/fixtures/ARS-100/ARS-103/business_requirements.md
 Прочитай их. Что дальше по фундаменту?
