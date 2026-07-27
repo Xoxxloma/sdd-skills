@@ -101,7 +101,8 @@ When in doubt about a rationale/purpose/classification, it is human-given → «
 in doubt about a plain fact, keep it in «Факты»: parking a code-fact in «Почему» silently
 locks `sync` out of a fact it must be able to fix. **Never mix a code-fact and its
 rationale in one line** — the bare fact goes in «Факты», its "why" as its own line in
-«Почему». See [`references/examples.md`](references/examples.md) for ❌/✅ contrasts; the
+«Почему». A statement that holds only because of an uncommitted local edit is not a
+«Факты» line at all, however code-readable it looks — see Scan baseline below. See [`references/examples.md`](references/examples.md) for ❌/✅ contrasts; the
 full form is in the Document shape section below.
 
 An empty «Почему» block is a correct outcome — write «—». Every «Почему» line must trace
@@ -211,6 +212,32 @@ not write it itself.
 3r. Read the existing `PROJECT.md` in full. Note the «Почему» / human-zone content and
     reuse decisions already recorded (e.g. certain credentials confirmed intentional — do
     not re-ask).
+3r-b. **If the document is in a legacy shape, migrate it in this Refine.** A document written
+    before the block model carries artefacts of the old one. Convert them; treat content as
+    content — never drop a statement while converting.
+    - **Header** — an intro that explains ownership by `<!--i-->` markers, or names a skill
+      that no longer exists (`create-baseline`), contradicts the block model the body now
+      uses. Replace it with the blockquote from the Document shape.
+    - **`<!--i-->` markers** — the current model has no per-line ownership. Keep what each
+      marked statement says, place it in «Почему» / its human zone, and delete the marker
+      syntax. A marker left in place points at a mechanism no skill implements any more.
+    - **`## Metadata` field names** — bring them to the shape (a legacy `Analyzed at commit:`
+      becomes `Last code re-scan:`). Only the label moves; the value keeps its meaning.
+    - **§9 — do NOT rename `Canonical patterns` into `Always`.** The legacy list is
+      descriptive; today's `Always`/`Never` is normative — a runner obeys it. So this is a
+      re-sort, not a rename. Take the legacy list apart line by line and route each line by
+      **where it came from**:
+      - stated in CONTRIBUTING / a config / a rule-comment in the repo, or confirmed by the
+        user → stays in §9 as `Always` / `Never`;
+      - an implementation recipe (a call shape, a library invocation, a format detail) →
+        «Факты» of the section that owns it (§5 components, §6 state, §7 backend), where
+        `sync` can keep it current;
+      - a pattern you merely observe in the code (a wrapper everyone uses, a naming habit, a
+        boundary between folders) → «Факты» of §3/§5/§6 — never a §9 rule.
+      A legacy list of four lines typically leaves one line in §9 and moves three. Both §9
+      lists ending up «—» is a correct outcome, not a gap to fill.
+    Migration is a shape change, so it needs no gate. Anything whose *meaning* you would
+    alter is a conflict → 8r.
 4r. Run the brownfield analysis (subagent fanout, scaled, briefed as in step 4) to gather a
     current picture, targeting incomplete sections, `TBD`/`TODO`, and likely inaccuracies.
     **Run the Detection half of the registration step here** — a regenerated init file is
@@ -279,6 +306,30 @@ for both baseline skills. Report exactly one Append outcome in the handoff (`add
 <file>` / `already present` / `no init file found` / `not registered (init file not
 confirmed)`). Leave any `business-baseline` block untouched.
 
+### Scan baseline — committed state vs working tree (shared, every mode)
+
+`PROJECT.md` is read by every agent on every machine, so «Факты» describe the **committed**
+state. Reading files off disk gives you the working tree, which is not necessarily that.
+
+- In the analysis phase, alongside the commit sha, read `git status --porcelain`. It is a
+  read, like the sha — allowed in every mode.
+- **Clean tree** → nothing further to do.
+- **Dirty tree** → the files you just read are not the commit you are about to stamp:
+  - Say so in `## Metadata`: `Last code re-scan: <date> @ <sha> (+N файлов с локальными
+    правками)`.
+  - A statement that holds **only** because of an uncommitted edit does not go into «Факты».
+    The committed value stays the fact; the local deviation goes to «Почему» or §10, marked
+    as not in the commit.
+  - To recover the committed value of a modified file, `git show HEAD:<path>` is a read and
+    is allowed.
+- Never stage, stash, commit, or revert anything to "clean" the tree — that is a git write.
+
+Why this is not bookkeeping: a local edit written as a fact makes the document wrong for
+everyone who has not made that edit, and it silently deletes the §10 gap the committed code
+still has (a locally re-enabled build flag reads as "shipped", so "pending re-enable"
+disappears from Known Gaps). The next Refine on a clean tree then sees a document-wide
+conflict that was never real.
+
 ### Secrets handling (shared)
 - Do not copy secret values into the document. Record the fact neutrally, by location only
   — the variable name and the file, never the value: "`DEV_TOKEN` present in
@@ -313,7 +364,8 @@ a document without them cannot be defended from `sync`.
 ## Metadata
 - Created: <YYYY-MM-DD — сегодняшняя реальная локальная дата из окружения, не заглушка>
 - Repository: <path / url>
-- Last code re-scan: <YYYY-MM-DD @ commit sha — ставит этот скилл на Create и каждый Refine; "n/a" на greenfield>
+- Last code re-scan: <YYYY-MM-DD @ commit sha — ставит этот скилл на Create и каждый Refine;
+  "n/a" на greenfield. Дерево грязное → допиши «(+N файлов с локальными правками)»>
 - Last synced: <YYYY-MM-DD — ставит sync-project-doc, когда последний раз вкатил инкремент; "n/a" до первого sync>
 - Generated by: project-baseline (+ <N> subagents | greenfield)
 
@@ -329,7 +381,8 @@ a document without them cannot be defended from `sync`.
 - State approach:
 - Testing / lint: <инструменты по имени>
 - Notable libraries: <только те немногие, что ФОРМИРУЮТ архитектуру, каждая — для чего.
-  Без полного списка зависимостей, без версий.>
+  Без полного списка зависимостей, без версий. Версия — это не «для чего»:
+  `react-router-dom` — да, `react-router-dom` 7 — нет.>
 - Scripts & Env: <реальные dev/build/test команды; обязательные env-переменные>
 
 **Почему / решения (sync не трогает):**
@@ -459,7 +512,9 @@ TODO/FIXME в коде) или подтверждённое пользовате
   from observation — that is an invented law, worse than an empty list. An observed module
   boundary (e.g. "features don't import each other") is a §3 «Факты» fact, never a §9
   Never — do not restate a boundary or pattern you merely saw as a rule. Skip anything
-  lint/TS/CI already enforces. Cap each list at 5–8 lines. §9 is a whole human zone.
+  lint/TS/CI already enforces. Cap each list at 5–8 lines. §9 is a whole human zone. A
+  legacy `Canonical patterns` list inherited from an older document is descriptive, not
+  normative: it does not become `Always`/`Never` (see 3r-b).
 - An §9 rule that turned out wrong — the user says it no longer holds, or the code moved
   past it — is a conflict for Refine (8r), never something to quietly drop or rewrite.
 - This skill writes at most two files: `docs/dev/PROJECT.md` (always), and a one-block
@@ -486,7 +541,15 @@ TODO/FIXME в коде) или подтверждённое пользовате
 - In Refine, never rewrite from scratch and never silently overwrite. Every conflict is
   confirmed with the user first; «Почему» / human-zone content changes only by re-asking.
 - Reuse decisions already recorded; do not re-ask settled questions on a re-run.
-- Do not run git write operations; reading the current commit sha for Metadata is fine.
+- Do not run git write operations; reading the current commit sha for Metadata is fine, and
+  so are `git status --porcelain` and `git show HEAD:<path>`.
+- «Факты» describe the committed state. Check the working tree during analysis; if it is
+  dirty, record the count in `## Metadata` and keep working-tree-only statements out of
+  «Факты» (see Scan baseline). Never stage, stash, commit, or revert to clean the tree.
+- In Refine, migrate a legacy-shaped document as you go (header, `<!--i-->` markers, Metadata
+  field names, §9 descriptive lists — see 3r-b). Shape migrates freely; meaning goes through
+  the gate.
+- Every file this skill writes ends with a trailing newline.
 - Do not write production code under any mode.
 
 ## Self-Review
@@ -530,6 +593,14 @@ Before reporting done, confirm:
 12. A pointer to `PROJECT.md` was added to the init/context file as real markdown (not
     blockquoted or fenced), or was already present and left alone, or was not registered —
     and the user was told. Any existing `Business Context` block was left untouched.
+13. Scan baseline: the working tree was checked. If it was dirty, `## Metadata` says so and
+    no «Факты» line rests on an uncommitted edit — each such deviation sits in «Почему»/§10
+    marked as not in the commit. Nothing was staged, stashed, committed, or reverted.
+14. In Refine on a legacy-shaped document: header replaced with the current blockquote, no
+    `<!--i-->` marker left in the file, `## Metadata` field names match the shape, and a
+    legacy descriptive `Canonical patterns` list was redistributed (§5/§6 «Факты», §3 for a
+    boundary) rather than promoted into `Always`/`Never`. No statement was lost in the
+    conversion.
 
 ## Handoff
 

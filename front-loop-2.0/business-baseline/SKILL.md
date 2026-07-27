@@ -169,6 +169,14 @@ The document has parts of different natures, and the skill must respect them:
 - Leave `Last synced` in `## Metadata` as `sync-project-doc` last set it. But if the
   document predates this convention and has no `Last synced` line, add `Last synced: n/a`
   so the doc matches its shape; do not backfill a real date, only `n/a`.
+- **Migrate a legacy shape as you go.** An older document carries artefacts of a format this
+  skill no longer uses; converting them is a shape change, not a content change, so it needs
+  no gate — but never drop what a converted line says.
+  - `## Metadata` field names take the shape's names: a legacy `Analyzed at commit:` becomes
+    `Last code re-scan:`. Only the label moves; the value keeps its meaning. Do not leave a
+    half-migrated field (the shape's value format under a legacy label).
+  - `<!--i-->` markers: this format has no per-line ownership, so the marker means nothing
+    here. Keep the sentence, delete the marker syntax.
 
 ## Document shape
 
@@ -183,7 +191,8 @@ The document has parts of different natures, and the skill must respect them:
 ## Metadata
 - Created: <YYYY-MM-DD — use today's real local date, not a placeholder>
 - Audience: analyst / product / non-developer
-- Last code re-scan: <YYYY-MM-DD @ commit sha — set by this skill on Create and each Refine; "n/a" if not a git repo>
+- Last code re-scan: <YYYY-MM-DD @ commit sha — set by this skill on Create and each Refine;
+  "n/a" if not a git repo. Working tree dirty → append "(+N файлов с локальными правками)">
 - Last synced: <YYYY-MM-DD — set by sync-project-doc when it last updated Capabilities; "n/a" until first sync>
 
 ## Product
@@ -247,8 +256,14 @@ from a real one.>
   Never describe implementation here.
 - Keep the business register throughout: plain user/analyst language, no technical
   terms. Technical phrasing belongs in `PROJECT.md`, not here.
-- Do not run build/test commands or perform git write operations. Reading files and
-  the commit sha is fine.
+- Do not run build/test commands or perform git write operations. Reading files, the commit
+  sha and `git status --porcelain` is fine. Capabilities are inventoried from the working
+  tree, so if it is dirty, record the count in `## Metadata` — a capability that exists only
+  in an uncommitted edit is not shipped and does not belong in the table. Never stage, stash,
+  commit, or revert to clean the tree.
+- In Refine, migrate a legacy-shaped document as you go (Metadata field names, `<!--i-->`
+  markers — see Refine specifics).
+- Every file this skill writes ends with a trailing newline.
 - Stay project-agnostic in your own logic; project-specific facts live in the
   document, not in this skill.
 - In Refine, never rewrite from scratch and never silently overwrite; confirm every
@@ -282,6 +297,11 @@ Before reporting done, confirm:
 8. In Refine: prior core reused; every conflict, including removals, was
    user-confirmed; nothing silently overwritten; Detection ran in Step 1, so a pointer
    lost to a regenerated init file was restored.
+9. Legacy shape migrated: `## Metadata` field names match the shape (no shape-format value
+   left under a legacy label), and no `<!--i-->` marker remains in the file — with every
+   marked sentence kept.
+10. The working tree was checked; if dirty, `## Metadata` says so and no capability rests on
+   an uncommitted edit.
 
 ## Handoff
 
