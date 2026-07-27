@@ -1,7 +1,7 @@
 ---
 name: technical-spec-doc
 user-invocable: false
-description: 'Turns a confirmed business-requirements doc (the output of business-requirements-doc, a ТЗ / BRD / SRS) into ONE Markdown technical specification in Russian that two AI coding agents — one frontend, one backend — can implement against with minimal friction at integration and release. The spec is organized around INTERACTIONS (the new/changed contracts crossing service or FE/BE boundaries), not siloed BE/FE chapters. There is NO code access (analytical repo, code is spread across services): NEW interactions are fully designed by the skill; anything about an EXISTING service is either confirmed by the analyst (written as fact, marked "подтверждено аналитиком, не по коду") or stays an assumption to validate — never invented. Use whenever someone wants a technical spec / тех.спека / ТЗ на разработку / dev design / implementation spec, wants to turn business requirements into something developers or AI agents can build, or wants to describe a new or changed interaction (contract, API, integration) between services or between frontend and backend. Trigger even if they just hand over a business-requirements doc and say "теперь сделай тех.спеку" or "распиши это для разработки". This skill REQUIRES a confirmed business-requirements document as input — if none is provided (only a vague brief or idea), it stops and asks for the БТ instead of proceeding.'
+description: 'Turns a confirmed business-requirements doc (the output of business-requirements-doc, a ТЗ / BRD / SRS) into ONE Markdown technical specification in Russian that two AI coding agents — one frontend, one backend — can implement against with minimal friction at integration and release. The spec is organized around INTERACTIONS (the new/changed contracts crossing service or FE/BE boundaries), not siloed BE/FE chapters. There is NO code access (analytical repo, code is spread across services), but the repo MAY carry a context digest of those services (BUSINESS.md, services/*.md, feature-map.md and the like) — if it exists the skill reads it to build better questions for the analyst; if it does not, the skill works from the БТ alone, as before. Either way the digest never speaks for the analyst: NEW interactions are fully designed by the skill; anything about an EXISTING service is either confirmed by the analyst (written as fact, marked "подтверждено аналитиком, не по коду") or stays an assumption to validate — never invented. Use whenever someone wants a technical spec / тех.спека / ТЗ на разработку / dev design / implementation spec, wants to turn business requirements into something developers or AI agents can build, or wants to describe a new or changed interaction (contract, API, integration) between services or between frontend and backend. Trigger even if they just hand over a business-requirements doc and say "теперь сделай тех.спеку" or "распиши это для разработки". This skill REQUIRES a confirmed business-requirements document as input — if none is provided (only a vague brief or idea), it stops and asks for the БТ instead of proceeding.'
 ---
 
 # Technical Specification Interview (BRD → Tech Spec)
@@ -20,7 +20,9 @@ description: 'Turns a confirmed business-requirements doc (the output of busines
 4. **Кардинальный грех — выдать непроверенное о существующем сервисе за факт.** Новое (🟢)
    проектируй конкретно (путь, схема, JSON-пример). Про существующее — только
    🟡 подтверждено аналитиком (факт) или 🟡 к валидации. Никогда не выдумывай эндпоинт/поле
-   чужого сервиса и не пиши его как установленный факт.
+   чужого сервиса и не пиши его как установленный факт. **Есть выжимка сервисов (Step 0.5) —
+   она делает твой ВОПРОС точнее, но в файл ничего не кладёт: подтверждает по-прежнему
+   аналитик. Нет выжимки — штатный режим, работай от БТ.**
 5. **Помечай провенанс везде** (🟢/🟡/❓; ⚠️ для расплывчатого) и **ставь статус
    механически:** есть хоть один 🟡 к валидации / TBD / ⚠️ → «Требуются уточнения», без
    суждения «блокирует ли». **Заполни КАЖДУЮ секцию шаблона** (нерелевантная → «не применимо:
@@ -35,9 +37,19 @@ gathers business *why/what* and is **banned from authoring design**. This skill 
 the confirmed business doc and produces exactly the design that skill refused to
 write: contracts, data shapes, conceptual migrations, UI states, rollout order.
 
-But there is no repository to read (the code lives in many separate services this
-skill cannot see). So the source of truth splits by provenance, and getting that split
-right is the whole job (see "The provenance contract").
+But there is no **code** to read (it lives in many separate services this skill cannot see).
+There may still be a **выжимка** — a curated context digest of those services living in this
+repo (`BUSINESS.md`, `services/*.md`, `feature-map.md`, system-overview, API descriptions).
+Есть она или нет — проверяется на Step 0.5, и оба исхода штатные.
+
+**Выжимка informs ВОПРОС, но никогда не СПЕКУ** — ровно то же правило, по которому окружение
+работает в `business-requirements-doc`. Прочитанное в ней не становится контентом спеки: оно
+становится **конкретным предложением, которое ты несёшь аналитику на подтверждение**, и в файл
+попадает только после его «да» — обычным 🟡 подтверждено аналитиком. Выигрыш здесь в том, что
+аналитику остаётся кивнуть вместо того, чтобы диктовать; словарь провенанса от этого не растёт.
+
+So the source of truth splits by provenance, and getting that split right is the whole job
+(see "The provenance contract").
 
 ## Precondition (entry guard): no business-requirements doc → no spec.
 
@@ -160,7 +172,10 @@ confirmation = the worst failure. Design freely in 🟢; never invent in 🟡.
   is assumed to be that analyst — «пользователь» and «аналитик» here are the same person).
   You do not re-litigate the business; you do gate every technical decision and every
   existing-system assumption.
-- **Analyst answers override your proposals, always.**
+- **Analyst answers override your proposals, always — и выжимку тоже.** Документ описывает
+  систему на момент своего написания; аналитик знает её сейчас. Разошлись — прав аналитик,
+  а расхождение назови вслух («в `services/auth.md` написано X, вы говорите Y — пишу Y»),
+  чтобы он мог поправить сам документ.
 - **Output is ONE new `.md` spec.** You write no code, no repo edits, no extra files.
 
 ## Process — do these in order
@@ -188,12 +203,39 @@ If no business-requirements doc is present, the entry guard above already applie
 and ask for it — do not fall back to the user's brief. This step assumes the guard has
 passed and a real БТ is in hand.
 
+### Step 0.5 — Контекст окружения: есть — используй в вопросах, нет — иди дальше
+
+**Кода в этом репозитории нет, но выжимка сервисов может быть.** Потрать один короткий заход
+на проверку — **оба исхода штатные**, ни один не блокирует ход и не меняет правил записи.
+
+Ищи **по именам файлов** (Glob): `BUSINESS.md`, `PROJECT.md`, `services/*.md`, `feature-map.md`,
+`system-overview*`, `docs/**/*service*.md`, `CLAUDE.md`/`GIGACODE.md`. Нашёл кандидатов — читай
+**только те, что относятся к сервисам из твоей задачи**; выжимку на сорок сервисов целиком не
+вычитывай. Есть поиск по содержимому (Grep) — ищи по именам сервисов и сущностей из БТ.
+
+**Time-box: один заход.** Это подготовка к интервью, а не исследование; ты ничего не пишешь.
+
+- **Контекст есть** → выпиши, что из него следует по каждому затронутому существующему сервису
+  (контракты, сущности, поля, роли, ограничения). Это **заготовки вопросов** для Step 3: ты
+  понесёшь их аналитику пересказом на подтверждение. **Холодный вопрос о том, что написано в
+  выжимке, — дефект:** ты заставляешь аналитика надиктовать лежащее на диске.
+- **Контекста нет** → **это норма, а не проблема.** Скажи одной строкой («выжимки по затронутым
+  сервисам не нашёл — иду от БТ и ваших ответов») и работай дальше без изменений. Ничего не
+  додумывай в компенсацию.
+
+**Что выжимка НЕ делает.** Она не закрывает ни одного гейта, не попадает в файл и не даёт
+права написать конкретный путь/JSON существующего сервиса — запрет из «The provenance contract»
+действует полностью и на прочитанное тоже. Её единственная работа — превратить твой открытый
+вопрос в конкретный пересказ на подтверждение. Подтвердил аналитик → пишешь обычным
+🟡 подтверждено аналитиком; не подтвердил → 🟡 к валидации, как если бы выжимки не было.
+
 ### Step 1 — Draft the design (to form proposals, not to write)
-From the business doc, draft proposals for each tech-gate: the interaction inventory,
-the contract shape of each new interaction, the conceptual data changes, states, rollout.
-Everything here is a **proposal** until confirmed. New pieces are provisional 🟢 designs;
-every touch of an existing service is a provisional 🟡 assumption you must put to the
-analyst. You write nothing yet.
+From the business doc **and the Step 0.5 context (if any)**, draft proposals for each
+tech-gate: the interaction inventory, the contract shape of each new interaction, the
+conceptual data changes, states, rollout. Everything here is a **proposal** until confirmed.
+New pieces are provisional 🟢 designs; every touch of an existing service is a provisional
+🟡 assumption you must put to the analyst — выжимка делает такое предложение точнее, но не
+отменяет гейт. You write nothing yet.
 
 ### Step 2 — Tag every tech-gate
 For each of the 10 tech-gates set a state. A gate may carry **more than one** tag when it
@@ -251,6 +293,13 @@ and ask to confirm / correct / decide:
 - **assumption (🟡)** → «Предполагаю, что существующий сервис … — подтвердите как
   аналитик (тогда пишу фактом с пометкой «подтверждено аналитиком»), поправьте, или
   оставляем к валидации.»
+  **Допущение опирается на выжимку (Step 0.5) → неси его пересказом, а не догадкой:**
+  «В `services/auth.md` описано, что сервис аутентификации отдаёт счёт активных сессий и
+  время обновления. Беру так — верно?» → [Да, так и есть] [Иначе — поправлю] [Не знаю,
+  оставим к валидации]. Спросить об этом вхолодную («а что умеет сервис аутентификации?»)
+  — дефект: ответ лежит на диске. Исход не меняется: «да» → 🟡 подтверждено аналитиком;
+  «не знаю» → 🟡 к валидации. **Путь к документу — твоя опора для вопроса, а не контент
+  спеки: в файл он не идёт.**
 - **fork (❓)** → present the options and ask them to choose (с твоей рекомендацией первой).
 - **unknown** → сначала преврати в предложение: спроектируй вариант и задай его на
   подтверждение. Открытым вопросом спрашивай только то, что вывести неоткуда (номер задачи,
