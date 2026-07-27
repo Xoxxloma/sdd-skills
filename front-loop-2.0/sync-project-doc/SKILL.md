@@ -235,6 +235,7 @@ first plan.
 - Do not write production code, and do not edit any existing file in the plan pack
   (`plan.md`, `plan-status.md`, `plan-test-plan.md`). Creating `.synced` is the only new
   file.
+- A document this skill edits keeps its trailing newline; do not strip the final one.
 - If completion is ambiguous (status missing, gate not passed, open blocker), stop and
   ask. Do not sync on assumption.
 - **`.synced` is the sole duplicate-sync guard.** A plan is already synced iff a
