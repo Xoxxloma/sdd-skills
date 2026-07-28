@@ -1,4 +1,3 @@
-root: ..
 services:
   - name: auth
     path: ../auth-service

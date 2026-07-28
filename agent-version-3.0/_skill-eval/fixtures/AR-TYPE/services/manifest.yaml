@@ -1,4 +1,3 @@
-root: ..
 services:
   - name: billing
     path: ../billing
