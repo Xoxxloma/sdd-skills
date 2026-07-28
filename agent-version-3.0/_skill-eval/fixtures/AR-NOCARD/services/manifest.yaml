@@ -1,0 +1,8 @@
+root: ..
+services:
+  - name: auth
+    path: ../auth-service
+    type: backend
+  - name: notify
+    path: ../notify-worker
+    type: backend
