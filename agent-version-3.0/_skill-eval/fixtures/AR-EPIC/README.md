@@ -7,24 +7,28 @@
 
 ```
 docs/ARS-100/
-  business_requirements.md
   decomposition.md
   _foundation/
     technical_specification.md          <- влить
   ARS-101/
-    business_requirements.md
     technical_specification.md
     .archived                           <- УЖЕ влито неделю назад, пропустить
   ARS-102/
-    business_requirements.md
     technical_specification.md          <- влить
   ARS-103/
     business_requirements.md            <- спеки ещё нет, взять нечего
 services/
   manifest.yaml
   auth.md
+  geo.md
   incident-web.md
 ```
+
+> **Детских БТ и эпик-БТ здесь намеренно нет** (раньше README рисовал их — дерево не совпадало с
+> диском). Вход `archive-spec` — `technical_specification.md`, бизнес-требования он не читает
+> вообще. Класть их сюда значило бы нарушить правило №2 корневого харнесса: не добавляй в фикстуру
+> ничего, чего проба не читает. `ARS-103/business_requirements.md` — исключение и несёт нагрузку:
+> именно он делает узел «существующим, но без спеки», ради чего и живёт пункт 4 ниже.
 
 ## Ожидаемое поведение
 

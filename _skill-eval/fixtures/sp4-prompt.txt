@@ -1,5 +1,0 @@
-[SP-4 — turn-1 промпт для technical-spec-doc (версия 3.0). Загрузи скилл в контекст. БТ-вход: _skill-eval/fixtures/ARS-120/business_requirements.md]
-
-Вот бизнес-требования (файл ARS-120/business_requirements.md, прочитай его). Теперь сделай тех.спеку под разработку.
-
-Дальше действуй строго по скиллу.
