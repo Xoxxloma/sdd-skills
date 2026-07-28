@@ -1,0 +1,5 @@
+[DC-14 — turn-1 промпт для task-decomposition-doc. Загрузи скилл в контекст, затем дай это. Эпик-БТ несёт готовый §4.5.]
+
+Эпик-БТ: _skill-eval/fixtures/ARS-70/business_requirements.md — прочитай его.
+
+Разбей на подзадачи.
