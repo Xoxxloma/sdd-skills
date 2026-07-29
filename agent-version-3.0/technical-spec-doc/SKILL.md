@@ -1,7 +1,7 @@
 ---
 name: technical-spec-doc
 user-invocable: false
-description: 'Turns a confirmed business-requirements doc (the output of business-requirements-doc, a ТЗ / BRD / SRS) into ONE Markdown technical specification in Russian that two AI coding agents — one frontend, one backend — can implement against with minimal friction at integration and release. The spec is organized around INTERACTIONS (the new/changed contracts crossing service or FE/BE boundaries), not siloed BE/FE chapters. There is NO code access (analytical repo, code is spread across services), but the repo MAY carry a context digest of those services (BUSINESS.md, services/*.md, feature-map.md and the like) — if it exists the skill reads it to build better questions for the analyst; if it does not, the skill works from the БТ alone, as before. Either way the digest never speaks for the analyst: NEW interactions are fully designed by the skill; anything about an EXISTING service is either confirmed by the analyst (written as fact, marked "подтверждено аналитиком, не по коду") or stays an assumption to validate — never invented. Use whenever someone wants a technical spec / тех.спека / ТЗ на разработку / dev design / implementation spec, wants to turn business requirements into something developers or AI agents can build, or wants to describe a new or changed interaction (contract, API, integration) between services or between frontend and backend. Trigger even if they just hand over a business-requirements doc and say "теперь сделай тех.спеку" or "распиши это для разработки". This skill REQUIRES a confirmed business-requirements document as input — if none is provided (only a vague brief or idea), it stops and asks for the БТ instead of proceeding.'
+description: 'Turns a confirmed business-requirements doc (the output of business-requirements-doc, a ТЗ / BRD / SRS) into ONE Markdown technical specification in Russian that two AI coding agents — one frontend, one backend — can implement against with minimal friction at integration and release. The spec is organized around INTERACTIONS (the new/changed contracts crossing service or FE/BE boundaries), not siloed BE/FE chapters. There is NO code access (analytical repo, code is spread across services), but the repo MAY carry a context digest of those services (services/*.md — one card per service) — if it exists the skill reads it to build better questions for the analyst; if it does not, the skill works from the БТ alone, as before. Either way the digest never speaks for the analyst: NEW interactions are fully designed by the skill; anything about an EXISTING service is either confirmed by the analyst (written as fact, marked "подтверждено аналитиком, не по коду") or stays an assumption to validate — never invented. Use whenever someone wants a technical spec / тех.спека / ТЗ на разработку / dev design / implementation spec, wants to turn business requirements into something developers or AI agents can build, or wants to describe a new or changed interaction (contract, API, integration) between services or between frontend and backend. Trigger even if they just hand over a business-requirements doc and say "теперь сделай тех.спеку" or "распиши это для разработки". This skill REQUIRES a confirmed business-requirements document as input — if none is provided (only a vague brief or idea), it stops and asks for the БТ instead of proceeding.'
 ---
 
 # Technical Specification Interview (BRD → Tech Spec)
@@ -39,7 +39,7 @@ write: contracts, data shapes, conceptual migrations, UI states, rollout order.
 
 But there is no **code** to read (it lives in many separate services this skill cannot see).
 There may still be a **выжимка** — a curated context digest of those services living in this
-repo (`BUSINESS.md`, `services/*.md`, `feature-map.md`, system-overview, API descriptions).
+repo (`services/manifest.yaml` плюс карточка на сервис в `services/*.md`).
 Есть она или нет — проверяется на Step 0.5, и оба исхода штатные.
 
 **Выжимка informs ВОПРОС, но никогда не СПЕКУ** — ровно то же правило, по которому окружение
@@ -208,10 +208,16 @@ passed and a real БТ is in hand.
 **Кода в этом репозитории нет, но выжимка сервисов может быть.** Потрать один короткий заход
 на проверку — **оба исхода штатные**, ни один не блокирует ход и не меняет правил записи.
 
-Ищи **по именам файлов** (Glob): `BUSINESS.md`, `PROJECT.md`, `services/*.md`, `feature-map.md`,
-`system-overview*`, `docs/**/*service*.md`, `CLAUDE.md`/`GIGACODE.md`. Нашёл кандидатов — читай
-**только те, что относятся к сервисам из твоей задачи**; выжимку на сорок сервисов целиком не
-вычитывай. Есть поиск по содержимому (Grep) — ищи по именам сервисов и сущностей из БТ.
+**Как искать.** Слепок лежит в `services/`: манифест и по карточке на сервис. Целиком его не
+читают — на двадцати сервисах это две тысячи строк ради двух-трёх нужных. Открой описания одним
+`Grep "^description:" services/*.md` и прочитай те карточки, что подходят под задачу. Мало —
+дочитай ещё, в первую очередь тех, кого открытые карточки называют в «Зависит от» и «Потребляемых
+API»: список соседей лежит в них самих, гадать второй раз не надо.
+
+Проектируется новый сервис — описания тем более единственный вход: его имени в системе ещё нет,
+искать по содержимому не по чему, а швы к соседям без их контрактов не спроектировать.
+
+Кроме `services/` может лежать `CLAUDE.md`/`GIGACODE.md` — читай как есть, он небольшой.
 
 **Time-box: один заход.** Это подготовка к интервью, а не исследование; ты ничего не пишешь.
 

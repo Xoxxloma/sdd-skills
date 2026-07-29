@@ -70,8 +70,8 @@ value you fill and never a `TBD` you assign yourself. You may write `TBD` for a 
 open. No user reply on a gate ⇒ it stays an open question, not `TBD`.
 
 **Ambient context ≠ ответ пользователя — но слова пользователя ≠ ambient context.**
-Если репозиторий или проектный файл (CLAUDE.md, GIGACODE.md, BUSINESS.md,
-`services/*.md`, `feature-map.md`, любая автозагруженная база знаний) как будто
+Если репозиторий или проектный файл (CLAUDE.md, GIGACODE.md,
+`services/*.md`, любая автозагруженная база знаний) как будто
 отвечает на гейт — это всё ещё только **улика**: ставь её пользователю гипотезой
 (`proposed`) на подтверждение, никогда не заполняй гейт из окружения молча.
 
@@ -102,8 +102,8 @@ detail** (what the system must do, as requirements — not a design).
 - **The user is the source of truth; the repo is only evidence.** Reading code can
   produce *proposals*; it can never put content into the spec by itself.
 - **Project-context files and knowledge bases are evidence, not the user.** Any
-  ambient or auto-loaded doc — CLAUDE.md, GIGACODE.md, BUSINESS.md,
-  `services/*.md`, `feature-map.md`, system-overview, API descriptions — is treated
+  ambient or auto-loaded doc — CLAUDE.md, GIGACODE.md,
+  `services/*.md` — is treated
   exactly like the repo: it may seed a *proposal*, but no gate is ever considered
   answered on its basis. This holds even when the whole repository is a knowledge
   base full of service/API/functional detail: that detail is `proposed ·
@@ -132,11 +132,23 @@ explicit onto the 14 gates (see "The gates to cover").
 
 ### Step 1 — Analyze the environment (read-only, to form proposals)
 **Есть кодовая база / репозиторий / загруженная база знаний (CLAUDE.md, GIGACODE.md,
-BUSINESS.md, `services/*.md`, `feature-map.md`) — прочитай/используй их и по КАЖДОМУ гейту,
+`services/*.md`) — прочитай/используй их и по КАЖДОМУ гейту,
 на который они отвечают, сформируй гипотезу-предложение** (кто потребители, как идёт процесс,
 какие интеграции, роли). При доступном окружении это **НЕ опционально**: холодный вопрос о
 том, что видно в окружении, — **дефект** (лишняя нагрузка на пользователя). Держи легко и
 time-boxed; это сбор улик, ты ничего не пишешь.
+
+**Как читать `services/`.** Там по карточке на сервис, целиком их не вычитывают: на двадцати
+сервисах это две тысячи строк ради двух-трёх нужных. Открой описания одним
+`Grep "^description:" services/*.md` и прочитай те карточки, что подходят под задачу. Мало —
+дочитай ещё, в первую очередь тех, кого открытые карточки называют в «Зависит от» и
+«Потребляемых API».
+
+Из открытой карточки твои — **«Что умеет для пользователя»** и **«Экраны»**: они написаны в
+аналитическом регистре и отвечают на гейты про потребителей и сценарии. Контракты, сущности и
+роли — слой тех-спеки, гипотез по твоим гейтам они не дают.
+
+Ничего подходящего не нашлось — это норма, работай от брифа и ответов пользователя, как раньше.
 
 **Окружение informs ВОПРОС, но никогда не СПЕКУ.** Всё, выведенное из кода/контекста, —
 `proposed · unconfirmed`: не контент спеки, а **кандидат ответа**, который ты задаёшь в форме
