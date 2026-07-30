@@ -1,0 +1,36 @@
+services:
+  - name: svc-alpha
+    path: ../svc-alpha
+    type: backend
+
+  - name: svc-bravo
+    path: ../svc-bravo
+    type: backend
+
+  - name: svc-charlie
+    path: ../svc-charlie
+    type: backend
+
+  - name: svc-delta
+    path: ../svc-delta
+    type: backend
+
+  - name: svc-echo
+    path: ../svc-echo
+    type: backend
+
+  - name: svc-foxtrot
+    path: ../svc-foxtrot
+    type: backend
+
+  - name: svc-golf
+    path: ../svc-golf
+    type: frontend
+
+  - name: svc-hotel
+    path: ../svc-hotel
+    type: frontend
+
+  - name: svc-india
+    path: ../svc-india
+    type: lib

@@ -1,0 +1,5 @@
+{
+  "name": "svc-golf",
+  "scripts": { "dev": "vite", "build": "vite build" },
+  "dependencies": { "react": "^18.3.1", "react-router-dom": "^6.26.0" }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "svc-india",
+  "main": "dist/index.js",
+  "exports": { ".": "./dist/index.js" }
+}

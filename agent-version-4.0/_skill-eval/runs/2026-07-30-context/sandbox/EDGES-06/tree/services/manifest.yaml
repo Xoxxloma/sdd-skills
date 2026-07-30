@@ -1,0 +1,16 @@
+services:
+  - name: auth
+    path: ../auth-service
+    type: backend
+    notes: |
+      Канонический владелец сессий.
+      Легаси-эндпоинт /v1/session не использовать: оставлен для старого мобильного клиента.
+  - name: geo
+    path: ../geo-service
+    type: backend
+  - name: incident-web
+    path: ../incident-web
+    type: frontend
+  - name: incident-api
+    path: ../incident-api
+    type: backend
