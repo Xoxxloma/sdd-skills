@@ -1,0 +1,4 @@
+services:
+  - name: billing
+    path: ../billing
+    type: backend

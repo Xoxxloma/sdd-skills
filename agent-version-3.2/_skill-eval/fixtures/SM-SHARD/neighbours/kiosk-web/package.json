@@ -1,0 +1,4 @@
+{
+  "name": "kiosk-web",
+  "scripts": { "dev": "vite", "build": "vite build" }
+}
