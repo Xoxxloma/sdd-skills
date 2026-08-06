@@ -8,3 +8,9 @@ Thumbs.db
 
 # Node (на случай локальной установки impeccable)
 node_modules/
+
+# Песочницы прогонов и вывод самотестов: пересоздаются скриптами _skill-eval
+# (setup-*.mjs копирует фикстуры, selftest-*.mjs пишет свой материал сам).
+# В репозитории от прогона остаются STATE.md, PROMPTS.md и GRADE-REPORT.txt.
+**/_skill-eval/runs/*/*/eval-*/
+**/_skill-eval/selftest/

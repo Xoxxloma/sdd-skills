@@ -1,0 +1,632 @@
+[
+  {
+    "kind": "spec-dirty",
+    "run": "run-01",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-01/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-01/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-01/outputs/report.md"
+  },
+  {
+    "kind": "spec-dirty",
+    "run": "run-02",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-02/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-02/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-02/outputs/report.md"
+  },
+  {
+    "kind": "spec-dirty",
+    "run": "run-03",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-03/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-03/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-03/outputs/report.md"
+  },
+  {
+    "kind": "spec-dirty",
+    "run": "run-04",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-04/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-04/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-04/outputs/report.md"
+  },
+  {
+    "kind": "spec-dirty",
+    "run": "run-05",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-05/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-05/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-05/outputs/report.md"
+  },
+  {
+    "kind": "spec-dirty",
+    "run": "run-06",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-06/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-06/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-06/outputs/report.md"
+  },
+  {
+    "kind": "spec-dirty",
+    "run": "run-07",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-07/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-07/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-07/outputs/report.md"
+  },
+  {
+    "kind": "spec-dirty",
+    "run": "run-08",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-08/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-08/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-08/outputs/report.md"
+  },
+  {
+    "kind": "spec-dirty",
+    "run": "run-09",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-09/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-09/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-09/outputs/report.md"
+  },
+  {
+    "kind": "spec-dirty",
+    "run": "run-10",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-10/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-10/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-0-spec-dirty/run-10/outputs/report.md"
+  },
+  {
+    "kind": "spec-clean",
+    "run": "run-01",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-01/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-01/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-01/outputs/report.md"
+  },
+  {
+    "kind": "spec-clean",
+    "run": "run-02",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-02/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-02/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-02/outputs/report.md"
+  },
+  {
+    "kind": "spec-clean",
+    "run": "run-03",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-03/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-03/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-03/outputs/report.md"
+  },
+  {
+    "kind": "spec-clean",
+    "run": "run-04",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-04/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-04/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-04/outputs/report.md"
+  },
+  {
+    "kind": "spec-clean",
+    "run": "run-05",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-05/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-05/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-05/outputs/report.md"
+  },
+  {
+    "kind": "spec-clean",
+    "run": "run-06",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-06/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-06/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-06/outputs/report.md"
+  },
+  {
+    "kind": "spec-clean",
+    "run": "run-07",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-07/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-07/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-07/outputs/report.md"
+  },
+  {
+    "kind": "spec-clean",
+    "run": "run-08",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-08/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-08/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-08/outputs/report.md"
+  },
+  {
+    "kind": "spec-clean",
+    "run": "run-09",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-09/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-09/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-09/outputs/report.md"
+  },
+  {
+    "kind": "spec-clean",
+    "run": "run-10",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-10/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-10/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-1-spec-clean/run-10/outputs/report.md"
+  },
+  {
+    "kind": "spec-loop",
+    "run": "run-01",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-01/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-01/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-01/outputs/report.md"
+  },
+  {
+    "kind": "spec-loop",
+    "run": "run-02",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-02/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-02/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-02/outputs/report.md"
+  },
+  {
+    "kind": "spec-loop",
+    "run": "run-03",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-03/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-03/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-03/outputs/report.md"
+  },
+  {
+    "kind": "spec-loop",
+    "run": "run-04",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-04/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-04/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-04/outputs/report.md"
+  },
+  {
+    "kind": "spec-loop",
+    "run": "run-05",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-05/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-05/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-05/outputs/report.md"
+  },
+  {
+    "kind": "spec-loop",
+    "run": "run-06",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-06/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-06/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-06/outputs/report.md"
+  },
+  {
+    "kind": "spec-loop",
+    "run": "run-07",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-07/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-07/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-07/outputs/report.md"
+  },
+  {
+    "kind": "spec-loop",
+    "run": "run-08",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-08/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-08/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-08/outputs/report.md"
+  },
+  {
+    "kind": "spec-loop",
+    "run": "run-09",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-09/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-09/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-09/outputs/report.md"
+  },
+  {
+    "kind": "spec-loop",
+    "run": "run-10",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-10/sandbox/docs/RMS-4021/technical_specification.md",
+    "source": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-10/sandbox/docs/RMS-4021/business_requirements.md",
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-spec.md",
+    "type": "тех-спецификация",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-2-spec-loop/run-10/outputs/report.md"
+  },
+  {
+    "kind": "bt-design",
+    "run": "run-01",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-01/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-01/outputs/report.md"
+  },
+  {
+    "kind": "bt-design",
+    "run": "run-02",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-02/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-02/outputs/report.md"
+  },
+  {
+    "kind": "bt-design",
+    "run": "run-03",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-03/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-03/outputs/report.md"
+  },
+  {
+    "kind": "bt-design",
+    "run": "run-04",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-04/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-04/outputs/report.md"
+  },
+  {
+    "kind": "bt-design",
+    "run": "run-05",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-05/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-05/outputs/report.md"
+  },
+  {
+    "kind": "bt-design",
+    "run": "run-06",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-06/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-06/outputs/report.md"
+  },
+  {
+    "kind": "bt-design",
+    "run": "run-07",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-07/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-07/outputs/report.md"
+  },
+  {
+    "kind": "bt-design",
+    "run": "run-08",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-08/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-08/outputs/report.md"
+  },
+  {
+    "kind": "bt-design",
+    "run": "run-09",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-09/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-09/outputs/report.md"
+  },
+  {
+    "kind": "bt-design",
+    "run": "run-10",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-10/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-3-bt-design/run-10/outputs/report.md"
+  },
+  {
+    "kind": "bt-clean",
+    "run": "run-01",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-01/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-01/outputs/report.md"
+  },
+  {
+    "kind": "bt-clean",
+    "run": "run-02",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-02/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-02/outputs/report.md"
+  },
+  {
+    "kind": "bt-clean",
+    "run": "run-03",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-03/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-03/outputs/report.md"
+  },
+  {
+    "kind": "bt-clean",
+    "run": "run-04",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-04/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-04/outputs/report.md"
+  },
+  {
+    "kind": "bt-clean",
+    "run": "run-05",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-05/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-05/outputs/report.md"
+  },
+  {
+    "kind": "bt-clean",
+    "run": "run-06",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-06/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-06/outputs/report.md"
+  },
+  {
+    "kind": "bt-clean",
+    "run": "run-07",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-07/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-07/outputs/report.md"
+  },
+  {
+    "kind": "bt-clean",
+    "run": "run-08",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-08/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-08/outputs/report.md"
+  },
+  {
+    "kind": "bt-clean",
+    "run": "run-09",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-09/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-09/outputs/report.md"
+  },
+  {
+    "kind": "bt-clean",
+    "run": "run-10",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-10/sandbox/docs/RMS-4021/business_requirements.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-bt.md",
+    "type": "бизнес-требования",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-4-bt-clean/run-10/outputs/report.md"
+  },
+  {
+    "kind": "stage-cut",
+    "run": "run-01",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-01/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-01/outputs/report.md"
+  },
+  {
+    "kind": "stage-cut",
+    "run": "run-02",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-02/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-02/outputs/report.md"
+  },
+  {
+    "kind": "stage-cut",
+    "run": "run-03",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-03/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-03/outputs/report.md"
+  },
+  {
+    "kind": "stage-cut",
+    "run": "run-04",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-04/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-04/outputs/report.md"
+  },
+  {
+    "kind": "stage-cut",
+    "run": "run-05",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-05/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-05/outputs/report.md"
+  },
+  {
+    "kind": "stage-cut",
+    "run": "run-06",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-06/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-06/outputs/report.md"
+  },
+  {
+    "kind": "stage-cut",
+    "run": "run-07",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-07/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-07/outputs/report.md"
+  },
+  {
+    "kind": "stage-cut",
+    "run": "run-08",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-08/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-08/outputs/report.md"
+  },
+  {
+    "kind": "stage-cut",
+    "run": "run-09",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-09/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-09/outputs/report.md"
+  },
+  {
+    "kind": "stage-cut",
+    "run": "run-10",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-10/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-5-stage-cut/run-10/outputs/report.md"
+  },
+  {
+    "kind": "stage-clean",
+    "run": "run-01",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-01/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-01/outputs/report.md"
+  },
+  {
+    "kind": "stage-clean",
+    "run": "run-02",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-02/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-02/outputs/report.md"
+  },
+  {
+    "kind": "stage-clean",
+    "run": "run-03",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-03/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-03/outputs/report.md"
+  },
+  {
+    "kind": "stage-clean",
+    "run": "run-04",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-04/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-04/outputs/report.md"
+  },
+  {
+    "kind": "stage-clean",
+    "run": "run-05",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-05/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-05/outputs/report.md"
+  },
+  {
+    "kind": "stage-clean",
+    "run": "run-06",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-06/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-06/outputs/report.md"
+  },
+  {
+    "kind": "stage-clean",
+    "run": "run-07",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-07/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-07/outputs/report.md"
+  },
+  {
+    "kind": "stage-clean",
+    "run": "run-08",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-08/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-08/outputs/report.md"
+  },
+  {
+    "kind": "stage-clean",
+    "run": "run-09",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-09/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-09/outputs/report.md"
+  },
+  {
+    "kind": "stage-clean",
+    "run": "run-10",
+    "artefact": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-10/sandbox/docs/RMS-4021/stages/stage-01.md",
+    "source": null,
+    "checklist": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/spec-review/reference/checklist-stage.md",
+    "type": "файл задачи",
+    "report": "C:/Users/Konstantin/projects/product-skills/agent-version-3.2/_skill-eval/runs/2026-08-05-review/tier-a/eval-6-stage-clean/run-10/outputs/report.md"
+  }
+]
