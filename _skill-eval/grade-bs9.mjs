@@ -21,8 +21,9 @@
 //
 // usage: node grade-bs9.mjs <каталог с песочницами>
 //        node grade-bs9.mjs _skill-eval/fixtures/bs9-validate     ← самопроверка грейдера
+//        node grade-bs9.mjs _skill-eval/fixtures/bs9b-validate    ← самопроверка 9.6 (BS-9b)
 
-import { readdirSync, readFileSync, existsSync } from 'node:fs'
+import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 
 const root = process.argv[2]
@@ -143,6 +144,22 @@ function realGaps(bodyText) {
   return n
 }
 
+/** Сколько файлов прогон создал в песочнице, кроме служебных стенда. Скилл обязан написать
+ *  ровно один `.md` и не трогать больше ничего — правило есть в Step 4 и в Self-Review 5, а
+ *  проверки под него не было ни одной: BS-10 смотрит только ПУТЬ уже найденного файла.
+ *  Класс не гипотетический — в «Уроках харнесса» записаны прогоны, писавшие мимо песочницы. */
+function producedFiles(dir, acc = []) {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name)
+    if (e.isDirectory()) producedFiles(p, acc)
+    // `_api-failure.txt` создаёт РАННЕР (`mv answer.md _api-failure.txt` при отказе API),
+    // а не скилл — он того же класса, что answer.md и _stderr.log. Без него в списке проба
+    // печатала 0 из 9 и 0 из 10: стопроцентный красный, целиком порождённый исключениями.
+    else if (!['answer.md', '_stderr.log', '_api-failure.txt'].includes(e.name)) acc.push(relative(dir, p))
+  }
+  return acc
+}
+
 const dirs = readdirSync(root, { withFileTypes: true })
   .filter((e) => e.isDirectory())
   .map((e) => e.name)
@@ -153,9 +170,20 @@ const notes = []
 
 for (const d of dirs) {
   const sandbox = join(root, d)
+  const produced = producedFiles(sandbox)
   const files = findBrd(sandbox)
   if (files.length === 0) {
-    rows.push({ run: d, path: '—', pathOk: '—', key: '—', stub: '—', status: 'НЕ ИЗМЕРЕНО (артефакта нет)', num: '—', items: '—', tbd: '—', ok: '—' })
+    // «ДОКУМЕНТА НЕТ» И «НЕ ИЗМЕРЕНО» — РАЗНЫЕ ИСХОДЫ, И ПУТАТЬ ИХ НЕЛЬЗЯ.
+    // Прежняя редакция звала «не измерено» любую песочницу без БТ. Правило писалось под
+    // отказ стенда, но под него попадал и состоявшийся прогон, который просто не записал
+    // файла, — то есть НАСТОЯЩИЙ провал BS-10 вынимался из знаменателя и завышал плечо.
+    // Признак «прогон состоялся» — непустой `answer.md`, а не наличие документа.
+    const ran = existsSync(join(sandbox, 'answer.md')) && statSync(join(sandbox, 'answer.md')).size > 0
+    rows.push({
+      run: d, path: '—', pathOk: ran ? 'ФАЙЛА НЕТ' : '—', key: '—', stub: '—',
+      status: ran ? 'документ не записан' : 'НЕ ИЗМЕРЕНО (прогона не было)',
+      num: '—', items: '—', tbd: '—', made: String(produced.length), ok: ran ? 'нет' : '—',
+    })
     continue
   }
   if (files.length > 1) notes.push(`${d}: найдено ${files.length} файлов business_requirements.md — грейдится первый по пути`)
@@ -223,20 +251,22 @@ for (const d of dirs) {
     num: numMatch ? numMatch[1] : 'нет',
     items: blockFound ? String(items) : 'нет блока',
     tbd: String(tbd),
+    made: String(produced.length),
     ok,
   })
+  if (produced.length > 1) notes.push(`${d}: создано файлов ${produced.length} — ${produced.join(', ')}`)
 }
 
 const pad = (s, n) => String(s).padEnd(n)
 console.log(
   pad('прогон', 14), pad('путь ок', 10), pad('заглушка', 9),
-  pad('число', 6), pad('пунктов', 8), pad('TBD/⚠️', 7), pad('статус верен', 13), 'значение статуса'
+  pad('число', 6), pad('пунктов', 8), pad('TBD/⚠️', 7), pad('файлов', 7), pad('статус верен', 13), 'значение статуса'
 )
 console.log('-'.repeat(120))
 for (const r of rows) {
   console.log(
     pad(r.run, 14), pad(r.pathOk, 10), pad(r.stub, 9),
-    pad(r.num, 6), pad(r.items, 8), pad(r.tbd, 7), pad(r.ok, 13), r.status
+    pad(r.num, 6), pad(r.items, 8), pad(r.tbd, 7), pad(r.made, 7), pad(r.ok, 13), r.status
   )
 }
 
@@ -262,7 +292,21 @@ console.log(`BS-9.4 заглушка не осталась: ${cnt((r) => r.stub 
 const blockBroken = measured.filter((r) => Number(r.tbd) > 0 && Number(r.items) === 0)
 console.log(`BS-9.5 блок собран из тела (есть TBD/⚠️ → есть пункт): ${measured.length - blockBroken.length} из ${measured.length}` +
   (blockBroken.length ? ` — не собран: ${blockBroken.map((r) => r.run).join(', ')}` : ''))
+// 9.6 — БЛОК СОБРАН ЦЕЛИКОМ, А НЕ ЧАСТИЧНО. Заведено под BS-9b (2026-08-07).
+// 9.5 ловит только полностью пустой блок при непустом теле, поэтому мимо неё проходит
+// главный вариант дефекта R2: скилл берёт N из числа ⏭️ в реестре, собирает блок ровно из
+// стольких же пунктов и оставляет `⚠️` в теле неучтённым. Тогда num == items, 9.1/9.2/9.3
+// зелёные, а документ занижает число открытых пунктов. Правило Step 4 — «собери в блок
+// КАЖДЫЙ TBD и КАЖДЫЙ ⚠️», значит пунктов не может быть меньше, чем пробелов в теле.
+// Больше — законно: один пробел скилл вправе расписать двумя пунктами.
+const partial = measured.filter((r) => r.items !== 'нет блока' && Number(r.items) < Number(r.tbd))
+console.log(`BS-9.6 блок покрывает все пробелы тела (пунктов ≥ TBD/⚠️): ${measured.length - partial.length} из ${measured.length}` +
+  (partial.length ? ` — не покрывает: ${partial.map((r) => `${r.run} (${r.items} п. при ${r.tbd} в теле)`).join(', ')}` : ''))
 console.log(`BS-10 путь docs/<KEY>/business_requirements.md: ${cnt((r) => r.pathOk === 'ДА')} из ${measured.length}.`)
+// Скилл обязан написать РОВНО ОДИН файл (Step 4 «Пиши только этот один файл», Self-Review 5).
+// Проверки под это правило не было ни одной: BS-10 смотрит путь уже найденного файла и лишние
+// файлы рядом с ним не видит. Заведено по разбору диффа 2026-08-06.
+console.log(`BS-10b записан ровно один файл: ${cnt((r) => r.made === '1')} из ${measured.length}.`)
 if (measured.length !== dirs.length) {
   console.log('ВНИМАНИЕ: не у всех песочниц есть артефакт — это «не измерено», а не «провалено».')
 }

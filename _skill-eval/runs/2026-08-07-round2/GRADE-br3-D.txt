@@ -1,0 +1,96 @@
+
+BR-3 (полный бриф → пишет) — _skill-eval/runs/2026-08-07-round2/br3-D
+
+прогон                 файл   путь         ключ       гейты   вопрос  реестр   вердикт
+---------------------------------------------------------------------------------------------------------
+run-01                 нет    —            —          0/4     нет     нет      нет
+run-02                 нет    —            —          0/4     нет     нет      нет
+run-03                 нет    —            —          0/4     нет     нет      нет
+run-04                 нет    —            —          0/4     нет     нет      нет
+run-05                 нет    —            —          0/4     нет     нет      нет
+run-06                 нет    —            —          0/4     нет     нет      нет
+run-07                 нет    —            —          0/4     нет     нет      нет
+run-08                 нет    —            —          0/4     нет     нет      нет
+run-09                 нет    —            —          0/4     нет     нет      нет
+run-10                 нет    —            —          0/4     нет     нет      нет
+run-11                 нет    —            —          0/4     нет     нет      нет
+run-12                 нет    —            —          0/4     нет     нет      нет
+run-13                 нет    —            —          0/4     нет     нет      нет
+run-14                 нет    —            —          0/4     нет     нет      нет
+run-15                 нет    —            —          0/4     нет     нет      нет
+run-16                 нет    —            —          0/4     нет     нет      нет
+run-17                 нет    —            —          0/4     нет     нет      нет
+run-18                 нет    —            —          0/4     нет     нет      нет
+run-19                 нет    —            —          0/4     нет     нет      нет
+run-20                 нет    —            —          0/4     нет     нет      нет
+
+Измерено: 20 из 20.
+BR-3 файл записан этим же ходом: 0 из 20.
+  регресс BS-10 путь docs/<KEY>/: н/д — ни одного файла, НЕ ИЗМЕРЕНО (знаменатель — прогоны с файлом).
+  БТ на диске нет: run-01, run-02, run-03, run-04, run-05, run-06, run-07, run-08, run-09, run-10, run-11, run-12, run-13, run-14, run-15, run-16, run-17, run-18, run-19, run-20 — причину смотри в их ответах ниже: переспросил / написал спеку только в ответ / сохранил под другим именем.
+  BR-3.3 реестр гейтов выведен: 0 из 20.
+       из них записали файл при ❓ в собственном реестре: 0
+
+
+===== ответы прогонов (для глаз: не переспрошено ли присланное) =====
+
+### run-01
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-02
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-03
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-04
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-05
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-06
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-07
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-08
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-09
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-10
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-11
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-12
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-13
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-14
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-15
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-16
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-17
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-18
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-19
+You've hit your session limit · resets 5am (Etc/GMT-3)
+
+### run-20
+You've hit your session limit · resets 5am (Etc/GMT-3)
+

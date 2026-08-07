@@ -1,6 +1,6 @@
 Режим B (дочерний узел наследует контракт #0).
-Детский БТ: _skill-eval/fixtures/ARS-90/ARS-93/business_requirements.md (выгрузка сводки, FR-5) — прочитай его.
-Контракт узла-фундамента #0 лежит здесь: _skill-eval/fixtures/ARS-90/_foundation/technical_specification.md
+Детский БТ: docs/ARS-90/ARS-93/business_requirements.md (выгрузка сводки, FR-5) — прочитай его.
+Контракт узла-фундамента #0 лежит здесь: docs/ARS-90/_foundation/technical_specification.md
 Унаследуй контракт INT-0 из этого файла и распиши спеку выгрузки (C) вокруг него.
 
 Это ПРОДОЛЖЕНИЕ: на turn-1 ты задал вопросы по тех-гейтам, аналитик отвечает на ВСЕ свои:

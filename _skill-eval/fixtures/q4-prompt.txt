@@ -15,6 +15,6 @@
 файла в ответ.
 
 СООБЩЕНИЕ ПОЛЬЗОВАТЕЛЯ (аналитика):
-Эпик-БТ: _skill-eval/fixtures/ARS-80/business_requirements.md — прочитай его.
+Эпик-БТ: docs/ARS-80/business_requirements.md — прочитай его.
 
 Разбей на подзадачи.

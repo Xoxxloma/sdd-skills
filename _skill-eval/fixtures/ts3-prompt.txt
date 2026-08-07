@@ -1,4 +1,4 @@
-[TS-3 — turn-2 промпт для technical-spec-doc. Загрузи скилл в контекст. БТ-вход: _skill-eval/fixtures/ARS-57/business_requirements.md]
+[TS-3 — turn-2 промпт для technical-spec-doc. Загрузи скилл в контекст. БТ-вход: docs/ARS-57/business_requirements.md]
 
 Это ПРОДОЛЖЕНИЕ. Подтверждённый БТ лежит в папке ARS-57 (business_requirements.md) — прочитай его. На turn-1 ты задал вопросы по тех-гейтам. Теперь аналитик отвечает на ВСЕ:
 
