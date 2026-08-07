@@ -1,0 +1,56 @@
+
+прогонов: base 10, fixed 10, fixed-r2 10
+
+пункт                                              base      fixed   fixed-r2
+-----------------------------------------------------------------------------
+Э-1 приёмка вызвана                                0/10      10/10      10/10
+Э-3 приёмка доведена до субагента                  0/10       7/10       5/10
+Э-2с строка СТРОГО по форме (путь в строке)        0/10       2/10       2/10
+Э-2л результат назван хоть как-то                  0/10       6/10       3/10
+Р-1 назван task-decomposition-doc                 10/10      10/10       8/10
+Р-2 сам файлов не писал                           10/10      10/10      10/10
+
+--- по прогонам: base ---
+  run-01 E1called=НЕТ E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-02 E1called=НЕТ E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-03 E1called=НЕТ E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-04 E1called=НЕТ E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-05 E1called=НЕТ E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-06 E1called=НЕТ E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-07 E1called=НЕТ E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-08 E1called=НЕТ E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-09 E1called=НЕТ E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-10 E1called=НЕТ E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+
+--- по прогонам: fixed ---
+  run-01 E1called=да E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-02 E1called=да E3completed=да E2strict=да E2any=да R1decomp=да R2no_write=да
+  run-03 E1called=да E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-04 E1called=да E3completed=да E2strict=НЕТ E2any=да R1decomp=да R2no_write=да
+  run-05 E1called=да E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-06 E1called=да E3completed=да E2strict=НЕТ E2any=да R1decomp=да R2no_write=да
+  run-07 E1called=да E3completed=да E2strict=НЕТ E2any=да R1decomp=да R2no_write=да
+  run-08 E1called=да E3completed=да E2strict=НЕТ E2any=да R1decomp=да R2no_write=да
+  run-09 E1called=да E3completed=да E2strict=да E2any=да R1decomp=да R2no_write=да
+  run-10 E1called=да E3completed=да E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+
+--- по прогонам: fixed-r2 ---
+  run-01 E1called=да E3completed=да E2strict=НЕТ E2any=НЕТ R1decomp=НЕТ R2no_write=да
+  run-02 E1called=да E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-03 E1called=да E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-04 E1called=да E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-05 E1called=да E3completed=да E2strict=да E2any=да R1decomp=да R2no_write=да
+  run-06 E1called=да E3completed=да E2strict=да E2any=да R1decomp=да R2no_write=да
+  run-07 E1called=да E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-08 E1called=да E3completed=НЕТ E2strict=НЕТ E2any=НЕТ R1decomp=НЕТ R2no_write=да
+  run-09 E1called=да E3completed=да E2strict=НЕТ E2any=НЕТ R1decomp=да R2no_write=да
+  run-10 E1called=да E3completed=да E2strict=НЕТ E2any=да R1decomp=да R2no_write=да
+
+
+прогонов измерено: 0
+ход 1 — проверка прошла: 0/0
+ход 1 — ЗАВИС (проверки не было): 0/0
+
+=== что было на ходу 2 у ЗАВИСШИХ (это и есть ответ на вопрос) ===
+
+зависших нет — на этом пуле дефект не воспроизвёлся
