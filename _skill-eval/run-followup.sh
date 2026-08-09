@@ -37,8 +37,15 @@ mkdir -p "$OUT"
 run_one() {
   local i="$1"
   local sb="$OUT/run-$i"
+  # Стоп-файл пула: `touch <плечо>/_STOP` — и не стартовавшие прогоны выпадают в «не измерено».
+  if [ -e "$OUT/_STOP" ]; then echo "  run-$i — СТОП-ФАЙЛ, прогон не запускался"; return 0; fi
   mkdir -p "$sb"
-  if [ -s "$sb/turn2.jsonl" ]; then echo "  run-$i — уже есть, пропуск"; return 0; fi
+  # Пропускаем только ДОЕХАВШИЙ прогон; помеченный переигрывается, метки прошлой попытки снимаем.
+  if [ -s "$sb/turn2.jsonl" ] && [ ! -e "$sb/_incomplete.txt" ]; then
+    echo "  run-$i — уже есть, пропуск"; return 0
+  fi
+  rm -f "$sb/turn1.jsonl" "$sb/turn2.jsonl" "$sb/_incomplete.txt" \
+        "$sb/_api-failure.txt" "$sb/_api-failure2.txt"
   local abs_sb; abs_sb="$(cd "$sb" && pwd)"
 
   mkdir -p "$abs_sb/.claude/skills"
@@ -53,7 +60,9 @@ run_one() {
 
 Сообщение пользователя лежит в файле ${PROMPT}. Прочитай его и ответь на него по скиллу. Твой ответ — то, что ты сказал бы пользователю в чат."
 
-  ( cd "$sb" && timeout 900 claude -p "$task" --model haiku --permission-mode bypassPermissions \
+  # CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 — приёмка поднимает субагента ФОНОВОЙ задачей, а CLI
+  # по умолчанию ждёт её 600 с и обрывает ход. Границу держит `timeout`, а не потолок ожидания.
+  ( cd "$sb" && CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 timeout 1800 claude -p "$task" --model haiku --permission-mode bypassPermissions \
       --output-format stream-json --verbose ) > "$sb/turn1.jsonl" 2> "$sb/_e1.log"
 
   if grep -qiE "API Error|Request not allowed|Please run /login|Credit balance|rate limit|session limit|usage limit" "$sb/turn1.jsonl" 2>/dev/null; then
@@ -61,11 +70,19 @@ run_one() {
   fi
 
   # Ход 2 — переспрос в ТОМ ЖЕ разговоре.
-  ( cd "$sb" && timeout 900 claude -p --continue "$Q2" --model haiku --permission-mode bypassPermissions \
+  ( cd "$sb" && CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 timeout 1800 claude -p --continue "$Q2" --model haiku --permission-mode bypassPermissions \
       --output-format stream-json --verbose ) > "$sb/turn2.jsonl" 2> "$sb/_e2.log"
+  local rc2=$?
 
   if grep -qiE "API Error|Request not allowed|Please run /login|Credit balance|rate limit|session limit|usage limit" "$sb/turn2.jsonl" 2>/dev/null; then
     mv "$sb/turn2.jsonl" "$sb/_api-failure2.txt"; echo "  run-$i — ОТКАЗ API на ходу 2"; return 0
+  fi
+  # Недоезд помечает раннер: только он видит код возврата и нотис CLI об обрыве фоновых задач.
+  if [ $rc2 -ne 0 ] || [ ! -s "$sb/turn2.jsonl" ] \
+     || grep -q "Background tasks still running" "$sb/_e1.log" "$sb/_e2.log" 2>/dev/null; then
+    echo "недоехал: rc2=$rc2" > "$sb/_incomplete.txt"
+    echo "  run-$i — НЕДОЕХАЛ (rc2=$rc2), помечен, в счёт не идёт"
+    return 0
   fi
   echo "  run-$i — готов"
 }

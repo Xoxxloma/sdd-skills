@@ -1,0 +1,7 @@
+Это ПРОДОЛЖЕНИЕ работы. Эпик-БТ docs/ARS-100/business_requirements.md готов, в §4.5 три слайса. Ты запустил под-скилл task-decomposition-doc, я подтвердил слайсы, ключи и порядок, и он только что записал индекс docs/ARS-100/decomposition.md и три детских БТ:
+
+- docs/ARS-100/ARS-101/business_requirements.md
+- docs/ARS-100/ARS-102/business_requirements.md
+- docs/ARS-100/ARS-103/business_requirements.md
+
+Продолжай по скиллу.
