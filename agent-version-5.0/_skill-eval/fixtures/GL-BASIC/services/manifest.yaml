@@ -1,0 +1,23 @@
+services:
+  - name: auth
+    path: ../auth-service
+    type: backend
+    notes: |
+      Канонический владелец сессий. Легаси /v1/session не использовать.
+
+  - name: geo
+    path: ../geo-service
+    type: backend
+
+  - name: incident-web
+    path: ../incident-web
+    type: frontend
+
+glossary:
+  - term: Session
+    say: сессия пользователя
+    avoid: сеанс, вход
+  - term: ЧОП
+    say: частное охранное предприятие
+  - term: ГБР
+    say: группа быстрого реагирования

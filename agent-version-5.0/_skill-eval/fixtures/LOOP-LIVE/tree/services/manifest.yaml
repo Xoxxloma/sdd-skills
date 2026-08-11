@@ -1,0 +1,12 @@
+services:
+  - name: arsenal-api
+    type: backend
+    repo: ../arsenal-api
+    notes: |
+      Ядро «Арсенала». Владеет инцидентами, пользователями и сессиями.
+      Сессии чистит ночной джоб; трогать вручную на проде нельзя.
+  - name: arsenal-admin-web
+    type: frontend
+    repo: ../arsenal-admin-web
+    notes: |
+      Веб-админка. Шапку ведёт команда Арсенал-Web.
