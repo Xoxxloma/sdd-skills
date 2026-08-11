@@ -1,0 +1,1 @@
+{ "name": "rentalcore", "private": true, "scripts": { "start": "nest start" } }

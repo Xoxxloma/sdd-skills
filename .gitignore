@@ -13,4 +13,9 @@ node_modules/
 # (setup-*.mjs копирует фикстуры, selftest-*.mjs пишет свой материал сам).
 # В репозитории от прогона остаются STATE.md, PROMPTS.md и GRADE-REPORT.txt.
 **/_skill-eval/runs/*/*/eval-*/
+**/_skill-eval/runs/*/sandbox/
 **/_skill-eval/selftest/
+
+# Вывод генераторов фикстур (RS-MONO/make.sh и подобные): дерево пересоздаётся скриптом,
+# в репозитории лежит только сам скрипт и README.
+**/_skill-eval/fixtures/*/out/
