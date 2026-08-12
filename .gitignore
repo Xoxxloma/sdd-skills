@@ -12,8 +12,11 @@ node_modules/
 # Песочницы прогонов и вывод самотестов: пересоздаются скриптами _skill-eval
 # (setup-*.mjs копирует фикстуры, selftest-*.mjs пишет свой материал сам).
 # В репозитории от прогона остаются STATE.md, PROMPTS.md и GRADE-REPORT.txt.
+# `before/` — снимок скилла до правки для A/B: 140 КБ дубля, run.sh достаёт его
+# из git по зафиксированному коммиту, поэтому в репозитории ему делать нечего.
 **/_skill-eval/runs/*/*/eval-*/
 **/_skill-eval/runs/*/sandbox/
+**/_skill-eval/runs/*/before/
 **/_skill-eval/selftest/
 
 # Вывод генераторов фикстур (RS-MONO/make.sh и подобные): дерево пересоздаётся скриптом,
