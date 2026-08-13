@@ -39,8 +39,8 @@ services:
 # запятой нет — получается один путь, то есть ровно прежнее поведение.
 # ----------------------------------------------------------------------------
 #
-#   - name: adjutant-catalog        # одна строка = одна карточка = один субагент
-#     path: ../adjutant/src/main/java/ru/sber/ecosec/adjutant/v2/templates, ../adjutant/src/main/java/ru/sber/ecosec/adjutant/v2/categories
+#   - name: rentalcore-catalog      # одна строка = одна карточка = один субагент
+#     path: ../rentalcore/src/modules/templates, ../rentalcore/src/modules/categories
 #     type: backend
 #
 # Несколько папок — это ОДИН сервис, разложенный по пакетам, а не несколько сервисов.
