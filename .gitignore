@@ -15,7 +15,7 @@ node_modules/
 # `before/` — снимок скилла до правки для A/B: 140 КБ дубля, run.sh достаёт его
 # из git по зафиксированному коммиту, поэтому в репозитории ему делать нечего.
 **/_skill-eval/runs/*/*/eval-*/
-**/_skill-eval/runs/*/sandbox/
+**/_skill-eval/runs/*/sandbox*/
 **/_skill-eval/runs/*/before/
 **/_skill-eval/selftest/
 
