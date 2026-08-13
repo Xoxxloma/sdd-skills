@@ -17,6 +17,9 @@ node_modules/
 **/_skill-eval/runs/*/*/eval-*/
 **/_skill-eval/runs/*/sandbox*/
 **/_skill-eval/runs/*/before/
+# Плечи, которые гоняет `run-pool.sh`: те же песочницы, только имя плеча своё у каждого
+# раунда (`bs1-after/run-01`, `gui4/run-03`). Ловим по имени песочницы, а не плеча.
+**/_skill-eval/runs/*/*/run-*/
 **/_skill-eval/selftest/
 
 # Вывод генераторов фикстур (RS-MONO/make.sh и подобные): дерево пересоздаётся скриптом,
