@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# run-ctx.sh — пул прогонов одной пробы петли 5.0 через `claude -p` (Haiku).
+#
+#   ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]
+#
+# Заменяет связку `setup-ctx-runs.mjs` + ручной запуск субагентов. Причины ровно две, и обе
+# из разбора раундов 2026-08-13/14:
+#
+# 1. **Снимок скилла обязателен и делается ЗДЕСЬ.** Прежняя раскладка писала в `runs.json` путь
+#    к ЖИВОМУ `SKILL.md`; файл правится между раундами и не коммитится, поэтому текст, которым
+#    получены числа, переставал существовать в момент следующей правки. Снимок кладётся в
+#    `<раунд>/_skills/` ОДИН раз на раунд: повторный запуск той же пробы в том же раунде обязан
+#    читать тот же текст, иначе половина пула мерит одно, половина другое.
+#
+# 2. **`answer.md` берётся из stdout, а не просьбой к прогону.** Раунд 2 просил «обязательно
+#    запиши ответ в answer.md» — шесть прогонов `ts-ctx` из десяти положили туда всю спеку и
+#    файла спеки не создали (`RUNNER.md`, раздел «Ловушка»). Здесь про запись файлов в промпте
+#    не сказано ничего: единственные файлы в песочнице те, которые скилл создал сам.
+#
+# Раскладка плоская: `<раунд>/<проба>/run-NN/` — она же песочница, `answer.md` рядом.
+# `grade-ctx.mjs` читает её напрямую, `grade-ts.mjs` — с 2026-08-14 тоже (обе формы).
+
+set -u
+
+PROBE="${1:-}"
+ROUND="${2:-}"
+N="${3:-10}"
+CONC="${4:-5}"
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Свой пул, а не корневой `_skill-eval/run-pool.sh`. Причина — в шапке `run-pool-ctx.sh`:
+# последняя строка промпта корневого раннера («Твой ответ — то, что ты сказал бы пользователю в
+# чат») отменяла запись файла у половины прогонов. Корневой раннер не трогаем: на нём стоят
+# другие евалы репы, и менять его надо своим замером, а не заодно.
+POOL="$HERE/run-pool-ctx.sh"
+
+# проба → фикстура, файл промпта, скилл. `SEED_SUB` — подпапка засева, если он не вся фикстура.
+SEED_SUB=""
+case "$PROBE" in
+  ts-live)   FIXTURE=TS-LIVE;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
+  ts-conv)   FIXTURE=TS-CONV;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
+  ts-conv2)  FIXTURE=TS-CONV2;  PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
+  ts-ctx)    FIXTURE=TS-CTX;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
+  ts-nodesc) FIXTURE=TS-NODESC; PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
+  ts-noctx)  FIXTURE=TS-NOCTX;  PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
+  br-ctx)    FIXTURE=BR-CTX;    PROMPT_FILE=t1-prompt.txt;    SKILL=business-requirements-doc ;;
+  sb-ctx)    FIXTURE=SB-CTX;    PROMPT_FILE=stage-prompt.txt; SKILL=stage-breakdown-doc ;;
+  # Приёмка ничего не пишет на диск: её артефакт — `answer.md` из stdout, и другого нет.
+  rv-conv)   FIXTURE=RV-CONV;   PROMPT_FILE=rv-prompt.txt;    SKILL=spec-review ;;
+  # Сторож основного пути: чистый документ и НЕТ папки `context/`. Ловит оба способа, которыми
+  # пункт 12 мог полезть не туда, — ложное срабатывание там, где его предмета нет, и уход
+  # субагента за пределы артефакта по новому пути к корню репозитория.
+  rv-clean)  FIXTURE=RV-CLEAN;  PROMPT_FILE=rv-prompt.txt;    SKILL=spec-review ;;
+  sb-ctx2)   FIXTURE=SB-CTX2;   PROMPT_FILE=stage-prompt.txt; SKILL=stage-breakdown-doc ;;
+  # У `BR-ROLES` засев лежит подпапкой (`seed/`), а не всей фикстурой: рядом с ним живут второй
+  # засев под тех-спеку и четыре промпта разных плеч.
+  br-roles-w) FIXTURE=BR-ROLES; PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed ;;
+  br-roles-q) FIXTURE=BR-ROLES; PROMPT_FILE=q-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx sb-ctx sb-ctx2 rv-conv br-roles-w br-roles-q"; exit 1 ;;
+esac
+
+[ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
+[ -f "$POOL" ]  || { echo "нет раннера: $POOL"; exit 1; }
+
+FIXTURE_DIR="$HERE/fixtures/$FIXTURE"
+PROMPT="$FIXTURE_DIR/$PROMPT_FILE"
+[ -f "$PROMPT" ] || { echo "нет промпта: $PROMPT"; exit 1; }
+
+mkdir -p "$ROUND/_skills"
+SNAP_KEEP="$ROUND/_skills/$SKILL.SKILL.md"
+if [ -f "$SNAP_KEEP" ]; then
+  echo "снимок скилла уже есть — прогон читает ЕГО: $SNAP_KEEP"
+else
+  cp "$HERE/../$SKILL/SKILL.md" "$SNAP_KEEP"
+  echo "снимок скилла: $SNAP_KEEP"
+fi
+# ПРОГОН ЧИТАЕТ КОПИЮ СНИМКА ВНЕ РЕПОЗИТОРИЯ. Единственный путь, который прогон получает внутрь
+# репы, — это путь к скиллу; получив его, часть прогонов уходит бродить по соседним папкам и
+# пишет результат в фикстуру (2026-08-14: три случая). В папке раунда снимок остаётся для
+# журнала, но читается он из /tmp — оттуда идти некуда.
+SNAP_ROOT="${SKILL_EVAL_SEED_ROOT:-/tmp/skill-eval-seed}/$(basename "$ROUND")-skills"
+mkdir -p "$SNAP_ROOT/$SKILL"
+SNAP="$SNAP_ROOT/$SKILL/SKILL.md"
+cp "$SNAP_KEEP" "$SNAP"
+# ПАПКА `reference/` — ЧАСТЬ ИЗМЕРЯЕМОГО ТЕКСТА, И БЕЗ НЕЁ СНИМОК ЛЖЁТ. `spec-review` держит в
+# `SKILL.md` только маршрут, а сами правила — в `reference/checklist-*.md`; `technical-spec-doc`
+# держит там шаблон спеки. Снимая один `SKILL.md`, раннер отправлял прогон читать ЖИВОЙ чек-лист:
+# круги «до правки» и «после» мерились бы на одном и том же тексте, и разница вышла бы нулевой
+# по построению. Кладётся рядом со снимком, поэтому относительный путь `reference/…` из скилла
+# ведёт в снимок, а не в репозиторий.
+if [ -d "$HERE/../$SKILL/reference" ]; then
+  if [ ! -d "$ROUND/_skills/$SKILL.reference" ]; then
+    cp -r "$HERE/../$SKILL/reference" "$ROUND/_skills/$SKILL.reference"
+  fi
+  rm -rf "$SNAP_ROOT/$SKILL/reference"
+  cp -r "$ROUND/_skills/$SKILL.reference" "$SNAP_ROOT/$SKILL/reference"
+fi
+# Отпечаток дерева рядом со снимком: по нему видно, из какого состояния репы взят текст.
+if [ ! -f "$ROUND/_commit.txt" ]; then
+  { git -C "$HERE" rev-parse HEAD 2>/dev/null || echo "нет git"; } > "$ROUND/_commit.txt"
+  if [ -n "$(git -C "$HERE" status --porcelain 2>/dev/null)" ]; then
+    echo "рабочее дерево грязное — источник истины это _skills/" >> "$ROUND/_commit.txt"
+  fi
+fi
+
+# ─── Караул фикстуры ДО прогона ────────────────────────────────────────────────────────────
+# Проверка после плеча опоздала дважды. Прогон записывает результат в фикстуру по абсолютному
+# пути (2026-08-14: `ts-conv`, потом `ts-live`), и следующее плечо засевается уже с готовым
+# документом — то есть проба «написал ли скилл файл» отвечает «да» сама себе. Поймано на
+# `runs/2026-08-14-loop-r1b`: все десять песочниц `ts-live` получили спеку засевом.
+#
+# Поэтому состав фикстуры фиксируется манифестом и сверяется ПЕРЕД засевом. Расхождение —
+# остановка, а не предупреждение: испорченное плечо дешевле не запускать, чем потом опознавать.
+MANIFEST="$FIXTURE_DIR/_manifest.txt"
+CURRENT="$(cd "$FIXTURE_DIR" && find . -type f -not -name '_manifest.txt' | sed 's|^\./||' | sort)"
+if [ -f "$MANIFEST" ]; then
+  if ! printf '%s\n' "$CURRENT" | diff -q - "$MANIFEST" >/dev/null 2>&1; then
+    echo "!!! СОСТАВ ФИКСТУРЫ $FIXTURE НЕ СОВПАДАЕТ С МАНИФЕСТОМ — прогон не запускался."
+    printf '%s\n' "$CURRENT" | diff - "$MANIFEST" | head -20
+    echo "Разберись, откуда файл: обычно это прогон, записавший результат в фикстуру."
+    echo "Манифест обновляется руками, когда фикстуру меняешь осознанно."
+    exit 1
+  fi
+else
+  printf '%s\n' "$CURRENT" > "$MANIFEST"
+  echo "манифест фикстуры заведён: $MANIFEST"
+fi
+
+# Засев: фикстура без материала стенда. README и промпты в песочницу не едут — прогон,
+# прочитавший README фикстуры, узнал бы ожидаемый исход и проба стала бы вакуумной.
+# ЗАСЕВ ЛЕЖИТ ВНЕ РЕПОЗИТОРИЯ, И ЭТО НЕ ГИГИЕНА, А ИЗОЛЯЦИЯ.
+#
+# Пока засев лежал в папке раунда (`<раунд>/_seed/<проба>`), он был соседом песочниц и выглядел
+# как ещё один рабочий репозиторий: та же `docs/<KEY>/business_requirements.md`, тот же
+# `context/`. Прогон, промахнувшийся мимо своей директории, писал спеку туда — и ВСЕ последующие
+# прогоны плеча копировали её себе засевом. Проба «записал ли скилл файл» отвечала «да» сама
+# себе; поймано 2026-08-14 на `_pilot-wrapper` и `loop-r1c/ts-live` — там спека стоит в
+# `_seeded.txt` у всех десяти песочниц.
+SEED_ROOT="${SKILL_EVAL_SEED_ROOT:-/tmp/skill-eval-seed}"
+SEED="$SEED_ROOT/$(basename "$ROUND")-$PROBE"
+SEED_SRC="$FIXTURE_DIR${SEED_SUB:+/$SEED_SUB}"
+rm -rf "$SEED"; mkdir -p "$SEED"
+( cd "$SEED_SRC" && tar cf - --exclude=README.md --exclude='*-prompt.txt' --exclude=_manifest.txt . ) | ( cd "$SEED" && tar xf - )
+
+echo "проба: $PROBE   фикстура: $FIXTURE   скилл: $SKILL"
+bash "$POOL" "$SNAP" "$PROMPT" "$ROUND/$PROBE" "$N" "$CONC" "$SEED"
+
+# ─── Караул фикстуры ────────────────────────────────────────────────────────────────────────
+# Запрет в промпте изоляцией НЕ является. Замер 2026-08-14, плечо `ts-conv`: прогон получил
+# песочницу рабочей директорией — и записал спеку по АБСОЛЮТНОМУ пути в саму фикстуру
+# (`fixtures/TS-CONV/docs/ARS-201/technical_specification.md`). Инцидент того же класса, что
+# описан в `PROBES.md` правилом №2, и цена та же: следующий прогон засеялся бы уже готовой
+# спекой, а «написал сам» стало бы неотличимо от «прочитал написанное».
+#
+# Караул не мешает прогону — он ловит след. Молча чинить нельзя: испорченное плечо надо
+# перегнать, а не подчистить.
+#
+# Сверяется фикстура с ЗАСЕВОМ, снятым с неё в начале плеча, а не с git: половина фикстур
+# не закоммичена, и `git status` показывал бы их целиком как новые — караул, кричащий всегда,
+# не караул.
+DIRT="$(diff -rq "$SEED" "$SEED_SRC" 2>/dev/null | grep -v "README.md\|-prompt.txt\|_manifest.txt" || true)"
+if [ -n "$DIRT" ]; then
+  echo ""
+  echo "!!! ФИКСТУРА ИЗМЕНИЛАСЬ ВО ВРЕМЯ ПРОГОНА — плечо недостоверно, перегнать после чистки:"
+  echo "$DIRT"
+fi

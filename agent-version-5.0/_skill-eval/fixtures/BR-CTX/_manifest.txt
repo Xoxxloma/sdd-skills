@@ -1,0 +1,4 @@
+context/gbr-rules.md
+context/glossary.md
+README.md
+t1-prompt.txt

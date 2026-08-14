@@ -1,0 +1,82 @@
+[
+  {
+    "probe": "br-ctx",
+    "run": "run-11",
+    "skill": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/business-requirements-doc/SKILL.md",
+    "sandbox": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-11",
+    "answer": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-11/answer.md",
+    "prompt": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/fixtures/BR-CTX/t1-prompt.txt"
+  },
+  {
+    "probe": "br-ctx",
+    "run": "run-12",
+    "skill": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/business-requirements-doc/SKILL.md",
+    "sandbox": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-12",
+    "answer": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-12/answer.md",
+    "prompt": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/fixtures/BR-CTX/t1-prompt.txt"
+  },
+  {
+    "probe": "br-ctx",
+    "run": "run-13",
+    "skill": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/business-requirements-doc/SKILL.md",
+    "sandbox": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-13",
+    "answer": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-13/answer.md",
+    "prompt": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/fixtures/BR-CTX/t1-prompt.txt"
+  },
+  {
+    "probe": "br-ctx",
+    "run": "run-14",
+    "skill": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/business-requirements-doc/SKILL.md",
+    "sandbox": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-14",
+    "answer": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-14/answer.md",
+    "prompt": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/fixtures/BR-CTX/t1-prompt.txt"
+  },
+  {
+    "probe": "br-ctx",
+    "run": "run-15",
+    "skill": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/business-requirements-doc/SKILL.md",
+    "sandbox": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-15",
+    "answer": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-15/answer.md",
+    "prompt": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/fixtures/BR-CTX/t1-prompt.txt"
+  },
+  {
+    "probe": "br-ctx",
+    "run": "run-16",
+    "skill": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/business-requirements-doc/SKILL.md",
+    "sandbox": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-16",
+    "answer": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-16/answer.md",
+    "prompt": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/fixtures/BR-CTX/t1-prompt.txt"
+  },
+  {
+    "probe": "br-ctx",
+    "run": "run-17",
+    "skill": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/business-requirements-doc/SKILL.md",
+    "sandbox": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-17",
+    "answer": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-17/answer.md",
+    "prompt": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/fixtures/BR-CTX/t1-prompt.txt"
+  },
+  {
+    "probe": "br-ctx",
+    "run": "run-18",
+    "skill": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/business-requirements-doc/SKILL.md",
+    "sandbox": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-18",
+    "answer": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-18/answer.md",
+    "prompt": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/fixtures/BR-CTX/t1-prompt.txt"
+  },
+  {
+    "probe": "br-ctx",
+    "run": "run-19",
+    "skill": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/business-requirements-doc/SKILL.md",
+    "sandbox": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-19",
+    "answer": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-19/answer.md",
+    "prompt": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/fixtures/BR-CTX/t1-prompt.txt"
+  },
+  {
+    "probe": "br-ctx",
+    "run": "run-20",
+    "skill": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/business-requirements-doc/SKILL.md",
+    "sandbox": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-20",
+    "answer": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/runs/2026-08-14-context-r3b/br-ctx/run-20/answer.md",
+    "prompt": "C:/Users/Konstantin/projects/product-skills/agent-version-5.0/_skill-eval/fixtures/BR-CTX/t1-prompt.txt"
+  }
+]
