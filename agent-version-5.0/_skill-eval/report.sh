@@ -62,3 +62,12 @@ if [ -d "$R/sb-ctx2" ]; then
   section "sb-ctx2  (grade-sb: спека с полем «Наша сторона»)"
   node "$HERE/grade-sb.mjs" "$R/sb-ctx2" | sed -n '/^СЧЁТЧИКИ/,$p'
 fi
+
+# `context-doc`: шесть плеч, у каждого свой критерий. Имя плеча = имя пробы, суффикс после
+# `cdoc-` — ключ грейдера, поэтому список пишется парами и на глаз проверяем.
+for pair in "cdoc-xlsx xlsx" "cdoc-txt txt" "cdoc-txt-q txt-q" "cdoc-docx docx" "cdoc-fix fix" "cdoc-dup dup"; do
+  set -- $pair
+  [ -d "$R/$1" ] || continue
+  section "$1  (grade-cdoc --probe=$2)"
+  node "$HERE/grade-cdoc.mjs" "$R/$1" --probe="$2" | sed -n '/^СЧЁТЧИКИ/,$p'
+done

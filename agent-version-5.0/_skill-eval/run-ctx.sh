@@ -56,7 +56,20 @@ case "$PROBE" in
   # засев под тех-спеку и четыре промпта разных плеч.
   br-roles-w) FIXTURE=BR-ROLES; PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed ;;
   br-roles-q) FIXTURE=BR-ROLES; PROMPT_FILE=q-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed ;;
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx sb-ctx sb-ctx2 rv-conv br-roles-w br-roles-q"; exit 1 ;;
+  # ── `context-doc`: импорт документа человека в `context/` ─────────────────────────────────
+  # Главная проба набора — `cdoc-xlsx`: источник НЕ читается (конвертера в окружении нет), и
+  # законный исход — отсутствие файла. Гейт описания в её промпте снят заранее, иначе «файла нет»
+  # получалось бы по неверной причине: прогон просто ждёт согласования описания.
+  cdoc-xlsx)  FIXTURE=CD-XLSX; PROMPT_FILE=x-prompt.txt; SKILL=context-doc ;;
+  # Одна фикстура, два плеча, отличие — один абзац промпта: снят гейт описания или нет. Складывать
+  # их числа нельзя, у плеч разные законные исходы (файл против вопроса) — см. `br-roles-w/q`.
+  cdoc-txt)   FIXTURE=CD-TXT;  PROMPT_FILE=w-prompt.txt; SKILL=context-doc ;;
+  cdoc-txt-q) FIXTURE=CD-TXT;  PROMPT_FILE=q-prompt.txt; SKILL=context-doc ;;
+  # Противовес `cdoc-xlsx`: офисный файл, который РЕАЛЬНО распаковывается, — отказ здесь дефект.
+  cdoc-docx)  FIXTURE=CD-DOCX; PROMPT_FILE=d-prompt.txt; SKILL=context-doc ;;
+  cdoc-fix)   FIXTURE=CD-FIX;  PROMPT_FILE=f-prompt.txt; SKILL=context-doc ;;
+  cdoc-dup)   FIXTURE=CD-DUP;  PROMPT_FILE=u-prompt.txt; SKILL=context-doc ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx sb-ctx sb-ctx2 rv-conv rv-clean br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup"; exit 1 ;;
 esac
 
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
