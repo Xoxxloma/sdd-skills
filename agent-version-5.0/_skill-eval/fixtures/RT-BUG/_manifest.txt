@@ -1,5 +1,8 @@
 bug-prompt.txt
+expected.md
 feature-prompt.txt
+menu-prompt.txt
+nokey-prompt.txt
 prebaked/bug_report.md
 prebaked/technical_specification.md
 services/auth.md
