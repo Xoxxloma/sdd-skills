@@ -302,8 +302,16 @@ function grade(dir) {
   // значит штрафовать скилл за инструкцию замера.
   // Служебные файлы раннера (`_seeded.txt`, `_stderr.log`, `_api-failure.txt`) — тоже стенд:
   // они появились до прогона или помимо него. Поймано пилотом 2026-08-14 сразу же.
+  //
+  // `answer.md` и `stream.jsonl` кладёт раннер, и оба перечислены здесь ЯВНО. 2026-08-18:
+  // `stream.jsonl` (поток вызовов, из него `check-escape.mjs` доказывает побег) появился в
+  // раннере — и эта проверка покрасила 4 прогона из 6 «лишний файл в корне», уронив зелёных с
+  // 8/10 до 0/6. Дефект был не в скилле и не в раннере, а в том, что список файлов стенда
+  // выписан в репе ЧЕТЫРЕЖДЫ: здесь, в `grade-bg.mjs`, в `grade-cdoc.mjs` и в исключениях
+  // засева `run-ctx.sh`/`run-ctl.sh`. Заводишь новый файл стенда — правь все четыре.
+  const HARNESS_ROOT = ['docs', 'services', 'context', 'answer.md', 'stream.jsonl'];
   const strayRoot = readdirSync(work).filter(
-    (n) => !['docs', 'services', 'context', 'answer.md'].includes(n) && !n.startsWith('_'));
+    (n) => !HARNESS_ROOT.includes(n) && !n.startsWith('_'));
   add('Лишних файлов в корне задачи не создано', strayRoot.length === 0,
     strayRoot.length ? `лишние: ${strayRoot.join(', ')}` : 'нет');
 
