@@ -1,0 +1,1 @@
+Проверь спеку docs/ARS-314/technical_specification.md. Можно отдавать в разработку?

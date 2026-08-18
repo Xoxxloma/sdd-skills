@@ -36,6 +36,9 @@ POOL="$HERE/run-pool-ctx.sh"
 
 # проба → фикстура, файл промпта, скилл. `SEED_SUB` — подпапка засева, если он не вся фикстура.
 SEED_SUB=""
+# Заглушки под-скиллов: имя подпапки внутри фикстуры. Пусто → в песочницу кладётся один скилл,
+# как было. Заводится только у проб, которые меряют МАРШРУТ оркестратора, а не содержание.
+STUBS_SUB=""
 case "$PROBE" in
   ts-live)   FIXTURE=TS-LIVE;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-conv)   FIXTURE=TS-CONV;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
@@ -52,6 +55,18 @@ case "$PROBE" in
   # субагента за пределы артефакта по новому пути к корню репозитория.
   rv-clean)  FIXTURE=RV-CLEAN;  PROMPT_FILE=rv-prompt.txt;    SKILL=spec-review ;;
   sb-ctx2)   FIXTURE=SB-CTX2;   PROMPT_FILE=stage-prompt.txt; SKILL=stage-breakdown-doc ;;
+  # ── `spec-readiness`: достаточно ли спеки, чтобы писать код ────────────────────────────────
+  # Как и приёмка, ничего не пишет на диск: артефакт — `answer.md` из stdout. Парное плечо без
+  # скилла гоняется отдельным `run-ctl.sh` на той же фикстуре — оно и есть знаменатель.
+  sr-gap)    FIXTURE=SR-GAP;    PROMPT_FILE=sr-prompt.txt;   SKILL=spec-readiness ;;
+  # Сторож ложного срабатывания: спека реализуема, законный исход — «блокеров: 0».
+  sr-clean)  FIXTURE=SR-CLEAN;  PROMPT_FILE=sr-prompt.txt;   SKILL=spec-readiness ;;
+  # Ловушка: `services/itsm.md` набита конкретикой, которой в спеке нет. Ни один её литерал не
+  # имеет права попасть в отчёт, и ни одна 🟡-карточка — в блокеры.
+  sr-yellow) FIXTURE=SR-YELLOW; PROMPT_FILE=sr-prompt.txt;   SKILL=spec-readiness ;;
+  # Дифференцирующий тест фикстуры, а не скилла: `SR-GAP` обязана быть чистой ПО ФОРМЕ. Приёмка
+  # нашла нарушение — значит фикстура мерит форму, а не реализуемость, и чинить надо её.
+  rv-srgap)  FIXTURE=SR-GAP;    PROMPT_FILE=rv-prompt.txt;   SKILL=spec-review ;;
   # У `BR-ROLES` засев лежит подпапкой (`seed/`), а не всей фикстурой: рядом с ним живут второй
   # засев под тех-спеку и четыре промпта разных плеч.
   br-roles-w) FIXTURE=BR-ROLES; PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed ;;
@@ -69,7 +84,73 @@ case "$PROBE" in
   cdoc-docx)  FIXTURE=CD-DOCX; PROMPT_FILE=d-prompt.txt; SKILL=context-doc ;;
   cdoc-fix)   FIXTURE=CD-FIX;  PROMPT_FILE=f-prompt.txt; SKILL=context-doc ;;
   cdoc-dup)   FIXTURE=CD-DUP;  PROMPT_FILE=u-prompt.txt; SKILL=context-doc ;;
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx sb-ctx sb-ctx2 rv-conv rv-clean br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup"; exit 1 ;;
+
+  # ── `bug-report-doc`: описание дефекта ────────────────────────────────────────────────────
+  # Одно дерево, шесть плеч (как `CD-TXT` и `BR-ROLES`). Отличие плеч — только сообщение
+  # аналитика; окружение у всех одно, поэтому числа сравнимы между собой.
+  #
+  # В дереве лежит `docs/ARS-102/` — спека вкладки расчёта ГБР на карточке инцидента. Для
+  # `bg-role-w` это ЯКОРЬ: ожидаемое поведение там записано (§4.4, §5.3), и скилл обязан
+  # сослаться путём и разделом. Для `bg-flick-w` и `bg-form-w` это ЛОВУШКА: их дефекты живут на
+  # других экранах, и приписанный им `ARS-102` — нарушение. Одно дерево ловит оба провала.
+  #
+  # Плечи `-w` дают ответы аналитика заранее («это ПРОДОЛЖЕНИЕ», как у `ts-ctx`) и меряют
+  # ЗАПИСАННЫЙ ФАЙЛ. Плечи `-q` дают голое описание и меряют, ЧТО СПРОШЕНО и что файла нет.
+  # Складывать их числа нельзя: законные исходы разные.
+  bg-flick-w)  FIXTURE=BG-INC; PROMPT_FILE=flick-w-prompt.txt;  SKILL=bug-report-doc ;;
+  bg-flick-q)  FIXTURE=BG-INC; PROMPT_FILE=flick-q-prompt.txt;  SKILL=bug-report-doc ;;
+  bg-form-w)   FIXTURE=BG-INC; PROMPT_FILE=form-w-prompt.txt;   SKILL=bug-report-doc ;;
+  bg-role-w)   FIXTURE=BG-INC; PROMPT_FILE=role-w-prompt.txt;   SKILL=bug-report-doc ;;
+  # Ключа в сообщении нет намеренно — Gate 0 обязан заблокировать запись.
+  bg-data-q)   FIXTURE=BG-INC; PROMPT_FILE=data-q-prompt.txt;   SKILL=bug-report-doc ;;
+  # Негативный случай: новая возможность в жалобной форме, баг-репорта быть не должно.
+  bg-notbug-q) FIXTURE=BG-INC; PROMPT_FILE=notbug-q-prompt.txt; SKILL=bug-report-doc ;;
+
+  # ── спека на багфикс: режим `technical-spec-doc` по баг-репорту ───────────────────────────
+  # Флаг багфикса изображён промптом — проводник про багфикс ещё не знает (шаг 8 плана). Дерево
+  # своё, а не `BG-INC`: там `bg-flick-w` сама пишет в `docs/ARS-312/`, и готовый репорт в
+  # песочнице дал бы ей найти собственный выход засеянным.
+  bf-spec)     FIXTURE=BF-SPEC; PROMPT_FILE=spec-prompt.txt; SKILL=technical-spec-doc ;;
+
+  # ── МАРШРУТ проводника: под-скиллы заглушены ──────────────────────────────────────────────
+  # Меряется только переход по шагам: какой скилл вызван, в каком порядке, что передано, зашёл ли
+  # в разрез. Документы не производятся — заглушки кладут предзаписанные из `prebaked/`.
+  #
+  # Грейдится `_trace.log`, который заглушки пишут на диск, а НЕ формулировка отчёта: агент может
+  # рассказать о вызове, не сделав его, и наоборот. То же правило, что «грейдить файл, а не отчёт».
+  #
+  # `rt-bug` — багфикс мимо БТ и мимо разреза; `rt-feature` — сторож: обычная задача обязана
+  # по-прежнему уходить в `business-requirements-doc`, иначе правка входа сломала основной путь.
+  rt-bug)      FIXTURE=RT-BUG; PROMPT_FILE=bug-prompt.txt;     SKILL=analyst-workspace; STUBS_SUB=stubs ;;
+  rt-feature)  FIXTURE=RT-BUG; PROMPT_FILE=feature-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs ;;
+  # Ветка «Продолжить начатое»: на диске лежит ТОЛЬКО баг-репорт, спеки под него нет. Проверяется,
+  # опознан ли он сводкой состояния (глоб ветки его раньше не видел вовсе) и уходит ли маршрут в
+  # спеку с флагом багфикса, а не по кругу в `bug-report-doc`. Рядом чужая `ARS-102` с полным
+  # комплектом — ловушка на подстановку соседнего документа.
+  rt-cont)     FIXTURE=RT-CONT; PROMPT_FILE=cont-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs ;;
+
+  # ── приёмка баг-репорта ───────────────────────────────────────────────────────────────────
+  # Главное плечо здесь ЧИСТОЕ, а не грязное: у проверяющего инструмента худший отказ — покраснеть
+  # на корректном документе. Список, который краснит зря, перестают читать целиком, и вместе с
+  # ложными находками теряются настоящие. Та же логика, что у сторожа `rv-clean`.
+  #
+  # Чистый документ — ЗАМОРОЖЕННЫЙ ВЫХОД ПРОГОНА `bg-flick-w` из круга 2, а не рукопись
+  # (происхождение записано в `fixtures/RV-BUG/PROVENANCE.txt`). Так проверка идёт по тому, что
+  # скилл реально пишет, а не по идеалу, которого он не производит.
+  rv-bug-clean) FIXTURE=RV-BUG; PROMPT_FILE=clean-prompt.txt; SKILL=spec-review ;;
+  rv-bug-dirty) FIXTURE=RV-BUG; PROMPT_FILE=dirty-prompt.txt; SKILL=spec-review ;;
+  # Спека на багфикс рядом с баг-репортом: источником обязан уйти РЕПОРТ, а пункт 3 обязан найти
+  # FR-1 в его «Ожидаемом результате» и НЕ покраснеть за «требование без контракта» — §2 у багфикса
+  # законно «не применимо». Два разных провала, различимы в одном отчёте: приёмка называет пути
+  # вслух, поэтому непереданный источник виден прямо, а ложная находка — это пункт 3.
+  rv-bug-spec)  FIXTURE=RV-BUG; PROMPT_FILE=spec-prompt.txt; SKILL=spec-review ;;
+  # РАЗЛИЧАЮЩАЯ проба под правило источника. У ARS-314 репорт несёт FR-1, а §7 спеки его не
+  # трассирует. Источник передан → пункт 3 обязан назвать «требование без критерия приёмки».
+  # Источник НЕ передан → пункт 3 молчит, и «нарушений: 0» получается сам собой. Без этой пробы
+  # чистый вердикт на `rv-bug-spec` не отличить от неработающего правила: он выходит в обоих случаях.
+  rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
+
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx sb-ctx sb-ctx2 rv-conv rv-clean br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q"; exit 1 ;;
 esac
 
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
@@ -139,8 +220,14 @@ else
   echo "манифест фикстуры заведён: $MANIFEST"
 fi
 
-# Засев: фикстура без материала стенда. README и промпты в песочницу не едут — прогон,
-# прочитавший README фикстуры, узнал бы ожидаемый исход и проба стала бы вакуумной.
+# Засев: фикстура без материала стенда. README, промпты и `expected.md` в песочницу не едут —
+# прогон, прочитавший их, узнал бы ожидаемый исход и проба стала бы вакуумной.
+#
+# `expected.md` добавлен в список 2026-08-18, после того как он приехал в песочницу пилота
+# `bg-flick-w` целиком — со списком анкеров и перечнем красных исходов. Раньше не срабатывало
+# только потому, что фикстуры с таким именем (`RS-*`) гоняются другим раннером: список исключений
+# перечислял конкретные имена, а не описывал класс «материал стенда». Пилот из-за этого выброшен
+# и переснят.
 # ЗАСЕВ ЛЕЖИТ ВНЕ РЕПОЗИТОРИЯ, И ЭТО НЕ ГИГИЕНА, А ИЗОЛЯЦИЯ.
 #
 # Пока засев лежал в папке раунда (`<раунд>/_seed/<проба>`), он был соседом песочниц и выглядел
@@ -153,10 +240,17 @@ SEED_ROOT="${SKILL_EVAL_SEED_ROOT:-/tmp/skill-eval-seed}"
 SEED="$SEED_ROOT/$(basename "$ROUND")-$PROBE"
 SEED_SRC="$FIXTURE_DIR${SEED_SUB:+/$SEED_SUB}"
 rm -rf "$SEED"; mkdir -p "$SEED"
-( cd "$SEED_SRC" && tar cf - --exclude=README.md --exclude='*-prompt.txt' --exclude=_manifest.txt . ) | ( cd "$SEED" && tar xf - )
+( cd "$SEED_SRC" && tar cf - --exclude=README.md --exclude='*-prompt.txt' --exclude=_manifest.txt --exclude=expected.md --exclude=stubs --exclude=PROVENANCE.txt . ) | ( cd "$SEED" && tar xf - )
 
 echo "проба: $PROBE   фикстура: $FIXTURE   скилл: $SKILL"
-bash "$POOL" "$SNAP" "$PROMPT" "$ROUND/$PROBE" "$N" "$CONC" "$SEED"
+STUBS_DIR=""
+if [ -n "$STUBS_SUB" ]; then
+  STUBS_DIR="$FIXTURE_DIR/$STUBS_SUB"
+  [ -d "$STUBS_DIR" ] || { echo "нет папки заглушек: $STUBS_DIR"; exit 1; }
+  echo "заглушки: $STUBS_SUB → .claude/skills/ песочницы"
+fi
+
+bash "$POOL" "$SNAP" "$PROMPT" "$ROUND/$PROBE" "$N" "$CONC" "$SEED" "$STUBS_DIR"
 
 # ─── Караул фикстуры ────────────────────────────────────────────────────────────────────────
 # Запрет в промпте изоляцией НЕ является. Замер 2026-08-14, плечо `ts-conv`: прогон получил
@@ -171,7 +265,10 @@ bash "$POOL" "$SNAP" "$PROMPT" "$ROUND/$PROBE" "$N" "$CONC" "$SEED"
 # Сверяется фикстура с ЗАСЕВОМ, снятым с неё в начале плеча, а не с git: половина фикстур
 # не закоммичена, и `git status` показывал бы их целиком как новые — караул, кричащий всегда,
 # не караул.
-DIRT="$(diff -rq "$SEED" "$SEED_SRC" 2>/dev/null | grep -v "README.md\|-prompt.txt\|_manifest.txt" || true)"
+# ВНИМАНИЕ: список материала стенда выписан ДВАЖДЫ — здесь и в исключениях `tar` при засеве выше.
+# Добавляешь имя — добавляй в оба места. 2026-08-18: `expected.md` добавили только в засев, и
+# караул тут же дал ложную тревогу «фикстура изменилась» на файле, который просто перестал ездить.
+DIRT="$(diff -rq "$SEED" "$SEED_SRC" 2>/dev/null | grep -v "README.md\|-prompt.txt\|_manifest.txt\|expected.md\|stubs\|PROVENANCE" || true)"
 if [ -n "$DIRT" ]; then
   echo ""
   echo "!!! ФИКСТУРА ИЗМЕНИЛАСЬ ВО ВРЕМЯ ПРОГОНА — плечо недостоверно, перегнать после чистки:"

@@ -33,7 +33,7 @@ const PROBES = ['xlsx', 'txt', 'txt-q', 'docx', 'fix', 'dup']
 // ─── Общее ──────────────────────────────────────────────────────────────────────────────────
 
 /** Файлы стенда: их создаёт раннер, они не результат работы скилла. */
-const HARNESS = new Set(['answer.md', '_seeded.txt', '_stderr.log', '_api-failure.txt', '_escaped.txt', '_STOP'])
+const HARNESS = new Set(['answer.md', 'stream.jsonl', '_seeded.txt', '_stderr.log', '_api-failure.txt', '_escaped.txt', '_STOP'])
 
 const RE_API_FAILURE = /API Error|Request not allowed|Please run \/login|Credit balance|rate limit|session limit|usage limit/i
 

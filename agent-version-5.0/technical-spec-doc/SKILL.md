@@ -53,12 +53,16 @@ So the source of truth splits by provenance, and getting that split right is the
 
 ## Precondition (entry guard): no business-requirements doc → no spec.
 
-**This skill runs only on top of a confirmed business-requirements document.** Before
-anything else — before the turn-1 questions, before any drafting — verify that a
-business-requirements artifact is actually present. It counts as present if the user:
-attached / named a path to a business-requirements `.md` (the output of
-`business-requirements-doc`), or pasted content that is clearly a business-requirements
-doc (has the problem / users / value / roles / FR-* + acceptance-criteria structure).
+**This skill runs only on top of a confirmed document above it.** Before anything else — before the
+turn-1 questions, before any drafting — verify that such an artifact is actually present. Two kinds
+count, and only two:
+
+1. **бизнес-требования** — attached / named a path to a business-requirements `.md` (the output of
+   `business-requirements-doc`), or pasted content that is clearly a business-requirements doc
+   (has the problem / users / value / roles / FR-* + acceptance-criteria structure);
+2. **баг-репорт** — a named path to `bug_report.md` (the output of `bug-report-doc`). У спеки на
+   багфикс документ сверху именно он: там нумерованы требования и записано, откуда взято ожидаемое
+   поведение. Работа с ним идёт по флагу багфикса — см. оговорку ниже.
 
 If no such document is present — the user gave only a vague brief, a one-liner, a feature
 idea, or nothing — **STOP. Do not interview, do not draft, do not write a file.** Reply
@@ -71,12 +75,17 @@ that is exactly the shortcut this guard exists to prevent. A tech spec without a
 business truth to trace to and no acceptance criteria to satisfy; producing one anyway
 manufactures the very fiction this skill is built to avoid. No БТ, no spec — full stop.
 
-> **Единственное исключение — режим узла-фундамента #0** (активируется ТОЛЬКО по явному флагу от
-> analyst-workspace): там бизнес-контекст даёт переданный **эпик-БТ**, а у самого #0 своего БТ нет
-> (он — чистая реализация, общая для нескольких детей). **Флаг есть → прочитай
-> `reference/foundation-node.md` целиком (путь от этого `SKILL.md`, инструменту передавай
-> абсолютным) и работай по нему вместе с этим файлом; флага нет → файл не открывай.**
-> Без флага правило «нет БТ → нет спеки» действует полностью, как выше.
+> **Исключений два, и оба активируются ТОЛЬКО по явному флагу от analyst-workspace. Флага нет —
+> соответствующий файл не открывай вовсе, правило «нет документа сверху → нет спеки» действует
+> полностью, как выше.**
+>
+> 1. **Режим узла-фундамента #0.** Бизнес-контекст даёт переданный **эпик-БТ**, а у самого #0
+>    своего БТ нет (он — чистая реализация, общая для нескольких детей). Флаг есть → прочитай
+>    `reference/foundation-node.md` целиком и работай по нему вместе с этим файлом.
+> 2. **Режим багфикса.** Документ сверху — `bug_report.md`. Флаг есть → прочитай
+>    `reference/bugfix-mode.md` целиком и работай по нему вместе с этим файлом.
+>
+> Путь считай от этого `SKILL.md`, инструменту передавай абсолютным.
 
 ## Turn 1 = questions only. No file.
 

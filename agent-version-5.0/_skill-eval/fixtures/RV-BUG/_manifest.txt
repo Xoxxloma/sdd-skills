@@ -1,0 +1,12 @@
+clean-prompt.txt
+dirty-prompt.txt
+docs/ARS-312/bug_report.md
+docs/ARS-312/technical_specification.md
+docs/ARS-314/bug_report.md
+docs/ARS-314/technical_specification.md
+docs/ARS-411/bug_report.md
+expected.md
+PROVENANCE.txt
+README.md
+spec-prompt.txt
+src-prompt.txt
