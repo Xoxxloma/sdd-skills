@@ -112,6 +112,16 @@ case "$PROBE" in
   # песочнице дал бы ей найти собственный выход засеянным.
   bf-spec)     FIXTURE=BF-SPEC; PROMPT_FILE=spec-prompt.txt; SKILL=technical-spec-doc ;;
 
+  # ── лишние тех-гейты у багфикса: BF-GATE, два ВОПРОСНЫХ плеча ─────────────────────────────
+  # Ответов аналитика заранее НЕТ — законный исход по скиллу «turn 1 = questions only»: список
+  # вопросов и ни одного файла. Грейдится `answer.md`, как у `br-ctx` и `bg-*-q`.
+  #
+  # `bfg-scroll` — дефект не про доступ/нагрузку/выкат/ошибки: меряется ПЕРЕБОР вопросов.
+  # `bfg-role`   — дефект ПРО доступ: сторож обратного отказа. Если правка научит скилл молчать
+  #                про роли вообще, покраснеет здесь. Складывать числа плеч нельзя.
+  bfg-scroll)  FIXTURE=BF-GATE; PROMPT_FILE=scroll-q-prompt.txt; SKILL=technical-spec-doc ;;
+  bfg-role)    FIXTURE=BF-GATE; PROMPT_FILE=role-q-prompt.txt;   SKILL=technical-spec-doc ;;
+
   # ── МАРШРУТ проводника: под-скиллы заглушены ──────────────────────────────────────────────
   # Меряется только переход по шагам: какой скилл вызван, в каком порядке, что передано, зашёл ли
   # в разрез. Документы не производятся — заглушки кладут предзаписанные из `prebaked/`.
@@ -162,7 +172,7 @@ case "$PROBE" in
   # чистый вердикт на `rv-bug-spec` не отличить от неработающего правила: он выходит в обоих случаях.
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx sb-ctx sb-ctx2 rv-conv rv-clean br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx sb-ctx sb-ctx2 rv-conv rv-clean br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q"; exit 1 ;;
 esac
 
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
