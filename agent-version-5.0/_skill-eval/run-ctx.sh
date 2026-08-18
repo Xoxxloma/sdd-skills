@@ -123,6 +123,18 @@ case "$PROBE" in
   # по-прежнему уходить в `business-requirements-doc`, иначе правка входа сломала основной путь.
   rt-bug)      FIXTURE=RT-BUG; PROMPT_FILE=bug-prompt.txt;     SKILL=analyst-workspace; STUBS_SUB=stubs ;;
   rt-feature)  FIXTURE=RT-BUG; PROMPT_FILE=feature-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs ;;
+  # ПОРЯДОК НА ВХОДЕ. Правка 2026-08-18 убрала лишний ход: проводник больше не спрашивает ключ
+  # задачи сам — его спрашивает под-скилл своим Gate 0, и порядок теперь «кнопка → меню БТ/баг →
+  # под-скилл». Два плеча выше этого НЕ ВИДЯТ: ключ подан в их промптах строкой «Ключ задачи: …»,
+  # то есть к моменту развилки он уже есть и спрашивать нечего. Отсюда два плеча ниже.
+  #
+  # `rt-menu` — Шаг 1Б: кнопка нажата, тип НЕ назван, ключа нет. Верный исход — ход остановлен
+  # одним вопросом из двух вариантов, ключ не спрошен, ни один под-скилл не вызван.
+  rt-menu)     FIXTURE=RT-BUG; PROMPT_FILE=menu-prompt.txt;    SKILL=analyst-workspace; STUBS_SUB=stubs ;;
+  # `rt-nokey` — тот же дефект, что в `rt-bug`, но ключа нет НИГДЕ. Маршрут обязан дойти до
+  # `bug-report-doc`, а не встать с требованием назвать ключ. Заглушка при непереданном ключе
+  # берёт `ARS-312`, поэтому пути ниже по маршруту те же и числа сопоставимы с `rt-bug` напрямую.
+  rt-nokey)    FIXTURE=RT-BUG; PROMPT_FILE=nokey-prompt.txt;   SKILL=analyst-workspace; STUBS_SUB=stubs ;;
   # Ветка «Продолжить начатое»: на диске лежит ТОЛЬКО баг-репорт, спеки под него нет. Проверяется,
   # опознан ли он сводкой состояния (глоб ветки его раньше не видел вовсе) и уходит ли маршрут в
   # спеку с флагом багфикса, а не по кругу в `bug-report-doc`. Рядом чужая `ARS-102` с полным
@@ -150,7 +162,7 @@ case "$PROBE" in
   # чистый вердикт на `rv-bug-spec` не отличить от неработающего правила: он выходит в обоих случаях.
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx sb-ctx sb-ctx2 rv-conv rv-clean br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx sb-ctx sb-ctx2 rv-conv rv-clean br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q"; exit 1 ;;
 esac
 
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
