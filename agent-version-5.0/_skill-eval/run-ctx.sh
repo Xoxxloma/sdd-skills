@@ -64,6 +64,9 @@ case "$PROBE" in
   # Ловушка: `services/itsm.md` набита конкретикой, которой в спеке нет. Ни один её литерал не
   # имеет права попасть в отчёт, и ни одна 🟡-карточка — в блокеры.
   sr-yellow) FIXTURE=SR-YELLOW; PROMPT_FILE=sr-prompt.txt;   SKILL=spec-readiness ;;
+  # Спека РЕАЛЬНОГО багфикса: маленькая, вопросов мало. На ней у человека проявился хвост
+  # после отчёта — замечание про §8 и перечень закрытых вопросов, которых в форме нет.
+  sr-bugfix) FIXTURE=SR-BUGFIX; PROMPT_FILE=sr-prompt.txt;   SKILL=spec-readiness ;;
   # Дифференцирующий тест фикстуры, а не скилла: `SR-GAP` обязана быть чистой ПО ФОРМЕ. Приёмка
   # нашла нарушение — значит фикстура мерит форму, а не реализуемость, и чинить надо её.
   rv-srgap)  FIXTURE=SR-GAP;    PROMPT_FILE=rv-prompt.txt;   SKILL=spec-review ;;
