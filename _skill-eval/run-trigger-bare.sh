@@ -23,7 +23,7 @@ CONC="${4:-5}"
 SEED="${5:-}"
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REVIEW_SKILL="$REPO/agent-version-3.2/spec-review"
+REVIEW_SKILL="$REPO/agent-version/spec-review"
 
 [ -f "$PROMPT" ] || { echo "нет файла промпта: $PROMPT"; exit 1; }
 [ -d "$REVIEW_SKILL" ] || { echo "нет скилла приёмки: $REVIEW_SKILL"; exit 1; }

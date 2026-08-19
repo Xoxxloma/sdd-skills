@@ -28,7 +28,7 @@ CONC="${5:-5}"
 SEED="${6:-}"
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SKILLS_SRC="$REPO/agent-version-3.2"
+SKILLS_SRC="$REPO/agent-version"
 
 # В реестр песочницы кладутся ВСЕ под-скиллы петли, а не одна приёмка.
 #
@@ -41,7 +41,11 @@ SKILLS_SRC="$REPO/agent-version-3.2"
 # `analyst-workspace` СЮДА НЕ КЛАДЁТСЯ: скилл автора грузится ПУТЁМ, так меряют все прежние
 # раунды, и менять способ загрузки ради этого нельзя. `service-map` и `archive-spec` тоже нет —
 # они читают код соседних сервисов, которого в песочнице не существует.
-SUBSKILLS="spec-review business-requirements-doc task-decomposition-doc technical-spec-doc stage-breakdown-doc project-conventions domain-glossary"
+#
+# `project-conventions` и `domain-glossary` убраны 2026-08-19: скиллов больше нет в наборе
+# (удалены записями от 2026-08-12 и 2026-08-13). Проверка на строке ниже — жёсткая, `exit 1`,
+# поэтому раннер падал бы на входе, а не давал прогон без под-скилла.
+SUBSKILLS="spec-review business-requirements-doc task-decomposition-doc technical-spec-doc stage-breakdown-doc"
 
 [ -f "$SKILL" ]  || { echo "нет файла скилла: $SKILL";  exit 1; }
 [ -f "$PROMPT" ] || { echo "нет файла промпта: $PROMPT"; exit 1; }

@@ -74,7 +74,7 @@
 
 ## 3. Формирование технической спецификации (`technical-spec-doc`)
 
-Машинные проверки этого скилла живут во **втором стенде**: `agent-version-3.2/_skill-eval/`.
+Машинные проверки этого скилла живут во **втором стенде**: `agent-version/_skill-eval/`.
 В корневом каталоге их нет ни одной — отсюда впечатление, что скилл не меряется.
 
 | Проба | Что меряет | Вход | Засев | Грейдер | Ограничения |
@@ -139,7 +139,7 @@ node _skill-eval/grade-bs6.mjs _skill-eval/fixtures/bs6-validate
 Засев не нужен: все входы стартуют с текста в промпте. `R` — каталог круга.
 
 ```bash
-R=_skill-eval/runs/$(date +%F)-full; S=agent-version-3.2/business-requirements-doc/SKILL.md
+R=_skill-eval/runs/$(date +%F)-full; S=agent-version/business-requirements-doc/SKILL.md
 cd _skill-eval
 for p in br1 br2 br3 br4 bs1 bs6 bs9 bs9b q1 q2; do
   ./run-pool.sh "../$S" "fixtures/$p-prompt.txt" "runs/$(basename $R)/$p" 10 5
@@ -161,10 +161,10 @@ node grade-bs9.mjs "$R/bs9"; node grade-bs9.mjs "$R/bs9b"
 
 ```bash
 for p in dc3 dc12 dc14; do
-  ./run-pool.sh ../agent-version-3.2/task-decomposition-doc/SKILL.md \
+  ./run-pool.sh ../agent-version/task-decomposition-doc/SKILL.md \
     "fixtures/$p-prompt.txt" "runs/$(basename $R)/$p" 10 5 fixtures/ARS-70 docs/ARS-70
 done
-./run-pool.sh ../agent-version-3.2/task-decomposition-doc/SKILL.md \
+./run-pool.sh ../agent-version/task-decomposition-doc/SKILL.md \
   fixtures/q4-prompt.txt "runs/$(basename $R)/q4" 10 5 fixtures/ARS-80 docs/ARS-80
 ```
 
@@ -177,20 +177,20 @@ done
 
 ```bash
 for p in ts3 ws2 q3; do
-  ./run-pool.sh ../agent-version-3.2/technical-spec-doc/SKILL.md \
+  ./run-pool.sh ../agent-version/technical-spec-doc/SKILL.md \
     "fixtures/$p-prompt.txt" "runs/$(basename $R)/$p" 10 5 fixtures/ARS-57 docs/ARS-57
 done
 for p in fnd3 fnd4; do
-  ./run-pool.sh ../agent-version-3.2/technical-spec-doc/SKILL.md \
+  ./run-pool.sh ../agent-version/technical-spec-doc/SKILL.md \
     "fixtures/$p-prompt.txt" "runs/$(basename $R)/$p" 10 5 fixtures/ARS-100 docs/ARS-100
 done
 for p in ch2 ch3; do
-  ./run-pool.sh ../agent-version-3.2/technical-spec-doc/SKILL.md \
+  ./run-pool.sh ../agent-version/technical-spec-doc/SKILL.md \
     "fixtures/$p-prompt.txt" "runs/$(basename $R)/$p" 10 5 fixtures/ARS-90 docs/ARS-90
 done
 ```
 
-Грейд: `node agent-version-3.2/_skill-eval/grade-sp.mjs` — секция `ts4` по артефакту `ts3`
+Грейд: `node agent-version/_skill-eval/grade-sp.mjs` — секция `ts4` по артефакту `ts3`
 (секции шаблона, пометки происхождения, статус, JSON у нового контракта). Остальное глазами.
 **Пробы SP-1…SP-7 не гонять** — они меряют секцию, удалённую из скилла 2026-07-31.
 
@@ -202,7 +202,7 @@ done
 ```bash
 declare -A ST=( [st1]=ARS-122 [st5]=ARS-122 [st2]=ARS-124 [st3]=ARS-123 [st7]=ARS-120 [st8]=ARS-125 )
 for p in "${!ST[@]}"; do
-  ./run-pool.sh ../agent-version-3.2/stage-breakdown-doc/SKILL.md \
+  ./run-pool.sh ../agent-version/stage-breakdown-doc/SKILL.md \
     "fixtures/$p-prompt.txt" "runs/$(basename $R)/$p" 10 5 "fixtures/${ST[$p]}" "${ST[$p]}"
 done
 ```
@@ -211,7 +211,7 @@ done
 
 ```bash
 for p in st1 st2 st3 st5 st7 st8; do
-  node agent-version-3.2/_skill-eval/grade-stages.mjs $p "$R"
+  node agent-version/_skill-eval/grade-stages.mjs $p "$R"
 done
 ```
 
