@@ -150,7 +150,13 @@ run_one() {
     const fs = require("fs")
     const lines = fs.readFileSync(process.argv[1], "utf8").trim().split("\n")
     const parsed = lines.map((s) => { try { return JSON.parse(s) } catch { return null } }).filter(Boolean)
-    const res = parsed.find((x) => x.type === "result")
+    // ПОСЛЕДНИЙ результат, а не первый. Скилл с субагентами запускает их фоновыми задачами и
+    // заканчивает ход, не дожидаясь: CLI печатает `result` на каждом таком ходе. У `spec-readiness`
+    // их пять — «запустил трёх субагентов, жду», три промежуточных, и только пятый несёт отчёт.
+    // `find` брал первый, и все пять прогонов выглядели как пустая работа при готовых отчётах
+    // в потоке. Пробы с одним субагентом или без них этого не показывали — там результат один.
+    const results = parsed.filter((x) => x.type === "result" && typeof x.result === "string")
+    const res = results.length ? results[results.length - 1] : null
     // Отказ CLI до первого события: поток пуст, писать нечего — пусть `answer.md` останется пустым,
     // раннер опознает это своей проверкой ниже.
     fs.writeFileSync(process.argv[2], res && typeof res.result === "string" ? res.result : "")

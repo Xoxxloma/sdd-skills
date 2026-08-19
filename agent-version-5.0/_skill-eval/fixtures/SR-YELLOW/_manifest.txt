@@ -1,0 +1,6 @@
+docs/SUP-702/business_requirements.md
+docs/SUP-702/technical_specification.md
+README.md
+services/itsm.md
+services/manifest.yaml
+sr-prompt.txt
