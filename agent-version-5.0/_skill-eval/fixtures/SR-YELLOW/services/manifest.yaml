@@ -1,0 +1,4 @@
+services:
+  - name: itsm
+    path: ../itsm-core
+    type: backend
