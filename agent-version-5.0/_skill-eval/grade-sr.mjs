@@ -294,6 +294,14 @@ function gradeOne (dir, specText) {
   // `noisyPreamble` меряет черновик перед отчётом. Пилот вылил тридцать строк рабочих заметок и
   // предварительный список блокеров ПЕРЕД фиксированной формой — то есть аналитик читает один и
   // тот же перечень дважды, в разных видах.
+  // ХВОСТ ПОСЛЕ ОТЧЁТА. Правило «печатается только отчёт» и счётчик `preamble` смотрят ТОЛЬКО
+  // вперёд — на текст до строки «спека:». На реальной спеке багфикса 2026-08-19 течь оказалась
+  // сзади: после счётной строки шли замечание о подсчёте §8 и перечень закрытых вопросов, которых
+  // в форме нет вовсе. Ни правило, ни счётчик этого не видели — чинил преамбулу, течь переехала.
+  const tailAnchor = text.search(/^[^\n]*(?:пунктов, уже объявленных|открытых пунктов в §8)[^\n]*$/m)
+  const nlAfter = tailAnchor >= 0 ? text.indexOf('\n', tailAnchor) : -1
+  const tail = nlAfter >= 0 ? text.slice(nlAfter + 1).replace(/```/g, '').trim() : ''
+
   const start = text.search(/^\s*спека\s*:/m)
   const preamble = start > 0 ? text.slice(0, start).trim().length : 0
 
@@ -328,6 +336,10 @@ function gradeOne (dir, specText) {
     foundOut,
     preamble,
     noisyPreamble: preamble > 400,
+    tail: tail.length,
+    tailText: tail.slice(0, 220),
+    tail: tail.length,
+    tailText: tail.slice(0, 200),
     agentCalls,
     retries: agentCalls === null ? null : Math.max(0, agentCalls - 3),
     // МЕХАНИЗМ ОБОЙДЁН: ролей меньше трёх. Такой прогон читает спеку главным агентом и выдаёт
@@ -571,6 +583,9 @@ if (withB.length) {
   console.log(`  ${avgB.toFixed(1)}  блокеров названо в среднем (подсажено дыр: 6)`)
   console.log(`  ${infl}${pct(infl)}  прогонов назвали больше 6 блокеров — порог «дороже правки строки» не сработал`)
   console.log(`  ${c('noisyPreamble')}${pct(c('noisyPreamble'))}  прогонов вылили черновик ПЕРЕД формой отчёта`)
+  const withTail = measured.filter(([, r]) => r.tail > 60)
+  console.log(`  ${withTail.length}${pct(withTail.length)}  прогонов дописали ХВОСТ после счётной строки`)
+  for (const [n2, r] of withTail) console.log(`      ${n2}: ${r.tailText.split('\n').join(' ').slice(0, 130)}`)
   const withC = measured.filter(([, r]) => r.cites && r.cites.total)
   if (withC.length) {
     const tot = withC.reduce((a, [, r]) => a + r.cites.total, 0)
