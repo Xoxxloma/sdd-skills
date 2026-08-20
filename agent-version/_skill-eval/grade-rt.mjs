@@ -26,7 +26,8 @@
 // ПРАВИЛА: регулярки литеральные; `\b`/`\w` рядом с кириллицей НЕ применять; побег — «не
 // измерено»; счётчик на каждый дефект.
 
-import { readdirSync, readFileSync, existsSync } from 'node:fs'
+import { readdirSync, readFileSync, existsSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const RE_API_FAILURE = /API Error|Request not allowed|Please run \/login|Credit balance|rate limit|session limit|usage limit/i
@@ -76,16 +77,102 @@ export function parseTrace (text) {
   return text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
 }
 
+const REPLACEMENT = String.fromCharCode(0xFFFD)
+
+/**
+ * ЧТЕНИЕ ТРАССЫ С ПОДБОРОМ КОДИРОВКИ.
+ *
+ * Поймано 2026-08-20 на прогоне base10/run-04: строка трассы пришла как
+ * `technical-spec-doc ????????=docs/... ????=???????` — латиница цела, кириллица мусор.
+ * Причина виндовая и не наша: заглушка велит «допиши строку в `_trace.log`», агент дописывает
+ * её PowerShell'ом, а `Add-Content` по умолчанию пишет системной кодировкой (cp1251), не UTF-8.
+ *
+ * Цена дефекта — ЛОЖНАЯ НАХОДКА: анкеры «источник=» и «флаг=» по такой строке не срабатывают, и
+ * прогон с ПОЛНЫМ маршрутом читается как «спека запущена без флага багфикса». Ровно тот класс,
+ * против которого заведено правило репы «грейдить файл, а не формулировку»: файл-то мы читаем,
+ * но читаем не теми байтами.
+ *
+ * Чиним на стороне ЧТЕНИЯ, а не в заглушке: правка фикстуры обнулила бы базу, снятую тем же днём.
+ * Лестница станций от этого не страдала — станции опознаются по латинским именам скиллов и путям
+ * файлов; страдали только счётчики флага и источника.
+ */
+export function readTrace (path) {
+  const buf = readFileSync(path)
+  const utf = buf.toString('utf8')
+  if (!utf.includes(REPLACEMENT)) return utf
+  // Символ-замена значит «эти байты не UTF-8». Единственный реальный кандидат на Windows —
+  // системная кириллическая кодировка; `TextDecoder` в ноде её знает (полный ICU в сборке).
+  try {
+    const cp = new TextDecoder('windows-1251').decode(buf)
+    return cp.includes(REPLACEMENT) ? utf : cp
+  } catch { return utf }
+}
+
 const SKILL_OF = (line) => line.split(/\s+/)[0]
+
+/**
+ * ЛЕСТНИЦА МАРШРУТА — шесть станций, в порядке исполнения.
+ *
+ * Заведена 2026-08-20. Повод: `r.pass` — конъюнкция шести условий, и на слабой модели она даёт
+ * ноль ВСЕГДА (`rt-bug`: 1/10, 0/10, 0/7, 0/7 за четыре раунда). Ноль не отличает «встал на
+ * репорте» от «дошёл до этапов», поэтому правка скилла не двигала ни одного числа, и стенд не
+ * отвечал на вопрос, ради которого заведён.
+ *
+ * Считаются ДВА разных числа, и путать их нельзя:
+ *   `steps` — сколько станций отмечено всего (объём сделанной работы);
+ *   `reach` — длина НЕПРЕРЫВНОГО префикса от первой станции (где маршрут оборвался).
+ * Пропустил приёмку, но написал спеку: `steps` 3, `reach` 1. Обе цифры честные и о разном.
+ *
+ * Станция «приёмка» опознаётся по ПУТИ в строке трассы, а не по имени скилла: `spec-review`
+ * вызывается за маршрут несколько раз на разные документы, и без пути они неразличимы.
+ */
+const STATION_REVIEW = (re) => (t) => t.some((l) => l.startsWith('spec-review') && re.test(l))
+const STATION_CALL = (name) => (t) => t.some((l) => l.startsWith(name))
+
+const STATIONS = {
+  bug: [
+    ['репорт написан', STATION_CALL('bug-report-doc')],
+    ['репорт принят', STATION_REVIEW(/bug_report\.md/)],
+    ['спека запущена', STATION_CALL('technical-spec-doc')],
+    ['спека принята', STATION_REVIEW(/technical_specification\.md/)],
+    ['этапы нарезаны', STATION_CALL('stage-breakdown-doc')],
+    ['этапы приняты', STATION_REVIEW(/stages/)],
+  ],
+  feature: [
+    ['БТ написано', STATION_CALL('business-requirements-doc')],
+    ['БТ принято', STATION_REVIEW(/business_requirements\.md/)],
+    ['спека запущена', STATION_CALL('technical-spec-doc')],
+    ['спека принята', STATION_REVIEW(/technical_specification\.md/)],
+    ['этапы нарезаны', STATION_CALL('stage-breakdown-doc')],
+    ['этапы приняты', STATION_REVIEW(/stages/)],
+  ],
+}
+STATIONS.nokey = STATIONS.bug
+// `menu` лестницы не имеет: там верный исход — остановка ДО первого вызова, и любая станция
+// на этом плече означает дефект, а не прогресс.
+
+export function ladder (lines, probe) {
+  const st = STATIONS[probe]
+  if (!st) return { steps: 0, reach: 0, hit: [], total: 0 }
+  const hit = st.map(([name, f]) => ({ name, ok: f(lines) }))
+  const steps = hit.filter((h) => h.ok).length
+  let reach = 0
+  for (const h of hit) { if (!h.ok) break; reach++ }
+  return { steps, reach, hit, total: st.length }
+}
 
 export function gradeRun (dir, probe) {
   const r = { dir, probe, measured: true, why: '' }
   const ans = existsSync(join(dir, 'answer.md')) ? readFileSync(join(dir, 'answer.md'), 'utf8') : ''
   if (existsSync(join(dir, '_escaped.txt'))) { r.measured = false; r.why = 'побег из песочницы'; return r }
+  // Отказ API ПОСРЕДИ цикла ходов (маркер ставит раннер): склейка ответов длинная, и маркер
+  // отказа в ней за первые 200 байт не виден — без этой проверки прогон, потерявший API на
+  // четвёртом ходу, считался бы обрывом маршрута на третьей станции.
+  if (existsSync(join(dir, '_api-failure-turn.txt'))) { r.measured = false; r.why = 'отказ API посреди ходов'; return r }
   if (isApiFailure(ans)) { r.measured = false; r.why = 'отказ API'; return r }
 
   const tracePath = join(dir, '_trace.log')
-  r.lines = existsSync(tracePath) ? parseTrace(readFileSync(tracePath, 'utf8')) : []
+  r.lines = existsSync(tracePath) ? parseTrace(readTrace(tracePath)) : []
   r.calls = r.lines.map(SKILL_OF)
   r.calledAny = r.calls.length > 0
 
@@ -99,6 +186,8 @@ export function gradeRun (dir, probe) {
   r.calledReview = r.calls.includes('spec-review')
   r.calledSpec = r.calls.includes('technical-spec-doc')
   r.calledStages = r.calls.includes('stage-breakdown-doc')
+  // Лестница считается по СЫРЫМ строкам трассы: станции приёмки различаются путём.
+  Object.assign(r, ladder(r.lines, probe))
   // Разрез: заглушки `task-decomposition-doc` нет намеренно — её вызов виден только в потоке.
   // В трассе признак другой: до спеки дошёл, а лишнего документа не появилось.
   r.decomposition = r.docs.some((d) => existsSync(join(dir, 'docs', d, 'decomposition.md')))
@@ -107,7 +196,11 @@ export function gradeRun (dir, probe) {
   const specLine = r.lines.find((l) => l.startsWith('technical-spec-doc')) ?? ''
   r.specSource = /источник=(\S+)/.exec(specLine)?.[1] ?? ''
   r.specFlag = /флаг=(\S+)/.exec(specLine)?.[1] ?? ''
-  r.flagBugfix = /багфикс/i.test(r.specFlag)
+  // ДВА НАПИСАНИЯ ФЛАГА, И ОБА ЗАКОННЫ. Заглушка просит писать «багфикс», но прогон
+  // base10/run-15 записал `флаг=bugfix` — сведение верное, слово английское. Меряем «передан ли
+  // флаг починки», а не «на каком языке заглушка его записала»: тот же класс ложной находки,
+  // что и cp1251-трасса, только на уровне словаря, а не байтов.
+  r.flagBugfix = /багфикс|bugfix|bug-fix/i.test(r.specFlag)
   r.sourceIsReport = /bug_report\.md/.test(r.specSource)
 
   // Ключ задачи спрашивает под-скилл, а не проводник. Заглушки вопросов не задают, значит любая
@@ -188,6 +281,57 @@ function selftest () {
   ck('стартовый вопрос ловится обеими половинами', RE_OPT_BT.test(STEP1) && RE_OPT_BUG.test(STEP1), true)
   ck('и отсекается соседями Шага 1', RE_STEP1_NEIGHBOURS.test(STEP1), true)
   ck('развилка 1Б соседей не содержит', RE_STEP1_NEIGHBOURS.test(MENU), false)
+
+  // Лестница: два числа об одном прогоне, и главный случай — когда они РАСХОДЯТСЯ.
+  const lb = ladder(parseTrace(REF_BUG), 'bug')
+  ck('лестница багфикса — станций', lb.steps, 5)
+  ck('лестница багфикса — дошёл до', lb.reach, 5)
+  const lf = ladder(parseTrace(REF_FEATURE), 'feature')
+  ck('лестница фичи — станций', lf.steps, 3)
+  ck('лестница фичи — дошёл до', lf.reach, 3)
+  // Пропущенная приёмка: работа сделана, но маршрут оборван на первой станции. Ровно это
+  // различение и есть повод завести лестницу — конъюнкция `pass` здесь даёт тот же ноль,
+  // что и у прогона, вставшего сразу после репорта.
+  const SKIPPED = `bug-report-doc
+technical-spec-doc источник=docs/ARS-312/bug_report.md флаг=багфикс
+stage-breakdown-doc`
+  const ls = ladder(parseTrace(SKIPPED), 'bug')
+  ck('приёмка пропущена — станций', ls.steps, 3)
+  ck('приёмка пропущена — дошёл до', ls.reach, 1)
+  // Встал сразу после репорта — нижняя точка шкалы.
+  const STALLED = ladder(parseTrace('bug-report-doc'), 'bug')
+  ck('встал на репорте — станций', STALLED.steps, 1)
+  ck('встал на репорте — дошёл до', STALLED.reach, 1)
+  ck('пустая трасса — ноль станций', ladder([], 'bug').steps, 0)
+  // `nokey` идёт по той же лестнице, что и `bug`: маршрут у них один, разница только в ключе.
+  ck('nokey — та же лестница', ladder(parseTrace(REF_BUG), 'nokey').steps, 5)
+  // `menu` лестницы не имеет: там верный исход — ноль вызовов.
+  ck('menu — лестницы нет', ladder(parseTrace(REF_BUG), 'menu').total, 0)
+
+  // Кодировка трассы: cp1251-строка обязана читаться так же, как UTF-8. Проверяем на настоящем
+  // событии — строке заглушки спеки, которая и приехала битой на base10/run-04.
+  const LINE = 'technical-spec-doc источник=docs/ARS-312/bug_report.md флаг=багфикс'
+  const tmp1 = join(tmpdir(), 'rt-trace-utf8.log')
+  const tmp2 = join(tmpdir(), 'rt-trace-cp1251.log')
+  writeFileSync(tmp1, LINE, 'utf8')
+  // Настоящие cp1251-байты, а не подделка: кодируем посимвольно по таблице windows-1251.
+  const cp1251 = Buffer.from(Array.from(LINE, (ch) => {
+    const c = ch.charCodeAt(0)
+    if (c < 128) return c
+    if (c >= 0x410 && c <= 0x44F) return c - 0x410 + 0xC0
+    if (c === 0x451) return 0xB8
+    if (c === 0x401) return 0xA8
+    throw new Error('символ вне таблицы: ' + ch)
+  }))
+  writeFileSync(tmp2, cp1251)
+  ck('трасса UTF-8 читается', readTrace(tmp1), LINE)
+  ck('трасса cp1251 читается так же', readTrace(tmp2), LINE)
+  const flagOf = (t) => /флаг=(\S+)/.exec(t)?.[1] ?? ''
+  ck('флаг виден в cp1251-трассе', flagOf(readTrace(tmp2)), 'багфикс')
+  // Английское написание флага — не дефект скилла, а словарь прогона.
+  ck('флаг багфикса по-русски', /багфикс|bugfix|bug-fix/i.test('багфикс'), true)
+  ck('флаг багфикса по-английски', /багфикс|bugfix|bug-fix/i.test('bugfix'), true)
+  ck('обычный флаг не путается', /багфикс|bugfix|bug-fix/i.test('обычный'), false)
   console.log(bad === 0 ? '\nсамопроверка: ok' : `\nсамопроверка: ПРОВАЛОВ ${bad}`)
   return bad === 0
 }
@@ -242,6 +386,25 @@ if (PROBE === 'bug' || PROBE === 'nokey') {
   console.log(`  ${pct(c((r) => r.calledBugReport))}\tУШЁЛ В БАГ-РЕПОРТ на обычной задаче  ← КРИТЕРИЙ`)
   console.log(`  ${pct(c((r) => r.wrongFirst))}\tпервым вызван не business-requirements-doc`)
   console.log(`  ${pct(c((r) => !r.calledReview))}\tприёмка не запущена ни разу`)
+}
+// ─── Лестница маршрута ──────────────────────────────────────────────────────────────────────
+// Печатается ПЕРЕД «зелёными» намеренно: зелёное — редкое событие, а лестница отвечает на
+// вопрос «докуда дошли» и на нуле зелёных. Средние даются с одним знаком: при N=7 второй знак
+// уже шум.
+if (N > 0) {
+  const TOTAL = ok[0].total || 6
+  const avg = (f) => (ok.reduce((s, r) => s + f(r), 0) / N).toFixed(1)
+  console.log('')
+  console.log(`  станций пройдено (объём работы): ${avg((r) => r.steps)} из ${TOTAL} в среднем`)
+  console.log(`  маршрут дошёл до (непрерывно):   ${avg((r) => r.reach)} из ${TOTAL} в среднем`)
+  const distr = Array.from({ length: TOTAL + 1 }, (_, k) => c((r) => r.reach === k))
+  console.log(`  распределение обрыва: ${distr.map((n, k) => `${k}→${n}`).join('  ')}`)
+  console.log('')
+  for (let i = 0; i < TOTAL; i++) {
+    const name = ok[0].hit[i]?.name ?? `станция ${i + 1}`
+    console.log(`  ${pct(c((r) => r.hit[i]?.ok))}\tстанция ${i + 1}: ${name}`)
+  }
+  console.log('')
 }
 console.log(`  ${pct(c((r) => r.pass))}\tзелёных`)
 console.log('')
