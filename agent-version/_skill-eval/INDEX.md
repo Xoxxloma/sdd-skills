@@ -95,6 +95,7 @@
 | `rt-feature` | `analyst-workspace` | `RT-BUG` | сторож основного пути: обычная задача обязана уйти в `business-requirements-doc` | `grade-rt.mjs --probe=feature` |
 | `rt-menu` | `analyst-workspace` | `RT-BUG` | **порядок на входе:** кнопка нажата, тип не назван — ход обязан встать меню «БТ или баг», ключ задачи НЕ спрашивается | `grade-rt.mjs --probe=menu` |
 | `rt-nokey` | `analyst-workspace` | `RT-BUG` | тот же дефект, что в `rt-bug`, но ключа нет нигде: маршрут обязан дойти до `bug-report-doc`, а не встать с требованием ключа | `grade-rt.mjs --probe=nokey` |
+| `rt-noreview` | `analyst-workspace` | `RT-BUG` (`noreview-prompt.txt`) | **флаг `--no-review`:** выключает ли он приёмку ЦЕЛИКОМ и НЕ ломает ли маршрут. Зачёт — конъюнкция: ни одного `spec-review` И дошёл до этапов | `grade-rt.mjs --probe=noreview` |
 | `rt-cont` | `analyst-workspace` | `RT-CONT` | «Продолжить начатое»: на диске только баг-репорт — опознан ли он сводкой; рядом чужая `ARS-102` как ловушка | вручную по `_trace.log` |
 
 ## Пара `rt-menu` / `rt-nokey` — порядок на входе в маршрут

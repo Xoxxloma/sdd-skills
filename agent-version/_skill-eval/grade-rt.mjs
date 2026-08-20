@@ -148,6 +148,13 @@ const STATIONS = {
   ],
 }
 STATIONS.nokey = STATIONS.bug
+// У пробы флага лестница СВОЯ и короткая: три станции приёмки из неё убраны, потому что их
+// отсутствие здесь — верное поведение, а не обрыв. Мерим то же самое: доехал ли маршрут до конца.
+STATIONS.noreview = [
+  ['репорт написан', STATION_CALL('bug-report-doc')],
+  ['спека запущена', STATION_CALL('technical-spec-doc')],
+  ['этапы нарезаны', STATION_CALL('stage-breakdown-doc')],
+]
 // `menu` лестницы не имеет: там верный исход — остановка ДО первого вызова, и любая станция
 // на этом плече означает дефект, а не прогресс.
 
@@ -193,14 +200,19 @@ export function gradeRun (dir, probe) {
   r.decomposition = r.docs.some((d) => existsSync(join(dir, 'docs', d, 'decomposition.md')))
 
   // Флаг багфикса и источник заглушка спеки пишет в свою строку.
-  const specLine = r.lines.find((l) => l.startsWith('technical-spec-doc')) ?? ''
+  // СТРОКА СПЕКИ — ТА, ГДЕ ЕСТЬ СВЕДЕНИЯ, А НЕ ПЕРВАЯ ПОПАВШАЯСЯ. Поймано 2026-08-20 на
+  // прогонах nr-bare10/run-08 и nr-canon10/run-04: заглушка отработала дважды и первым записала
+  // голое `technical-spec-doc` без источника и флага. Взяв первую строку, грейдер объявлял
+  // «спека запущена БЕЗ флага багфикса» прогону, который флаг передал во второй строке.
+  const specLines = r.lines.filter((l) => l.startsWith('technical-spec-doc'))
+  const specLine = specLines.find((l) => /=/.test(l)) ?? specLines[0] ?? ''
   r.specSource = /источник=(\S+)/.exec(specLine)?.[1] ?? ''
   r.specFlag = /флаг=(\S+)/.exec(specLine)?.[1] ?? ''
   // ДВА НАПИСАНИЯ ФЛАГА, И ОБА ЗАКОННЫ. Заглушка просит писать «багфикс», но прогон
   // base10/run-15 записал `флаг=bugfix` — сведение верное, слово английское. Меряем «передан ли
   // флаг починки», а не «на каком языке заглушка его записала»: тот же класс ложной находки,
   // что и cp1251-трасса, только на уровне словаря, а не байтов.
-  r.flagBugfix = /багфикс|bugfix|bug-fix/i.test(r.specFlag)
+  r.flagBugfix = /ба[гк]-?фикс|b[ua]g-?fix/i.test(r.specFlag)
   r.sourceIsReport = /bug_report\.md/.test(r.specSource)
 
   // Ключ задачи спрашивает под-скилл, а не проводник. Заглушки вопросов не задают, значит любая
@@ -219,6 +231,13 @@ export function gradeRun (dir, probe) {
     // На `bug` ключ подан, и переспрашивание остаётся ОТДЕЛЬНЫМ счётчиком: вшив его в зелёное,
     // мы поменяли бы критерий плеча задним числом и сделали числа r1…r3 несопоставимыми.
     if (probe === 'nokey') r.pass = r.pass && !r.asksKey
+  } else if (probe === 'noreview') {
+    // Флаг `--no-review` обязан выключить приёмку ЦЕЛИКОМ и НЕ обязан менять маршрут.
+    // Зачёт — конъюнкция двух половин. Половина «приёмка не звалась» сама по себе ничего не
+    // стоит: прогон, вставший на репорте, приёмку тоже не зовёт — и выглядел бы образцовым.
+    r.wrongFirst = r.first !== null && r.first !== 'bug-report-doc'
+    r.pass = r.first === 'bug-report-doc' && !r.calledReview && !r.calledBT &&
+      r.calledSpec && r.flagBugfix && r.calledStages
   } else if (probe === 'feature') {
     r.wrongFirst = r.first !== null && r.first !== 'business-requirements-doc'
     r.pass = r.first === 'business-requirements-doc' && !r.calledBugReport
@@ -331,7 +350,29 @@ stage-breakdown-doc`
   // Английское написание флага — не дефект скилла, а словарь прогона.
   ck('флаг багфикса по-русски', /багфикс|bugfix|bug-fix/i.test('багфикс'), true)
   ck('флаг багфикса по-английски', /багфикс|bugfix|bug-fix/i.test('bugfix'), true)
-  ck('обычный флаг не путается', /багфикс|bugfix|bug-fix/i.test('обычный'), false)
+  ck('обычный флаг не путается', /ба[гк]-?фикс|b[ua]g-?fix/i.test('обычный'), false)
+  // `bagfix` — опечатка прогона nr-canon10/run-10. Меряем «передан ли флаг починки», а не
+  // орфографию заглушки, поэтому анкер принимает и её.
+  ck('опечатка bagfix принимается', /ба[гк]-?фикс|b[ua]g-?fix/i.test('bagfix'), true)
+  // Двойной вызов заглушки: сведения во ВТОРОЙ строке, первая голая.
+  const DOUBLE = `bug-report-doc
+technical-spec-doc
+technical-spec-doc источник=docs/ARS-312/bug_report.md флаг=багфикс
+stage-breakdown-doc`
+  const dl = parseTrace(DOUBLE).filter((l) => l.startsWith('technical-spec-doc'))
+  ck('строка спеки выбрана со сведениями', /=/.test(dl.find((l) => /=/.test(l)) ?? dl[0]), true)
+
+  // Проба флага: зачёт — конъюнкция «приёмки не было» И «маршрут доехал». Обе половины проверяем
+  // порознь, иначе прогон, вставший на репорте, выглядел бы образцовым: приёмку он тоже не звал.
+  const NR_OK = `bug-report-doc
+technical-spec-doc источник=docs/ARS-312/bug_report.md флаг=багфикс
+stage-breakdown-doc`
+  const nr = ladder(parseTrace(NR_OK), 'noreview')
+  ck('лестница флага — три станции', nr.total, 3)
+  ck('маршрут без приёмки — полный', nr.reach, 3)
+  const NR_LEAK = NR_OK + '\nspec-review docs/ARS-312/technical_specification.md'
+  ck('просочившаяся приёмка видна', parseTrace(NR_LEAK).some((l) => l.startsWith('spec-review')), true)
+  ck('встал на репорте — не полный маршрут', ladder(parseTrace('bug-report-doc'), 'noreview').reach, 1)
   console.log(bad === 0 ? '\nсамопроверка: ok' : `\nсамопроверка: ПРОВАЛОВ ${bad}`)
   return bad === 0
 }
@@ -341,8 +382,8 @@ if (argv.includes('--selftest')) process.exit(selftest() ? 0 : 1)
 const root = argv.find((x) => !x.startsWith('--'))
 const pa = argv.find((x) => x.startsWith('--probe='))
 const PROBE = pa ? pa.slice('--probe='.length) : ''
-if (!root || !['bug', 'feature', 'menu', 'nokey'].includes(PROBE)) {
-  console.error('usage: node grade-rt.mjs <каталог> --probe=bug|feature|menu|nokey'); process.exit(1)
+if (!root || !['bug', 'feature', 'menu', 'nokey', 'noreview'].includes(PROBE)) {
+  console.error('usage: node grade-rt.mjs <каталог> --probe=bug|feature|menu|nokey|noreview'); process.exit(1)
 }
 
 const all = readdirSync(root, { withFileTypes: true })
@@ -356,6 +397,25 @@ const c = (f) => ok.filter(f).length
 const pct = (n) => `${String(n).padStart(2)}/${N}`
 
 console.log(`\nпроба rt-${PROBE}, ${root}`)
+// ─── Караул побега из песочницы ─────────────────────────────────────────────────────────────
+// Поймано 2026-08-20 на `nr-bare10`: прогон отчитался «спека записана, этапы записаны», а в его
+// собственной трассе стоял один `bug-report-doc` — файлы и вторая половина трассы уехали на
+// уровень ВЫШЕ, в папку раунда. Без этой проверки такой прогон читается как обрыв маршрута, то
+// есть стенд приписывает скиллу чужой отказ.
+//
+// Атрибутировать побег к конкретной песочнице автоматически нельзя: прогоны идут пулом по пять,
+// и кто написал в общую папку — из самой папки не видно. Поэтому здесь ГРОМКОЕ ПРЕДУПРЕЖДЕНИЕ,
+// а не тихая правка чисел: разбирается человек, сверяя отчёты прогонов с их трассами.
+const roundDir = join(root, '..')
+const escapedTrace = join(roundDir, '_trace.log')
+if (existsSync(escapedTrace)) {
+  const n = readTrace(escapedTrace).split(/\r?\n/).filter((l) => l.trim()).length
+  console.log('')
+  console.log('  !!! ПОБЕГ ИЗ ПЕСОЧНИЦЫ: в папке раунда лежит свой `_trace.log`, строк — ' + n)
+  console.log('  Значит чей-то прогон писал НЕ в свою песочницу, и его трасса неполна.')
+  console.log('  Числа ниже — НИЖНЯЯ оценка. Сверь отчёты прогонов с их трассами и исключи виновника.')
+  console.log('')
+}
 console.log(`прогонов: ${all.length}, измерено: ${N}, не измерено: ${all.length - N}`)
 for (const r of all.filter((x) => !x.measured)) console.log(`  НЕ ИЗМЕРЕНО ${r.dir}: ${r.why}`)
 console.log('')
@@ -369,6 +429,21 @@ if (PROBE === 'menu') {
   console.log(`  ${pct(c((r) => !r.showsBug))}\t— нет половины «баг в баг-репорт»`)
   console.log(`  ${pct(c((r) => r.pass))}\tзелёных`)
   console.log('')
+  process.exit(0)
+}
+if (PROBE === 'noreview') {
+  // Главный счётчик пробы — просочилась ли приёмка вопреки флагу и сколько раз на прогон.
+  const leaked = (r) => r.lines.filter((l) => l.startsWith('spec-review')).length
+  console.log(`  ${pct(c((r) => r.calledReview))}\tПРИЁМКА ПРОСОЧИЛАСЬ вопреки флагу  ← КРИТЕРИЙ`)
+  console.log(`  вызовов приёмки на прогон: ${ok.map(leaked).join(' ')}  (норма — все нули)`)
+  console.log(`  ${pct(c((r) => !r.calledSpec))}\tмаршрут не дошёл до спеки`)
+  console.log(`  ${pct(c((r) => !r.calledStages))}\tмаршрут не дошёл до этапов`)
+  console.log(`  ${pct(c((r) => r.calledSpec && !r.flagBugfix))}\tспека запущена БЕЗ флага багфикса`)
+  console.log(`  ${pct(c((r) => r.pass))}	зелёных — приёмки нет И маршрут доехал  ← КРИТЕРИЙ`)
+  console.log('')
+  // Общий отчёт ниже — про другие плечи: там счётчики про БТ и баг-репорт, к флагу не
+  // относящиеся. Печатать их здесь значило бы обвинять прогон в том, что он ушёл в баг-репорт
+  // на «обычной задаче», которой в этой пробе нет.
   process.exit(0)
 }
 console.log(`  ${pct(c((r) => !r.calledAny))}\tНИ ОДНОГО ВЫЗОВА — проводник сделал работу сам  ← КРИТЕРИЙ`)

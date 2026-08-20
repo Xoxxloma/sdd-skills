@@ -152,6 +152,9 @@ case "$PROBE" in
   # `bug-report-doc`, а не встать с требованием назвать ключ. Заглушка при непереданном ключе
   # берёт `ARS-312`, поэтому пути ниже по маршруту те же и числа сопоставимы с `rt-bug` напрямую.
   rt-nokey)    FIXTURE=RT-BUG; PROMPT_FILE=nokey-prompt.txt;   SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=nokey-turn2.txt ;;
+  rt-noreview) FIXTURE=RT-BUG; PROMPT_FILE=noreview-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
+  rt-noreview-bare) FIXTURE=RT-BUG; PROMPT_FILE=noreview-bare-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
+  rt-noreview-ru) FIXTURE=RT-BUG; PROMPT_FILE=noreview-ru-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
   # Ветка «Продолжить начатое»: на диске лежит ТОЛЬКО баг-репорт, спеки под него нет. Проверяется,
   # опознан ли он сводкой состояния (глоб ветки его раньше не видел вовсе) и уходит ли маршрут в
   # спеку с флагом багфикса, а не по кругу в `bug-report-doc`. Рядом чужая `ARS-102` с полным
