@@ -1,8 +1,11 @@
 bug-prompt.txt
+bug-turn2.txt
 expected.md
 feature-prompt.txt
+feature-turn2.txt
 menu-prompt.txt
 nokey-prompt.txt
+nokey-turn2.txt
 prebaked/bug_report.md
 prebaked/technical_specification.md
 services/auth.md

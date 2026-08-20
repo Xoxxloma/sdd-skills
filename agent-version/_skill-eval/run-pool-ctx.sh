@@ -47,6 +47,17 @@ if [ -n "$STUBS_DIR" ]; then
   [ -d "$STUBS_DIR" ] || { echo "нет папки заглушек: $STUBS_DIR"; exit 1; }
   STUBS_DIR="$(cd "$STUBS_DIR" && pwd)"
 fi
+# ХОД 2 — файл с репликой аналитика, которой он отвечает на хендофф под-скилла. Пусто → стенд
+# одноходовой, как был, и прежние пробы этого не замечают. Зачем второй ход: у проб маршрута
+# (`rt-*`) отказ наступает ИМЕННО на стыке — под-скилл кончает ход, и проводник должен продолжить
+# сам. Одним ходом стык не воспроизводится: прогон отвечает выводом заглушки и останавливается,
+# а в живой сессии там стоит реплика человека. Текст реплики держать НЕЙТРАЛЬНЫМ («да, годится»):
+# любое «продолжай маршрут» превращает стенд в подсказку, и мерить он будет себя.
+TURN2="${8:-}"
+if [ -n "$TURN2" ]; then
+  [ -f "$TURN2" ] || { echo "нет файла второго хода: $TURN2"; exit 1; }
+  TURN2="$(cd "$(dirname "$TURN2")" && pwd)/$(basename "$TURN2")"
+fi
 mkdir -p "$OUT"
 
 # Настоящий отказ CLI: короткий вывод либо маркер в первых 200 байтах.
@@ -65,6 +76,22 @@ SEED_FILES=""
 if [ -n "$SEED" ]; then
   SEED_FILES="$(cd "$SEED" && find . -type f | sed 's|^\./||' | sort | tr '\n' ' ')"
 fi
+
+# Достаёт текст последнего `result` из потока в файл. Вынесено из тела прогона: ходов стало два,
+# извлечение нужно обоим.
+extract_answer() {
+  local stream="$1" out="$2" err="$3"
+  node -e '
+    const fs = require("fs")
+    const lines = fs.readFileSync(process.argv[1], "utf8").trim().split("\n")
+    const parsed = lines.map((s) => { try { return JSON.parse(s) } catch { return null } }).filter(Boolean)
+    // ПОСЛЕДНИЙ результат, а не первый: скилл с субагентами печатает `result` на каждом своём ходе.
+    // `find` брал первый, и прогоны выглядели пустой работой при готовых отчётах в потоке.
+    const results = parsed.filter((x) => x.type === "result" && typeof x.result === "string")
+    const res = results.length ? results[results.length - 1] : null
+    fs.writeFileSync(process.argv[2], res ? res.result : "")
+  ' "$stream" "$out" 2>>"$err" || cp /dev/null "$out"
+}
 
 run_one() {
   local i="$1"
@@ -142,25 +169,32 @@ run_one() {
   #
   # `answer.md` собирается из поля `result` терминального события, то есть побайтно равен прежнему
   # stdout: все грейдеры набора читают его и меняться не должны.
+  # Свой `session-id` на песочницу: по нему второй ход находит сессию первого. Генерится node —
+  # он в наборе есть везде (на нём грейдеры), `uuidgen` под Git Bash нет.
+  local sid; sid="$(node -e 'console.log(require("crypto").randomUUID())')"
   ( cd "$sb" && timeout 900 claude -p "$task" --model haiku --permission-mode bypassPermissions \
-        --output-format stream-json --verbose ) \
+        --session-id "$sid" --output-format stream-json --verbose ) \
       > "$sb/stream.jsonl" 2> "$sb/_stderr.log"
   local rc=$?
-  node -e '
-    const fs = require("fs")
-    const lines = fs.readFileSync(process.argv[1], "utf8").trim().split("\n")
-    const parsed = lines.map((s) => { try { return JSON.parse(s) } catch { return null } }).filter(Boolean)
-    // ПОСЛЕДНИЙ результат, а не первый. Скилл с субагентами запускает их фоновыми задачами и
-    // заканчивает ход, не дожидаясь: CLI печатает `result` на каждом таком ходе. У `spec-readiness`
-    // их пять — «запустил трёх субагентов, жду», три промежуточных, и только пятый несёт отчёт.
-    // `find` брал первый, и все пять прогонов выглядели как пустая работа при готовых отчётах
-    // в потоке. Пробы с одним субагентом или без них этого не показывали — там результат один.
-    const results = parsed.filter((x) => x.type === "result" && typeof x.result === "string")
-    const res = results.length ? results[results.length - 1] : null
-    // Отказ CLI до первого события: поток пуст, писать нечего — пусть `answer.md` останется пустым,
-    // раннер опознает это своей проверкой ниже.
-    fs.writeFileSync(process.argv[2], res && typeof res.result === "string" ? res.result : "")
-  ' "$sb/stream.jsonl" "$sb/answer.md" 2>>"$sb/_stderr.log" || cp /dev/null "$sb/answer.md"
+  extract_answer "$sb/stream.jsonl" "$sb/answer.md" "$sb/_stderr.log"
+
+  # ─── ХОД 2: реплика аналитика в ТУ ЖЕ сессию ───────────────────────────────────────────────
+  # `--resume` продолжает разговор первого хода: контекст, прочитанный скилл и записанные файлы
+  # на месте, песочница та же, `_trace.log` продолжает накапливаться. Это и есть живая
+  # последовательность «под-скилл отдал файл → человек ответил → проводник идёт дальше».
+  # Второй ход НЕ делается, если первый упал или упёрся в отказ API: продолжать нечего.
+  if [ -n "$TURN2" ] && [ $rc -eq 0 ] && [ -s "$sb/answer.md" ] && ! is_api_failure "$sb/answer.md"; then
+    cp "$sb/answer.md" "$sb/answer1.md"
+    local reply; reply="$(cat "$TURN2")"
+    ( cd "$sb" && timeout 900 claude -p "$reply" --model haiku --permission-mode bypassPermissions \
+          --resume "$sid" --output-format stream-json --verbose ) \
+        > "$sb/stream2.jsonl" 2>> "$sb/_stderr.log"
+    rc=$?
+    extract_answer "$sb/stream2.jsonl" "$sb/answer2.md" "$sb/_stderr.log"
+    # `answer.md` — склейка обоих ходов: грейдеры набора читают именно его и ищут в нём анкеры
+    # (спрошен ли ключ, показано ли меню). Склейка сохраняет находки первого хода и добавляет второй.
+    cat "$sb/answer1.md" "$sb/answer2.md" > "$sb/answer.md"
+  fi
 
   if [ -s "$sb/answer.md" ] && is_api_failure "$sb/answer.md"; then
     mv "$sb/answer.md" "$sb/_api-failure.txt"
