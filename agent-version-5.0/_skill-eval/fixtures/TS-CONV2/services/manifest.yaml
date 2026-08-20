@@ -1,8 +1,0 @@
-services:
-  - name: auth
-    path: ../auth-service
-    type: backend
-
-  - name: arsenal-web
-    path: ../arsenal-web
-    type: frontend
