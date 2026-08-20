@@ -39,6 +39,10 @@ SEED_SUB=""
 # Заглушки под-скиллов: имя подпапки внутри фикстуры. Пусто → в песочницу кладётся один скилл,
 # как было. Заводится только у проб, которые меряют МАРШРУТ оркестратора, а не содержание.
 STUBS_SUB=""
+# Файл с репликой аналитика для ВТОРОГО хода (пусто → проба одноходовая, как была). Нужен только
+# пробам маршрута: их отказ наступает на стыке «под-скилл кончил ход → проводник продолжает сам»,
+# а одним ходом этот стык не воспроизводится.
+TURN2_FILE=""
 case "$PROBE" in
   ts-live)   FIXTURE=TS-LIVE;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-conv)   FIXTURE=TS-CONV;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
@@ -134,8 +138,8 @@ case "$PROBE" in
   #
   # `rt-bug` — багфикс мимо БТ и мимо разреза; `rt-feature` — сторож: обычная задача обязана
   # по-прежнему уходить в `business-requirements-doc`, иначе правка входа сломала основной путь.
-  rt-bug)      FIXTURE=RT-BUG; PROMPT_FILE=bug-prompt.txt;     SKILL=analyst-workspace; STUBS_SUB=stubs ;;
-  rt-feature)  FIXTURE=RT-BUG; PROMPT_FILE=feature-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs ;;
+  rt-bug)      FIXTURE=RT-BUG; PROMPT_FILE=bug-prompt.txt;     SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
+  rt-feature)  FIXTURE=RT-BUG; PROMPT_FILE=feature-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=feature-turn2.txt ;;
   # ПОРЯДОК НА ВХОДЕ. Правка 2026-08-18 убрала лишний ход: проводник больше не спрашивает ключ
   # задачи сам — его спрашивает под-скилл своим Gate 0, и порядок теперь «кнопка → меню БТ/баг →
   # под-скилл». Два плеча выше этого НЕ ВИДЯТ: ключ подан в их промптах строкой «Ключ задачи: …»,
@@ -147,7 +151,7 @@ case "$PROBE" in
   # `rt-nokey` — тот же дефект, что в `rt-bug`, но ключа нет НИГДЕ. Маршрут обязан дойти до
   # `bug-report-doc`, а не встать с требованием назвать ключ. Заглушка при непереданном ключе
   # берёт `ARS-312`, поэтому пути ниже по маршруту те же и числа сопоставимы с `rt-bug` напрямую.
-  rt-nokey)    FIXTURE=RT-BUG; PROMPT_FILE=nokey-prompt.txt;   SKILL=analyst-workspace; STUBS_SUB=stubs ;;
+  rt-nokey)    FIXTURE=RT-BUG; PROMPT_FILE=nokey-prompt.txt;   SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=nokey-turn2.txt ;;
   # Ветка «Продолжить начатое»: на диске лежит ТОЛЬКО баг-репорт, спеки под него нет. Проверяется,
   # опознан ли он сводкой состояния (глоб ветки его раньше не видел вовсе) и уходит ли маршрут в
   # спеку с флагом багфикса, а не по кругу в `bug-report-doc`. Рядом чужая `ARS-102` с полным
@@ -265,7 +269,7 @@ SEED_ROOT="${SKILL_EVAL_SEED_ROOT:-/tmp/skill-eval-seed}"
 SEED="$SEED_ROOT/$(basename "$ROUND")-$PROBE"
 SEED_SRC="$FIXTURE_DIR${SEED_SUB:+/$SEED_SUB}"
 rm -rf "$SEED"; mkdir -p "$SEED"
-( cd "$SEED_SRC" && tar cf - --exclude=README.md --exclude='*-prompt.txt' --exclude=_manifest.txt --exclude=expected.md --exclude=stubs --exclude=PROVENANCE.txt . ) | ( cd "$SEED" && tar xf - )
+( cd "$SEED_SRC" && tar cf - --exclude=README.md --exclude='*-prompt.txt' --exclude='*-turn2.txt' --exclude=_manifest.txt --exclude=expected.md --exclude=stubs --exclude=PROVENANCE.txt . ) | ( cd "$SEED" && tar xf - )
 
 echo "проба: $PROBE   фикстура: $FIXTURE   скилл: $SKILL"
 STUBS_DIR=""
@@ -275,7 +279,13 @@ if [ -n "$STUBS_SUB" ]; then
   echo "заглушки: $STUBS_SUB → .claude/skills/ песочницы"
 fi
 
-bash "$POOL" "$SNAP" "$PROMPT" "$ROUND/$PROBE" "$N" "$CONC" "$SEED" "$STUBS_DIR"
+TURN2=""
+if [ -n "$TURN2_FILE" ]; then
+  TURN2="$FIXTURE_DIR/$TURN2_FILE"
+  [ -f "$TURN2" ] || { echo "нет файла второго хода: $TURN2"; exit 1; }
+  echo "второй ход: $TURN2_FILE"
+fi
+bash "$POOL" "$SNAP" "$PROMPT" "$ROUND/$PROBE" "$N" "$CONC" "$SEED" "$STUBS_DIR" "$TURN2"
 
 # ─── Караул фикстуры ────────────────────────────────────────────────────────────────────────
 # Запрет в промпте изоляцией НЕ является. Замер 2026-08-14, плечо `ts-conv`: прогон получил
@@ -293,7 +303,7 @@ bash "$POOL" "$SNAP" "$PROMPT" "$ROUND/$PROBE" "$N" "$CONC" "$SEED" "$STUBS_DIR"
 # ВНИМАНИЕ: список материала стенда выписан ДВАЖДЫ — здесь и в исключениях `tar` при засеве выше.
 # Добавляешь имя — добавляй в оба места. 2026-08-18: `expected.md` добавили только в засев, и
 # караул тут же дал ложную тревогу «фикстура изменилась» на файле, который просто перестал ездить.
-DIRT="$(diff -rq "$SEED" "$SEED_SRC" 2>/dev/null | grep -v "README.md\|-prompt.txt\|_manifest.txt\|expected.md\|stubs\|PROVENANCE" || true)"
+DIRT="$(diff -rq "$SEED" "$SEED_SRC" 2>/dev/null | grep -v "README.md\|-prompt.txt\|-turn2.txt\|_manifest.txt\|expected.md\|stubs\|PROVENANCE" || true)"
 if [ -n "$DIRT" ]; then
   echo ""
   echo "!!! ФИКСТУРА ИЗМЕНИЛАСЬ ВО ВРЕМЯ ПРОГОНА — плечо недостоверно, перегнать после чистки:"
