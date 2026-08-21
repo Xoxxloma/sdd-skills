@@ -152,6 +152,9 @@ case "$PROBE" in
   # `bug-report-doc`, а не встать с требованием назвать ключ. Заглушка при непереданном ключе
   # берёт `ARS-312`, поэтому пути ниже по маршруту те же и числа сопоставимы с `rt-bug` напрямую.
   rt-nokey)    FIXTURE=RT-BUG; PROMPT_FILE=nokey-prompt.txt;   SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=nokey-turn2.txt ;;
+  rt-noreview) FIXTURE=RT-BUG; PROMPT_FILE=noreview-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
+  rt-noreview-bare) FIXTURE=RT-BUG; PROMPT_FILE=noreview-bare-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
+  rt-noreview-ru) FIXTURE=RT-BUG; PROMPT_FILE=noreview-ru-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
   # Ветка «Продолжить начатое»: на диске лежит ТОЛЬКО баг-репорт, спеки под него нет. Проверяется,
   # опознан ли он сводкой состояния (глоб ветки его раньше не видел вовсе) и уходит ли маршрут в
   # спеку с флагом багфикса, а не по кругу в `bug-report-doc`. Рядом чужая `ARS-102` с полным
@@ -283,8 +286,20 @@ TURN2=""
 if [ -n "$TURN2_FILE" ]; then
   TURN2="$FIXTURE_DIR/$TURN2_FILE"
   [ -f "$TURN2" ] || { echo "нет файла второго хода: $TURN2"; exit 1; }
-  echo "второй ход: $TURN2_FILE"
+  echo "реплика аналитика: $TURN2_FILE   ходов до 2 подряд без движения, потолок ${RT_MAX_TURNS:-8}"
 fi
+# НАСТРОЙКИ, КОТОРЫМИ ПОЛУЧЕНЫ ЧИСЛА, ПИШУТСЯ В ПАПКУ РАУНДА. Снимок скилла уже кладётся сюда по
+# той же причине: через неделю «прогоняли с эффортом или без» восстанавливается только из файла.
+mkdir -p "$ROUND/$PROBE"
+{
+  echo "проба: $PROBE"
+  echo "модель: haiku"
+  echo "effort: ${EFFORT:-умолчание CLI}"
+  echo "реплика аналитика: ${TURN2_FILE:-нет, стенд одноходовой}"
+  echo "потолок ходов: ${RT_MAX_TURNS:-8}"
+  echo "прогонов: $N, параллельность: $CONC"
+} > "$ROUND/$PROBE/_settings.txt"
+echo "effort: ${EFFORT:-умолчание CLI}"
 bash "$POOL" "$SNAP" "$PROMPT" "$ROUND/$PROBE" "$N" "$CONC" "$SEED" "$STUBS_DIR" "$TURN2"
 
 # ─── Караул фикстуры ────────────────────────────────────────────────────────────────────────
