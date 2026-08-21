@@ -63,6 +63,9 @@ case "$PROBE" in
   # Как и приёмка, ничего не пишет на диск: артефакт — `answer.md` из stdout. Парное плечо без
   # скилла гоняется отдельным `run-ctl.sh` на той же фикстуре — оно и есть знаменатель.
   sr-gap)    FIXTURE=SR-GAP;    PROMPT_FILE=sr-prompt.txt;   SKILL=spec-readiness ;;
+  # Свод и сверка без субагентов: роли поданы готовыми в `roles-output.md`. Мерит Шаги 3–4 на
+  # замороженном входе — см. `fixtures/SR-VERIFY/README.md`. Ключ `KEY.md` в песочницу не едет.
+  sr-verify) FIXTURE=SR-VERIFY; PROMPT_FILE=sr-verify-prompt.txt; SKILL=spec-readiness ;;
   # Сторож ложного срабатывания: спека реализуема, законный исход — «блокеров: 0».
   sr-clean)  FIXTURE=SR-CLEAN;  PROMPT_FILE=sr-prompt.txt;   SKILL=spec-readiness ;;
   # Ловушка: `services/itsm.md` набита конкретикой, которой в спеке нет. Ни один её литерал не
@@ -182,7 +185,7 @@ case "$PROBE" in
   # чистый вердикт на `rv-bug-spec` не отличить от неработающего правила: он выходит в обоих случаях.
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx sb-ctx sb-ctx2 rv-conv rv-clean br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx sb-ctx sb-ctx2 rv-conv rv-clean br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q"; exit 1 ;;
 esac
 
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
@@ -272,7 +275,10 @@ SEED_ROOT="${SKILL_EVAL_SEED_ROOT:-/tmp/skill-eval-seed}"
 SEED="$SEED_ROOT/$(basename "$ROUND")-$PROBE"
 SEED_SRC="$FIXTURE_DIR${SEED_SUB:+/$SEED_SUB}"
 rm -rf "$SEED"; mkdir -p "$SEED"
-( cd "$SEED_SRC" && tar cf - --exclude=README.md --exclude='*-prompt.txt' --exclude='*-turn2.txt' --exclude=_manifest.txt --exclude=expected.md --exclude=stubs --exclude=PROVENANCE.txt . ) | ( cd "$SEED" && tar xf - )
+# `KEY.md` — ключ пробы `sr-verify`: по каждому вопросу сказано, отвечает ли спека. Засеянный в
+# песочницу, он превращает замер в списывание: прогон закроет ровно то, что в ключе, и «закрыто
+# 12 из 40» будет означать «прочитал ответы», а не «нашёл их в спеке».
+( cd "$SEED_SRC" && tar cf - --exclude=README.md --exclude='*-prompt.txt' --exclude='*-turn2.txt' --exclude=_manifest.txt --exclude=expected.md --exclude=KEY.md --exclude=stubs --exclude=PROVENANCE.txt . ) | ( cd "$SEED" && tar xf - )
 
 echo "проба: $PROBE   фикстура: $FIXTURE   скилл: $SKILL"
 STUBS_DIR=""
@@ -318,9 +324,28 @@ bash "$POOL" "$SNAP" "$PROMPT" "$ROUND/$PROBE" "$N" "$CONC" "$SEED" "$STUBS_DIR"
 # ВНИМАНИЕ: список материала стенда выписан ДВАЖДЫ — здесь и в исключениях `tar` при засеве выше.
 # Добавляешь имя — добавляй в оба места. 2026-08-18: `expected.md` добавили только в засев, и
 # караул тут же дал ложную тревогу «фикстура изменилась» на файле, который просто перестал ездить.
-DIRT="$(diff -rq "$SEED" "$SEED_SRC" 2>/dev/null | grep -v "README.md\|-prompt.txt\|-turn2.txt\|_manifest.txt\|expected.md\|stubs\|PROVENANCE" || true)"
+DIRT="$(diff -rq "$SEED" "$SEED_SRC" 2>/dev/null | grep -v "README.md\|-prompt.txt\|-turn2.txt\|_manifest.txt\|expected.md\|KEY.md\|stubs\|PROVENANCE" || true)"
 if [ -n "$DIRT" ]; then
   echo ""
   echo "!!! ФИКСТУРА ИЗМЕНИЛАСЬ ВО ВРЕМЯ ПРОГОНА — плечо недостоверно, перегнать после чистки:"
   echo "$DIRT"
+fi
+
+# ─── Снимок из /tmp сносится ПОСЛЕ плеча ───────────────────────────────────────────────────
+#
+# Комментарий у `SNAP_ROOT` выше обещает: прогон читает копию вне репозитория, «оттуда идти
+# некуда». Идти есть куда — к соседям. `/tmp/skill-eval-seed/` копил снимки всех раундов подряд,
+# и к 2026-08-21 там лежало под две сотни каталогов, включая `SKILL.md` пятидневной давности.
+#
+# Разбор журналов 2026-08-21: из тридцати прогонов девятнадцать листали этот каталог (в листинге
+# соседи видны все разом, это ещё не беда), а ОДИН — `r23-before/run-10` — сделал `cat` чужого
+# `spec-readiness/SKILL.md` из раунда 17 августа: 24 926 байт против измеряемых 28 870. Прогон дал
+# 5 из 6, верх плеча, и попал в знаменатель. То есть замер сравнивал правку не с тем текстом.
+#
+# Снимок нужен только на время плеча: журнальная копия остаётся в `<раунд>/_skills/`, и именно она
+# объявлена источником истины. Поэтому по завершении плеча каталог сносится целиком — соседних
+# снимков, к которым можно уйти, у следующего раунда просто не будет.
+if [ -n "${SNAP_ROOT:-}" ] && [ -d "$SNAP_ROOT" ]; then
+  rm -rf "$SNAP_ROOT"
+  echo "снимок из /tmp снесён: $SNAP_ROOT (журнальная копия осталась в $ROUND/_skills/)"
 fi
