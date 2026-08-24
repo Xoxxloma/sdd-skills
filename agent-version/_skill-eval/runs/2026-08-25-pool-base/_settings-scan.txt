@@ -1,0 +1,6 @@
+плечо: scan
+модель: haiku
+прогонов: 5, параллельность: 5
+текст скилла: /c/Users/Konstantin/projects/product-skills/agent-version/service-map
+источники: /c/Users/Konstantin/projects/{repairy,resonance}
+снимок скилла: _skills/service-map.SKILL.md (925 строк)

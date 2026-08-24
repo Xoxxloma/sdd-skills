@@ -1,0 +1,6 @@
+плечо: first
+модель: haiku
+прогонов: 5, параллельность: 5
+текст скилла: /tmp/sm-pre-step1/service-map
+источники: /c/Users/Konstantin/projects/{repairy,resonance}
+снимок скилла: _skills/service-map.SKILL.md (982 строк)
