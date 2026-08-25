@@ -81,6 +81,13 @@ case "$PROBE" in
   # засев под тех-спеку и четыре промпта разных плеч.
   br-roles-w) FIXTURE=BR-ROLES; PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed ;;
   br-roles-q) FIXTURE=BR-ROLES; PROMPT_FILE=q-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed ;;
+  # ── первый ход интервью: ПРЕДМЕТ вопроса, а не его форма ─────────────────────────────────
+  # Засев пуст намеренно: ни `services/`, ни `context/`. Правило «сразу за ключом — суть задачи»
+  # срабатывает только когда предложить нечего; положи сюда карточку — и проба начнёт мерить то
+  # же, что `br-ctx`. Плечи не складываются: у `q` законный исход — вопросы без файла, у `w` —
+  # записанный файл с выведенным типом изменения.
+  br-open-q)  FIXTURE=BR-OPEN; PROMPT_FILE=q-prompt.txt; SKILL=business-requirements-doc ;;
+  br-open-w)  FIXTURE=BR-OPEN; PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc ;;
   # ── `context-doc`: импорт документа человека в `context/` ─────────────────────────────────
   # Главная проба набора — `cdoc-xlsx`: источник НЕ читается (конвертера в окружении нет), и
   # законный исход — отсутствие файла. Гейт описания в её промпте снят заранее, иначе «файла нет»

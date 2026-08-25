@@ -73,6 +73,8 @@
 | `rv-clean` | `spec-review` | `RV-CLEAN` | **сторож основного пути:** документ чистый, папки `context/` нет вовсе. Ловит ложное срабатывание пункта 12 и уход субагента за пределы артефакта | `grade-rv-conv.mjs --clean` |
 | `br-roles-w` | `business-requirements-doc` | `BR-ROLES` (засев `seed/`) | гейт ролей закрыт ссылкой на карточки → файл записан, имена ролей дословные | `grade-br-roles.mjs --expect=write` |
 | `br-roles-q` | `business-requirements-doc` | `BR-ROLES` (засев `seed/`) | гейт ролей открыт → вопрос, и в нём имена ролей из карточек, а не «какие у вас роли?» | `grade-br-roles.mjs --expect=questions` |
+| `br-open-q` | `business-requirements-doc` | `BR-OPEN` | **главная:** тонкий бриф, ключа нет, окружение пустое → спрошены ключ и суть задачи, вопроса «новый функционал или доработка» НЕТ, файла нет | `grade-br-open.mjs --expect=questions` |
+| `br-open-w` | `business-requirements-doc` | `BR-OPEN` | сторож обратного отказа: аналитик ответил всё, тип словом не назван → файл записан, §1.0 заполнена выведенным типом, а не `TBD` | `grade-br-open.mjs --expect=write` |
 | `cdoc-xlsx` | `context-doc` | `CD-XLSX` | **искажение ячеек:** лист 60×5 собирается распаковкой контейнера — сверяется каждая ячейка с эталоном `cd-xlsx-truth.mjs` | `grade-cdoc.mjs --probe=xlsx` |
 | `cdoc-txt` | `context-doc` | `CD-TXT` (`w-prompt.txt`) | полнота и дословность переноса: 8 кодов, некруглые числа, опечатка, аббревиатуры, противоречие обеими версиями | `grade-cdoc.mjs --probe=txt` |
 | `cdoc-txt-q` | `context-doc` | `CD-TXT` (`q-prompt.txt`) | гейт описания НЕ снят → вопрос с вариантами и без файла; ловит молча записанное своё описание | `grade-cdoc.mjs --probe=txt-q` |
