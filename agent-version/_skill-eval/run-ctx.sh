@@ -88,6 +88,17 @@ case "$PROBE" in
   # записанный файл с выведенным типом изменения.
   br-open-q)  FIXTURE=BR-OPEN; PROMPT_FILE=q-prompt.txt; SKILL=business-requirements-doc ;;
   br-open-w)  FIXTURE=BR-OPEN; PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc ;;
+  # Эпик лежит НЕ в `docs/<KEY>/`, а в спек-репе `AI-SDD/docs/PSS-40/`; в корне песочницы при этом
+  # есть настоящая `docs/` с документацией продукта. Меряется якорь пути: дети обязаны лечь ВНУТРЬ
+  # папки эпика. Второе плечо — тот же эпик ВСТАВЛЕН ТЕКСТОМ и на диске отсутствует: гейт обязан
+  # отказать, а не резать по сообщению. Засевы разные, поэтому `SEED_SUB`.
+  td-path-w)  FIXTURE=TD-PATH; PROMPT_FILE=w-prompt.txt;     SKILL=task-decomposition-doc; SEED_SUB=seed ;;
+  td-gate)    FIXTURE=TD-PATH; PROMPT_FILE=paste-prompt.txt; SKILL=task-decomposition-doc; SEED_SUB=seed-paste ;;
+  # Раскладка, принесённая с живой работы: ключ эпика `T-T-M-1.2` НЕ матчит regex гейта, у детей
+  # ключи настоящие (AAA-1..4), а рядом под `docs/` лежит обычная задача `OPS-77` — то есть
+  # шаблон «ключ задачи → своя папка под docs/» прогон видит на диске. Красный исход отсюда и
+  # приехал: дети легли СИБЛИНГАМИ папки эпика.
+  td-alias)   FIXTURE=TD-PATH; PROMPT_FILE=alias-prompt.txt; SKILL=task-decomposition-doc; SEED_SUB=seed-alias ;;
   # ── `context-doc`: импорт документа человека в `context/` ─────────────────────────────────
   # Главная проба набора — `cdoc-xlsx`: источник НЕ читается (конвертера в окружении нет), и
   # законный исход — отсутствие файла. Гейт описания в её промпте снят заранее, иначе «файла нет»
