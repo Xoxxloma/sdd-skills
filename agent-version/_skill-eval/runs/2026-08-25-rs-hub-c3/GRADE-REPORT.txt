@@ -1,0 +1,129 @@
+
+=== opscore-1 ===
+  классов сошлось:   3/4
+  ⚠ НЕ СОШЛОСЬ:      событи ~20 (в отчёте: 0)
+  хаб назван числом: ✅
+  куски (28):       opscore-address opscore-analytics opscore-billing opscore-cargo opscore-claim opscore-contract opscore-customs opscore-depot opscore-dock opscore-driver opscore-geozone opscore-incident opscore-invoice opscore-notify opscore-order opscore-partner opscore-permit opscore-report opscore-route opscore-shipment opscore-slot opscore-tariff opscore-telemetry opscore-template opscore-trailer opscore-vehicle opscore-warehouse opscore-waybill
+  ядро одним куском: ❌ 29 кусков
+  разрез по слоям:   ✅ нет
+  периферия:         ✅ все 3 кластера
+  вердикт:           ✅ разрез предъявлен
+  своя сверка:       по всей репе 104, по кускам 104
+  ⚠ ПОТЕРЯНО ПРИ РАЗРЕЗЕ: задачи: по репе 11, по кускам 0 · сущности: по репе 91, по кускам 88
+  сквозные:          ✅ вне кусков
+  числа по кускам:   ✅ посчитаны
+  сверка:            ✅ своя
+  археология:        ✅ нет
+
+=== opscore-2 ===
+  классов сошлось:   0/4
+  ⚠ НЕ СОШЛОСЬ:      эндпоинт ~118 (в отчёте: 62) · событи ~20 (в отчёте: нет) · задач ~11 (в отчёте: нет) · сущност ~91 (в отчёте: 183)
+  хаб назван числом: ✅
+  куски (12):       opscore-analytics opscore-billing opscore-contracts opscore-legacy opscore-locations opscore-logistics opscore-notifications opscore-orders opscore-reference opscore-routing opscore-shipment opscore-warehouse
+  ядро одним куском: ✅ 6
+  разрез по слоям:   ✅ нет
+  периферия:         ✅ все 3 кластера
+  вердикт:           ✅ разрез предъявлен
+  своя сверка:       по всей репе 62, по кускам 62
+  сквозные:          ✅ вне кусков
+  числа по кускам:   ✅ посчитаны
+  сверка:            ✅ своя
+  археология:        ✅ нет
+
+=== opscore-3 ===
+  классов сошлось:   3/4
+  ⚠ НЕ СОШЛОСЬ:      событи ~20 (в отчёте: 11)
+  ⚠ ЛОВУШКА:         событи: 11 — наивный маркер
+  хаб назван числом: ✅
+  куски (7):       opscore-dictionaries opscore-financial opscore-logistics opscore-notifications opscore-operations opscore-scheduler opscore-shipment
+  ядро одним куском: ✅ 5
+  разрез по слоям:   ✅ нет
+  периферия:         ❌ не отделено: C (notify,template)
+  вердикт:           ✅ разрез предъявлен
+  своя сверка:       по всей репе —, по кускам —
+  сквозные:          ✅ вне кусков
+  числа по кускам:   ✅ посчитаны
+  сверка:            ✅ своя
+  археология:        ✅ нет
+
+=== opscore-4 ===
+  классов сошлось:   2/4
+  ⚠ НЕ СОШЛОСЬ:      событи ~20 (в отчёте: 0) · сущност ~91 (в отчёте: 182)
+  хаб назван числом: ✅
+  куски (5):       opscore-analytics opscore-financials opscore-logistics opscore-operations opscore-shipment
+  ядро одним куском: ✅ 3
+  разрез по слоям:   ✅ нет
+  периферия:         ✅ все 3 кластера
+  вердикт:           ✅ разрез предъявлен
+  своя сверка:       по всей репе —, по кускам —
+  сквозные:          ✅ вне кусков
+  числа по кускам:   ✅ посчитаны
+  сверка:            ✅ своя
+  археология:        ❌ судит о жизненном цикле / читал историю
+
+=== opscore-5 ===
+  классов сошлось:   3/4
+  ⚠ НЕ СОШЛОСЬ:      событи ~20 (в отчёте: нет)
+  хаб назван числом: ✅
+  куски (13):       opscore-accounting opscore-backend opscore-billing opscore-comms opscore-core opscore-finance opscore-logistics opscore-notifications opscore-notify opscore-operations opscore-scheduler opscore-services opscore-shipment
+  ядро одним куском: ✅ 3
+  разрез по слоям:   ✅ нет
+  периферия:         ✅ все 3 кластера
+  вердикт:           ✅ разрез предъявлен
+  своя сверка:       по всей репе —, по кускам —
+  сквозные:          ✅ вне кусков
+  числа по кускам:   ❌ прикинуты (~N), не посчитаны
+  сверка:            ✅ своя
+  археология:        ✅ нет
+
+=== opscore-6 ===
+  классов сошлось:   4/4
+  хаб назван числом: ✅
+  куски (8):       opscore-billing opscore-compliance opscore-logistics opscore-notify opscore-other opscore-routing opscore-shipment opscore-telemetry
+  ядро одним куском: ✅ 5
+  разрез по слоям:   ✅ нет
+  периферия:         ✅ все 3 кластера
+  вердикт:           ✅ разрез предъявлен
+  своя сверка:       по всей репе —, по кускам —
+  сквозные:          ❌ легли в кусок
+  числа по кускам:   ✅ посчитаны
+  сверка:            ✅ своя
+  археология:        ✅ нет
+
+=== opscore-7 ===
+  классов сошлось:   3/4
+  ⚠ НЕ СОШЛОСЬ:      событи ~20 (в отчёте: нет)
+  хаб назван числом: ✅
+  куски (7):       opscore-analytics opscore-billing opscore-core opscore-logistics opscore-notify opscore-ops opscore-shipment
+  ядро одним куском: ✅ 3
+  разрез по слоям:   ✅ нет
+  периферия:         ✅ все 3 кластера
+  вердикт:           ✅ разрез предъявлен
+  своя сверка:       по всей репе —, по кускам —
+  ⚠ ПОТЕРЯНО ПРИ РАЗРЕЗЕ: эндпоинты: по репе 104, по кускам 11 · задачи: по репе 11, по кускам 91
+  сквозные:          ✅ вне кусков
+  числа по кускам:   ❌ прикинуты (~N), не посчитаны
+  сверка:            ✅ своя
+  археология:        ✅ нет
+
+=== opscore-8 ===
+  классов сошлось:   3/4
+  ⚠ НЕ СОШЛОСЬ:      событи ~20 (в отчёте: 11)
+  ⚠ ЛОВУШКА:         событи: 11 — наивный маркер
+  хаб назван числом: ✅
+  куски (4):       opscore-analytics opscore-billing opscore-core opscore-notifications
+  ядро одним куском: ✅ 2
+  разрез по слоям:   ✅ нет
+  периферия:         ✅ все 3 кластера
+  вердикт:           ✅ разрез предъявлен
+  своя сверка:       по всей репе —, по кускам 83
+  сквозные:          ✅ вне кусков
+  числа по кускам:   ✅ посчитаны
+  сверка:            ✅ своя
+  археология:        ✅ нет
+
+──────  ИТОГ по 8 прогонам  ──────
+  классов не сошлось 11 · хаб не назван 0 · разрез по слоям 0 · ядро раздроблено 1 · периферия не отделена 1
+  вердиктов неверных 0 · сверка не сошлась 4 · археология 1
+  числа прикинуты 2 · сверка делегирована 0 · сквозные в куске 1
+  КРАСНО
