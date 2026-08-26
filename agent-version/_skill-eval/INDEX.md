@@ -73,6 +73,8 @@
 | `rv-clean` | `spec-review` | `RV-CLEAN` | **сторож основного пути:** документ чистый, папки `context/` нет вовсе. Ловит ложное срабатывание пункта 12 и уход субагента за пределы артефакта | `grade-rv-conv.mjs --clean` |
 | `br-roles-w` | `business-requirements-doc` | `BR-ROLES` (засев `seed/`) | гейт ролей закрыт ссылкой на карточки → файл записан, имена ролей дословные | `grade-br-roles.mjs --expect=write` |
 | `br-roles-q` | `business-requirements-doc` | `BR-ROLES` (засев `seed/`) | гейт ролей открыт → вопрос, и в нём имена ролей из карточек, а не «какие у вас роли?» | `grade-br-roles.mjs --expect=questions` |
+| `br-open-q` | `business-requirements-doc` | `BR-OPEN` | **главная:** тонкий бриф, ключа нет, окружение пустое → спрошены ключ и суть задачи, вопроса «новый функционал или доработка» НЕТ, файла нет | `grade-br-open.mjs --expect=questions` |
+| `br-open-w` | `business-requirements-doc` | `BR-OPEN` | сторож обратного отказа: аналитик ответил всё, тип словом не назван → файл записан, §1.0 заполнена выведенным типом, а не `TBD` | `grade-br-open.mjs --expect=write` |
 | `cdoc-xlsx` | `context-doc` | `CD-XLSX` | **искажение ячеек:** лист 60×5 собирается распаковкой контейнера — сверяется каждая ячейка с эталоном `cd-xlsx-truth.mjs` | `grade-cdoc.mjs --probe=xlsx` |
 | `cdoc-txt` | `context-doc` | `CD-TXT` (`w-prompt.txt`) | полнота и дословность переноса: 8 кодов, некруглые числа, опечатка, аббревиатуры, противоречие обеими версиями | `grade-cdoc.mjs --probe=txt` |
 | `cdoc-txt-q` | `context-doc` | `CD-TXT` (`q-prompt.txt`) | гейт описания НЕ снят → вопрос с вариантами и без файла; ловит молча записанное своё описание | `grade-cdoc.mjs --probe=txt-q` |
@@ -98,6 +100,8 @@
 | `rt-nokey` | `analyst-workspace` | `RT-BUG` | тот же дефект, что в `rt-bug`, но ключа нет нигде: маршрут обязан дойти до `bug-report-doc`, а не встать с требованием ключа | `grade-rt.mjs --probe=nokey` |
 | `rt-noreview` | `analyst-workspace` | `RT-BUG` (`noreview-prompt.txt`) | **флаг `--no-review`:** выключает ли он приёмку ЦЕЛИКОМ и НЕ ломает ли маршрут. Зачёт — конъюнкция: ни одного `spec-review` И дошёл до этапов | `grade-rt.mjs --probe=noreview` |
 | `rt-cont` | `analyst-workspace` | `RT-CONT` | «Продолжить начатое»: на диске только баг-репорт — опознан ли он сводкой; рядом чужая `ARS-102` как ловушка | вручную по `_trace.log` |
+| `rs-hub` | `repo-split` | `RS-HUB` | **одно приложение над порогом:** звёздная связность (75 % ссылок через хаб), контракт вне кода, событие-топик против класса. Ветка «режем ВНУТРИ приложения», не мерявшаяся ни разу в c1…c10. Запуск — `runs/2026-08-25-rs-hub-c*/run.sh <N>` | `grade-rs-hub.mjs` |
+| `rs-real` | `repo-split` | `RS-REAL` | две настоящие репы монолитом: `repairy` (монорепа, режем по приложениям) и `resonance` (мелкая, ОТКАЗ — отрицательный сторож) | `grade-rs-real.mjs` |
 
 ## Пара `rt-menu` / `rt-nokey` — порядок на входе в маршрут
 
