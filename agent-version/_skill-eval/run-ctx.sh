@@ -47,6 +47,16 @@ case "$PROBE" in
   ts-live)   FIXTURE=TS-LIVE;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-conv)   FIXTURE=TS-CONV;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-conv2)  FIXTURE=TS-CONV2;  PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
+  # ПЕРВЫЙ ХОД на богатом входе: то же БТ и те же карточки сервисов, что у ts-conv, но ответов
+  # аналитика в промпте НЕТ — агент обязан спрашивать сам. Заведена 2026-08-26 под жалобу с
+  # прода: варианты ответа мудрёные именно на подробном входе, а все существующие плечи спеки
+  # либо выдают агенту готовые ответы (ts-live, ts-conv — их промпт начинается словами
+  # «это ПРОДОЛЖЕНИЕ, аналитик отвечает»), либо подают тонкий вход. Ни одно из них поэтому не
+  # порождает вариантов: за круг из пяти прогонов их выходит 0–4, и на таком числе счётчик
+  # сложности вариантов ничего не различает.
+  # Мерится grade-options.mjs по тексту ответа; файл при этом писать НЕЛЬЗЯ — на первом ходу
+  # действует правило «turn 1 = questions only», и его сторожит grade-ts.mjs.
+  ts-opt)    FIXTURE=TS-CONV;   PROMPT_FILE=opt-prompt.txt;   SKILL=technical-spec-doc ;;
   ts-ctx)    FIXTURE=TS-CTX;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-nodesc) FIXTURE=TS-NODESC; PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-noctx)  FIXTURE=TS-NOCTX;  PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
