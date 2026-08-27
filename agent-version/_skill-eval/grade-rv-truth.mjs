@@ -62,11 +62,11 @@ function parse(specPath) {
 // Пометка происхождения карточки: в заголовке либо строкой «Происхождение».
 function markOf(card) {
   const src = card.head + '\n' + card.text;
-  if (/🟡\s*подтвержд/i.test(src)) return 'yellow-confirmed';
+  if (/(?:🔵|🟡)\s*подтвержд/i.test(src)) return 'yellow-confirmed';
   if (/🟡\s*к валидации/i.test(src) || (/🟡/.test(src) && /к валидации/i.test(src))) return 'yellow-tovalidate';
   if (/🟢/.test(src)) return 'green';
   if (/❓/.test(src)) return 'open';
-  if (/🟡/.test(src)) return 'yellow-plain';
+  if (/🔵|🟡/.test(src)) return 'yellow-plain';
   return null;
 }
 

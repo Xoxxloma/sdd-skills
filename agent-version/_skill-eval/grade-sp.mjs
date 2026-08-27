@@ -52,7 +52,7 @@ const CHECKS = {
 
     // INT-карточки и пометки происхождения у каждой
     const intCards = t.match(/^#+\s*INT-\d+\..*$/gm) || [];
-    const intTagged = intCards.filter((h) => /🟢|🟡|❓/.test(h));
+    const intTagged = intCards.filter((h) => /🟢|🔵|🟡|❓/.test(h));
 
     // статус: заглушки нет, значение механически согласовано с наличием открытых пунктов
     const placeholder = /ПРОСТАВЛЯЕТСЯ ПОСЛЕ ЗАПИСИ/.test(t);
@@ -64,7 +64,7 @@ const CHECKS = {
     // цитата, начинающаяся с маркера; фильтр взят из `grade-ts.mjs`, где он уже работает.
     const liveBody = t
       .split('\n')
-      .filter((l) => !/^\s*>\s*(🟢|🟡|❓|⚠️)/.test(l))
+      .filter((l) => !/^\s*>\s*(🟢|🔵|🟡|❓|⚠️)/.test(l))
       .join('\n');
     const hasOpen = /к валидации|TBD|⚠️/.test(liveBody);
     // Число в статусе — сам механизм, а не оформление: посчитать N можно только по блоку,

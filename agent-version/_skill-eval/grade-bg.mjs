@@ -89,7 +89,7 @@ const RE_STATUS_OK = /Статус готовности:\*{0,2}\s*(Готово 
 const RE_STATUS_SPEC_VOCAB = /Статус готовности:\*{0,2}\s*Готово к разработке/
 const RE_FR = /\bFR-\d+\b/
 const RE_GREEN = /🟢/
-const RE_YELLOW = /🟡/
+const RE_YELLOW = /🔵|🟡/ // пометка «со слов аналитика»: 🔵 по текущей легенде, 🟡 — прежняя
 const RE_ARS102 = /ARS-102/
 const RE_ROLE_SECTION = /§\s*4\.4|§\s*5\.3|Доступ по ролям|Ролевая модель/
 const RE_SOURCE_ANALYST = /со слов аналитика|документа нет|документ отсутствует/i
@@ -275,7 +275,7 @@ source: документа нет — со слов аналитика
 Полигон появляется, пропадает примерно на полсекунды и отрисовывается заново.
 
 ## 4. Ожидаемый результат
-- **FR-1:** полигон отрисовывается один раз, без пропадания — 🟡 со слов аналитика, документа нет
+- **FR-1:** полигон отрисовывается один раз, без пропадания — 🔵 со слов аналитика, документа нет
 
 ## 5. Критичность и срочность починки
 Средняя. Общий релиз, не хотфикс.
@@ -286,7 +286,7 @@ source: документа нет — со слов аналитика
 
 const REF_FLICK_BAD = REF_FLICK_OK
   .replace('source: документа нет — со слов аналитика', 'source: docs/ARS-102/technical_specification.md')
-  .replace('🟡 со слов аналитика, документа нет', '🟢 docs/ARS-102/technical_specification.md §4.1')
+  .replace('🔵 со слов аналитика, документа нет', '🟢 docs/ARS-102/technical_specification.md §4.1')
   .replace('Готово к оценке', 'Готово к разработке')
 
 function selftest () {
@@ -321,7 +321,7 @@ function selftest () {
 
   const s4ok = section(REF_FLICK_OK, 4)
   const s4bad = section(REF_FLICK_BAD, 4)
-  check('верный: 🟡 стоит', RE_YELLOW.test(s4ok), true)
+  check('верный: 🔵 стоит', RE_YELLOW.test(s4ok), true)
   check('верный: 🟢 не стоит', RE_GREEN.test(s4ok), false)
   check('верный: чужой документ не назван', RE_ARS102.test(s4ok), false)
   check('дырявый: 🟢 на словах аналитика пойман', RE_GREEN.test(s4bad), true)
