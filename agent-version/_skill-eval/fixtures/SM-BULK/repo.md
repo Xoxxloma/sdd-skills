@@ -15,6 +15,7 @@
 | HTTP-эндпоинты | **48** | Публичный контракт |
 | Топики | **12** (публикует 8, потребляет 4) | События |
 | Сущности | **9** | Владеет данными |
+| Поля сущностей | **60** (у всех 9) | Владеет данными, строки `-` внутри блоков |
 | Роли | **7** | Роли и доступ |
 
 ## `go.mod`
@@ -160,15 +161,93 @@ const (
 ## `internal/storage/models.go`
 
 ```go
-type Incident struct{ ... }        // единственный источник правды по инцидентам
-type IncidentHistoryEntry struct{ ... }
-type Attachment struct{ ... }
-type Squad struct{ ... }
-type Shift struct{ ... }
-type Assignment struct{ ... }
-type ReportSchedule struct{ ... }
-type AuditEntry struct{ ... }
-type Settings struct{ ... }
+// Incident — единственный источник правды по инцидентам.
+type Incident struct {
+	ID              string
+	Number          int64
+	Status          string
+	DistrictID      string
+	ChopID          *string
+	AssignedSquadID *string
+	OpenedAt        time.Time
+	ClosedAt        *time.Time
+	Description     string
+}
+
+type IncidentHistoryEntry struct {
+	ID         string
+	IncidentID string
+	Field      string
+	OldValue   string
+	NewValue   string
+	ChangedBy  string
+	ChangedAt  time.Time
+}
+
+type Attachment struct {
+	ID         string
+	IncidentID string
+	FileName   string
+	MimeType   string
+	Size       *int64
+	UploadedBy string
+	UploadedAt time.Time
+}
+
+type Squad struct {
+	ID         string
+	Code       string
+	ChopID     string
+	DistrictID string
+	Active     bool
+	CreatedAt  time.Time
+}
+
+type Shift struct {
+	ID       string
+	SquadID  string
+	StartsAt time.Time
+	EndsAt   time.Time
+	State    string
+	ClosedBy *string
+}
+
+type Assignment struct {
+	ID         string
+	IncidentID string
+	SquadID    string
+	AssignedAt time.Time
+	ReleasedAt *time.Time
+	AssignedBy string
+}
+
+type ReportSchedule struct {
+	ID         string
+	Kind       string
+	Cron       string
+	Recipients []string
+	LastRunAt  *time.Time
+	Enabled    bool
+}
+
+type AuditEntry struct {
+	ID         string
+	ActorID    string
+	Action     string
+	ObjectType string
+	ObjectID   string
+	At         time.Time
+	Payload    []byte
+}
+
+type Settings struct {
+	ID                string
+	Revision          int
+	RetentionDays     int
+	DefaultDistrictID *string
+	UpdatedBy         string
+	UpdatedAt         time.Time
+}
 ```
 
 Семантика:
@@ -221,6 +300,10 @@ JWT_SIGNING_KEY=8Hq2LmX9pR4tVzKw1NcBd7YsAe3GfUj0
 - **Затухание по секциям.** Гипотеза, которую проба проверяет заодно: полнота падает к концу
   карточки — первая секция близка к полной, дальние обрезаны сильнее. Порядок секций у `backend`
   как раз ставит самую крупную первой, так что доли по четырём секциям сравнимы между собой.
+- **SM-86 (новая).** У **всех 9** сущностей в «Владеет данными» есть строки полей — всего **60**
+  строк. Поля выписаны в `internal/storage/models.go` именами и типами; раздел «Семантика:» ниже
+  идёт в счёт SM-38 и здесь не считается. Записывается доля, как у SM-29. Красный исход поля:
+  секция в один прочерк при девяти ключах в описи.
 - **SM-30.** Догоняющий ход «посмотри внимательнее и дополни» не добавляет **ни одного** ключа.
   Прирост доказывает, что первый проход был неполон, и меряет он первый проход, а не умение
   дополнять по подсказке.

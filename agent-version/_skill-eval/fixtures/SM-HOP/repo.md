@@ -1,13 +1,23 @@
-# Фикстура SM-NEUTRAL — тот же дефект на чужом материале
+# Фикстура SM-HOP — поля лежат НЕ рядом с сущностью
 
 Синтетический репозиторий. Подаётся модели как содержимое `/work/shipping-api`; она работает с этим
 текстом, а не ходит по диску. `type` в манифесте — `backend`.
 
-**Зачем она нужна.** `SM-BULK` совпадает с примерами внутри самого скилла: те же числа (48/12/9/7),
-те же префиксы (`/v1/incidents/*`, `/v1/squads/*`, `/v1/chops/*`, `/v1/reports/*`, `/v1/admin/*`), тот
-же стек (Go, chi, Kafka), те же аббревиатуры (`ЧОП`, `ГБР`). На такой фикстуре нельзя отличить
-«модель прочитала код и сгруппировала по префиксу» от «модель повторила список из инструкции». Здесь
-всё другое: домен, стек, числа, префиксы, аббревиатуры. Правило либо переносится, либо нет.
+**Зачем она нужна.** `SM-NEUTRAL` кладёт поля сплошным блоком прямо под именем сущности
+(`data class Shipment(val id: String, …)`), и на такой раскладке baseline даёт 5 из 5: переписать
+готовый блок — механическая работа. Живая репа устроена иначе, и сам `card.template.md` это
+называет главной причиной пустых карточек: «поля ответа, их типы, что значит `null` — файл DTO или
+сущности, а не контроллер», «за фактом, лежащим в другом файле, надо зайти».
+
+Здесь ровно эта раскладка. `domain/Entities.kt` объявляет шесть голых классов и не содержит ни
+одного поля. Поля разложены по шести другим файлам: два DTO, две миграции, одна доменная запись,
+один аудит-класс. Инвентарь **тот же, что у `SM-NEUTRAL`** (31/7/6/5, 12 фактов семантики, 45
+полей) — значит доли сравнимы с ним напрямую, и различие между плечами ровно одно: надо ли делать
+второй переход.
+
+Решение «зайти ли за полями» принимается заново на **каждой** сущности — шесть раз, — и каждый раз
+пропустить дёшево. Это тот же провал, что скилл уже описывает для эндпоинтов: на сорок восьмом
+модель давно решает, что суть передана.
 
 Инвентарь задан точными числами, чтобы грейдинг был счётным:
 
@@ -16,12 +26,12 @@
 | HTTP-эндпоинты | **31** | Публичный контракт |
 | Топики | **7** (публикует 5, потребляет 2) | События |
 | Сущности | **6** | Владеет данными |
-| Поля сущностей | **45** (у всех 6) | Владеет данными, строки `-` внутри блоков |
+| Поля сущностей | **45** (у всех 6), **ни одного в `Entities.kt`** | Владеет данными, строки `-` внутри блоков |
 | Роли | **5** | Роли и доступ |
 | Факты семантики | **12** (8 контрактных + 4 сущностных) | внутри блоков |
 
-**Один буллет «Семантика» здесь = ровно один факт** — в отличие от `SM-BULK`, где в одном пункте их
-бывает два-три. Сделано намеренно: чек-лист из 12 якорей проверяется однозначно.
+**Один буллет «Семантика» здесь = ровно один факт**, как в `SM-NEUTRAL`: чек-лист из 12 якорей
+проверяется однозначно.
 
 Имена из манифеста, которые передаются субагенту: `shipping, carrier-registry, warehouse-web`.
 
@@ -60,6 +70,26 @@ dependencies {
 - `cancel`: отмена в пути разрешена; `422` приходит только на уже доставленный груз.
 - `export`: `period` обязателен, максимум 62 дня.
 
+## `src/main/kotlin/http/dto/ShipmentDto.kt`
+
+```kotlin
+data class ShipmentDto(
+    val id: String,
+    val number: Long,
+    val status: String,
+    val carrierId: String,
+    val vehicleId: String?,
+    val originSlotId: String,
+    val destinationAddress: String,
+    val weightKg: Int,
+    val declaredValue: BigDecimal?,
+    val createdAt: Instant,
+    val deliveredAt: Instant?,
+)
+```
+
+Отдаётся всеми ручками `/api/shipments*` и повторяет сущность целиком.
+
 ## `src/main/kotlin/http/WaybillController.kt`
 
 ```kotlin
@@ -71,6 +101,20 @@ dependencies {
 
 Семантика:
 - `waybill`: документ собирается заново на каждый запрос, номер ТТН остаётся прежним.
+
+## `src/main/kotlin/http/dto/CarrierDto.kt`
+
+```kotlin
+data class CarrierDto(
+    val id: String,
+    val inn: String,
+    val name: String,
+    val licenseNumber: String,
+    val licenseValidUntil: LocalDate,
+    val active: Boolean,
+    val createdAt: Instant,
+)
+```
 
 ## `src/main/kotlin/http/CarrierController.kt`
 
@@ -86,6 +130,20 @@ dependencies {
 Семантика:
 - `carriers list`: заблокированные перевозчики из выдачи не исчезают, приходят с `blocked: true`.
 - `carriers POST`: ИНН проверяется на уникальность; повтор даёт `409`, а не второго перевозчика.
+
+## `src/main/kotlin/domain/TariffRecord.kt`
+
+```kotlin
+class TariffRecord(
+    val id: String,
+    val carrierId: String,
+    val route: String,
+    val pricePerKg: BigDecimal,
+    val minPrice: BigDecimal?,
+    val validFrom: LocalDate,
+    val validUntil: LocalDate?,
+)
+```
 
 ## `src/main/kotlin/http/TariffController.kt`
 
@@ -153,68 +211,12 @@ const val SLOT_FREED = "warehouse.slot.freed"
 ## `src/main/kotlin/domain/Entities.kt`
 
 ```kotlin
-data class Shipment(
-    val id: String,
-    val number: Long,
-    val status: String,
-    val carrierId: String,
-    val vehicleId: String?,
-    val originSlotId: String,
-    val destinationAddress: String,
-    val weightKg: Int,
-    val declaredValue: BigDecimal?,
-    val createdAt: Instant,
-    val deliveredAt: Instant?,
-)
-
-data class Carrier(
-    val id: String,
-    val inn: String,
-    val name: String,
-    val licenseNumber: String,
-    val licenseValidUntil: LocalDate,
-    val active: Boolean,
-    val createdAt: Instant,
-)
-
-data class Vehicle(
-    val id: String,
-    val carrierId: String,
-    val plate: String,
-    val model: String,
-    val capacityPallets: Int,
-    val assignedAt: Instant,
-    val releasedAt: Instant?,
-)
-
-data class Tariff(
-    val id: String,
-    val carrierId: String,
-    val route: String,
-    val pricePerKg: BigDecimal,
-    val minPrice: BigDecimal?,
-    val validFrom: LocalDate,
-    val validUntil: LocalDate?,
-)
-
-data class WarehouseSlot(
-    val id: String,
-    val code: String,
-    val warehouseType: String,
-    val capacityKg: Int?,
-    val occupiedKg: Int,
-    val updatedAt: Instant,
-)
-
-data class AuditEntry(
-    val id: String,
-    val actorId: String,
-    val action: String,
-    val objectType: String,
-    val objectId: String,
-    val at: Instant,
-    val payload: ByteArray,
-)
+class Shipment
+class Carrier
+class Vehicle
+class Tariff
+class WarehouseSlot
+class AuditEntry
 ```
 
 Семантика:
@@ -249,6 +251,49 @@ enum class Role {
 Роли проверяются в самом сервисе (`@PreAuthorize`), список лежит здесь же — то есть из кода
 выводится, `не определено` тут будет ошибкой.
 
+## `src/main/kotlin/db/migration/V4__vehicles.sql`
+
+```sql
+CREATE TABLE vehicles (
+    id            uuid PRIMARY KEY,
+    carrier_id    uuid NOT NULL REFERENCES carriers (id),
+    plate         varchar(16) NOT NULL,
+    model         varchar(64) NOT NULL,
+    capacity_pallets integer NOT NULL,
+    assigned_at   timestamptz NOT NULL,
+    released_at   timestamptz
+);
+```
+
+## `src/main/kotlin/db/migration/V7__warehouse_slots.sql`
+
+```sql
+CREATE TABLE warehouse_slots (
+    id             uuid PRIMARY KEY,
+    code           varchar(32) NOT NULL,
+    warehouse_type varchar(16) NOT NULL,
+    capacity_kg    integer,
+    occupied_kg    integer NOT NULL DEFAULT 0,
+    updated_at     timestamptz NOT NULL
+);
+```
+
+## `src/main/kotlin/audit/AuditEntry.kt`
+
+```kotlin
+@Entity
+@Table(name = "audit_entries")
+class AuditEntry {
+    @Id lateinit var id: String
+    lateinit var actorId: String
+    lateinit var action: String
+    lateinit var objectType: String
+    lateinit var objectId: String
+    lateinit var at: Instant
+    lateinit var payload: ByteArray
+}
+```
+
 ## `src/main/resources/application.yml`
 
 ```yaml
@@ -275,11 +320,6 @@ integration:
 - **SM-38 (вторая фикстура).** Все 12 фактов семантики доехали в блоки. Якоря для грейдера:
   `total`/отменённые, `assignedVehicleId`, `422`/доставлен, `62`, номер ТТН, `blocked: true`, ИНН/`409`,
   дата отправки, целиком/частичное, «склад + окно», `cancelled`, `releasedAt`, `180`, `capacityKg`.
-- **SM-86 (новая, вторая фикстура).** У **всех 6** сущностей есть строки полей — всего **45** строк
-  в `domain/Entities.kt`. Якоря имён: `originSlotId`, `destinationAddress`, `declaredValue`,
-  `licenseValidUntil`, `capacityPallets`, `pricePerKg`, `minPrice`, `occupiedKg`. `capacityKg` в
-  якоря **не входит**: он стоит примером в `card.template.md`, и его появление доказывает чтение
-  шаблона, а не кода.
 - **SM-39.** Три служебных блока (`/actuator/health`, `/actuator/metrics`, `/api/version`) законно
   пусты; у остальных 28 в блоке есть хотя бы одна строка, не выводимая из заголовка.
 - **SM-43 (новая, тир A).** Секции «Заметки команды» в возвращённой карточке **нет**: `notes`
@@ -307,3 +347,14 @@ SM-5/SM-7 на этой фикстуре смотрит в обратную ст
 
 **`billing-legacy` — не ошибка манифеста.** Строка обязана остаться с пометкой. Выброшенная делает
 карточку ложной: сервис ходит не только туда, куда она утверждает.
+
+- **SM-86 (главная здесь).** У всех **6** сущностей в «Владеет данными» есть строки полей — всего
+  **45**. Ни одного поля нет в `domain/Entities.kt`: они лежат в `http/dto/ShipmentDto.kt` (11),
+  `http/dto/CarrierDto.kt` (7), `domain/TariffRecord.kt` (7), миграциях `V4__vehicles.sql` (7) и
+  `V7__warehouse_slots.sql` (6), `audit/AuditEntry.kt` (7). Записывается доля. Красный исход:
+  шесть блоков с назначением и семантикой и без единого поля — форма безупречна, схемы нет.
+- **Второй переход, а не полнота.** Ключи здесь доезжают и без него: имена сущностей стоят в
+  `Entities.kt` открытым списком. Меряется ровно то, зашёл ли агент за полями в другой файл.
+- **Раскладка имён разная намеренно.** В DTO поля в `camelCase`, в миграциях — в `snake_case`
+  (`origin_slot_id`, `capacity_kg`). Карточка вправе писать любой вариант; грейдер сверяет имя без
+  учёта разделителя, и требовать одну раскладку значит красить зелёный прогон в красное.
