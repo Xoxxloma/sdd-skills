@@ -49,7 +49,7 @@ const RE_FALSE_BUSYUNTIL = /^.*busyUntil.*(?:нарушени|исправ|пр�
  * уходит в счётную строку. К пункту 12 отношения не имеет — считается отдельно, чтобы не
  * приписывать этому раунду чужой шум.
  */
-const RE_ITEM1_ON_CONFIRMED = /\/api\/v2\/calendar/
+const RE_ITEM1_ON_CONFIRMED = /\/api\/v2\/calendar/ // карточка INT-2 несёт 🔵 подтверждено аналитиком
 
 /** Отчёт приёмки вообще состоялся: строка формата. */
 const RE_REPORT = /нарушени[йя][:*\s]*\d+|чек-лист прочитан/i
@@ -96,7 +96,7 @@ function selftest () {
     ['все три', 'нарушений: 3\n/rooms/occupancy без /v1/; as_of вместо asOf; 401 вместо 403', { found: true, all3: true }],
     ['чистый отчёт', 'чек-лист прочитан, тип: тех-спецификация\nнарушений: 0', { found: false, report: true, violations: 0 }],
     ['ложное на чужой карточке', 'нарушений: 1\nINT-2: GET /api/v2/calendar/events — не по конвенции /v1/', { found: false, falseAlien: true }],
-    ['INT-2 по пункту 1 — НЕ ложное', 'нарушений: 1\n1. §2 INT-2 — конкретный путь под 🟡\n«GET /api/v2/calendar/events»', { falseAlien: false, item1OnConfirmed: true }],
+    ['INT-2 по пункту 1 — НЕ ложное', 'нарушений: 1\n1. §2 INT-2 — конкретный путь под 🔵\n«GET /api/v2/calendar/events»', { falseAlien: false, item1OnConfirmed: true }],
     ['жирная разметка в счёте', '**нарушений:** 2\n«as_of» → нужен asOf', { violations: 2, report: true, found: true }],
     ['403 без цитаты 401 не засчитывается', 'нарушений: 0\nобщие правила: 403 для ролей соблюдены', { hitCode: false, found: false }],
   ]

@@ -43,11 +43,11 @@ const RE_403 = /\b403\b/
 const RE_DATE_FIELD = /`[A-Za-z]+At`|\b[a-z][A-Za-z]*At\s*[:(]|:\s*`?(iso8601|timestamp|date)\b/i
 
 const RE_GREEN = /🟢/
-const RE_YELLOW = /🟡/
+const RE_YELLOW = /🟡|🔵/ // существующее: 🔵 подтверждено аналитиком либо 🟡 к валидации
 const RE_STATUS_NEEDS = /Требуются уточнения\s*\((\d+)\)/
 const RE_STATUS_DONE = /Готово к разработке/
 const RE_OPEN_MARK = /к валидации|⚠️|\bTBD\b/g
-const RE_LEGEND_LINE = /^\s*>\s*(🟢|🟡|❓|⚠️)/
+const RE_LEGEND_LINE = /^\s*>\s*(🟢|🔵|🟡|❓|⚠️)/
 
 /**
  * Холодный вопрос о том, на что человек уже ответил файлом правил. Из pass НЕ входит:
@@ -234,7 +234,7 @@ function gradeSandbox(sb, mode) {
 const SPEC_GOOD = `# Техническая спецификация: журнал уведомлений СЦБ
 > **Задача:** SMSEC-420
 > **Статус готовности:** Требуются уточнения (1)
-> Легенда: 🟢 новое, 🟡 существующее, ❓ развилка
+> Легенда: 🟢 новое, 🔵 подтверждено аналитиком, 🟡 существующее, ❓ развилка
 ## 2. Взаимодействия
 ### INT-1 🟢 Журнал уведомлений в карточке инцидента
 \`GET /v1/incidents/{id}/notifications\`
@@ -255,7 +255,7 @@ const SPEC_LEAK = SPEC_GOOD.replace(
 // Красный №2 — свой новый контракт помечен 🟡: stage-breakdown не заведёт этап.
 const SPEC_OWN_YELLOW = SPEC_GOOD.replace(
   '### INT-1 🟢 Журнал уведомлений',
-  '### INT-1 🟡 подтверждено аналитиком Журнал уведомлений'
+  '### INT-1 🔵 подтверждено аналитиком Журнал уведомлений'
 )
 // Красный №3 — правило дат не применено, хотя поле времени есть.
 const SPEC_NO_ISO = SPEC_GOOD.replace(' (iso8601, UTC)', '')
