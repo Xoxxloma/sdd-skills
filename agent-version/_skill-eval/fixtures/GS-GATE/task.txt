@@ -1,0 +1,3 @@
+/analyst-workspace --no-review
+
+Вот бизнес-требования: docs/ARS-800/business_requirements.md. Что дальше?

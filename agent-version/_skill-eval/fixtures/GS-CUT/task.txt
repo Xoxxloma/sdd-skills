@@ -1,0 +1,1 @@
+Вот готовые бизнес-требования: docs/ARS-200/business_requirements.md. Что дальше?
