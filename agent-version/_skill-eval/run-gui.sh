@@ -42,6 +42,7 @@ cp "$ROUND/_skills/analyst-workspace.SKILL.md" "$SNAP/analyst-workspace/SKILL.md
 SNAP_WIN="$(cd "$SNAP" && { pwd -W 2>/dev/null || pwd; })"
 
 TPL="$HERE/stand-gui/prompt.md"
+[ -f "$FIX/prompt.md" ] && TPL="$FIX/prompt.md"
 [ -f "$TPL" ] || { echo "нет промпта: $TPL"; exit 1; }
 [ -f "$FIX/task.txt" ] || { echo "нет task.txt в фикстуре"; exit 1; }
 
@@ -56,6 +57,7 @@ run_one() {
   rm -rf "$sb"; mkdir -p "$sb"
   bash "$FIX/seed.sh" "$sb/w" > "$sb/_seed.log" 2>&1 || { echo "  run-$i — засев не собрался"; return 0; }
   local abs; abs="$(cd "$sb/w" && { pwd -W 2>/dev/null || pwd; })"
+  if [ -d "$FIX/stubs" ]; then mkdir -p "$sb/w/.claude/skills"; cp -r "$FIX/stubs"/* "$sb/w/.claude/skills/"; fi
   local task
   task="$(awk 'FNR==NR{t=t $0 ORS; next} /^TASKTEXT$/{printf "%s", t; next} {print}' "$FIX/task.txt" "$TPL" \
         | sed -e "s|WORKDIR|$abs|g" -e "s|SKILLDIR|$SNAP_WIN|g")"
@@ -71,6 +73,7 @@ run_one() {
   mkdir -p "$dst"
   cp "$sb/answer.md" "$dst/answer.md" 2>/dev/null || true
   cp "$sb/_stderr.log" "$dst/_stderr.log" 2>/dev/null || true
+  cp "$sb/w/_trace.log" "$dst/_trace.log" 2>/dev/null || true
   ( cd "$sb" && find w -type f | sort ) > "$dst/_files.txt" 2>/dev/null || true
   if [ $rc -ne 0 ] || [ ! -s "$dst/answer.md" ]; then echo "  run-$i — ОТКАЗ (rc=$rc)"; else echo "  run-$i — готов"; fi
 }
