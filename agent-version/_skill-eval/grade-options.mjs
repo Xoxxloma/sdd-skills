@@ -137,6 +137,12 @@ function selftest() {
 }
 
 // ─── CLI ───────────────────────────────────────────────────────────────────────────────────
+// Охрана main-модуля. Без неё `import { optionsOf }` из соседнего грейдера запускал ЭТОТ CLI
+// с чужим argv: `grade-propose.mjs --selftest` печатал самопроверку grade-options и выходил,
+// своей не показав вовсе. Парсер вариантов здесь один на все счётчики намеренно (см. шапку),
+// поэтому импорт обязан быть тихим. На прямой запуск охрана не влияет — числа те же.
+const IS_MAIN = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].split('\\').join('/')}`).href
+if (!IS_MAIN) { /* импорт: только экспорты, CLI молчит */ } else {
 const argv = process.argv.slice(2)
 if (argv.includes('--selftest')) selftest()
 
@@ -182,4 +188,6 @@ if (!corpusMode) {
   for (const o of [...bad].sort((a, b) => b.len - a.len).slice(0, 8)) {
     console.log(`· ${o.text.slice(0, 150)}\n    [${o.flags.join(', ')}]`)
   }
+}
+
 }
