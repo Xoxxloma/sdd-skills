@@ -2,7 +2,7 @@
 name: technical-spec-doc
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
-description: 'Turns a confirmed business-requirements doc (БТ/BRD/SRS) into ONE Russian Markdown technical spec (technical_specification.md, saved next to the БТ), organized around INTERACTIONS — the new and changed contracts crossing service or FE/BE boundaries — so a frontend agent and a backend agent code against the same contracts and meet without after-the-fact stitching. There is no code to read: NEW things are designed fully (path, schema, JSON example); anything about an EXISTING service is written only as the analyst confirmed it — inventing an endpoint of a service you cannot see is the worst failure of this skill. Requires a ready БТ: given only a brief or an idea it refuses and asks for the business requirements. Use when the БТ is ready and a dev spec is needed.'
+description: 'Turns a confirmed business-requirements doc (the output of business-requirements-doc, a ТЗ / BRD / SRS) into ONE Markdown technical specification in Russian that two AI coding agents — one frontend, one backend — can implement against with minimal friction at integration and release. The spec is organized around INTERACTIONS (the new/changed contracts crossing service or FE/BE boundaries), not siloed BE/FE chapters. There is NO code access (analytical repo, code is spread across services), but the repo MAY carry a context digest of those services (services/*.md — one card per service) — if it exists the skill reads it to build better questions for the analyst; if it does not, the skill works from the БТ alone, as before. Either way the digest never speaks for the analyst: NEW interactions are fully designed by the skill; anything about an EXISTING service is either confirmed by the analyst (written as fact, marked "подтверждено аналитиком, не по коду") or stays an assumption to validate — never invented. Use whenever someone wants a technical spec / тех.спека / ТЗ на разработку / dev design / implementation spec, wants to turn business requirements into something developers or AI agents can build, or wants to describe a new or changed interaction (contract, API, integration) between services or between frontend and backend. Trigger even if they just hand over a business-requirements doc and say "теперь сделай тех.спеку" or "распиши это для разработки". This skill REQUIRES a confirmed business-requirements document as input — if none is provided (only a vague brief or idea), it stops and asks for the БТ instead of proceeding.'
 ---
 
 # Technical Specification Interview (BRD → Tech Spec)
@@ -362,12 +362,6 @@ call *is* the question, not a file.
 - **Сказанное аналитиком не переспрашивай открытым вопросом** — сверяйся пересказом
   («вы сказали, что счёт сессий отдаёт сервис аутентификации, — верно?»), чтобы ему
   осталось кивнуть, а не набирать заново.
-- **Спрашивай о видимом поведении, а не о реализации.** Как устроено внутри — компонент, проп,
-  библиотека — решает разработка. Развилка техническая → переформулируй её в поведение: что
-  требует БТ против того, что есть сейчас.
-  ❌ «Где разместить логику — внутри существующего компонента или отдельным модулем?»
-  ✅ «В БТ — [поведение по БТ], сейчас — [поведение сегодня]. Оставляем как есть или делаем по БТ?»
-  Поведение от развилки не меняется → это не вопрос к аналитику: реши сам как 🟢-дизайн.
 **Никакой воды — ни в вопросе, ни в варианте.** Гипотеза называет предмет; вода называет
 класс предмета и не сообщает ничего. Пять оборотов, которых в твоём ходе не бывает:
 
@@ -550,7 +544,7 @@ business-requirements doc or any repo/code file (you may, on a later refinement 
 ### Step 5 — Self-Review (before handoff)
 Check, and fix anything that fails:
 1. **Provenance is marked everywhere.** Every existing-system statement carries 🔵
-   ("подтверждено аналитиком") or 🟡 ("к валидации"). **🟡 рядом со словом «подтверждено» — описка: подтверждённое несёт 🔵.** No unverified claim about a service you
+   ("подтверждено аналитиком") or 🟡 ("к валидации"). No unverified claim about a service you
    cannot see is written as plain fact. Scan §2/§3/§4 token by token: any endpoint, table,
    field, status, or behaviour attributed to an *existing* service that is neither 🟢-new
    nor analyst-confirmed 🔵 is a cardinal-sin violation → downgrade to 🟡-к-валидации or
@@ -711,7 +705,7 @@ Provenance markers (🟢 / 🔵 / 🟡 / ❓, plus ⚠️ for vague) appear inli
 > 🔵 depends-on #0 — контракт унаследован из спеки узла-фундамента. Это НЕ открытый пункт: он уже спроектирован и подтверждён на стороне #0. В «Открытые вопросы» не попадает и «Статус готовности» не меняет. *(Строка легенды нужна, ТОЛЬКО если эта спека наследует контракт #0. Обычный прогон — просто убери её.)*
 > ❓ — открытое архитектурное решение.
 > ⚠️ — подтверждено, но расплывчато: требует уточнения перед разработкой.
-> 🟢 и 🔵 — пункт закрыт; 🟡, ❓ и ⚠️ — открыт и идёт в «Открытые вопросы».
+> *(Цвет = закрыт пункт или открыт: 🟢 и 🔵 закрыты; 🟡, ❓ и ⚠️ идут в «Открытые вопросы».)*
 >
 > **Открытые вопросы (решить до / во время разработки):**
 > 1. [Гейт и что не решено — ❓ или 🟡 к валидации]
