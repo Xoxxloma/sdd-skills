@@ -21,7 +21,7 @@ run_one() {
   # Промпт подаётся stdin, а не аргументом: на Windows длина командной строки ограничена ~32 КБ,
   # и промпт SM-BULK (33 КБ) в неё не влез — пять прогонов упали с rc=126 «Argument list too long»,
   # причём в answer.md при этом не было ничего, то есть по размеру отказ виден не был.
-  ( cd "$sb" && timeout 900 claude -p --model haiku --permission-mode bypassPermissions < "$PROMPT" ) \
+  ( cd "$sb" && timeout 900 claude -p --model "${SM_MODEL:-haiku}" --permission-mode bypassPermissions < "$PROMPT" ) \
       > "$sb/answer.md" 2> "$sb/_stderr.log"
   local rc=$?
   if grep -qiE "API Error|Request not allowed|Please run /login|Credit balance|rate limit|session limit|usage limit" "$sb/answer.md" 2>/dev/null; then
@@ -32,11 +32,11 @@ run_one() {
 }
 
 echo "плечо: $OUT   промпт: $PROMPT   прогонов: $N, параллельно: $CONC"
-running=0
+# Семафор по числу живых фоновых задач, как в runs/2026-08-24-sm-real/run.sh: `wait -n` в bash 3.2
+# (macOS) не существует, а откат на голый `wait` после первой волны гонит пул по одному прогону.
 for i in $(seq -w 1 "$N"); do
+  while [ "$(jobs -rp | wc -l)" -ge "$CONC" ]; do sleep 5; done
   run_one "$i" &
-  running=$((running + 1))
-  if [ "$running" -ge "$CONC" ]; then wait -n 2>/dev/null || wait; running=$((running - 1)); fi
 done
 wait
 echo "ГОТОВО: $OUT — с ответом $(find "$OUT" -name answer.md -size +0 | wc -l) из $N"

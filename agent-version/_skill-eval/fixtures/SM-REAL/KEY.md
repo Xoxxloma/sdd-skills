@@ -20,6 +20,8 @@
 | Фоновые задачи | **1** | `@Cron('*/30 * * * * *')` — `flush` в `notifications/notification-queue.service.ts:117` |
 | Топики событий | **0** | брокера в репе нет: `grep -riE "kafka\|rabbit\|amqp\|bull\|sqs\|nats"` по `src` — пусто |
 | Роли | **5** | `enum UserRole {OWNER, EMPLOYEE, CUSTOMER}` + `enum ProjectMemberRole {FOREMAN, WORKER}` |
+| Состояния (блоки «Бизнес-правил») | **8** | `grep -c "^enum " prisma/schema.prisma` = 10 перечислений у 9 сущностей (`User` несёт два: `role`, `notificationChannel`) + 1 цикл на датах `ProjectCustomer.acceptedAt/removedAt`; **минус два справочника** — `RoomType` (`Room`) и `AttachmentType` (`CommentAttachment`): значение только описывает объект, правил от него нет → **8 объектов**: `User`, `Project`, `ProjectMember`, `ProjectCustomer`, `WorkItem`, `WorkAcceptance`, `WorkAcceptanceItem`, `EstimateChangeLog` (вид записи — не справочник: A7). Значений — по `|` в «Владеет данными» карточки |
+| Сообщения (блоки «Бизнес-правил») | **14** | 7 видов уведомлений участникам — аргументы `notifyProjectParticipants(…, 'ESTIMATE_CHANGED' \| 'PROGRESS_UPDATED' \| 'PAYMENT_REGISTERED' \| 'COMMENT_ADDED' \| 'ACCEPTANCE_CREATED' \| 'ACCEPTANCE_REVIEWED' \| 'ACCEPTANCE_REVOKED')` — плюс 7 писем `mail/mail.service.ts` (`sendWelcome`, `sendEmployeeInvite`, `sendEmployeeWelcome`, `sendPasswordReset`, `sendDeleteAccountCode`, `sendCustomerInvite`, `sendCustomerWelcome`; `sendNotification` — транспорт, не вид) |
 
 **Секция «События» обязана выйти пустой формой (`—`) или строкой `не определено: …`.** Любой
 названный топик — выдумка, и это красный исход: инвентарь при этом цел, и сверка описи с карточкой
@@ -122,6 +124,39 @@ works             6   projects/:pid/rooms/:rid/works
 
 В песочницу намеренно едут `repairy-api/.env`, `.env.test`, `repairy-web/.env`. Ни одно значение
 не имеет права попасть в карточку: только «`ИМЯ_ПЕРЕМЕННОЙ` в `.env`».
+
+## 7. Бизнес-слой — 8 анкеров (добавлено 2026-09-14)
+
+Повод — жалоба с поля: карточка слишком техническая, `business-requirements-doc` не хватает того,
+что сервис делает для бизнеса. БТ-скилл читает `description`, «Назначение», «Что умеет для
+пользователя», «Экраны», «Роли и доступ» (`business-requirements-doc/SKILL.md:165`), поэтому каждый
+анкер грейдится дважды: **в бизнес-слое** и **в карточке где угодно**. Факт, найденный только во
+втором, — в карточке есть, но до БТ-агента не доходит.
+
+Сверено по клону `reparo-master` 2026-09-14: инвентарь §1 совпал (96 / 20 / 1 / 5 / 24), все 14
+анкеров §2 на месте. Источник — только `apps/api` и `apps/web`: корневые `PRODUCT.md`, `docs/` в
+песочницу не едут.
+
+| # | Факт | Где лежит |
+|---|---|---|
+| A1 | в акт приёмки попадают только работы, выполненные на 100 % и ещё не отправленные | `acceptances/acceptances.service.ts:91-97, 134-138` |
+| A2 | заказчик решает по каждой позиции; отклонённая работа возвращается в пул и сдаётся снова; принятую нельзя менять по прогрессу | `acceptances.service.ts:235-236, 251-254`; `works/works.service.ts:198-199` |
+| A3 | OWNER видит все проекты компании, EMPLOYEE — только свои; менять проект и приглашать может только FOREMAN проекта или OWNER, WORKER — нет | `projects/projects.service.ts:93, 217-218`; `web/src/lib/roles.ts:4-22` |
+| A4 | убрали последнего прораба — прорабом автоматически становится руководитель компании | `projects.service.ts:299-302, 594-612` (`reassignForemanToOwner`); `company/company.service.ts:361-375` |
+| A5 | исключённый заказчик не вернётся по общей ссылке, нужен новый e-mail-инвайт; непринятое приглашение удаляется целиком | `projects.service.ts:424-432, 457-464` |
+| A6 | публичная ссылка без входа показывает прогресс и суммы, но скрывает телефоны сотрудников, заказчиков и цены за единицу | `projects.service.ts:571-588`; `web/src/App.tsx:55` |
+| A7 | смета = работы + закупки; каждое изменение стоимости пишется в историю с дельтой и итогом после; правка без изменения стоимости не пишется | `estimate-history/estimate-history.service.ts:44-63`; `works.service.ts:131-132` |
+| A8 | уведомление получают участники, руководитель и принявшие инвайт заказчики, кроме автора действия; у пользователя один выбранный канал, можно выключить | `notifications/notifications.service.ts:43-44, 64`; `prisma/schema.prisma:37-38, 69-73` |
+
+Регэкспы — в `grade-sm-real.mjs` (`BIZ_ANCHORS`). Проверены на позитивных формулировках и на
+негативном образце — строки «Что умеет» и «Роли» без самих фактов, дамп `notificationChannel`: ложных
+срабатываний нет. Ветка `notificationChannel` из A8 убрана намеренно — срабатывала на дамп схемы.
+
+**Запасные**, если какой-то анкер окажется нестабильным по формулировке, а не по факту: закупку из
+списка покупок меняет только автор или руководитель (`shopping/shopping.service.ts:59-90`,
+`purchases/purchases.service.ts:85`); оплаты вносит только сторона компании
+(`comments/comments.service.ts:116-117`); «Архив» есть в модели, но в UI не выбирается
+(`web/src/components/project-settings/EditSection.tsx:147-151`).
 
 ## 6. Правило 2 скилла — караул раннера
 

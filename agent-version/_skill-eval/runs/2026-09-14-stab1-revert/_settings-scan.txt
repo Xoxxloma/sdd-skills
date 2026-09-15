@@ -1,0 +1,6 @@
+плечо: scan
+модель: haiku
+прогонов: 8, параллельность: 4
+текст скилла: /private/tmp/claude-501/-Users-macbook-Documents-Projects-sdd-skills/f860d5e9-f2ba-4f62-96a0-31364e9b17aa/scratchpad/arm1/skill
+источники: /private/tmp/claude-501/-Users-macbook-Documents-Projects-sdd-skills/f860d5e9-f2ba-4f62-96a0-31364e9b17aa/scratchpad/src/{repairy,resonance}
+снимок скилла: _skills/service-map.SKILL.md (     977 строк)

@@ -196,7 +196,7 @@ run_one() {
   # Свой `session-id` на песочницу: по нему второй ход находит сессию первого. Генерится node —
   # он в наборе есть везде (на нём грейдеры), `uuidgen` под Git Bash нет.
   local sid; sid="$(node -e 'console.log(require("crypto").randomUUID())')"
-  ( cd "$sb" && timeout 900 claude -p "$task" --model haiku --permission-mode bypassPermissions \
+  ( cd "$sb" && timeout 900 claude -p "$task" --model "${SM_MODEL:-haiku}" --permission-mode bypassPermissions \
         ${EFFORT:+--effort "$EFFORT"} \
         --session-id "$sid" --output-format stream-json --verbose ) \
       > "$sb/stream.jsonl" 2> "$sb/_stderr.log"
@@ -228,7 +228,7 @@ run_one() {
     while [ "$turn" -lt "$MAX_TURNS" ] && [ "$idle" -lt 2 ]; do
       local before; before="$(trace_len "$sb")"
       turn=$((turn + 1))
-      ( cd "$sb" && timeout 900 claude -p "$reply" --model haiku --permission-mode bypassPermissions \
+      ( cd "$sb" && timeout 900 claude -p "$reply" --model "${SM_MODEL:-haiku}" --permission-mode bypassPermissions \
             ${EFFORT:+--effort "$EFFORT"} \
             --resume "$sid" --output-format stream-json --verbose ) \
           > "$sb/stream-$(printf '%02d' "$turn").jsonl" 2>> "$sb/_stderr.log"
