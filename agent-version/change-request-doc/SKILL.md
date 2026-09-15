@@ -1,5 +1,6 @@
 ---
 name: change-request-doc
+version: 1.0.0
 user-invocable: true
 argument-hint: "<ключ задачи>"
 allowed-tools: Read, Write, Glob, Grep, AskUserQuestion

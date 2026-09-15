@@ -1,5 +1,6 @@
 ---
 name: context-doc
+version: 1.0.0
 user-invocable: true
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion
 description: 'Кладёт документ аналитика в папку `context/` в том виде, в каком его читает петля: переносит содержимое в Markdown дословно и сочиняет строку `description`, которую утверждает человек. Без этой строки файла для петли не существует: `business-requirements-doc` и `technical-spec-doc` ищут контекст одним грепом по `^description:`. Вход — любой файл (txt, csv, html, json, xlsx, docx, pdf), несколько файлов, папка или текст, вставленный прямо в чат. Запускай, когда рядом с задачей появился документ, который должны прочитать другие скиллы. Без аргумента работает как починка: находит в `context/` файлы без строки `description` и дописывает её, не трогая текст.'
