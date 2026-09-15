@@ -143,6 +143,17 @@ case "$PROBE" in
   bg-data-q)   FIXTURE=BG-INC; PROMPT_FILE=data-q-prompt.txt;   SKILL=bug-report-doc ;;
   # Негативный случай: новая возможность в жалобной форме, баг-репорта быть не должно.
   bg-notbug-q) FIXTURE=BG-INC; PROMPT_FILE=notbug-q-prompt.txt; SKILL=bug-report-doc ;;
+  # ── `change-request-doc`: запрос на мелкую правку ─────────────────────────────────────────
+  # Одно дерево, то же, что у BG-INC (слепок и ARS-102-ловушка). Плечи `-w` дают ответы аналитика
+  # заранее и мерят ФАЙЛ; плечи `-q` дают голое описание и мерят СТОРОЖ: разбор по пяти строкам,
+  # вердикт и то, что файла нет. `cr-notsmall-q` — мягкий стоп (вопрос «правка или БТ», не отказ),
+  # `cr-idea-q` и `cr-bug-q` — жёсткие (файла нет, назван другой маршрут).
+  cr-btn-w)      FIXTURE=CR-SMALL; PROMPT_FILE=btn-w-prompt.txt;      SKILL=change-request-doc ;;
+  cr-btn-q)      FIXTURE=CR-SMALL; PROMPT_FILE=btn-q-prompt.txt;      SKILL=change-request-doc ;;
+  cr-api-w)      FIXTURE=CR-SMALL; PROMPT_FILE=api-w-prompt.txt;      SKILL=change-request-doc ;;
+  cr-notsmall-q) FIXTURE=CR-SMALL; PROMPT_FILE=notsmall-q-prompt.txt; SKILL=change-request-doc ;;
+  cr-idea-q)     FIXTURE=CR-SMALL; PROMPT_FILE=idea-q-prompt.txt;     SKILL=change-request-doc ;;
+  cr-bug-q)      FIXTURE=CR-SMALL; PROMPT_FILE=bug-q-prompt.txt;      SKILL=change-request-doc ;;
 
   # ── спека на багфикс: режим `technical-spec-doc` по баг-репорту ───────────────────────────
   # Флаг багфикса изображён промптом — проводник про багфикс ещё не знает (шаг 8 плана). Дерево
@@ -213,7 +224,7 @@ case "$PROBE" in
   # чистый вердикт на `rv-bug-spec` не отличить от неработающего правила: он выходит в обоих случаях.
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx sb-ctx sb-ctx2 rv-conv rv-clean br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx sb-ctx sb-ctx2 rv-conv rv-clean br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
 esac
 
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
