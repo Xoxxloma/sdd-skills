@@ -32,8 +32,10 @@ const CODEISH = /(^|\s)\/[a-z]|\b(GET|POST|PUT|PATCH|DELETE)\b|\b[a-z]+[A-Z][A-Z
 const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)])
 
 function gradeRun(dir) {
+  // Добранный после отказа прогон держит и старый `_api-failure.txt`, и новый `answer.md`:
+  // измерен тот, у кого есть непустой ответ без текста отказа; старый файл отказа не решает.
   const ans = join(dir, 'answer.md')
-  if (existsSync(join(dir, '_api-failure.txt')) || !existsSync(ans) || !readFileSync(ans, 'utf8').trim()) return { dir, measured: false }
+  if (!existsSync(ans) || !readFileSync(ans, 'utf8').trim()) return { dir, measured: false }
   const text = readFileSync(ans, 'utf8')
   if (RE_API_FAILURE.test(text)) return { dir, measured: false }
   const files = walk(dir).filter((f) => /business_requirements\.md$/.test(f))

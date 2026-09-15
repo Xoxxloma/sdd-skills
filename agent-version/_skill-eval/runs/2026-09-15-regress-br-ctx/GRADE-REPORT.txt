@@ -1,0 +1,17 @@
+плечо: runs/2026-09-15-regress-br-ctx/br-ctx   режим: questions
+измерено: 8 из 8
+  run-1: ЗЕЛЁНЫЙ  файл нет  анкеров 9 [11 мин, 26 мин, 34 мин, за КАД, промзона, PCN_DISPATCHER, PCN_SHIFT_LEAD, GBR_CREW_LEAD, OBJECT_OWNER]
+  run-2: ЗЕЛЁНЫЙ  файл нет  анкеров 7 [11 мин, за КАД, промзона, PCN_DISPATCHER, PCN_SHIFT_LEAD, GBR_CREW_LEAD, OBJECT_OWNER]
+  run-3: ЗЕЛЁНЫЙ  файл нет  анкеров 9 [11 мин, 26 мин, 34 мин, за КАД, промзона, PCN_DISPATCHER, PCN_SHIFT_LEAD, GBR_CREW_LEAD, OBJECT_OWNER]
+  run-4: ЗЕЛЁНЫЙ  файл нет  анкеров 7 [11 мин, за КАД, промзона, PCN_DISPATCHER, PCN_SHIFT_LEAD, GBR_CREW_LEAD, OBJECT_OWNER]
+  run-5: ЗЕЛЁНЫЙ  файл нет  анкеров 9 [11 мин, 26 мин, 34 мин, за КАД, промзона, PCN_DISPATCHER, PCN_SHIFT_LEAD, GBR_CREW_LEAD, OBJECT_OWNER]
+  run-6: ЗЕЛЁНЫЙ  файл нет  анкеров 9 [11 мин, 26 мин, 34 мин, за КАД, промзона, PCN_DISPATCHER, PCN_SHIFT_LEAD, GBR_CREW_LEAD, OBJECT_OWNER]
+  run-7: ЗЕЛЁНЫЙ  файл нет  анкеров 9 [11 мин, 26 мин, 34 мин, за КАД, промзона, PCN_DISPATCHER, PCN_SHIFT_LEAD, GBR_CREW_LEAD, OBJECT_OWNER]
+  run-8: ЗЕЛЁНЫЙ  файл нет  анкеров 9 [11 мин, 26 мин, 34 мин, за КАД, промзона, PCN_DISPATCHER, PCN_SHIFT_LEAD, GBR_CREW_LEAD, OBJECT_OWNER]
+
+СЧЁТЧИКИ (из 8 измеренных; меньше — лучше, кроме последней строки):
+  0 (0%)  вопрос вхолодную: ни одного анкера из context/
+  0 (0%)  анкер ровно один — чтение частичное
+  0 (0%)  файл требований записан на первом ходу (нельзя)
+  0 (0%)  глоссарий открыт (больше — лучше)
+  8 (100%)  зелёных целиком (все правила сразу)
