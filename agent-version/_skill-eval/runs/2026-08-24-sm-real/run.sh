@@ -16,6 +16,10 @@
 # Идемпотентность: песочница с непустым answer.md пропускается — скрипт можно перезапускать.
 set -u
 
+# На macOS нет `timeout` (coreutils не входят в систему). Без подмены вызов падает с rc=127, а
+# пустой answer.md уходит в «ОТКАЗ» — то есть весь раунд выглядит не измеренным. perl есть везде.
+command -v timeout > /dev/null || timeout() { local s="$1"; shift; perl -e 'alarm shift; exec @ARGV' "$s" "$@"; }
+
 HERE="$(cd "$(dirname "$0")" && pwd)"
 EVAL="$(cd "$HERE/../.." && pwd)"            # …/agent-version/_skill-eval
 SKILLROOT="$(cd "$EVAL/.." && pwd)"          # …/agent-version
@@ -33,6 +37,9 @@ mkdir -p "$ROUND"
 ARM="${1:?плечо: scan | first}"
 N="${2:-1}"
 CONC="${3:-1}"
+# Модель ведущего и субагентов. По умолчанию haiku — так сняты все раунды до 2026-09-14; прод
+# аналитиков перешёл на flash-модели с рассуждением, ближайшая замена — sonnet (SM_MODEL=sonnet).
+MODEL="${SM_MODEL:-haiku}"
 
 case "$ARM" in
   scan)  PROMPT="$HERE/stand/prompt-scan.md" ;;
@@ -77,7 +84,7 @@ OUT="$ROUND/sandbox"
 mkdir -p "$OUT"
 
 run_one() {
-  local i="$1"
+  local i="$1"          # номер песочницы; $2 — номер попытки (пусто = первая), см. «брошено в фоне»
   local sb="$OUT/$ARM-$i"
   if [ -s "$sb/answer.md" ]; then echo "  $ARM-$i — уже есть, пропуск"; return 0; fi
   mkdir -p "$sb"
@@ -95,9 +102,9 @@ run_one() {
   local wd="$sb/w/AI-SDD"
   local abs_wd; abs_wd="$(cd "$wd" && { pwd -W 2>/dev/null || pwd; })"
   local task
-  task="$(sed -e "s|WORKDIR|$abs_wd|g" -e "s|SKILLDIR|$SNAP_WIN|g" "$PROMPT")"
+  task="$(sed -e "s|WORKDIR|$abs_wd|g" -e "s|SKILLDIR|$SNAP_WIN|g" -e "s|модель \`haiku\`|модель \`$MODEL\`|g" "$PROMPT")"
 
-  ( cd "$wd" && timeout 3600 claude -p "$task" --model haiku --permission-mode bypassPermissions ) \
+  ( cd "$wd" && timeout 3600 claude -p "$task" --model "$MODEL" --permission-mode bypassPermissions ) \
       > "$sb/answer.md" 2> "$sb/_stderr.log"
   local rc=$?
 
@@ -105,6 +112,24 @@ run_one() {
   if grep -qiE "API Error|Request not allowed|Please run /login|Credit balance|rate limit|session limit|usage limit" "$sb/answer.md" 2>/dev/null; then
     mv "$sb/answer.md" "$sb/_api-failure.txt"
     echo "  $ARM-$i — ОТКАЗ API, в счёт не идёт"
+    return 0
+  fi
+
+  # Брошено в фоне — тоже «не измерено», не «провалено». На sonnet ведущий запускает субагентов
+  # фоном и заканчивает ход «жду уведомления»; в `claude -p` уведомление не приходит, процесс
+  # завершается без карточек (2026-09-14-sonnet-base, scan-5 и scan-6 — треть раунда). Опознаётся
+  # по последней строке ответа; карточки на диске при этом могут быть частично (scan-5 записал web).
+  # Один повтор той же песочницы: засев заново, чтобы частичная карточка не сошла за «уже есть».
+  if tail -c 600 "$sb/answer.md" | grep -qiE "жд[уё]м?[^\n]*(уведомлен|субагент|заверш|результат)|ожида[юе][^\n]*(уведомлен|субагент|заверш|результат)|продолжу[^\n]*(как только|когда)[^\n]*(верн|заверш)"; then
+    local attempt="${2:-1}"
+    mv "$sb/answer.md" "$sb/_bg-abandoned$([ "$attempt" -gt 1 ] && echo "-$attempt").txt"
+    if [ "$attempt" -lt 2 ]; then
+      echo "  $ARM-$i — брошено в фоне, повтор"
+      rm -rf "$sb/w"
+      run_one "$i" 2
+      return 0
+    fi
+    echo "  $ARM-$i — брошено в фоне ДВАЖДЫ, в счёт не идёт"
     return 0
   fi
 
@@ -126,7 +151,7 @@ run_one() {
 
 {
   echo "плечо: $ARM"
-  echo "модель: haiku"
+  echo "модель: $MODEL"
   echo "прогонов: $N, параллельность: $CONC"
   echo "текст скилла: $SKILL_SRC"
   echo "источники: ${SM_REAL_SRC:-/c/Users/Konstantin/projects}/{repairy,resonance}"
@@ -134,11 +159,12 @@ run_one() {
 } > "$ROUND/_settings-$ARM.txt"
 cat "$ROUND/_settings-$ARM.txt"
 
-running=0
+# Семафор по числу живых фоновых задач. Прежний `wait -n` в bash 3.2 (macOS) не существует, а откат
+# на голый `wait` ждал ВСЕ задачи сразу: после первой волны пул шёл строго по одному прогону
+# (2026-09-14: волна из четырёх — 10 мин, дальше каждый прогон в одиночку).
 for i in $(seq -w 1 "$N"); do
+  while [ "$(jobs -rp | wc -l)" -ge "$CONC" ]; do sleep 5; done
   run_one "$i" &
-  running=$((running + 1))
-  if [ "$running" -ge "$CONC" ]; then wait -n 2>/dev/null || wait; running=$((running - 1)); fi
 done
 wait
 

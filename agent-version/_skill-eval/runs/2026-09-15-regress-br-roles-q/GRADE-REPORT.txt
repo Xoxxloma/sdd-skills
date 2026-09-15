@@ -1,0 +1,12 @@
+плечо: runs/2026-09-15-regress-br-roles-q/br-roles-q   режим: questions
+измерено: 8 из 8
+  run-1: ЗЕЛЁНЫЙ  файл нет  точных имён в вопросе: 4 [SRM_BUSINESS_ADMIN, SRM_INTERNAL_USER, SRM_EXTERNAL_USER, SRM_ACCREDIT_MODERATOR]
+  run-2: ЗЕЛЁНЫЙ  файл нет  точных имён в вопросе: 4 [SRM_BUSINESS_ADMIN, SRM_INTERNAL_USER, SRM_EXTERNAL_USER, SRM_ACCREDIT_MODERATOR]
+  run-3: ЗЕЛЁНЫЙ  файл нет  точных имён в вопросе: 4 [SRM_BUSINESS_ADMIN, SRM_INTERNAL_USER, SRM_EXTERNAL_USER, SRM_ACCREDIT_MODERATOR]
+  run-4: ЗЕЛЁНЫЙ  файл нет  точных имён в вопросе: 4 [SRM_BUSINESS_ADMIN, SRM_INTERNAL_USER, SRM_EXTERNAL_USER, SRM_ACCREDIT_MODERATOR]
+  run-5: ЗЕЛЁНЫЙ  файл нет  точных имён в вопросе: 4 [SRM_BUSINESS_ADMIN, SRM_INTERNAL_USER, SRM_EXTERNAL_USER, SRM_ACCREDIT_MODERATOR]
+  run-6: ЗЕЛЁНЫЙ  файл нет  точных имён в вопросе: 4 [SRM_BUSINESS_ADMIN, SRM_INTERNAL_USER, SRM_EXTERNAL_USER, SRM_ACCREDIT_MODERATOR]
+  run-7: ЗЕЛЁНЫЙ  файл нет  точных имён в вопросе: 4 [SRM_BUSINESS_ADMIN, SRM_INTERNAL_USER, SRM_EXTERNAL_USER, SRM_ACCREDIT_MODERATOR]
+  run-8: ЗЕЛЁНЫЙ  файл нет  точных имён в вопросе: 4 [SRM_BUSINESS_ADMIN, SRM_INTERNAL_USER, SRM_EXTERNAL_USER, SRM_ACCREDIT_MODERATOR]
+
+ИТОГ: 8/8 (100%)

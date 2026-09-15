@@ -1,0 +1,5 @@
+README.md
+services/manifest.yaml
+services/repairy-api.md
+services/repairy-web.md
+t1-prompt.txt
