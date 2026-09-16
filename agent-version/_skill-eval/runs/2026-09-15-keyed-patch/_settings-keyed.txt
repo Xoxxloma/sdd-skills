@@ -1,0 +1,7 @@
+плечо: keyed
+модель: sonnet
+прогонов: 2, параллельность: 2
+текст скилла: /Users/macbook/Documents/Projects/sdd-skills/.claude/worktrees/keyed-update/agent-version/service-map
+источники: /private/tmp/claude-501/-Users-macbook-Documents-Projects-sdd-skills/e02ba650-2b7f-40a8-8faa-4c9d06c9cd1f/scratchpad/src/{repairy,resonance}
+подсказка: /Users/macbook/Documents/Projects/sdd-skills/.claude/worktrees/keyed-update/agent-version/_skill-eval/runs/2026-08-24-sm-real/stand/hint-patch.md; аргументы: repairy-api; патч: /Users/macbook/Documents/Projects/sdd-skills/.claude/worktrees/keyed-update/agent-version/_skill-eval/fixtures/SM-REAL/patch-remind.diff
+снимок скилла: _skills/service-map.SKILL.md (     951 строк)

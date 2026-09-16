@@ -1,0 +1,6 @@
+плечо: rescan
+модель: sonnet
+прогонов: 2, параллельность: 2
+текст скилла: /Users/macbook/Documents/Projects/sdd-skills/.claude/worktrees/keyed-update/agent-version/service-map
+источники: /private/tmp/claude-501/-Users-macbook-Documents-Projects-sdd-skills/e02ba650-2b7f-40a8-8faa-4c9d06c9cd1f/scratchpad/src/{repairy,resonance}
+снимок скилла: _skills/service-map.SKILL.md (     951 строк)

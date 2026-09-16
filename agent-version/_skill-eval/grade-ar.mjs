@@ -1,66 +1,97 @@
-// Грейдер archive-spec 2.0 (триггер ре-скана вместо вливания).
-// Запуск: node agent-version/_skill-eval/grade-ar.mjs arbasic
-import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
+// Грейдер archive-spec 2.0: архивация запускает ре-скан по подсказке «Задето»; карточки скилл не пишет.
+// Запуск: node agent-version/_skill-eval/grade-ar.mjs <папка-раунда> [проба...]
+//
+// ПРОБА ОДНОХОДОВАЯ — ЭТО ПОТОЛОК ИЗМЕРЕНИЯ, А НЕ ПРОВАЛ СКИЛЛА. Шаг 3 требует подтверждения состава
+// человеком и останавливает ход; до Шагов 4–6 (список сервисов, строка про клоны, вызов скана,
+// отчёт) прогон в одном ходу не доходит. Поэтому такие проверки считаются, ТОЛЬКО когда состоялся
+// второй ход (`answer-02.md`), а иначе печатаются как «не измеряется». Первая редакция грейдера
+// считала их провалом — и красила зелёным ровно те прогоны, что нарушали Шаг 3 и бежали вперёд.
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-const probe = process.argv[2] || 'arbasic';
 const base = join(process.cwd(), 'agent-version/_skill-eval');
-const runsDir = join(base, 'runs/2026-07-31-stages', probe);
-const fixture = join(base, 'fixtures/AR-BASIC');
+const roundArg = process.argv[2];
+if (!roundArg) { console.error('usage: node grade-ar.mjs <папка-раунда> [проба...]'); process.exit(1) }
+const round = roundArg.startsWith('/') ? roundArg : join(process.cwd(), roundArg);
+
+// scan: кого скилл обязан отдать в скан; named: кого обязан назвать, но в скан НЕ отдавать (Р5:
+// роль «потребитель» без изменения контракта перечитывать незачем — спека назвала бы его иначе).
+const PROBES = {
+  arbasic:  { fix: 'AR-BASIC',  key: 'ARS-57',  scan: ['auth', 'geo'], named: ['incident-web'] },
+  arepic:   { fix: 'AR-EPIC',   key: 'ARS-100', scan: [], named: [] },
+  arlate:   { fix: 'AR-LATE',   key: 'ARS-100', scan: [], named: [] },
+  arnocard: { fix: 'AR-NOCARD', key: 'ARS-70',  scan: ['auth', 'notify'], named: [] },
+  artype:   { fix: 'AR-TYPE',   key: 'ARS-61',  scan: ['billing'], named: [] },
+  arreal:   { fix: 'AR-REAL',   key: 'ARS-77',  scan: ['repairy-api'], named: ['repairy-web'] },
+};
 const read = (p) => (existsSync(p) ? readFileSync(p, 'utf8') : '');
-const isDir = (p) => existsSync(p) && statSync(p).isDirectory();
+const walk = (d) => (existsSync(d) ? readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)])) : []);
+const probes = process.argv.slice(3).filter((p) => PROBES[p]);
 
-const runs = readdirSync(runsDir).filter((f) => /^run-\d+$/.test(f)).sort().map((f) => join(runsDir, f));
-const tally = {};
-const lines = [];
+for (const probe of (probes.length ? probes : Object.keys(PROBES))) {
+  const { fix, key, scan, named } = PROBES[probe];
+  const runsDir = join(round, probe);
+  if (!existsSync(runsDir)) { console.log(`\n=== ${probe.toUpperCase()} — прогонов нет`); continue }
+  const fixture = join(base, 'fixtures', fix);
+  const runs = readdirSync(runsDir).filter((f) => /^run-\d+$/.test(f)).sort().map((f) => join(runsDir, f));
+  const tally = {}; const lines = [];
 
-for (const run of runs) {
-  const ans = read(join(run, 'answer.md'));
-  // «Не измерено» ≠ «провалено». Если в песочнице прогона вообще нет `services/`, сверять
-  // «карточки не тронуты» не с чем: сравнение пустой строки с содержимым фикстуры всегда даёт
-  // «различается», и оба пункта красятся нулём на ровном месте. Такой прогон в эти два пункта
-  // не входит — печатается предупреждение. (Тот же класс, что уже давал ложный красный на ST-4.)
-  // Пустая `services/` считается так же, как отсутствующая: при уплотнении артефактов нетронутые
-  // карточки удаляли как избыточные, и папка осталась пустым каркасом. Проверять надо наличие
-  // самих файлов, а не директории.
-  const hasServices = ['auth.md', 'incident-web.md', 'manifest.yaml']
-    .every((f) => existsSync(join(run, 'services', f)));
-  const cardsUntouched = hasServices
-    ? ['auth.md', 'incident-web.md'].every(
-        (f) => read(join(run, 'services', f)) === read(join(fixture, 'services', f))
-      )
-    : null;
-  const manifestUntouched = hasServices
-    ? read(join(run, 'services/manifest.yaml')) === read(join(fixture, 'services/manifest.yaml'))
-    : null;
-  if (!hasServices) console.error(`  !! ${run.split(/[\\/]/).pop()}: карточек в services/ нет (артефакт уплотнён) — AR-20.3 и AR-20.4 не измеряются.`);
-  const callLine = (ans.match(/ВЫЗОВ:.*service-map.*/i) || [''])[0] || (/service-map\s+auth/i.test(ans) ? ans.match(/service-map[^\n]*/i)[0] : '');
-  const res = {
-    'AR-20.1 скан вызван по service-map': /service-map/i.test(ans),
-    // NB: имена могут стоять и одной командой, и списком — считаем по всему ответу
-    'AR-20.2 в скан отданы все три сервиса §1.2 (включая 🟡 к валидации geo)':
-      /service-map/i.test(ans) && /auth/.test(ans) && /incident-web/.test(ans) && /geo/.test(ans),
-    'AR-20.3 карточки сервисов не тронуты': cardsUntouched,
-    'AR-20.4 манифест не тронут': manifestUntouched,
-    'AR-21 депрекейт §6.2 назван в отчёте': /v1\/session/.test(ans) && /(notes|устарев|deprecated)/i.test(ans),
-    'AR-22 клоны названы человеку до скана': /(подтян|клон)/i.test(ans),
-    // NB: стем «архивир», а не «архивиру» — первая редакция искала несуществующую подстроку
-    'AR-8 состав спеки назван': /(архивир|состав|подтвержд)/i.test(ans),
-    'AR-23 .archived положен в папку спеки': existsSync(join(run, 'docs/ARS-57/.archived')),
-    'AR-24 файла отчёта на диск нет': !existsSync(join(run, 'docs/ARS-57/ARCHIVE_REPORT.md')),
-  };
-  // null = «не измерено»: в знаменатель не идёт и провалом не считается.
-  const failed = Object.entries(res).filter(([, v]) => v === false).map(([k]) => k);
-  for (const [k, v] of Object.entries(res)) {
-    if (v === null) continue;
-    tally[k] = tally[k] || { pass: 0, total: 0 };
-    tally[k].total++; if (v) tally[k].pass++;
+  for (const run of runs) {
+    const name = run.split(/[\\/]/).pop();
+    const full = read(join(run, 'answer.md'));
+    const turn2 = existsSync(join(run, 'answer-02.md'));       // подтверждение состава состоялось
+    const streams = walk(run).filter((f) => /stream.*\.jsonl$/.test(f)).map(read).join('\n');
+    const trace = read(join(run, '_trace.log'));
+    const scanRan = /service-map ВЫЗВАН/i.test(trace);
+    const fixCards = walk(join(fixture, 'services')).map((p) => p.slice(join(fixture, 'services').length + 1));
+    const hasServices = fixCards.length > 0 && fixCards.every((f) => existsSync(join(run, 'services', f)));
+    const scanLines = full.split('\n').filter((l) => /service-map/i.test(l)).join('\n');
+    const rel = (root) => walk(join(root, 'docs')).filter((f) => /\.archived$/.test(f)).map((f) => f.slice(join(root, 'docs').length + 1));
+    const seeded = new Set(rel(fixture));
+    const marks = rel(run).filter((m) => !seeded.has(m));   // только поставленные прогоном
+
+    const res = {
+      // ── Шаг 3: меряется в любом прогоне ───────────────────────────────────────────────
+      'AR-8 состав предъявлен и подтверждения ждут': new RegExp(`(состав|${key})`, 'i').test(full) && /подтвер(д|жд)/i.test(full),
+      'AR-20.3 карточки и манифест не тронуты': hasServices ? fixCards.every((f) => read(join(run, 'services', f)) === read(join(fixture, 'services', f))) : null,
+      'AR-18 git не запускался': streams ? !/"name":"Bash"[^\n]*git /.test(streams) : null,
+      'AR-24 файла отчёта на диск нет': walk(join(run, 'docs')).every((f) => !/ARCHIVE_REPORT/i.test(f)),
+      'AR-3 без подтверждения метка не кладётся': turn2 ? null : marks.length === 0,   // marks = новые, без засеянных
+      // ── Шаги 4–6: только после подтверждения ──────────────────────────────────────────
+      'AR-20.1 скан вызван (по следу заглушки)': turn2 ? scanRan : null,
+      'AR-22 клоны названы перед сканом': turn2 ? /(подтян|клон)/i.test(full) : null,
+      'AR-28 подсказка «Задето» дошла до скана': turn2 ? (scanRan ? /подсказка=(?!нет)\S/i.test(trace) : /задето/i.test(full)) : null,
+      'AR-23 метка поставлена после успешного скана': scanRan ? marks.length > 0 : null,
+    };
+    if (scan.length) res['AR-20.2 в скан отданы нужные сервисы'] = turn2 ? scan.every((s) => new RegExp(s).test(scanRan ? trace : scanLines)) : null;
+    if (named.length) {
+      res['Р5 потребитель назван, но в скан не отдан'] = turn2 ? named.every((s) => new RegExp(s).test(full) && !new RegExp(s).test(scanRan ? trace : scanLines)) : null;
+    }
+    if (probe === 'arbasic') res['AR-22 депрекейт §6.2 назван кандидатом в notes'] = turn2 ? /v1\/session/.test(full) && /notes/i.test(full) : null;
+    if (probe === 'arepic' || probe === 'arlate') {
+      res['AR-20 метка не на корне эпика'] = !existsSync(join(run, 'docs', key, '.archived'));
+      res['прежние метки целы'] = !existsSync(join(fixture, 'docs', key, 'ARS-101/.archived')) || existsSync(join(run, 'docs', key, 'ARS-101/.archived'));
+    }
+    if (probe === 'arepic') res['AR-7 ARS-103 назван как узел без спеки'] = /ARS-103/.test(full);
+    if (probe === 'arlate') res['AR-25 поздняя спека ARS-103 взята в состав'] = /ARS-103/.test(full) && !/всё уже архивировано/i.test(full);
+    if (probe === 'arnocard') res['AR-21 карточка отсутствующему сервису не создана'] = !existsSync(join(run, 'services/notify.md'));
+    if (probe === 'arreal') {
+      const src = scanRan ? trace : full;
+      res['AR-29 вызов remind в подсказке'] = turn2 ? /acceptances\/:id\/remind/.test(src) : null;
+      res['AR-30 поле lastRemindedAt в подсказке'] = turn2 ? /lastRemindedAt|когда последний раз напоминали/i.test(src) : null;
+      res['AR-31 число §5.1 (45 → 60 с) в подсказке'] = turn2 ? /60 ?с|60 секунд/.test(src) : null;
+    }
+    if (probe === 'artype') res['AR-11 расхождение типа названо'] = turn2 ? /экран/i.test(full) && /(тип|type|backend|frontend|фронт|манифест)/i.test(full) : null;
+
+    const failed = Object.entries(res).filter(([, v]) => v === false).map(([k]) => k);
+    const skipped = Object.entries(res).filter(([, v]) => v === null).length;
+    for (const [k, v] of Object.entries(res)) { if (v === null) continue; tally[k] = tally[k] || { pass: 0, total: 0 }; tally[k].total++; if (v) tally[k].pass++ }
+    lines.push(`${name}: ${failed.length ? 'FAIL — ' + failed.join('; ') : 'PASS'}   [ходов: ${turn2 ? '2+' : '1'}, не измерено: ${skipped}, меток поставлено: ${marks.length}]`);
   }
-  lines.push(`${run.split(/[\\/]/).pop()}: ${failed.length ? 'FAIL — ' + failed.join('; ') : 'PASS'}`);
-}
 
-console.log(`\n=== ${probe.toUpperCase()} — ${runs.length} прогонов ===`);
-lines.forEach((l) => console.log(l));
-console.log('\n--- по пунктам ---');
-for (const [k, v] of Object.entries(tally)) console.log(`${v.pass}/${v.total}  ${k}`);
-console.log(`\nПРОБА ЦЕЛИКОМ: ${lines.filter((l) => l.includes(': PASS')).length}/${runs.length}`);
+  console.log(`\n=== ${probe.toUpperCase()} (${fix}) — ${runs.length} прогонов ===`);
+  lines.forEach((l) => console.log(l));
+  console.log('--- по пунктам (только измеренное) ---');
+  for (const [k, v] of Object.entries(tally)) console.log(`${v.pass}/${v.total}  ${k}`);
+  console.log(`ПРОБА ЦЕЛИКОМ: ${lines.filter((l) => l.includes(': PASS')).length}/${runs.length}`);
+}

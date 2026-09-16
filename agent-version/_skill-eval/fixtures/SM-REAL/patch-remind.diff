@@ -1,0 +1,128 @@
+diff -ruN a/repairy-api/prisma/migrations/20260915000000_add_acceptance_reminder/migration.sql b/repairy-api/prisma/migrations/20260915000000_add_acceptance_reminder/migration.sql
+--- a/repairy-api/prisma/migrations/20260915000000_add_acceptance_reminder/migration.sql	1970-01-01 03:00:00
++++ b/repairy-api/prisma/migrations/20260915000000_add_acceptance_reminder/migration.sql	2026-09-15 17:47:32
+@@ -0,0 +1,2 @@
++-- AlterTable
++ALTER TABLE "work_acceptances" ADD COLUMN "lastRemindedAt" TIMESTAMP(3);
+diff -ruN a/repairy-api/prisma/schema.prisma b/repairy-api/prisma/schema.prisma
+--- a/repairy-api/prisma/schema.prisma	2026-09-15 17:47:32
++++ b/repairy-api/prisma/schema.prisma	2026-09-15 17:47:32
+@@ -344,6 +344,7 @@
+   createdById String?
+   createdAt   DateTime         @default(now())
+   reviewedAt  DateTime?
++  lastRemindedAt DateTime?
+ 
+   project   Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+   createdBy User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+diff -ruN a/repairy-api/src/acceptances/acceptances.controller.ts b/repairy-api/src/acceptances/acceptances.controller.ts
+--- a/repairy-api/src/acceptances/acceptances.controller.ts	2026-09-15 17:47:32
++++ b/repairy-api/src/acceptances/acceptances.controller.ts	2026-09-15 17:47:32
+@@ -100,4 +100,17 @@
+   ) {
+     return this.acceptances.review(pid, id, dto, user.id, user.name)
+   }
++
++  @Post(':id/remind')
++  @Roles(UserRole.OWNER, UserRole.EMPLOYEE)
++  @UseGuards(RolesGuard, RequiresCompanyGuard)
++  @HttpCode(HttpStatus.NO_CONTENT)
++  @ApiOperation({ summary: 'Напомнить заказчику о заявке на приёмку (только PENDING, не чаще раза в сутки)' })
++  remind(
++    @CurrentUser() user: User,
++    @Param('pid', ParseUUIDPipe) pid: string,
++    @Param('id', ParseUUIDPipe) id: string,
++  ) {
++    return this.acceptances.remind(user.companyId!, pid, id, user.id, user.name, user.role)
++  }
+ }
+diff -ruN a/repairy-api/src/acceptances/acceptances.service.ts b/repairy-api/src/acceptances/acceptances.service.ts
+--- a/repairy-api/src/acceptances/acceptances.service.ts	2026-09-15 17:47:32
++++ b/repairy-api/src/acceptances/acceptances.service.ts	2026-09-15 17:47:32
+@@ -12,6 +12,9 @@
+ import { PrismaService } from '../prisma/prisma.service'
+ import { resolveUser } from '../common/utils/user'
+ 
++// Не чаще одного напоминания по акту в сутки — иначе заказчик получает поток одинаковых уведомлений.
++const REMIND_INTERVAL_MS = 24 * 60 * 60 * 1000
++
+ const acceptanceInclude = {
+   createdBy: { select: { id: true, name: true, avatarUrl: true } },
+   items: {
+@@ -311,6 +314,29 @@
+         userId,
+         `Акт №${acceptance.number}`,
+       )
++      .catch((err: unknown) => this.logger.warn({ err }, 'notification dispatch failed'))
++  }
++
++  async remind(companyId: string, projectId: string, id: string, userId: string, userName: string, role: string) {
++    if (role === UserRole.CUSTOMER) throw new ForbiddenException()
++    await this.verifyAccess(companyId, projectId, userId, role)
++
++    const acceptance = await this.prisma.workAcceptance.findFirst({
++      where: { id, projectId },
++      select: { id: true, number: true, status: true, lastRemindedAt: true },
++    })
++    if (!acceptance) throw new NotFoundException('Заявка не найдена')
++    if (acceptance.status !== 'PENDING') {
++      throw new BadRequestException('Напомнить можно только о нерассмотренном акте')
++    }
++    if (acceptance.lastRemindedAt && Date.now() - acceptance.lastRemindedAt.getTime() < REMIND_INTERVAL_MS) {
++      throw new ConflictException('Напоминание по этому акту уже отправлялось за последние сутки')
++    }
++
++    await this.prisma.workAcceptance.update({ where: { id }, data: { lastRemindedAt: new Date() } })
++
++    void this.notifications
++      .notifyProjectParticipants(projectId, 'ACCEPTANCE_REMINDER', userName, userId, `Акт №${acceptance.number}`)
+       .catch((err: unknown) => this.logger.warn({ err }, 'notification dispatch failed'))
+   }
+ 
+diff -ruN a/repairy-api/src/notifications/notification-queue.service.ts b/repairy-api/src/notifications/notification-queue.service.ts
+--- a/repairy-api/src/notifications/notification-queue.service.ts	2026-09-15 17:47:32
++++ b/repairy-api/src/notifications/notification-queue.service.ts	2026-09-15 17:47:32
+@@ -20,13 +20,14 @@
+ }
+ 
+ const DEBOUNCE_MS: Record<NotificationEventType, number> = {
+-  COMMENT_ADDED: 45_000,
++  COMMENT_ADDED: 60_000,
+   PROGRESS_UPDATED: 120_000,
+   ESTIMATE_CHANGED: 180_000,
+   PAYMENT_REGISTERED: 45_000,
+   ACCEPTANCE_CREATED: 0,
+   ACCEPTANCE_REVIEWED: 0,
+   ACCEPTANCE_REVOKED: 0,
++  ACCEPTANCE_REMINDER: 0,
+ }
+ 
+ const RATE_LIMIT_PER_HOUR = 10
+@@ -41,6 +42,7 @@
+   ACCEPTANCE_CREATED: (p) => `Работы отправлены на приёмку в «${p}»`,
+   ACCEPTANCE_REVIEWED: (p) => `Приёмка работ рассмотрена в «${p}»`,
+   ACCEPTANCE_REVOKED: (p) => `Акт приёмки отозван в «${p}»`,
++  ACCEPTANCE_REMINDER: (p) => `Напоминание: работы ждут приёмки в «${p}»`,
+ }
+ 
+ const notificationBodies: Record<NotificationEventType, (authorName: string, text?: string) => string> = {
+@@ -57,6 +59,8 @@
+     text ? `${a} рассмотрел(а) приёмку — ${text}` : `${a} рассмотрел(а) акт приёмки`,
+   ACCEPTANCE_REVOKED: (a, text) =>
+     text ? `${a} отозвал(а) ${text}` : `${a} отозвал(а) акт приёмки`,
++  ACCEPTANCE_REMINDER: (a, text) =>
++    text ? `${a} напоминает: ${text} ждёт вашего решения` : `${a} напоминает о работах, ожидающих приёмки`,
+ }
+ 
+ // Символы, требующие экранирования в Telegram Markdown v1
+diff -ruN a/repairy-api/src/notifications/notifications.service.ts b/repairy-api/src/notifications/notifications.service.ts
+--- a/repairy-api/src/notifications/notifications.service.ts	2026-09-15 17:47:32
++++ b/repairy-api/src/notifications/notifications.service.ts	2026-09-15 17:47:32
+@@ -10,6 +10,7 @@
+   | 'ACCEPTANCE_CREATED'
+   | 'ACCEPTANCE_REVIEWED'
+   | 'ACCEPTANCE_REVOKED'
++  | 'ACCEPTANCE_REMINDER'
+ 
+ const participantSelect = {
+   id: true,

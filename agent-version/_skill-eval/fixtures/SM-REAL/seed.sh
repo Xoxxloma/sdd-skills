@@ -26,7 +26,7 @@
 set -u
 
 DEST="${1:?куда: путь к песочнице}"
-ARM="${2:?плечо: first | scan}"
+ARM="${2:?плечо: first | scan | rescan | keyed}"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC_ROOT="${SM_REAL_SRC:-/c/Users/Konstantin/projects}"
@@ -59,6 +59,14 @@ copy "$REPAIRY/apps/web"    "$DEST/repairy-web"
 copy "$RESONANCE/backend"   "$DEST/resonance-api"
 copy "$RESONANCE/frontend"  "$DEST/resonance-web"
 
+# Патч кода поверх засева — «маленькая фича» для плеча keyed (SM_REAL_PATCH, пути вида a/repairy-api/…).
+# Источники не трогаются: патч ложится только на копию в песочнице.
+if [ -n "${SM_REAL_PATCH:-}" ]; then
+  ( cd "$DEST" && patch -p1 -s < "$SM_REAL_PATCH" ) || { echo "патч не лёг: $SM_REAL_PATCH"; exit 1; }
+  find "$DEST" -name "*.orig" -delete
+  echo "патч наложен: $(basename "$SM_REAL_PATCH")"
+fi
+
 # Маркер репозитория. Без него `Glob **/.git/HEAD` не найдёт кандидатов и мерить будет нечего.
 # Заводится файлами, а не `git init`: скилл сам git не запускает и в `.git` не заглядывает —
 # для него это просто признак «отдельный репозиторий, а не случайная папка рядом».
@@ -69,9 +77,24 @@ done
 # Worktree-форма: `.git` — ФАЙЛ, и `HEAD` внутри него нет.
 printf 'gitdir: ../.gitworktrees/resonance-web\n' > "$DEST/resonance-web/.git"
 
-if [ "$ARM" = scan ]; then
+if [ "$ARM" = scan ] || [ "$ARM" = rescan ] || [ "$ARM" = keyed ]; then
   mkdir -p "$DEST/AI-SDD/services"
   cp "$HERE/manifest.yaml" "$DEST/AI-SDD/services/manifest.yaml"
+fi
+
+# Плечо `rescan`: поверх манифеста — прежние карточки из SM_RESCAN_CARDS (по умолчанию карточки
+# фикстуры BR-REAL). Копия ложится и в `_prev/` рядом с песочницей — с ней сравнивается результат.
+# Дата `scanned` сдвигается в прошлое (SM_RESCAN_DATE): с сегодняшней ведущий решает, что карточку
+# собрал этот же прогон, и пропускает гард (2026-09-15-rescan, rescan-2).
+if [ "$ARM" = rescan ] || [ "$ARM" = keyed ]; then
+  PREV="${SM_RESCAN_CARDS:-$HERE/../BR-REAL/services}"
+  mkdir -p "$DEST/../_prev"
+  for c in repairy-api repairy-web; do
+    [ -f "$PREV/$c.md" ] || { echo "нет прежней карточки: $PREV/$c.md"; exit 1; }
+    cp "$PREV/$c.md" "$DEST/AI-SDD/services/$c.md"
+    cp "$PREV/$c.md" "$DEST/../_prev/$c.md"
+    perl -pi -e "s/^scanned: .*/scanned: ${SM_RESCAN_DATE:-2026-06-01}/" "$DEST/AI-SDD/services/$c.md" "$DEST/../_prev/$c.md"
+  done
 fi
 
 echo "песочница собрана: $DEST   плечо: $ARM"
