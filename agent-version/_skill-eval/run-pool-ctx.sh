@@ -204,7 +204,7 @@ run_one() {
   # `--resume ""` и умирал с «requires a valid session ID» — весь второй ход терялся пустым файлом.
   local sid; sid="$( { command -v uuidgen > /dev/null && uuidgen; } || perl -e 'printf "%08x-%04x-4%03x-%04x-%04x%08x", rand(2**32), rand(2**16), rand(2**12), 0x8000 | rand(2**14), rand(2**16), rand(2**32)' )"
   sid="$(printf '%s' "$sid" | tr 'A-Z' 'a-z')"
-  ( cd "$sb" && timeout 900 claude -p "$task" --model "${SM_MODEL:-haiku}" --permission-mode bypassPermissions \
+  ( cd "$sb" && timeout "${RUN_TIMEOUT:-900}" claude -p "$task" --model "${SM_MODEL:-haiku}" --permission-mode bypassPermissions \
         ${EFFORT:+--effort "$EFFORT"} \
         --session-id "$sid" --output-format stream-json --verbose ) \
       > "$sb/stream.jsonl" 2> "$sb/_stderr.log"
@@ -240,7 +240,7 @@ run_one() {
     while [ "$turn" -lt "$MAX_TURNS" ] && [ "$idle" -lt 2 ]; do
       local before; before="$(trace_len "$sb")"
       turn=$((turn + 1))
-      ( cd "$sb" && timeout 900 claude -p "$reply" --model "${SM_MODEL:-haiku}" --permission-mode bypassPermissions \
+      ( cd "$sb" && timeout "${RUN_TIMEOUT:-900}" claude -p "$reply" --model "${SM_MODEL:-haiku}" --permission-mode bypassPermissions \
             ${EFFORT:+--effort "$EFFORT"} \
             --resume "$sid" --output-format stream-json --verbose ) \
           > "$sb/stream-$(printf '%02d' "$turn").jsonl" 2>> "$sb/_stderr.log"
@@ -288,11 +288,12 @@ echo "скилл: $SKILL"
 echo "промпт: $PROMPT"
 echo "прогонов: $N, параллельно: $CONC"
 
-running=0
+# bash 3.2 (macOS) не знает `wait -n`: прежний откат на `wait` ждал ВСЮ партию, а затем пускал по
+# одному прогону за круг — плечо из десяти шло как 5 + 1 + 1 + 1 + 1 + 1. Семафор по числу живых
+# фоновых задач работает в любом bash и на bash ≥ 4.3 ведёт себя ровно как `wait -n`.
 for i in $(seq -w 1 "$N"); do
+  while [ "$(jobs -rp | wc -l | tr -d ' ')" -ge "$CONC" ]; do sleep 5; done
   run_one "$i" &
-  running=$((running + 1))
-  if [ "$running" -ge "$CONC" ]; then wait -n 2>/dev/null || wait; running=$((running - 1)); fi
 done
 wait
 
