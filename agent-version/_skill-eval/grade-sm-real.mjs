@@ -205,16 +205,22 @@ function grade(runDir, label) {
   const rulesSec = section(api, 'Бизнес-правила')
   const ruleBlocks = blocks(rulesSec)
   const msgBlocks = ruleBlocks.filter((b) => /^сообщение/i.test(b.key))
-  const objBlocks = ruleBlocks.filter((b) => !/^сообщение/i.test(b.key))
+  // Третий вид блока (5.3): «ограничение «условие»» — внешнее условие, при котором сервис отказывает.
+  const restrBlocks = ruleBlocks.filter((b) => /^ограничени/i.test(b.key))
+  const objBlocks = ruleBlocks.filter((b) => !/^(сообщение|ограничени)/i.test(b.key))
   const entNames = new Set(ents.map((e) => e.key))
   // Ключ блока объекта — имя сущности до « — подпись».
   const objNotEntity = objBlocks.map((b) => b.key.split(/\s+—\s+/)[0].trim()).filter((k) => !entNames.has(k))
   // Токен в бэктиках внутри строк секции обязан встречаться в «Владеет данными» — иначе состояние выдумано.
   const entText = section(api, 'Владеет данными')
   // Токены сверяются только в блоках объектов: у сообщений токен — имя вида, его в сущностях нет законно.
-  const objText = objBlocks.length ? rulesSec.split(/^### /m).filter((c) => !/^сообщение/i.test(c)).join('\n### ') : ''
+  const objText = objBlocks.length ? rulesSec.split(/^### /m).filter((c) => !/^(сообщение|ограничени)/i.test(c)).join('\n### ') : ''
   const tokens = [...objText.matchAll(/^- [^`\n]*`([A-Za-z_][A-Za-z0-9_]*)`/gm)].map((m) => m[1])
   const badTokens = [...new Set(tokens.filter((t) => !entText.includes(t)))]
+  // Строка на поле (5.3, гейт 3): первый токен строки — имя поля из «Владеет данными» (левая часть
+  // «- поле: тип»), а не значение перечисления. Блок из таких строк — схема, а не правила.
+  const fieldNames = new Set([...entText.matchAll(/^- `?([A-Za-z_][A-Za-z0-9_]*)`?\s*:/gm)].map((m) => m[1]))
+  const fieldRows = tokens.filter((t) => fieldNames.has(t)).length
   const ruleRows = ruleBlocks.reduce((s, b) => s + b.facts, 0)
   // Хвост «— http/ShipmentController.kt» (формат строки описи, скопированный в карточку; тир A neutral-s4)
   // ловится отдельным шаблоном пути с расширением: ведущего слэша у него нет.
@@ -223,7 +229,7 @@ function grade(runDir, label) {
   // Сообщения против «Событий»: каждый публикуемый топик — исходящее сообщение, блок обязан быть.
   const published = blocks(section(api, 'События')).filter((b) => /^публикует/i.test(b.key)).length
   const msgShort = Math.max(0, published - msgBlocks.length)
-  if (api) console.log(`    бизнес-правила: объектов ${objBlocks.length}/${KEY_RULES.objects} · сообщений ${msgBlocks.length}/${KEY_RULES.messages} · строк ${ruleRows} · токенов не из «Владеет данными» ${badTokens.length}${badTokens.length ? ' (' + badTokens.slice(0, 4).join(', ') + ')' : ''} · объектов не-сущностей ${objNotEntity.length} · строк с кодом/файлом ${ruleCodeish} · публикуемых без блока сообщения ${msgShort}`)
+  if (api) console.log(`    бизнес-правила: объектов ${objBlocks.length}/${KEY_RULES.objects} · сообщений ${msgBlocks.length}/${KEY_RULES.messages} · строк ${ruleRows} · токенов не из «Владеет данными» ${badTokens.length}${badTokens.length ? ' (' + badTokens.slice(0, 4).join(', ') + ')' : ''} · объектов не-сущностей ${objNotEntity.length} · строк с кодом/файлом ${ruleCodeish} · публикуемых без блока сообщения ${msgShort} · ограничений ${restrBlocks.length} · строк на поле ${fieldRows}`)
   const layer = (t) => [(t.match(/^description:.*$/m) || [''])[0], ...BIZ_SECTIONS.map((s) => section(t, s))].join('\n')
   const bizLayer = layer(api) + '\n' + layer(web)
   const whole = api + '\n' + web
