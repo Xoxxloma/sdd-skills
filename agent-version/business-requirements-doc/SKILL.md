@@ -1,6 +1,6 @@
 ---
 name: business-requirements-doc
-version: 1.0.0
+version: 1.0.1
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
 description: 'Gathers business requirements and writes ONE Markdown spec (BRD→SRS) in Russian. It MAY read the repo as evidence, but nothing enters the spec on your own authority: before writing, every gate is either stated by the user themselves or put to the user and answered, and anything unconfirmed becomes TBD. The mandatory first question is the linked Jira/SberTrack task key (SMSEC-1234); without it the spec is not written. Before writing it also decides the business cut (§4.5) — several separately-shippable deliverables → it proposes the slice split; one deliverable → it says so explicitly («не применимо: причина») — and puts that proposal to the user in the handoff. Use whenever someone wants to write a ТЗ / BRD / SRS, formalize a request, or describe a task, feature, change, or integration for developers.'
@@ -171,7 +171,7 @@ explicit onto the 14 gates (see "The gates to cover").
 |---|---|---|
 | Назначение | какую задачу бизнеса закрывает сервис, какие процессы поддерживает, главные объекты | 10 проблематика, 1 тип, 2 процесс |
 | Что умеет для пользователя | действия и их ограничения, по ролям | 1, 5 цель, 9 описание, 12 потребитель |
-| **Бизнес-правила** | блок на объект — строка на каждое состояние: кто и при каком условии переводит, что при этом происходит, что нельзя; блок на исходящее сообщение — повод, кому, кому нет, задержка | **2 процесс, 9 описание, 11 критерий приёмки, 6 риски, 3 роли** — «кто переводит» в строке состояния это и есть право роли на действие; имя роли из «Роли и доступ», правило — отсюда |
+| **Бизнес-правила** | блок на объект — строка на каждое состояние: кто и при каком условии переводит, что при этом происходит, что нельзя; блок на исходящее сообщение — повод, кому, кому нет, задержка; блок на ограничение — внешнее условие, при котором сервис отказывает целиком, и кто им управляет | **2 процесс, 9 описание, 11 критерий приёмки, 6 риски, 3 роли** — «кто переводит» в строке состояния это и есть право роли на действие; имя роли из «Роли и доступ», правило — отсюда; ограничение — риск (6) и критерий приёмки (11): что происходит, когда условие действует |
 | Экраны | где пользователь это делает | 2, 12 |
 | Роли и доступ | имена ролей, что может каждая; строка `без входа` — что видно без авторизации | 3 |
 | Заметки команды | договорённости людей, которых нет в коде | 6, 13 |
