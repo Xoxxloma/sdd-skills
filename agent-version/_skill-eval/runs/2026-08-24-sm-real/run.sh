@@ -7,6 +7,10 @@
 #   scan   манифест засеян тремя строками, аргумент `repairy-api repairy-web`.
 #          Мерит Шаги 2–6: опись против кода, гейт на запись, плотность, гард, обратные рёбра.
 #   first  манифеста нет. Мерит Шаг 1: два глоба, тип по маркерам, черновик манифеста, остановка.
+#   rescan как scan, но в services/ уже лежат прежние карточки (SM_RESCAN_CARDS, по умолчанию BR-REAL).
+#          Мерит перечитывание: гард на утоньшение, правило прежней формулировки, дифф против _prev/.
+#   keyed  как rescan, плюс подсказка «Задето» (SM_KEYED_HINT — файл, SM_KEYED_ARGS — имена сервисов;
+#          SM_REAL_PATCH — патч кода поверх засева). Мерит быстрое обновление по задетому.
 #
 # Чем этот раунд отличается от всех прошлых: дерево не синтетическое. Самая большая фикстура
 # стенда — 33 файла на всю пробу и до 48 ключей; здесь `repairy-api` один даёт 125 файлов и
@@ -34,7 +38,7 @@ ROUND="${ROUND_DIR:-$HERE}"
 SKILL_SRC="${SKILL_SRC:-$SKILLROOT/service-map}"
 mkdir -p "$ROUND"
 
-ARM="${1:?плечо: scan | first}"
+ARM="${1:?плечо: scan | first | rescan | keyed}"
 N="${2:-1}"
 CONC="${3:-1}"
 # Модель ведущего и субагентов. По умолчанию haiku — так сняты все раунды до 2026-09-14; прод
@@ -43,6 +47,9 @@ MODEL="${SM_MODEL:-haiku}"
 
 case "$ARM" in
   scan)  PROMPT="$HERE/stand/prompt-scan.md" ;;
+  rescan) PROMPT="$HERE/stand/prompt-scan.md" ;;   # тот же скан поверх прежних карточек (seed.sh)
+  keyed)  PROMPT="$HERE/stand/prompt-keyed.md"
+          [ -f "${SM_KEYED_HINT:-}" ] || { echo "плечо keyed: нужен SM_KEYED_HINT — файл подсказки"; exit 1; } ;;
   first) PROMPT="$HERE/stand/prompt-first.md" ;;
   *) echo "неизвестное плечо: $ARM"; exit 1 ;;
 esac
@@ -103,6 +110,10 @@ run_one() {
   local abs_wd; abs_wd="$(cd "$wd" && { pwd -W 2>/dev/null || pwd; })"
   local task
   task="$(sed -e "s|WORKDIR|$abs_wd|g" -e "s|SKILLDIR|$SNAP_WIN|g" -e "s|модель \`haiku\`|модель \`$MODEL\`|g" "$PROMPT")"
+  if [ "$ARM" = keyed ]; then
+    task="${task/KEYEDARGS/${SM_KEYED_ARGS:-repairy-api repairy-web}}"
+    task="${task/HINTBLOCK/$(cat "$SM_KEYED_HINT")}"
+  fi
 
   ( cd "$wd" && timeout 3600 claude -p "$task" --model "$MODEL" --permission-mode bypassPermissions ) \
       > "$sb/answer.md" 2> "$sb/_stderr.log"
@@ -155,6 +166,7 @@ run_one() {
   echo "прогонов: $N, параллельность: $CONC"
   echo "текст скилла: $SKILL_SRC"
   echo "источники: ${SM_REAL_SRC:-/c/Users/Konstantin/projects}/{repairy,resonance}"
+  [ "$ARM" = keyed ] && echo "подсказка: $SM_KEYED_HINT; аргументы: ${SM_KEYED_ARGS:-repairy-api repairy-web}; патч: ${SM_REAL_PATCH:-нет}"
   echo "снимок скилла: _skills/service-map.SKILL.md ($(wc -l < "$ROUND/_skills/service-map.SKILL.md") строк)"
 } > "$ROUND/_settings-$ARM.txt"
 cat "$ROUND/_settings-$ARM.txt"

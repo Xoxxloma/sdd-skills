@@ -27,6 +27,10 @@
 
 set -u
 
+# На macOS нет `timeout` (coreutils не входят в систему): вызов падает с rc=127, песочница остаётся
+# без `answer.md`, и всё плечо выглядит «не измеренным». Та же подмена стоит в раннере SM-REAL.
+command -v timeout > /dev/null || timeout() { local s="$1"; shift; perl -e 'alarm shift; exec @ARGV' "$s" "$@"; }
+
 SKILL="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 PROMPT="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
 OUT="$3"
@@ -195,13 +199,21 @@ run_one() {
   # stdout: все грейдеры набора читают его и меняться не должны.
   # Свой `session-id` на песочницу: по нему второй ход находит сессию первого. Генерится node —
   # он в наборе есть везде (на нём грейдеры), `uuidgen` под Git Bash нет.
-  local sid; sid="$(node -e 'console.log(require("crypto").randomUUID())')"
+  # `crypto.randomUUID` появился в node 14.17, а системный node бывает старее (здесь v12): вызов
+  # падал молча, `sid` уходил пустым, первый ход шёл без своей сессии, а второй получал
+  # `--resume ""` и умирал с «requires a valid session ID» — весь второй ход терялся пустым файлом.
+  local sid; sid="$( { command -v uuidgen > /dev/null && uuidgen; } || perl -e 'printf "%08x-%04x-4%03x-%04x-%04x%08x", rand(2**32), rand(2**16), rand(2**12), 0x8000 | rand(2**14), rand(2**16), rand(2**32)' )"
+  sid="$(printf '%s' "$sid" | tr 'A-Z' 'a-z')"
   ( cd "$sb" && timeout 900 claude -p "$task" --model "${SM_MODEL:-haiku}" --permission-mode bypassPermissions \
         ${EFFORT:+--effort "$EFFORT"} \
         --session-id "$sid" --output-format stream-json --verbose ) \
       > "$sb/stream.jsonl" 2> "$sb/_stderr.log"
   local rc=$?
   extract_answer "$sb/stream.jsonl" "$sb/answer.md" "$sb/_stderr.log"
+  # Продолжаем по тому id, который вернул САМ CLI: если `--session-id` не был принят, он назначил свой,
+  # и продолжение по нашему значению ушло бы в никуда.
+  local rsid; rsid="$(grep -o '"session_id":"[^"]*"' "$sb/stream.jsonl" 2>/dev/null | head -1 | cut -d'"' -f4)"
+  [ -n "$rsid" ] && sid="$rsid"
 
   # ─── ХОДЫ 2…K: реплика аналитика в ТУ ЖЕ сессию, ПОКА МАРШРУТ ДВИЖЕТСЯ ──────────────────────
   # `--resume` продолжает разговор первого хода: контекст, прочитанный скилл и записанные файлы
