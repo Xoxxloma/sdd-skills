@@ -57,6 +57,12 @@ case "$PROBE" in
   # Мерится grade-options.mjs по тексту ответа; файл при этом писать НЕЛЬЗЯ — на первом ходу
   # действует правило «turn 1 = questions only», и его сторожит grade-ts.mjs.
   ts-opt)    FIXTURE=TS-CONV;   PROMPT_FILE=opt-prompt.txt;   SKILL=technical-spec-doc ;;
+  # ДВА НАСТОЯЩИХ ХОДА (аудит, С9): первый — как у ts-opt, агент сам читает карточки и спрашивает;
+  # второй — тот же блок ответов аналитика, что в ts-conv, включая «про источник не знаю». У ts-conv
+  # первый ход выдуманный, карточки читаются ПОСЛЕ ответов — и 2 из 7 прогонов переспрашивали источник
+  # «с новой уликой». Здесь улика известна до вопросов. Гонять с RT_MAX_TURNS=2: трассы у пробы нет,
+  # без потолка пул отправит реплику дважды.
+  ts-conv-2t) FIXTURE=TS-CONV;  PROMPT_FILE=opt-prompt.txt;   SKILL=technical-spec-doc; TURN2_FILE=conv-turn2.txt ;;
   ts-ctx)    FIXTURE=TS-CTX;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-nodesc) FIXTURE=TS-NODESC; PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-noctx)  FIXTURE=TS-NOCTX;  PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
@@ -168,6 +174,9 @@ case "$PROBE" in
   bg-data-q)   FIXTURE=BG-INC; PROMPT_FILE=data-q-prompt.txt;   SKILL=bug-report-doc ;;
   # Негативный случай: новая возможность в жалобной форме, баг-репорта быть не должно.
   bg-notbug-q) FIXTURE=BG-INC; PROMPT_FILE=notbug-q-prompt.txt; SKILL=bug-report-doc ;;
+  # Фронтовый баг, правило которого лежит в карточке БЭКЕНДА (аудит, С13): у карточки фронта
+  # «Бизнес-правил» нет по форме. Первый ход: ожидаемое пришло гипотезой из правила или вхолодную.
+  bg-front-q)  FIXTURE=BG-FRONT; PROMPT_FILE=front-q-prompt.txt; SKILL=bug-report-doc ;;
   # ── `change-request-doc`: запрос на мелкую правку ─────────────────────────────────────────
   # Одно дерево, то же, что у BG-INC (слепок и ARS-102-ловушка). Плечи `-w` дают ответы аналитика
   # заранее и мерят ФАЙЛ; плечи `-q` дают голое описание и мерят СТОРОЖ: разбор по пяти строкам,

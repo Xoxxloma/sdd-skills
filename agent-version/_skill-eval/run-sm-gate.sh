@@ -2,6 +2,7 @@
 # run-sm-gate.sh <SKILL.md> <папка-раунда> [N] — изолированная проба гейта «Бизнес-правила» (фикстура SM-GATE).
 # Текст скилла про секцию вырезается из УКАЗАННОГО SKILL.md по якорям: плечо «до» собирается из
 # снимка (`git show <commit>:…`), плечо «после» — из живого файла. Инструментов прогон не получает.
+# SM_GATE_ONLY="g clean" — гонять только названные варианты (плечо «до» под один двойник).
 set -u
 SKILL="${1:?путь к SKILL.md}"; ROUND="${2:?папка раунда}"; N="${3:-3}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; FIX="$HERE/fixtures/SM-GATE"; OUT="$ROUND/sm-gate"
@@ -15,7 +16,9 @@ for x in "$B1" "$B2" "$O1" "$O2" "$G1" "$G2" "$U1" "$U2"; do [ -n "$x" ] || { ec
 mkdir -p "$OUT"; cp "$SKILL" "$OUT/_skill-snapshot.md"
 printf 'модель: %s\nпрогонов на вариант: %s\nякоря: бриф %s–%s, опись %s–%s, гейт %s–%s, бюджет %s–%s\n' "$MODEL" "$N" "$B1" "$B2" "$O1" "$O2" "$G1" "$G2" "$U1" "$U2" > "$OUT/_settings.txt"
 for ans in "$FIX"/answer-*.md; do
-  v="$(basename "$ans" .md)"; v="${v#answer-}"; mkdir -p "$OUT/$v"
+  v="$(basename "$ans" .md)"; v="${v#answer-}"
+  if [ -n "${SM_GATE_ONLY:-}" ]; then case " $SM_GATE_ONLY " in *" $v "*) ;; *) continue ;; esac; fi
+  mkdir -p "$OUT/$v"
   {
     echo 'Ты — ведущий агент скилла `service-map` на Шаге 4: субагент вернул ответ по сервису, и перед записью карточки ты прогоняешь гейт «Бизнес-правила». Ниже — всё, что твой скилл говорит про эту секцию, дословно.'
     echo; echo '### Из брифа субагенту (Шаг 3)'; echo; sed -n "${B1},$((B2-1))p" "$SKILL"
