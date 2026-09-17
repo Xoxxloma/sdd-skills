@@ -153,6 +153,9 @@ case "$PROBE" in
   cdoc-docx)  FIXTURE=CD-DOCX; PROMPT_FILE=d-prompt.txt; SKILL=context-doc ;;
   cdoc-fix)   FIXTURE=CD-FIX;  PROMPT_FILE=f-prompt.txt; SKILL=context-doc ;;
   cdoc-dup)   FIXTURE=CD-DUP;  PROMPT_FILE=u-prompt.txt; SKILL=context-doc ;;
+  # Вторая вставка из чата на ДРУГУЮ тему (аудит, С33): у любого текста из чата `source` один и тот
+  # же, а правило Шага 5 по букве велит перезаписать файл с тем же источником. Цел ли прежний файл.
+  cdoc-paste) FIXTURE=CD-PASTE; PROMPT_FILE=paste-prompt.txt; SKILL=context-doc ;;
 
   # ── `bug-report-doc`: описание дефекта ────────────────────────────────────────────────────
   # Одно дерево, шесть плеч (как `CD-TXT` и `BR-ROLES`). Отличие плеч — только сообщение
