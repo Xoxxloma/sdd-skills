@@ -1,6 +1,6 @@
 ---
 name: technical-spec-doc
-version: 1.0.1
+version: 1.0.2
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
 description: 'Turns a confirmed business-requirements doc (БТ/BRD/SRS) into ONE Russian Markdown technical spec (technical_specification.md, saved next to the БТ), organized around INTERACTIONS — the new and changed contracts crossing service or FE/BE boundaries — so a frontend agent and a backend agent code against the same contracts and meet without after-the-fact stitching. There is no code to read: NEW things are designed fully (path, schema, JSON example); anything about an EXISTING service is written only as the analyst confirmed it — inventing an endpoint of a service you cannot see is the worst failure of this skill. Requires a ready БТ: given only a brief or an idea it refuses and asks for the business requirements. Use when the БТ is ready and a dev spec is needed.'
@@ -612,12 +612,9 @@ Check, and fix anything that fails:
 Report concisely: the file path, «Статус готовности», and the list of open items the
 analyst still needs to resolve (❓ forks and 🟡-к-валидации assumptions).
 
-**Последней строкой назови следующий шаг — одной строкой, без вопроса:** «чтобы раздать работу
-исполнителям, скажите «разбей спеку на этапы» — `stage-breakdown-doc` посчитает разрез по стыкам
-§2 и напишет по файлу задачи на этап».
-
-**Проси словами, а не командой:** у `stage-breakdown-doc` нет слэш-команды (`user-invocable: false`),
-и «запустите `stage-breakdown-doc`» отправляет аналитика набирать то, чего не существует.
+**Следующий шаг здесь НЕ называется — ни документом, ни скиллом, ни командой.** Твоя работа
+кончается записанным файлом и списком открытых пунктов. Что делать со спекой дальше — проверять
+готовность, резать на этапы, раздавать — решает тот, кто тебя позвал: у него на этот ход свои шаги.
 
 **Разрез ты не считаешь и не предлагаешь.** Он выводится из инвентаря стыков — 🟢 INT-карточки §2
 плюс новые сущности §3.2, — и считает его тот скилл, который его же и материализует, в момент,
