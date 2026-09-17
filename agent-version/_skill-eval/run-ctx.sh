@@ -64,6 +64,13 @@ case "$PROBE" in
   # Карточка с «Бизнес-правилами» (шаг 5 плана бизнес-слоя): читает ли БТ-скилл новую секцию.
   # Первый ход, файла нет; анкеры — факты из секции, которых в брифе нет. Грейдер — grade-br-real.mjs.
   br-real)   FIXTURE=BR-REAL;   PROMPT_FILE=t1-prompt.txt;    SKILL=business-requirements-doc ;;
+  # Доработка ГОТОВОГО БТ по находкам приёмки (К5 аудита 2026-09-17): процедуры доработки у писателя
+  # нет, а маршрут на неё опирается. Грейдится файл: поправлен на месте, переписан, заведён новый
+  # или не тронут. Состав — `fixtures/BR-REWORK/README.md`.
+  br-rework) FIXTURE=BR-REWORK; PROMPT_FILE=rework-prompt.txt; SKILL=business-requirements-doc ;;
+  # То же, но находки переданы БЕЗ ответов аналитика: верный исход — вопросы только по двум находкам,
+  # ключ и закрытые гейты не переспрошены, нового файла нет. Читается по `answer.md` вручную.
+  br-rework-q) FIXTURE=BR-REWORK; PROMPT_FILE=rework-q-prompt.txt; SKILL=business-requirements-doc ;;
   sb-ctx)    FIXTURE=SB-CTX;    PROMPT_FILE=stage-prompt.txt; SKILL=stage-breakdown-doc ;;
   # Шаг 5 `service-map` на ВТОРОМ проходе, файлами на диске: зеркала прошлого прохода уже стоят, одно
   # устарело. Ловит выдуманное обратное ребро (К6 аудита 2026-09-17) — на `SM-GRAPH` его не видно,
@@ -236,6 +243,10 @@ case "$PROBE" in
   # скилл реально пишет, а не по идеалу, которого он не производит.
   rv-bug-clean) FIXTURE=RV-BUG; PROMPT_FILE=clean-prompt.txt; SKILL=spec-review ;;
   rv-bug-dirty) FIXTURE=RV-BUG; PROMPT_FILE=dirty-prompt.txt; SKILL=spec-review ;;
+  # Доработка ГОТОВОГО баг-репорта по находкам приёмки (К5 аудита 2026-09-17), ответов аналитика нет:
+  # верный исход — свой файл правится на месте там, где хватает данных, вопросы только по находкам,
+  # ключ не переспрошен, нового файла нет. Читается по файлу и `answer.md` вручную.
+  bg-rework-q) FIXTURE=RV-BUG; PROMPT_FILE=rework-q-prompt.txt; SKILL=bug-report-doc ;;
   # Спека на багфикс рядом с баг-репортом: источником обязан уйти РЕПОРТ, а пункт 3 обязан найти
   # FR-1 в его «Ожидаемом результате» и НЕ покраснеть за «требование без контракта» — §2 у багфикса
   # законно «не применимо». Два разных провала, различимы в одном отчёте: приёмка называет пути
@@ -257,7 +268,7 @@ case "$PROBE" in
   artype)    FIXTURE=AR-TYPE;   PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx br-real sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-nosplit rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-nosplit rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
 esac
 
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }

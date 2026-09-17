@@ -8,5 +8,6 @@ docs/ARS-411/bug_report.md
 expected.md
 PROVENANCE.txt
 README.md
+rework-q-prompt.txt
 spec-prompt.txt
 src-prompt.txt
