@@ -3,7 +3,7 @@
 > Список дел, а не журнал: сделанное отсюда удаляется, история — в `CHANGELOG.md` и в `STATE.md` раундов.
 >
 > Ссылки `файл:строка` верны на рабочее дерево ветки `fix/audit-k8-optional-stages`
-> (`service-map` 1.4.1, `analyst-workspace` 1.1.0, `spec-review` 1.0.1, `technical-spec-doc` 1.0.2,
+> (`service-map` 1.4.1, `analyst-workspace` 1.1.0, `spec-review` 1.0.2, `technical-spec-doc` 1.0.2,
 > `spec-readiness` 1.1.1, `archive-spec` 1.2.1). Правка сдвинет номера, цитаты останутся. Номера пунктов сквозные и не
 > перенумеровываются: на них ссылаются `CHANGELOG.md` и раунды.
 >
