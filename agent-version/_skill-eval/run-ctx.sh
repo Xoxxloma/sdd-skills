@@ -351,7 +351,7 @@ fi
 mkdir -p "$ROUND/$PROBE"
 {
   echo "проба: $PROBE"
-  echo "модель: haiku"
+  echo "модель: ${SM_MODEL:-haiku}"
   echo "effort: ${EFFORT:-умолчание CLI}"
   echo "реплика аналитика: ${TURN2_FILE:-нет, стенд одноходовой}"
   echo "потолок ходов: ${RT_MAX_TURNS:-8}"

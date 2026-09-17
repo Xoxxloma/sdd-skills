@@ -119,12 +119,45 @@ function gradeOne (dir, key) {
   const text = readFileSync(a, 'utf8')
   if (!text.trim()) return { measured: false, why: 'пустой answer.md' }
 
-  // РОЛИ ЗАПУСКАТЬ БЫЛО НЕ НУЖНО. Проба подаёт их ответы готовыми; прогон, поднявший субагентов,
+  // РОЛИ ЗАПУСКАТЬ БЫЛО НЕ НУЖНО. Проба подаёт их ответы готовыми; прогон, поднявший роли,
   // мерил не то и стоил вчетверо дороже. Это отказ стенда, а не дефект скилла: в знаменатель он
   // не идёт, но печатается — по нему видно, что строка промпта про Шаги 1–2 перестала работать.
+  //
+  // С 2026-09-16 у Шага 3.5 есть СВОЙ субагент — сверка (`reference/probe-verify.md`). Его вызов
+  // законен и считается отдельно: по нему видно, что шаг вообще состоялся. Роль от сверки
+  // отличается по промпту: ролям уходит `probe-backend|frontend|contract`, сверке — `probe-verify`.
   const st = join(dir, 'stream.jsonl')
-  const agents = existsSync(st) ? (readFileSync(st, 'utf8').match(/"name":"Agent"/g) || []).length : 0
-  if (agents > 0) return { measured: false, why: `запустил ${agents} субагент(ов) вопреки промпту` }
+  let verifyAgents = 0, roleAgents = 0, mainGreps = 0
+  const verifyIds = new Set(); let verifyText = ''
+  if (existsSync(st)) {
+    for (const line of readFileSync(st, 'utf8').split('\n')) {
+      let e; try { e = JSON.parse(line) } catch { continue }
+      const content = e && e.message && Array.isArray(e.message.content) ? e.message.content : []
+      for (const c of content) {
+        if (c.type === 'tool_result' && verifyIds.has(c.tool_use_id)) {
+          verifyText += (typeof c.content === 'string' ? c.content : (c.content || []).map(x => x.text || '').join('\n')) + '\n'
+        }
+        if (c.type !== 'tool_use') continue
+        if (c.name === 'Agent') {
+          if (/probe-verify|сверка начата/i.test(String(c.input && c.input.prompt))) { verifyAgents++; verifyIds.add(c.id) } else roleAgents++
+        }
+        if (c.name === 'Grep' && e.parent_tool_use_id == null) mainGreps++
+      }
+    }
+  }
+  // Цитаты из вердиктов «закрыт» и «частично» сверяются со спекой в песочнице по «скелету»
+  // (без пробелов и регистра) — как в `grade-sr.mjs`: перенос строки не выдумка, подменённый
+  // метод — выдумка.
+  let quotes = null
+  const specPath = join(dir, 'docs/PSS-2210/technical_specification.md')
+  if (verifyText && existsSync(specPath)) {
+    const skel = s => s.replace(/\s+/g, '').replace(/[«»"„“”*`]/g, '').toLowerCase()
+    const spec = skel(readFileSync(specPath, 'utf8'))
+    const qs = [...verifyText.matchAll(/^\s*\d+\s*\|\s*(?:закрыт|частично)\s*\|[^|]*\|\s*«([^»\n]{6,})»/gm)].map(x => x[1])
+    const bad = qs.filter(q => !spec.includes(skel(q)))
+    quotes = { total: qs.length, verbatim: qs.length - bad.length, bad: bad.map(q => q.slice(0, 60)) }
+  }
+  if (roleAgents > 0) return { measured: false, why: `запустил ${roleAgents} субагент(ов)-ролей вопреки промпту` }
 
   const units = splitUnits(text)
   const alive = {}, touched = {}
@@ -145,11 +178,11 @@ function gradeOne (dir, key) {
   // придумать его. Придуманное ложное закрытие заставляет откатывать работающую правку —
   // это и произошло, и стоило дня.
   let closedRight = 0, closedWrong = 0, missed = 0, moot = 0, unclear = 0
-  const wrongList = [], unclearList = []
+  const wrongList = [], unclearList = [], missedList = []
   for (const [n, title] of Q) {
     const k = key[n]
     if (k === 'moot') { moot++; continue }
-    if (alive[n]) { if (k === 'yes') missed++; continue }
+    if (alive[n]) { if (k === 'yes') { missed++; missedList.push(`${n}. ${title}`) } continue }
     if (touched[n]) { unclear++; unclearList.push(`${n}. ${title}`); continue }
     if (k === 'no') { closedWrong++; wrongList.push(`${n}. ${title}`) } else closedRight++
   }
@@ -158,10 +191,11 @@ function gradeOne (dir, key) {
   const axis = re => units.filter(u => re.test(u)).length
   return {
     measured: true,
-    closedWrong, closedRight, missed, moot, wrongList, items, unclear, unclearList,
+    closedWrong, closedRight, missed, moot, wrongList, missedList, items, unclear, unclearList,
     asked: (text.match(RE_ASKED) || [])[1] ?? null,
     closed: (text.match(RE_CLOSED) || [])[1] ?? null,
     breakdown: RE_BREAKDOWN.test(text),
+    verifyAgents, mainGreps, quotes,
     axRepeat: axis(/повторн|дважды|двойн/i),
     axConfirm: axis(/подтвержд/i),
   }
@@ -202,6 +236,8 @@ for (const [n, r] of rows) {
   if (!r.measured) { console.log(`  ${n}: НЕ ИЗМЕРЕНО (${r.why})`); continue }
   console.log(`  ${n}: ложно закрыто ${r.closedWrong} · верно закрыто ${r.closedRight} из 16 · пропущено ${r.missed} · пунктов ${r.items}`)
   for (const w of r.wrongList) console.log(`        ЛОЖНО: ${w}`)
+  if (process.argv.includes('--missed')) for (const w of r.missedList) console.log(`        пропущено: ${w}`)
+  if (r.quotes) console.log(`        цитат сверки дословных: ${r.quotes.verbatim} из ${r.quotes.total}${r.quotes.bad.length ? ' — НЕ ДОСЛОВНО: ' + r.quotes.bad.join(' | ') : ''}`)
 }
 if (!m.length) { console.log('\nизмеренных прогонов нет'); process.exit(0) }
 const avg = k => (m.reduce((a, [, r]) => a + r[k], 0) / m.length).toFixed(1)
@@ -220,3 +256,13 @@ console.log(`  ${avg('axConfirm')}  пунктов про подтвержден
 console.log('')
 const br = m.filter(([, r]) => r.breakdown).length
 console.log(`  ${br}${pct(br)}  отчётов несут разбивку закрытий по разделам`)
+// Правка 2026-09-16: сверку делает отдельный субагент. Два счётчика механизма: поднят ли он вообще
+// и проверяет ли главный агент его цитаты поиском (в старой редакции Grep был самой сверкой).
+const va = m.filter(([, r]) => r.verifyAgents > 0).length
+console.log(`  ${va}${pct(va)}  прогонов подняли субагента сверки (правка 2026-09-16; до неё ожидаемо 0)`)
+console.log(`  ${avg('mainGreps')}  вызовов Grep у главного агента на прогон (проверка цитат)`)
+const q = m.filter(([, r]) => r.quotes)
+if (q.length) {
+  const tot = q.reduce((a, [, r]) => a + r.quotes.total, 0), ver = q.reduce((a, [, r]) => a + r.quotes.verbatim, 0)
+  console.log(`  ${ver} из ${tot}  цитат сверки найдены в спеке дословно (по скелету) — обязано быть всё`)
+}
