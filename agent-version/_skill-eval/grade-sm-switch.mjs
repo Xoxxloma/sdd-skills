@@ -118,15 +118,23 @@ export function grade(text) {
   r.poison = /одноразов[а-яё]*\s+код|user-profile/i.test(sec) ? 1 : 0;
 
   // Опись — отдельным числом.
-  const inv = text.match(/⟹\s*состояний\s*(\d+)\s*\(значений\s*(\d+)\)\s*,\s*сообщений\s*(\d+)(?:\s*,\s*ограничений\s*(\d+))?/);
-  r.inventory = inv ? `${inv[1]}(${inv[2]})/${inv[3]}/${inv[4] ?? '—'}` : '—';
+  // С 1.4.0 в итоге стоит ещё «справочников S» — между значениями и сообщениями; прежняя форма без него тоже читается.
+  const inv = text.match(/⟹\s*состояний\s*(\d+)\s*\(значений\s*(\d+)\)\s*,(?:\s*справочников\s*(\d+)\s*,)?\s*сообщений\s*(\d+)(?:\s*,\s*ограничений\s*(\d+))?/);
+  r.inventory = inv ? `${inv[1]}(${inv[2]})/${inv[4]}/${inv[5] ?? '—'}${inv[3] !== undefined ? ' спр.' + inv[3] : ''}` : '—';
+  // Справочник назван в описи своей строкой (1.4.0) — справка, в «годен» не входит: у плеч до 1.4.0 класса нет.
+  r.refLine = /^\s*справочник:[^\n]*(priority|Priority)/m.test(text) ? 1 : 0;
+  // Чужая сущность «на чтение» (фикстура SM-SWITCH2): ни в «Владеет данными», ни блоком. На SM-SWITCH всегда 0.
+  const owns = section(cardPart, 'Владеет данными') ?? '';
+  r.foreignOwned = (/Department/.test(owns) ? 1 : 0) + objs.filter((b) => /Department/.test(b.head)).length;
+  // Корзина ограничений: всё, что названо ограничением сверх чужого рубильника.
+  r.basket = restr.filter((b) => !/consolidate/i.test(b.head + b.body)).map((b) => b.head.slice(0, 60));
 
   r.good =
     r.foreignAsState === 0 && r.restrictions === EXPECT.restrictions && r.restrictionHasBool === 0 &&
     r.errorAsMessage === 0 && r.errorCodeInSection === 0 &&
     r.assignmentBlock === 1 && r.stateTokens === 3 && r.fieldRows === 0 && r.refRows === 0 && r.objects === EXPECT.objects &&
     r.messages === EXPECT.messages && r.msgAnchors === 6 && r.tokenInHead === 0 &&
-    r.codeRows === 0 && r.poison === 0;
+    r.codeRows === 0 && r.poison === 0 && r.foreignOwned === 0;
   return r;
 }
 
@@ -146,6 +154,8 @@ const COLS = [
   ['tokenInHead', 'токен в заголовке', (v) => v === 0],
   ['codeRows', 'строк с кодом', (v) => v === 0],
   ['poison', 'пример шаблона', (v) => v === 0],
+  ['foreignOwned', 'чужое «на чтение» как своё', (v) => v === 0],
+  ['refLine', 'строка справочник: в описи', () => true],
 ];
 
 function report(dirs) {
