@@ -9,6 +9,7 @@ nokey-turn2.txt
 noreview-bare-prompt.txt
 noreview-prompt.txt
 noreview-ru-prompt.txt
+nosplit-turn2.txt
 prebaked/bug_report.md
 prebaked/technical_specification.md
 services/auth.md

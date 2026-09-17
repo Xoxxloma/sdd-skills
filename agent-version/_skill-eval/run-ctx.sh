@@ -71,6 +71,17 @@ case "$PROBE" in
   # пункт 12 мог полезть не туда, — ложное срабатывание там, где его предмета нет, и уход
   # субагента за пределы артефакта по новому пути к корню репозитория.
   rv-clean)  FIXTURE=RV-CLEAN;  PROMPT_FILE=rv-prompt.txt;    SKILL=spec-review ;;
+  # Аудит 2026-09-17, К1–К4 и К8.2: исключения чек-листов. `RV-CLEAN` шаблон обходит (§8 одной
+  # строкой, блока «Открытые вопросы» в шапке нет), поэтому ложные срабатывания пунктов 6 и 10 на
+  # ней не видны; здесь спеки в форме шаблона, БТ с именами ролей, фронтовая спека без контрактов и
+  # индекс этапов «не применимо». Состав и ожидания — `fixtures/RV-AUDIT/README.md`.
+  rv-bt-clean)  FIXTURE=RV-AUDIT; PROMPT_FILE=bt-clean-prompt.txt;  SKILL=spec-review ;;
+  rv-bt-dirty)  FIXTURE=RV-AUDIT; PROMPT_FILE=bt-dirty-prompt.txt;  SKILL=spec-review ;;
+  rv-fe)        FIXTURE=RV-AUDIT; PROMPT_FILE=fe-prompt.txt;        SKILL=spec-review ;;
+  rv-tpl-clean) FIXTURE=RV-AUDIT; PROMPT_FILE=tpl-clean-prompt.txt; SKILL=spec-review ;;
+  rv-tpl-dirty) FIXTURE=RV-AUDIT; PROMPT_FILE=tpl-dirty-prompt.txt; SKILL=spec-review ;;
+  rv-tpl-count) FIXTURE=RV-AUDIT; PROMPT_FILE=tpl-count-prompt.txt; SKILL=spec-review ;;
+  rv-stage-na)  FIXTURE=RV-AUDIT; PROMPT_FILE=stage-na-prompt.txt;  SKILL=spec-review ;;
   sb-ctx2)   FIXTURE=SB-CTX2;   PROMPT_FILE=stage-prompt.txt; SKILL=stage-breakdown-doc ;;
   # ── `spec-readiness`: достаточно ли спеки, чтобы писать код ────────────────────────────────
   # Как и приёмка, ничего не пишет на диск: артефакт — `answer.md` из stdout. Парное плечо без
@@ -200,6 +211,11 @@ case "$PROBE" in
   rt-noreview) FIXTURE=RT-BUG; PROMPT_FILE=noreview-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
   rt-noreview-bare) FIXTURE=RT-BUG; PROMPT_FILE=noreview-bare-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
   rt-noreview-ru) FIXTURE=RT-BUG; PROMPT_FILE=noreview-ru-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
+  # `rt-nosplit` — хвост Шага 5 после правки 2026-09-17: нарезка на этапы необязательна, маршрут о
+  # ней спрашивает. Реплика аналитика отказывается от нарезки; верный исход — `stage-breakdown-doc`
+  # не вызван, папки `stages/` нет, строка про `/spec-readiness` названа, маршрут дошёл до развилки
+  # Шага 6. Ветку «да» меряют `rt-bug`/`rt-feature`: их «Да, годится.» на вопрос про этапы — согласие.
+  rt-nosplit)  FIXTURE=RT-BUG; PROMPT_FILE=bug-prompt.txt;     SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=nosplit-turn2.txt ;;
   # Ветка «Продолжить начатое»: на диске лежит ТОЛЬКО баг-репорт, спеки под него нет. Проверяется,
   # опознан ли он сводкой состояния (глоб ветки его раньше не видел вовсе) и уходит ли маршрут в
   # спеку с флагом багфикса, а не по кругу в `bug-report-doc`. Рядом чужая `ARS-102` с полным
@@ -237,7 +253,7 @@ case "$PROBE" in
   artype)    FIXTURE=AR-TYPE;   PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx br-real sb-ctx sb-ctx2 rv-conv rv-clean br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-ctx ts-nodesc ts-noctx br-ctx br-real sb-ctx sb-ctx2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-nosplit rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
 esac
 
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }

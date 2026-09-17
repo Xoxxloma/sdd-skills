@@ -2,7 +2,7 @@
 // grade-rt.mjs — пробы rt-bug / rt-feature / rt-menu / rt-nokey: МАРШРУТ проводника,
 // под-скиллы заглушены.
 //
-//   node grade-rt.mjs <каталог с песочницами> --probe=bug|feature|menu|nokey
+//   node grade-rt.mjs <каталог с песочницами> --probe=bug|feature|menu|nokey|noreview|nosplit
 //   node grade-rt.mjs --selftest
 //
 // ПОРЯДОК НА ВХОДЕ (плечи `menu` и `nokey`, заведены 2026-08-18). До правки маршрут спрашивал
@@ -58,6 +58,15 @@ const RE_OPT_BUG = /баг-репорт|баг-репорте|сломанное
  * Шаге 1Б появиться не могут.
  */
 const RE_STEP1_NEIGHBOURS = /Продолжить начатое|обновить описание сервисов|Создаем Спецификацию|создаём спецификацию|готового документа/i
+
+/**
+ * ХВОСТ ШАГА 5 (правка 2026-09-17, К8): нарезка на этапы необязательна. Проводник называет станцию
+ * `/spec-readiness` и спрашивает «Разбить спеку на этапы?». Развилка Шага 6 опознаётся по двум
+ * вариантам, которых нет больше нигде в маршруте, — так «дошёл до конца» отличается от «встал на спеке».
+ */
+const RE_READINESS = /spec-readiness/i
+const RE_STEP6 = /На сегодня закончить|Начать другую задачу/i
+const RE_ASKS_SPLIT = /Разбить спек[уи][^.\n]{0,30}на этапы/i
 
 /**
  * Просьба, ПЕРЕАДРЕСОВАННАЯ под-скиллу, просьбой проводника не является: «ключ спросит
@@ -155,6 +164,9 @@ STATIONS.noreview = [
   ['спека запущена', STATION_CALL('technical-spec-doc')],
   ['этапы нарезаны', STATION_CALL('stage-breakdown-doc')],
 ]
+// У пробы отказа от нарезки лестница кончается на принятой спеке: с правки 2026-09-17 этапы —
+// необязательный шаг, и при ответе «нет» их отсутствие — верное поведение, а не обрыв.
+STATIONS.nosplit = STATIONS.bug.slice(0, 4)
 // `menu` лестницы не имеет: там верный исход — остановка ДО первого вызова, и любая станция
 // на этом плече означает дефект, а не прогресс.
 
@@ -222,6 +234,11 @@ export function gradeRun (dir, probe) {
   r.showsBug = RE_OPT_BUG.test(ans)
   r.wrongStep = RE_STEP1_NEIGHBOURS.test(ans)
   r.showsMenu = r.showsBT && r.showsBug && !r.wrongStep
+  // Хвост Шага 5: папка этапов, станция готовности, вопрос про нарезку, развилка Шага 6.
+  r.stagesDir = r.docs.some((d) => existsSync(join(dir, 'docs', d, 'stages')))
+  r.mentionsReadiness = RE_READINESS.test(ans)
+  r.asksSplit = RE_ASKS_SPLIT.test(ans)
+  r.reachedFinal = RE_STEP6.test(ans)
 
   if (probe === 'bug' || probe === 'nokey') {
     r.wrongFirst = r.first !== null && r.first !== 'bug-report-doc'
@@ -238,6 +255,15 @@ export function gradeRun (dir, probe) {
     r.wrongFirst = r.first !== null && r.first !== 'bug-report-doc'
     r.pass = r.first === 'bug-report-doc' && !r.calledReview && !r.calledBT &&
       r.calledSpec && r.flagBugfix && r.calledStages
+  } else if (probe === 'nosplit') {
+    // Аналитик отказался от нарезки. Зачёт — конъюнкция: маршрут дефекта верный до спеки, этапы не
+    // тронуты (ни вызова, ни папки), станция готовности названа, и маршрут не встал, а дошёл до
+    // развилки Шага 6. Без последней половины прогон, вставший на спеке, выглядел бы образцовым:
+    // этапы он тоже не резал.
+    r.wrongFirst = r.first !== null && r.first !== 'bug-report-doc'
+    r.pass = r.first === 'bug-report-doc' && !r.calledBT && !r.decomposition &&
+      r.calledSpec && r.flagBugfix && r.sourceIsReport &&
+      !r.calledStages && !r.stagesDir && r.mentionsReadiness && r.reachedFinal
   } else if (probe === 'feature') {
     r.wrongFirst = r.first !== null && r.first !== 'business-requirements-doc'
     r.pass = r.first === 'business-requirements-doc' && !r.calledBugReport
@@ -373,6 +399,17 @@ stage-breakdown-doc`
   const NR_LEAK = NR_OK + '\nspec-review docs/ARS-312/technical_specification.md'
   ck('просочившаяся приёмка видна', parseTrace(NR_LEAK).some((l) => l.startsWith('spec-review')), true)
   ck('встал на репорте — не полный маршрут', ladder(parseTrace('bug-report-doc'), 'noreview').reach, 1)
+
+  // Проба отказа от нарезки: лестница кончается на принятой спеке, а станция готовности, вопрос
+  // про этапы и развилка Шага 6 опознаются по тексту ответа.
+  const ns = ladder(parseTrace(REF_BUG.replace(/\nstage-breakdown-doc$/, '')), 'nosplit')
+  ck('лестница отказа — четыре станции', ns.total, 4)
+  ck('маршрут до принятой спеки — полный', ns.reach, 4)
+  ck('станция готовности опознана', RE_READINESS.test('спека принята; перед раздачей исполнителям запустите `/spec-readiness docs/ARS-312/technical_specification.md`'), true)
+  ck('вопрос про этапы опознан', RE_ASKS_SPLIT.test('Разбить спеку на этапы?'), true)
+  ck('вопрос про этапы у эпика опознан', RE_ASKS_SPLIT.test('Разбить спеки эпика на этапы?'), true)
+  ck('развилка Шага 6 опознана', RE_STEP6.test('Что дальше? Начать другую задачу / Доработать спеку / На сегодня закончить'), true)
+  ck('вопрос хвоста — НЕ развилка Шага 6', RE_STEP6.test('Разбить спеку на этапы? Да, разбить на этапы / Нет, спеки достаточно'), false)
   console.log(bad === 0 ? '\nсамопроверка: ok' : `\nсамопроверка: ПРОВАЛОВ ${bad}`)
   return bad === 0
 }
@@ -382,8 +419,8 @@ if (argv.includes('--selftest')) process.exit(selftest() ? 0 : 1)
 const root = argv.find((x) => !x.startsWith('--'))
 const pa = argv.find((x) => x.startsWith('--probe='))
 const PROBE = pa ? pa.slice('--probe='.length) : ''
-if (!root || !['bug', 'feature', 'menu', 'nokey', 'noreview'].includes(PROBE)) {
-  console.error('usage: node grade-rt.mjs <каталог> --probe=bug|feature|menu|nokey|noreview'); process.exit(1)
+if (!root || !['bug', 'feature', 'menu', 'nokey', 'noreview', 'nosplit'].includes(PROBE)) {
+  console.error('usage: node grade-rt.mjs <каталог> --probe=bug|feature|menu|nokey|noreview|nosplit'); process.exit(1)
 }
 
 const all = readdirSync(root, { withFileTypes: true })
@@ -457,10 +494,25 @@ if (PROBE === 'bug' || PROBE === 'nokey') {
   console.log(`  ${pct(c((r) => r.calledSpec && !r.sourceIsReport))}\tспеке передан не репорт`)
   console.log(`  ${pct(c((r) => !r.calledReview))}\tприёмка не запущена ни разу`)
   console.log(`  ${pct(c((r) => !r.calledStages))}\tэтапы не запущены`)
+} else if (PROBE === 'nosplit') {
+  console.log(`  ${pct(c((r) => r.calledStages))}\tНАРЕЗАЛ ЭТАПЫ вопреки отказу аналитика  ← КРИТЕРИЙ`)
+  console.log(`  ${pct(c((r) => r.stagesDir))}\tпапка stages/ заведена`)
+  console.log(`  ${pct(c((r) => !r.mentionsReadiness))}\tстанция НЕ названа — строки про /spec-readiness нет  ← КРИТЕРИЙ`)
+  console.log(`  ${pct(c((r) => !r.reachedFinal))}\tдо развилки Шага 6 НЕ дошёл  ← КРИТЕРИЙ`)
+  console.log(`  ${pct(c((r) => r.asksSplit))}\tвопрос про этапы задан (справка: до отказа — норма, после отказа — переспрос; смотри ход)`)
+  console.log(`  ${pct(c((r) => r.wrongFirst))}\tпервым вызван не тот скилл`)
+  console.log(`  ${pct(c((r) => r.calledSpec && !r.flagBugfix))}\tспека запущена БЕЗ флага багфикса`)
+  console.log(`  ${pct(c((r) => !r.calledReview))}\tприёмка не запущена ни разу`)
 } else {
   console.log(`  ${pct(c((r) => r.calledBugReport))}\tУШЁЛ В БАГ-РЕПОРТ на обычной задаче  ← КРИТЕРИЙ`)
   console.log(`  ${pct(c((r) => r.wrongFirst))}\tпервым вызван не business-requirements-doc`)
   console.log(`  ${pct(c((r) => !r.calledReview))}\tприёмка не запущена ни разу`)
+}
+// Хвост Шага 5 на плечах ветки «да» — справка, в зелёное не входит: критерий плеч задним числом
+// не меняется, а по этим двум числам видно «до/после» правки 2026-09-17.
+if (PROBE !== 'nosplit') {
+  console.log(`  ${pct(c((r) => r.mentionsReadiness))}\tстанция названа — строка про /spec-readiness (справка)`)
+  console.log(`  ${pct(c((r) => r.asksSplit))}\tвопрос «разбить на этапы?» задан (справка)`)
 }
 // ─── Лестница маршрута ──────────────────────────────────────────────────────────────────────
 // Печатается ПЕРЕД «зелёными» намеренно: зелёное — редкое событие, а лестница отвечает на
