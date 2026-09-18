@@ -302,7 +302,7 @@ for (const r of rounds) {
   const sb = join(r, 'sandbox')
   if (!existsSync(sb)) { console.log(`${r}: песочниц нет`); continue }
   const rs = []
-  const dirs = readdirSync(sb).filter((f) => /^scan-/.test(f)).sort()
+  const dirs = readdirSync(sb).filter((f) => /^(re)?scan-/.test(f)).sort()
   // Брошенный в фоне прогон (см. ниже) в сводку метрик не идёт: его частичная карточка (scan-5
   // записал только web) тянет медианы вниз за дефект стенда, а не скилла.
   const BG_EARLY = /жд[уё]м?[^\n]*(уведомлен|субагент|заверш|результат)|ожида[юе][^\n]*(уведомлен|субагент|заверш|результат)|продолжу[^\n]*(как только|когда)[^\n]*(верн|заверш)/i

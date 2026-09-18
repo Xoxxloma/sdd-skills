@@ -244,6 +244,44 @@ public class AssignmentLimits {
 }
 ```
 
+## `src/main/java/ru/summary/navigator/integration/GeocoderClient.java`
+
+```java
+/**
+ * Внешний геокодер (АС Геокодер, вне манифеста): по координатам инцидента получаем адрес для SMS.
+ * Сервис может быть недоступен — тогда адрес остаётся пустым, назначение всё равно создаётся,
+ * в SMS вместо адреса уходят координаты. Никакого флага и настройки: это просто сбой соседа.
+ */
+@Component
+public class GeocoderClient {
+    @Value("${geocoder.url}") String baseUrl;
+
+    public Optional<String> resolve(double lat, double lon) {
+        try { /* GET {baseUrl}/reverse?lat=..&lon=.. */ return Optional.of(address); }
+        catch (RestClientException e) { log.warn("геокодер недоступен: {}", e.getMessage()); return Optional.empty(); }
+    }
+}
+```
+
+## `src/main/java/ru/summary/navigator/integration/PatrolRegistryClient.java`
+
+```java
+/**
+ * Реестр нарядов (внешняя АС РНД, вне манифеста): перед назначением проверяем, что наряд существует и
+ * на смене. Реестр недоступен — назначение НЕ создаётся: 503 «Реестр нарядов недоступен, повторите
+ * позже». Флага и настройки нет — это сбой соседа, а не режим.
+ */
+@Component
+public class PatrolRegistryClient {
+    @Value("${patrol-registry.url}") String baseUrl;
+
+    public PatrolInfo check(String patrolId) {
+        try { /* GET {baseUrl}/patrols/{patrolId} */ return info; }
+        catch (RestClientException e) { throw new UpstreamUnavailableException("Реестр нарядов недоступен, повторите позже"); }
+    }
+}
+```
+
 ## `src/main/java/ru/summary/navigator/domain/Assignment.java`
 
 ```java
@@ -295,13 +333,17 @@ public class AssignmentService {
     private final SubscriberMailer mailer;
     private final SmsSender sms;
     private final AssignmentProducer producer;
+    private final GeocoderClient geocoder;
+    private final PatrolRegistryClient registry;
 
     /** Диспетчер назначает наряд. У инцидента может быть только одно незакрытое назначение. */
     public AssignmentDto assign(long incidentId, String patrolId, Priority priority, User by) {
         if (repo.existsByIncidentIdAndStatusNot(incidentId, AssignmentStatus.CLOSED))
             throw new ConflictException("У инцидента уже есть незакрытое назначение");
+        registry.check(patrolId);                  // реестр недоступен — 503, назначение не создаётся
         Assignment a = new Assignment(incidentId, patrolId, priority, AssignmentStatus.NEW, now());
         repo.save(a);
+        a.address = geocoder.resolve(a.lat, a.lon).orElse(null);   // геокодер недоступен — адрес пустой, назначение создано
         mailer.sendAssignmentCreated(a);          // подписчикам категории инцидента
         sms.sendAssignedSms(a);                    // старшему наряда
         return toDto(a);
@@ -436,6 +478,7 @@ public enum Role {
 @RestControllerAdvice
 public class ErrorHandler {
     @ExceptionHandler(NavigatorIntegrationException.class)   // 503 { code: SYSTEM_ERROR, message }
+    @ExceptionHandler(UpstreamUnavailableException.class)    // 503 { code: UPSTREAM_UNAVAILABLE, message }
     @ExceptionHandler(ConflictException.class)               // 409 { code: CONFLICT, message }
     @ExceptionHandler(ForbiddenException.class)              // 403 { code: FORBIDDEN, message }
 }
@@ -451,6 +494,10 @@ switch:
 topics:
   assignment-closed: navigator.assignment.closed
   incident-closed: consolidate.incident.closed
+geocoder:
+  url: ${GEOCODER_URL}
+patrol-registry:
+  url: ${PATROL_REGISTRY_URL}
 sms:
   url: ${SOWA_URL}
   token: ${SOWA_TOKEN}
@@ -494,7 +541,21 @@ sms:
   блок `ограничение «…»` по-прежнему **один**, про рубильник у `consolidate`.
 - **Опись.** Итоговая строка `⟹ состояний 1 (значений 3), справочников 1, сообщений 6, ограничений 1`.
 
+- **BR-10, недоступность внешней системы — не ограничение, даже при полном отказе.** Два внешних
+  соседа вне манифеста: геокодер (недоступен — адрес пустой, назначение создаётся) и реестр нарядов
+  (недоступен — назначение НЕ создаётся, 503). Ни то ни другое не условие, которым кто-то
+  управляет: это сбои. Блоков `ограничение «геокодер недоступен»` и `ограничение «реестр нарядов
+  недоступен»` **нет**; ограничение в карточке ровно одно — флаг у `consolidate`. Оба соседа — в
+  «Зависит от» строками `вне манифеста`, отказ 503 — в «Публичном контракте» у `POST …/assign`.
+  Ровно этот промах дал на repairy блоки про DeepSeek и Telegram.
+
 ## Ловушки
+
+**Недоступность выглядит как условие.** «Пока геокодер недоступен, адреса нет» читается как
+«ограничение с хозяином — внешняя система». Отличие: хозяин условия его включает и выключает
+(флаг, настройка, лицензия); сбой никто не включает. На repairy тот же промах дал два блока про
+DeepSeek и Telegram.
+
 
 **Флаг перевёрнут.** `status=true` у `consolidate` значит «отключено», и комментарий это называет.
 Правильная строка ограничения говорит об условии словами («пока интеграция отключена»), а не о
