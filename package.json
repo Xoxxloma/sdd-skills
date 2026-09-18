@@ -12,6 +12,6 @@
     ".gigacode"
   ],
   "engines": {
-    "node": ">=16"
+    "node": ">=12.20"
   }
 }
