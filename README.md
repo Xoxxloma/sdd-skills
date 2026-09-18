@@ -44,17 +44,13 @@
 
 ### Установка скиллов
 
-Одной командой из корня рабочего репозитория со спеками (нужен Node.js 12+ и доступ к репозиторию со скиллами по git — тот же, что для `git clone`):
+Одной командой из корня рабочего репозитория со спеками. Нужны только `git` и `bash` (на Windows — Git Bash), доступ к репозиторию со скиллами тот же, что для `git clone`:
 
 ```
-npx git+https://onework.sigma.sbrf.ru.sc/ai-security-department/AI-SDD-SKILLS.git
+bash tools/skills.sh
 ```
 
-По ssh: `npx git+ssh://git@onework.sigma.sbrf.ru.sc/ai-security-department/AI-SDD-SKILLS.git`. Если `npx` не находит команду сам: `npx --package=git+https://onework.sigma.sbrf.ru.sc/ai-security-department/AI-SDD-SKILLS.git sdd-skills`. Из GitHub-зеркала: `npx github:Xoxxloma/sdd-skills`.
-
-Установщик `install.mjs` берёт папки скиллов из `.gigacode/` исходного репозитория, кладёт их с `reference/` в `.gigacode/` рабочего и печатает версии; стенд `_skill-eval` и CHANGELOG не копирует. Другая папка — аргументом после адреса (`… .claude/skills`), конкретная ветка или тег — через `#` после `.git` (`…AI-SDD-SKILLS.git#main`). Повторный запуск обновляет скиллы на месте.
-
-**Если `npx` в вашей среде не работает** (корпоративный сертификат, запрет запуска файлов из `~/.npm`): скопируйте `tools/skills.mjs` (любая ОС, запуск `node tools/skills.mjs [папка]`) или `tools/skills.sh` (macOS, Linux, Git Bash: `bash tools/skills.sh [папка]`) из этого репозитория в свой репозиторий со спеками. Скрипт клонирует репозиторий со скиллами во временную папку и запускает тот же `install.mjs` через `node`, без `npx` и без прав на исполнение файлов. Адрес репозитория задан в скрипте один раз, переопределяется переменными `SDD_SKILLS_REPO` и `SDD_SKILLS_REF` (ветка или тег).
+Скрипт `tools/skills.sh` из этого репозитория один раз копируется в репозиторий со спеками (например, `AI-SDD/tools/skills.sh`). Он клонирует репозиторий со скиллами во временную папку и копирует из его `.gigacode/` каждую папку со `SKILL.md` вместе с `reference/` в `.gigacode/` рабочего репозитория, печатает версии; стенд `_skill-eval` и CHANGELOG не копирует. Другая целевая папка — аргументом (`bash tools/skills.sh .claude/skills`), ветка или тег — переменной `SDD_SKILLS_REF`, другой адрес репозитория — `SDD_SKILLS_REPO`. Повторный запуск обновляет скиллы на месте. Запускать через `bash …`, а не `./…`: в корпоративных образах запуск файлов из домашней папки бывает запрещён.
 
 Вручную: скопируйте папки скиллов из `agent-version/` этого репозитория в свою рабочую папку `.gigacode`.
 
