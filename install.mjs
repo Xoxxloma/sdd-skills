@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Установщик скиллов: копирует папки agent-version/<скилл>/ (SKILL.md + reference/) в целевую папку.
+// Установщик скиллов: копирует папки <скилл>/ (SKILL.md + reference/) из .gigacode/ или agent-version/ исходного
+// репозитория в целевую папку.
 //
 //   npx github:Xoxxloma/sdd-skills                # → ./.gigacode
 //   npx github:Xoxxloma/sdd-skills .claude/skills # → другая папка
@@ -11,7 +12,10 @@ import { readdirSync, existsSync, statSync, mkdirSync, rmSync, cpSync, readFileS
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const SRC = join(dirname(fileURLToPath(import.meta.url)), 'agent-version');
+// Скиллы в исходном репозитории лежат в .gigacode/ (как у аналитика) либо в agent-version/ (этот репозиторий).
+const ROOT = dirname(fileURLToPath(import.meta.url));
+const SRC = ['.gigacode', 'agent-version'].map((d) => join(ROOT, d)).find((p) => existsSync(p) && statSync(p).isDirectory());
+if (!SRC) { console.error(`рядом с install.mjs нет ни .gigacode/, ни agent-version/`); process.exit(1); }
 const DEST = resolve(process.cwd(), process.argv[2] || '.gigacode');
 
 const skills = readdirSync(SRC).filter((d) => {

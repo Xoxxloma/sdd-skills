@@ -50,7 +50,7 @@
 npx github:Xoxxloma/sdd-skills
 ```
 
-Установщик `install.mjs` кладёт в `.gigacode/` папки всех скиллов с их `reference/` и печатает версии; стенд `_skill-eval` и CHANGELOG не копирует. Другая папка — аргументом (`npx github:Xoxxloma/sdd-skills .claude/skills`), конкретная ветка или тег — через `#` (`npx github:Xoxxloma/sdd-skills#main`). Повторный запуск обновляет скиллы на месте.
+Установщик `install.mjs` берёт папки скиллов из `.gigacode/` либо `agent-version/` исходного репозитория, кладёт их с `reference/` в `.gigacode/` рабочего и печатает версии; стенд `_skill-eval` и CHANGELOG не копирует. Другая папка — аргументом (`npx github:Xoxxloma/sdd-skills .claude/skills`), конкретная ветка или тег — через `#` (`npx github:Xoxxloma/sdd-skills#main`). Повторный запуск обновляет скиллы на месте.
 
 Вручную: скопируйте папки скиллов из `agent-version/` этого репозитория в свою рабочую папку `.gigacode`.
 
