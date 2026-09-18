@@ -1,0 +1,10 @@
+{
+  "name": "sdd-skills",
+  "version": "5.11.0",
+  "description": "Скиллы аналитической петли SDD: установка папок agent-version/*/SKILL.md в .gigacode рабочего репозитория. Запуск: npx github:Xoxxloma/sdd-skills [целевая папка]",
+  "private": true,
+  "type": "module",
+  "bin": { "sdd-skills": "./install.mjs" },
+  "files": ["install.mjs", "agent-version"],
+  "engines": { "node": ">=16" }
+}
