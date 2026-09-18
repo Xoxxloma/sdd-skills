@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # skills.sh — установить или обновить скиллы в репозитории со спеками одной командой.
 #
-#   bash tools/skills.sh                 # → ./.gigacode
+#   bash tools/skills.sh                 # → ./.gigacode/skills
 #   bash tools/skills.sh .claude/skills  # → другая папка
 #
 # Клонирует репозиторий со скиллами во временную папку и копирует из его .gigacode/ каждую папку,
-# в которой есть SKILL.md, вместе с её reference/. Папки на «_» (стенд) и файлы верхнего уровня
+# в которой есть SKILL.md, вместе с её reference/, в .gigacode/skills/ репозитория со спеками. Папки на «_» (стенд) и файлы верхнего уровня
 # не копирует. Повторный запуск обновляет установленные скиллы на месте, чужие папки не трогает.
 #
 # Нужны только git и bash (на Windows — Git Bash). Запускать через `bash …`, а не `./…`: в
@@ -17,7 +17,7 @@ set -euo pipefail
 
 REPO="${SDD_SKILLS_REPO:-https://onework.sigma.sbrf.ru.sc/ai-security-department/AI-SDD-SKILLS.git}"
 REF="${SDD_SKILLS_REF:-}"            # ветка или тег; пусто — ветка по умолчанию
-DEST="${1:-.gigacode}"
+DEST="${1:-.gigacode/skills}"
 
 command -v git >/dev/null || { echo "нужен git"; exit 1; }
 
