@@ -44,13 +44,15 @@
 
 ### Установка скиллов
 
-Одной командой из корня рабочего репозитория со спеками (нужен Node.js 16+ и доступ к этому репозиторию по git):
+Одной командой из корня рабочего репозитория со спеками (нужен Node.js 16+ и доступ к репозиторию со скиллами по git — тот же, что для `git clone`):
 
 ```
-npx github:Xoxxloma/sdd-skills
+npx git+https://onework.sigma.sbrf.ru.sc/ai-security-department/AI-SDD-SKILLS.git
 ```
 
-Установщик `install.mjs` берёт папки скиллов из `.gigacode/` исходного репозитория, кладёт их с `reference/` в `.gigacode/` рабочего и печатает версии; стенд `_skill-eval` и CHANGELOG не копирует. Другая папка — аргументом (`npx github:Xoxxloma/sdd-skills .claude/skills`), конкретная ветка или тег — через `#` (`npx github:Xoxxloma/sdd-skills#main`). Повторный запуск обновляет скиллы на месте.
+По ssh: `npx git+ssh://git@onework.sigma.sbrf.ru.sc/ai-security-department/AI-SDD-SKILLS.git`. Если `npx` не находит команду сам: `npx --package=git+https://onework.sigma.sbrf.ru.sc/ai-security-department/AI-SDD-SKILLS.git sdd-skills`. Из GitHub-зеркала: `npx github:Xoxxloma/sdd-skills`.
+
+Установщик `install.mjs` берёт папки скиллов из `.gigacode/` исходного репозитория, кладёт их с `reference/` в `.gigacode/` рабочего и печатает версии; стенд `_skill-eval` и CHANGELOG не копирует. Другая папка — аргументом после адреса (`… .claude/skills`), конкретная ветка или тег — через `#` после `.git` (`…AI-SDD-SKILLS.git#main`). Повторный запуск обновляет скиллы на месте.
 
 Вручную: скопируйте папки скиллов из `agent-version/` этого репозитория в свою рабочую папку `.gigacode`.
 
