@@ -24,6 +24,13 @@ const WANT = {
   // дата, которой состояние отличается, рядом со значением в скобках — форма, которую бриф разрешает
   // («как `expiresAt` в примере шаблона»); гейт (3) обязан её пропускать
   h: { verdict: 'ПРОЙДЕН' },
+  i: { verdict: 'ДОБОР', why: /таблиц|значени|Владеет|\|/i },
+  j: { verdict: 'ДОБОР', why: /письмо|сообщени|заголов/i },
+  k: { verdict: 'ДОБОР', why: /заголов|ключ|Shipment/i },
+  l: { verdict: 'ДОБОР', why: /заполнит|не определено|одинаков|CANCELLED|LOST|перехода/i },
+  n: { verdict: 'ПРОЙДЕН' },
+  o: { verdict: 'ДОБОР', why: /хозя|управля|конфиг|ограничени|манифест/i },
+  p: { verdict: 'ДОБОР', why: /BOX|PALLET|запят|справочник|упаковк/i },
 }
 const RE_VERDICT = /ГЕЙТ:\s*\**\s*(ПРОЙДЕН|ДОБОР)([^\n]*)/g
 
@@ -36,7 +43,7 @@ export function grade (text, variant) {
   if (verdict !== w.verdict) return { verdict, pass: false, note: verdict === 'ДОБОР' ? 'ЛОЖНЫЙ добор: ' + last[2].trim().slice(0, 110) : 'посаженное ПРОПУЩЕНО' }
   if (w.why && !w.why.test(tail)) return { verdict, pass: false, note: 'добор не за то: ' + last[2].trim().slice(0, 110) }
   // Добор за посаженное, но заодно требует блоки для справочников — след К7.
-  const junk = variant !== 'f' && verdict === 'ДОБОР' && /Attachment|packageType|PHOTO|PALLET/.test(tail)
+  const junk = !['f', 'p', 'i'].includes(variant) && verdict === 'ДОБОР' && /Attachment|packageType|PHOTO|PALLET/.test(tail)
   return { verdict, pass: !junk, note: junk ? 'заодно требует блоки для справочников' : '' }
 }
 
@@ -54,6 +61,10 @@ function selftest () {
   ck('двойник G — строка на поле названа', grade('ГЕЙТ: ДОБОР — строка «перевешено» с `weightKg` — строка на поле', 'g').pass, true)
   ck('двойник G — пропущен', grade('ГЕЙТ: ПРОЙДЕН', 'g').pass, false)
   ck('берётся последняя строка', grade('ГЕЙТ: ПРОЙДЕН — так было бы, но\nГЕЙТ: ДОБОР — блок `Courier`', 'a').pass, true)
+  ck('двойник N — не определено проходит', grade('ГЕЙТ: ПРОЙДЕН', 'n').pass, true)
+  ck('двойник L — заполнитель назван', grade('ГЕЙТ: ДОБОР — строки CANCELLED и LOST одинаковым правилом, нужно «не определено»', 'l').pass, true)
+  ck('двойник O — хозяин назван', grade('ГЕЙТ: ДОБОР — в ограничении не назван хозяин, конфиг им не является', 'o').pass, true)
+  ck('двойник P — справочник назван', grade('ГЕЙТ: ДОБОР — строка BOX/PALLET: два токена, справочник', 'p').pass, true)
   ck('нет строки вердикта', grade('всё хорошо', 'clean').pass, false)
   console.log(bad === 0 ? '\nсамопроверка: ok' : `\nсамопроверка: ПРОВАЛОВ ${bad}`)
   process.exit(bad === 0 ? 0 : 1)

@@ -1,0 +1,1 @@
+9c56a21 — база (feat/biz-rules-rework от fix/audit-k8-optional-stages); плечи «до» гейта — runs/2026-09-17-k7-after (1.4.0) и runs/2026-09-17-c17-after (1.4.1); текст финального прогона — _skills/
