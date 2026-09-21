@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>schema</title>
+<style>
+  html,body{margin:0;background:#fff}
+  #inner{position:absolute;left:0;top:300px;width:1780px;height:2240px}
+  #c{position:relative;width:1780px;height:2540px;background:#fff;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;color:#1d2725}
+  .sec{position:absolute;left:18px;width:1744px;background:#eef1ee;border-radius:26px}
+  .role{position:absolute;left:36px;width:220px;background:#e3e9e6;border:2px solid #9aa8a2;border-radius:14px;text-align:center;padding:16px 10px;box-sizing:border-box}
+  .role b{display:block;font-size:22px;line-height:28px}
+  .role span{display:block;font-size:19px;color:#3b4744}
+  .box{position:absolute;box-sizing:border-box;border:2.5px solid;border-radius:14px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:8px 20px}
+  .box .t{font-size:26px;font-weight:700;line-height:32px}
+  .box .m{font-family:Menlo,"SF Mono",Consolas,monospace;font-size:24px;font-weight:700;line-height:30px}
+  .box .s{font-size:19px;line-height:25px;color:#5f6d69;margin-top:4px}
+  .box .p{font-family:Menlo,"SF Mono",Consolas,monospace;font-size:16px;color:#7a5a2a;margin-bottom:6px}
+  .g{background:#dce9e3;border-color:#2f6b5a}
+  .a{background:#f3ebdd;border-color:#b39a68}
+  .o{background:#f9e6c8;border-color:#c4721f}
+  .r{background:#f8d9d6;border-color:#b23a3a}
+  .d{border-style:dashed}
+  .lbl{position:absolute;font-size:19px;color:#3b4744}
+  svg{position:absolute;left:0;top:0}
+</style></head><body>
+<div id="c">
+  <!-- section 0: context -->
+  <div class="sec" style="top:30px;height:260px"></div>
+  <div class="role" style="top:60px"><b>Подготовка контекста</b><span>один раз, далее точечно</span></div>
+  <div class="box g" style="left:310px;top:60px;width:650px;height:90px"><div class="m">/service-map</div><div class="s">карточки сервисов по их коду</div></div>
+  <div class="box a" style="left:995px;top:60px;width:705px;height:90px"><div class="p">services/</div><div class="m">manifest.yaml + ui.md, core.md …</div></div>
+  <div class="box g" style="left:310px;top:170px;width:650px;height:90px"><div class="m">/context-doc</div><div class="s">то, чего нет в коде: регламенты, договорённости, глоссарий</div></div>
+  <div class="box a" style="left:995px;top:170px;width:705px;height:90px"><div class="p">context/</div><div class="m">api-conventions.md, roles-glossary.md …</div></div>
+  <div class="lbl" style="left:1030px;top:270px">контекст читают все скиллы ниже</div>
+  <div id="inner">
+  <div class="sec" style="top:30px;height:910px"></div>
+  <div class="sec" style="top:960px;height:890px"></div>
+  <div class="sec" style="top:1870px;height:350px"></div>
+
+  <div class="role" style="top:60px"><b>Владелец продукта /</b><span>бизнес-аналитик</span></div>
+  <div class="role" style="top:990px"><b>Системный аналитик</b></div>
+  <div class="role" style="top:1900px;padding:34px 10px"><b>Разработчик</b></div>
+
+  <!-- section 1 -->
+  <div class="box g" style="left:310px;top:60px;width:1390px;height:90px"><div class="m">/analyst-workspace</div><div class="s">Шаг 1Б — что это за работа: новая возможность, дефект или мелкая правка</div></div>
+
+  <div class="lbl" style="left:320px;top:212px">новая возможность</div>
+  <div class="box g" style="left:310px;top:240px;width:650px;height:105px"><div class="m">business-requirements-doc</div><div class="s">интервью по гейтам, ключ задачи обязателен</div></div>
+  <div class="box a" style="left:995px;top:240px;width:705px;height:105px"><div class="p">docs/SMSEC-12345/</div><div class="m">business_requirements.md</div></div>
+
+  <div class="lbl" style="left:320px;top:347px">сломанное поведение прода</div>
+  <div class="box g" style="left:310px;top:375px;width:650px;height:105px"><div class="m">bug-report-doc</div><div class="s">шаги воспроизведения, ожидаемый результат</div></div>
+  <div class="box a" style="left:995px;top:375px;width:705px;height:105px"><div class="p">docs/SMSEC-12345/</div><div class="m">bug_report.md</div></div>
+
+  <div class="lbl" style="left:320px;top:482px">мелкая правка работающего</div>
+  <div class="box g" style="left:310px;top:510px;width:650px;height:105px"><div class="m">change-request-doc</div><div class="s">без нового поведения: текст, лимит, версия, поле</div></div>
+  <div class="box a" style="left:995px;top:510px;width:705px;height:105px"><div class="p">docs/SMSEC-12345/</div><div class="m">change_request.md</div></div>
+
+  <div class="box o" style="left:310px;top:690px;width:1390px;height:90px"><div class="t">Приёмка № 1 — скилл spec-review</div><div class="s">документ читает отдельный агент, который его не писал; возвращает список нарушений</div></div>
+  <div class="box r" style="left:310px;top:820px;width:1390px;height:95px"><div class="t">ГЕЙТ: документ принят?</div><div class="s" style="color:#1d2725">статус «Требуются уточнения» ИЛИ хотя бы одно нарушение приёмки — возврат на доработку</div></div>
+  <div class="lbl" style="left:1080px;top:922px">дефект и правка идут сразу сюда, без БТ</div>
+
+  <!-- section 2 -->
+  <div class="box g" style="left:310px;top:990px;width:650px;height:105px"><div class="m">technical-spec-doc</div><div class="s">спека вокруг стыков между сервисами и FE/BE</div></div>
+  <div class="box a" style="left:995px;top:990px;width:705px;height:105px"><div class="p">docs/SMSEC-12345/</div><div class="m">technical_specification.md</div></div>
+
+  <div class="box o" style="left:310px;top:1155px;width:1390px;height:90px"><div class="t">Приёмка № 4 — скилл spec-review</div><div class="s">один вызов на спеку</div></div>
+  <div class="box o d" style="left:310px;top:1290px;width:1390px;height:105px;background:#fbf3e6"><div class="t">/spec-readiness — достаточно ли спеки, чтобы писать код</div><div class="s">запускает аналитик вручную, перед передачей разработчику: три агента ищут нерешённое</div></div>
+
+  <div class="box g" style="left:310px;top:1485px;width:650px;height:115px"><div class="t" style="font-size:28px">СПЕКИ ДОСТАТОЧНО</div><div class="s">один исполнитель берёт задачу целиком — обычный случай</div></div>
+  <div class="box g d" style="left:1050px;top:1485px;width:650px;height:115px;background:#e9f1ed"><div class="m">stage-breakdown-doc</div><div class="s">необязательный шаг: если работу делят<br>между несколькими исполнителями</div></div>
+  <div class="box a d" style="left:1050px;top:1655px;width:650px;height:115px;background:#f8f2e8"><div class="p">docs/SMSEC-12345/stages/</div><div class="m">index.md + stage-01.md …</div><div class="s">и приёмка № 5 на всю папку</div></div>
+  <div class="lbl" style="left:660px;top:1705px">по спецификации</div>
+  <div class="lbl" style="left:880px;top:1808px">по своему этапу</div>
+
+  <!-- section 3 -->
+  <div class="box g" style="left:310px;top:1900px;width:650px;height:105px"><div class="t">пишет код</div><div class="s">по спеке — либо по своему stage-NN.md, если этапы нарезали</div></div>
+  <div class="box a" style="left:995px;top:1900px;width:705px;height:105px"><div class="t">инкремент кода</div></div>
+  <div class="box g" style="left:310px;top:2085px;width:650px;height:105px"><div class="t">merge в основную ветку</div></div>
+  <div class="box a" style="left:995px;top:2085px;width:705px;height:105px"><div class="t">основная кодовая база</div></div>
+
+  <svg width="1780" height="2240" fill="none" stroke="#3f4a47" stroke-width="3">
+    <defs>
+      <marker id="ah" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L12,6 L0,12 z" fill="#3f4a47" stroke="none"/></marker>
+      <marker id="ahg" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L12,6 L0,12 z" fill="#8b9793" stroke="none"/></marker>
+    </defs>
+    <!-- trunk from analyst-workspace to three branches -->
+    <path d="M1005,150 V180 H285 V562"/>
+    <path d="M285,292 H300" marker-end="url(#ah)"/>
+    <path d="M285,427 H300" marker-end="url(#ah)"/>
+    <path d="M285,562 H300" marker-end="url(#ah)"/>
+    <!-- skill -> artifact -->
+    <path d="M960,292 H985" marker-end="url(#ah)"/>
+    <path d="M960,427 H985" marker-end="url(#ah)"/>
+    <path d="M960,562 H985" marker-end="url(#ah)"/>
+    <!-- artifacts -> acceptance -->
+    <path d="M1700,292 H1735 V655 H1660 V680" marker-end="url(#ah)"/>
+    <path d="M1700,427 H1735"/><circle cx="1735" cy="427" r="5" fill="#3f4a47" stroke="none"/>
+    <path d="M1700,562 H1735"/><circle cx="1735" cy="562" r="5" fill="#3f4a47" stroke="none"/>
+    <path d="M1005,780 V810" marker-end="url(#ah)"/>
+    <!-- gate -> tech spec -->
+    <path d="M1005,915 V950 H640 V980" marker-end="url(#ah)"/>
+    <!-- section 2 -->
+    <path d="M960,1042 H985" marker-end="url(#ah)"/>
+    <path d="M1350,1095 V1145" marker-end="url(#ah)"/>
+    <path d="M1005,1245 V1280" marker-end="url(#ah)"/>
+    <path d="M1005,1395 V1435 H640 V1475" marker-end="url(#ah)"/>
+    <circle cx="1005" cy="1435" r="5" fill="#3f4a47" stroke="none"/>
+    <path d="M1005,1435 H1375 V1475" stroke="#8b9793" stroke-dasharray="10 8" marker-end="url(#ahg)"/>
+    <path d="M1375,1600 V1645" stroke="#8b9793" stroke-dasharray="10 8" marker-end="url(#ahg)"/>
+    <path d="M640,1600 V1890" marker-end="url(#ah)"/>
+    <path d="M1375,1770 V1830 H840 V1890" stroke="#8b9793" stroke-dasharray="10 8" marker-end="url(#ahg)"/>
+    <!-- section 3 -->
+    <path d="M960,1952 H985" marker-end="url(#ah)"/>
+    <path d="M1350,2005 V2045 H640 V2075" marker-end="url(#ah)"/>
+    <path d="M960,2137 H985" marker-end="url(#ah)"/>
+  </svg>
+  </div>
+  <svg width="1780" height="360" style="overflow:visible" fill="none" stroke="#3f4a47" stroke-width="3">
+    <defs><marker id="ah0" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L12,6 L0,12 z" fill="#3f4a47" stroke="none"/></marker></defs>
+    <path d="M960,105 H985" marker-end="url(#ah0)"/>
+    <path d="M960,215 H985" marker-end="url(#ah0)"/>
+    <path d="M1005,262 V352" marker-end="url(#ah0)"/>
+  </svg>
+</div>
+</body></html>
