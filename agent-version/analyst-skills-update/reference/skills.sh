@@ -4,7 +4,7 @@
 #   bash .gigacode/skills/analyst-skills-update/reference/skills.sh                 # → ./.gigacode/skills
 #   bash .gigacode/skills/analyst-skills-update/reference/skills.sh .claude/skills  # → другая папка
 #
-# Клонирует репозиторий со скиллами во временную папку и копирует из его .gigacode/ каждую папку,
+# Клонирует репозиторий со скиллами во временную папку и копирует из его skills/ каждую папку,
 # в которой есть SKILL.md, вместе с её reference/, в .gigacode/skills/ репозитория со спеками. Папки на «_» (стенд) и файлы верхнего уровня
 # не копирует. Повторный запуск обновляет установленные скиллы на месте, чужие папки не трогает.
 #
@@ -36,11 +36,14 @@ trap 'rm -rf "$SRC" "$SDD_SKILLS_SELF"' EXIT
 
 echo "скиллы: $REPO${REF:+ #$REF}"
 git clone -q --depth 1 ${REF:+--branch "$REF"} "$REPO" "$SRC"
-[ -d "$SRC/.gigacode" ] || { echo "в репозитории со скиллами нет папки .gigacode/"; exit 1; }
+# Скиллы лежат в skills/; .gigacode/ — прежняя раскладка того же репозитория, читаем и её.
+SKILLS="$SRC/skills"
+[ -d "$SKILLS" ] || SKILLS="$SRC/.gigacode"
+[ -d "$SKILLS" ] || { echo "в репозитории со скиллами нет папки skills/"; exit 1; }
 
 mkdir -p "$DEST"
 count=0
-for dir in "$SRC"/.gigacode/*/; do
+for dir in "$SKILLS"/*/; do
   name="$(basename "$dir")"
   case "$name" in _*) continue ;; esac
   [ -f "$dir/SKILL.md" ] || continue
@@ -50,5 +53,5 @@ for dir in "$SRC"/.gigacode/*/; do
   printf '  %-28s %s\n' "$name" "${version:-—}"
   count=$((count + 1))
 done
-[ "$count" -gt 0 ] || { echo "в .gigacode/ не нашлось ни одной папки со SKILL.md"; exit 1; }
+[ "$count" -gt 0 ] || { echo "в $(basename "$SKILLS")/ не нашлось ни одной папки со SKILL.md"; exit 1; }
 echo "установлено в $DEST: $count скиллов; точка входа — analyst-workspace"
