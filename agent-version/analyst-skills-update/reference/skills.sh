@@ -1,19 +1,29 @@
 #!/usr/bin/env bash
 # skills.sh — установить или обновить скиллы в репозитории со спеками одной командой.
 #
-#   bash tools/skills.sh                 # → ./.gigacode/skills
-#   bash tools/skills.sh .claude/skills  # → другая папка
+#   bash .gigacode/skills/analyst-skills-update/reference/skills.sh                 # → ./.gigacode/skills
+#   bash .gigacode/skills/analyst-skills-update/reference/skills.sh .claude/skills  # → другая папка
 #
 # Клонирует репозиторий со скиллами во временную папку и копирует из его .gigacode/ каждую папку,
 # в которой есть SKILL.md, вместе с её reference/, в .gigacode/skills/ репозитория со спеками. Папки на «_» (стенд) и файлы верхнего уровня
 # не копирует. Повторный запуск обновляет установленные скиллы на месте, чужие папки не трогает.
 #
+# Скрипт живёт внутри скилла analyst-skills-update и обновляется вместе с ним. Поскольку при этом
+# перезаписывается его собственная папка, он сначала копирует себя во временный файл и работает из него.
+#
 # Нужны только git и bash (на Windows — Git Bash). Запускать через `bash …`, а не `./…`: в
 # корпоративных образах запуск файлов из домашней папки бывает запрещён, а bash читает скрипт как текст.
 #
-# Скопируйте этот файл в свой репозиторий со спеками (например, AI-SDD/tools/skills.sh). Адрес
-# репозитория со скиллами задан ниже один раз; переопределяется переменными окружения.
+# Адрес репозитория со скиллами задан ниже один раз; переопределяется переменными окружения.
 set -euo pipefail
+
+# Работаем из временной копии: оригинал лежит в папке, которую ниже удалим и перепишем.
+if [ -z "${SDD_SKILLS_SELF:-}" ]; then
+  SELF="$(mktemp "${TMPDIR:-/tmp}/sdd-skills-self.XXXXXX")"
+  cp "$0" "$SELF"
+  SDD_SKILLS_SELF="$SELF" exec bash "$SELF" "$@"
+fi
+trap 'rm -f "$SDD_SKILLS_SELF"' EXIT
 
 REPO="${SDD_SKILLS_REPO:-https://onework.sigma.sbrf.ru.sc/ai-security-department/AI-SDD-SKILLS.git}"
 REF="${SDD_SKILLS_REF:-}"            # ветка или тег; пусто — ветка по умолчанию
@@ -22,7 +32,7 @@ DEST="${1:-.gigacode/skills}"
 command -v git >/dev/null || { echo "нужен git"; exit 1; }
 
 SRC="$(mktemp -d "${TMPDIR:-/tmp}/sdd-skills.XXXXXX")"
-trap 'rm -rf "$SRC"' EXIT
+trap 'rm -rf "$SRC" "$SDD_SKILLS_SELF"' EXIT
 
 echo "скиллы: $REPO${REF:+ #$REF}"
 git clone -q --depth 1 ${REF:+--branch "$REF"} "$REPO" "$SRC"
