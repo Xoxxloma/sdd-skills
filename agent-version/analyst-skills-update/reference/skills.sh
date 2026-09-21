@@ -25,7 +25,7 @@ if [ -z "${SDD_SKILLS_SELF:-}" ]; then
 fi
 trap 'rm -f "$SDD_SKILLS_SELF"' EXIT
 
-REPO="${SDD_SKILLS_REPO:-https://onework.sigma.sbrf.ru.sc/ai-security-department/AI-SDD-SKILLS.git}"
+REPO="${SDD_SKILLS_REPO:-https://api.sc-ci.sber.ru/ai-security-deparment/AI-SDD-SKILLS.git}"
 REF="${SDD_SKILLS_REF:-}"            # ветка или тег; пусто — ветка по умолчанию
 DEST="${1:-.gigacode/skills}"
 
@@ -36,7 +36,6 @@ trap 'rm -rf "$SRC" "$SDD_SKILLS_SELF"' EXIT
 
 echo "скиллы: $REPO${REF:+ #$REF}"
 git clone -q --depth 1 ${REF:+--branch "$REF"} "$REPO" "$SRC"
-# Скиллы лежат в skills/; .gigacode/ — прежняя раскладка того же репозитория, читаем и её.
 SKILLS="$SRC/skills"
 [ -d "$SKILLS" ] || SKILLS="$SRC/.gigacode"
 [ -d "$SKILLS" ] || { echo "в репозитории со скиллами нет папки skills/"; exit 1; }
