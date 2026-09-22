@@ -2,8 +2,12 @@
 // grade-rt.mjs — пробы rt-bug / rt-feature / rt-menu / rt-nokey: МАРШРУТ проводника,
 // под-скиллы заглушены.
 //
-//   node grade-rt.mjs <каталог с песочницами> --probe=bug|feature|menu|nokey|noreview|nosplit
+//   node grade-rt.mjs <каталог с песочницами> --probe=bug|feature|menu|nokey|noreview|nosplit|gate
 //   node grade-rt.mjs --selftest
+//
+// ПЛЕЧО `gate` (2026-09-22, `analyst-workspace` 1.2.0): гейт Шага 2Б задаёт вопрос «идём дальше?»
+// всегда. Меряется ПО ХОДАМ (`stream*.jsonl` + `answer-NN.md`): спека обязана запуститься ходом,
+// следующим за вопросом. На остальных плечах те же счётчики печатаются справкой.
 //
 // ПОРЯДОК НА ВХОДЕ (плечи `menu` и `nokey`, заведены 2026-08-18). До правки маршрут спрашивал
 // ключ задачи ДВАЖДЫ: `analyst-workspace` своим ходом между меню «БТ или баг» и запуском
@@ -26,7 +30,7 @@
 // ПРАВИЛА: регулярки литеральные; `\b`/`\w` рядом с кириллицей НЕ применять; побег — «не
 // измерено»; счётчик на каждый дефект.
 
-import { readdirSync, readFileSync, existsSync, writeFileSync } from 'node:fs'
+import { readdirSync, readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -67,6 +71,61 @@ const RE_STEP1_NEIGHBOURS = /Продолжить начатое|обновит�
 const RE_READINESS = /spec-readiness/i
 const RE_STEP6 = /На сегодня закончить|Начать другую задачу/i
 const RE_ASKS_SPLIT = /Разбить спек[уи][^.\n]{0,30}на этапы/i
+
+/**
+ * ГЕЙТ ШАГА 2Б (правка 1.2.0, 2026-09-22): вопрос «документ принят — идём дальше?» задаётся ВСЕГДА,
+ * и это единственная остановка между документом сверху и `technical-spec-doc`. Меряется не по
+ * склейке, а ПО ХОДАМ: спека обязана запуститься ходом, СЛЕДУЮЩИМ за тем, в котором задан вопрос.
+ * Склейка `answer.md` порядок не хранит — по ней «вопрос задан» и «спека запущена в том же ходу»
+ * неразличимы, а второе и есть дефект.
+ *
+ * Анкер — обе формы из текста скилла: вопрос («идём дальше?») и подпись варианта («Идти дальше —»).
+ * `\b` рядом с кириллицей не применяется.
+ */
+const RE_GATE = /ид[её]м дальше|идти дальше/i
+
+/**
+ * Ход, в котором запущена спека, по потоку `stream*.jsonl` этого хода. Запуск опознаётся по любому
+ * из следов: вызов `Skill` с именем, чтение `SKILL.md` заглушки, запись её строки в `_trace.log`
+ * (`Bash`/`Write`/`Edit`). Один след достаточен: нужен ХОД, а не способ.
+ */
+export function turnLaunchesSpec (streamText) {
+  for (const line of streamText.split(/\r?\n/)) {
+    if (!line.includes('technical-spec-doc')) continue
+    let j; try { j = JSON.parse(line) } catch { continue }
+    const c = j.message?.content
+    if (!Array.isArray(c)) continue
+    for (const b of c) {
+      if (b.type !== 'tool_use') continue
+      const i = b.input ?? {}
+      if (b.name === 'Skill' && /technical-spec-doc/.test(i.skill ?? '')) return true
+      if (b.name === 'Read' && /technical-spec-doc[\\/]SKILL\.md/.test(i.file_path ?? '')) return true
+      if (b.name === 'Bash' && /technical-spec-doc/.test(i.command ?? '') && /_trace/.test(i.command ?? '')) return true
+      if ((b.name === 'Write' || b.name === 'Edit') && /_trace\.log/.test(i.file_path ?? '') &&
+        /technical-spec-doc/.test((i.content ?? '') + (i.new_string ?? ''))) return true
+    }
+  }
+  return false
+}
+
+/** Номер хода (с 1), в котором запущена спека; 0 — не запущена. Ход 1 — `stream.jsonl`, дальше `stream-NN.jsonl`. */
+export function specTurn (dir) {
+  const streamOf = (k) => join(dir, k === 1 ? 'stream.jsonl' : `stream-${String(k).padStart(2, '0')}.jsonl`)
+  for (let k = 1; k <= 16; k++) {
+    const p = streamOf(k)
+    if (!existsSync(p)) { if (k === 1) continue; break }
+    if (turnLaunchesSpec(readFileSync(p, 'utf8'))) return k
+  }
+  return 0
+}
+
+/** Текст ответа хода k: `answer-NN.md` у многоходового прогона, `answer.md` — у одноходового. */
+export function answerOfTurn (dir, k) {
+  const p = join(dir, `answer-${String(k).padStart(2, '0')}.md`)
+  if (existsSync(p)) return readFileSync(p, 'utf8')
+  if (k === 1 && existsSync(join(dir, 'answer.md'))) return readFileSync(join(dir, 'answer.md'), 'utf8')
+  return ''
+}
 
 /**
  * Просьба, ПЕРЕАДРЕСОВАННАЯ под-скиллу, просьбой проводника не является: «ключ спросит
@@ -167,6 +226,8 @@ STATIONS.noreview = [
 // У пробы отказа от нарезки лестница кончается на принятой спеке: с правки 2026-09-17 этапы —
 // необязательный шаг, и при ответе «нет» их отсутствие — верное поведение, а не обрыв.
 STATIONS.nosplit = STATIONS.bug.slice(0, 4)
+// У пробы гейта БТ лежит на диске готовым — станции «БТ написано» нет, лестница начинается с приёмки.
+STATIONS.gate = STATIONS.feature.slice(1)
 // `menu` лестницы не имеет: там верный исход — остановка ДО первого вызова, и любая станция
 // на этом плече означает дефект, а не прогресс.
 
@@ -239,6 +300,12 @@ export function gradeRun (dir, probe) {
   r.mentionsReadiness = RE_READINESS.test(ans)
   r.asksSplit = RE_ASKS_SPLIT.test(ans)
   r.reachedFinal = RE_STEP6.test(ans)
+  // Гейт 2Б по ходам: в каком ходу запущена спека и задан ли вопрос гейта ходом раньше.
+  r.specTurn = specTurn(dir)
+  r.gateAsked = RE_GATE.test(ans)
+  r.specInTurn1 = r.specTurn === 1
+  r.gateStop = r.specTurn > 1 && RE_GATE.test(answerOfTurn(dir, r.specTurn - 1))
+  r.sourceIsBT = /business_requirements\.md/.test(r.specSource)
 
   if (probe === 'bug' || probe === 'nokey') {
     r.wrongFirst = r.first !== null && r.first !== 'bug-report-doc'
@@ -267,6 +334,14 @@ export function gradeRun (dir, probe) {
   } else if (probe === 'feature') {
     r.wrongFirst = r.first !== null && r.first !== 'business-requirements-doc'
     r.pass = r.first === 'business-requirements-doc' && !r.calledBugReport
+  } else if (probe === 'gate') {
+    // Готовый БТ на диске. Зачёт — конъюнкция: приёмка БТ была, БТ не переписан, разреза нет, спека
+    // запущена на БТ обычным флагом И ОСТАНОВКА: вопрос гейта задан ходом раньше запуска спеки.
+    // Без последней половины прогон, уехавший в спеку первым ходом, выглядел бы образцовым — это
+    // ровно дефект, ради которого проба заведена.
+    r.wrongFirst = r.first !== null && r.first !== 'spec-review'
+    r.pass = r.calledReview && !r.calledBT && !r.calledBugReport && !r.decomposition &&
+      r.calledSpec && r.sourceIsBT && !r.flagBugfix && r.gateStop
   } else {
     // `menu`: верный исход — ход ОСТАНОВЛЕН вопросом. Ни один под-скилл не вызван, ключ не
     // спрошен, показаны обе половины кнопки Шага 1Б — и это именно 1Б, а не переспрошенный Шаг 1.
@@ -410,6 +485,30 @@ stage-breakdown-doc`
   ck('вопрос про этапы у эпика опознан', RE_ASKS_SPLIT.test('Разбить спеки эпика на этапы?'), true)
   ck('развилка Шага 6 опознана', RE_STEP6.test('Что дальше? Начать другую задачу / Доработать спеку / На сегодня закончить'), true)
   ck('вопрос хвоста — НЕ развилка Шага 6', RE_STEP6.test('Разбить спеку на этапы? Да, разбить на этапы / Нет, спеки достаточно'), false)
+
+  // Гейт 2Б: анкер ловит обе формы из текста скилла и не ловит хендофф заглушки.
+  ck('вопрос гейта опознан', RE_GATE.test('БТ SMSEC-77 принят — идём дальше?'), true)
+  ck('подпись варианта опознана', RE_GATE.test('1. Идти дальше — писать тех-спеку по SMSEC-77'), true)
+  ck('хендофф заглушки — НЕ гейт', RE_GATE.test('БТ записан: docs/SMSEC-77/business_requirements.md\nСтатус готовности: Готово к оценке'), false)
+  // Ход запуска спеки — по потоку, любой из следов.
+  const ev = (name, input) => JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name, input }] } })
+  ck('запуск через Skill', turnLaunchesSpec(ev('Skill', { skill: 'technical-spec-doc', args: 'docs/SMSEC-77/business_requirements.md' })), true)
+  ck('запуск через чтение заглушки', turnLaunchesSpec(ev('Read', { file_path: 'C:/sb/.claude/skills/technical-spec-doc/SKILL.md' })), true)
+  ck('запуск через запись трассы', turnLaunchesSpec(ev('Bash', { command: 'echo "technical-spec-doc источник=docs/SMSEC-77/business_requirements.md флаг=обычный" >> _trace.log' })), true)
+  ck('приёмка — НЕ запуск спеки', turnLaunchesSpec(ev('Skill', { skill: 'spec-review', args: 'docs/SMSEC-77/technical_specification.md' })), false)
+  ck('чтение готовой спеки — НЕ запуск', turnLaunchesSpec(ev('Read', { file_path: 'docs/SMSEC-77/technical_specification.md' })), false)
+  // Ход и ответ на диске: остановка = спека в ходе 2, вопрос гейта в ответе хода 1.
+  const sb = join(tmpdir(), 'rt-gate-selftest')
+  mkdirSync(sb, { recursive: true })
+  writeFileSync(join(sb, 'stream.jsonl'), ev('Skill', { skill: 'spec-review', args: 'docs/SMSEC-77/business_requirements.md' }))
+  writeFileSync(join(sb, 'stream-02.jsonl'), ev('Skill', { skill: 'technical-spec-doc', args: 'docs/SMSEC-77/business_requirements.md' }))
+  writeFileSync(join(sb, 'answer-01.md'), 'приёмка: нарушений нет. БТ SMSEC-77 принят — идём дальше?\n1. Идти дальше — писать тех-спеку\n2. Пока остановиться')
+  writeFileSync(join(sb, 'answer-02.md'), 'Спека записана.')
+  ck('спека запущена в ходе 2', specTurn(sb), 2)
+  ck('ответ хода 1 содержит гейт', RE_GATE.test(answerOfTurn(sb, 1)), true)
+  // Спека в ходе 1 — остановки нет, даже если вопрос где-то произнесён.
+  writeFileSync(join(sb, 'stream.jsonl'), ev('Skill', { skill: 'technical-spec-doc', args: 'docs/SMSEC-77/business_requirements.md' }))
+  ck('спека в ходе 1 опознана', specTurn(sb), 1)
   console.log(bad === 0 ? '\nсамопроверка: ok' : `\nсамопроверка: ПРОВАЛОВ ${bad}`)
   return bad === 0
 }
@@ -419,8 +518,8 @@ if (argv.includes('--selftest')) process.exit(selftest() ? 0 : 1)
 const root = argv.find((x) => !x.startsWith('--'))
 const pa = argv.find((x) => x.startsWith('--probe='))
 const PROBE = pa ? pa.slice('--probe='.length) : ''
-if (!root || !['bug', 'feature', 'menu', 'nokey', 'noreview', 'nosplit'].includes(PROBE)) {
-  console.error('usage: node grade-rt.mjs <каталог> --probe=bug|feature|menu|nokey|noreview|nosplit'); process.exit(1)
+if (!root || !['bug', 'feature', 'menu', 'nokey', 'noreview', 'nosplit', 'gate'].includes(PROBE)) {
+  console.error('usage: node grade-rt.mjs <каталог> --probe=bug|feature|menu|nokey|noreview|nosplit|gate'); process.exit(1)
 }
 
 const all = readdirSync(root, { withFileTypes: true })
@@ -494,6 +593,18 @@ if (PROBE === 'bug' || PROBE === 'nokey') {
   console.log(`  ${pct(c((r) => r.calledSpec && !r.sourceIsReport))}\tспеке передан не репорт`)
   console.log(`  ${pct(c((r) => !r.calledReview))}\tприёмка не запущена ни разу`)
   console.log(`  ${pct(c((r) => !r.calledStages))}\tэтапы не запущены`)
+} else if (PROBE === 'gate') {
+  console.log(`  ${pct(c((r) => r.specInTurn1))}\tСПЕКА ЗАПУЩЕНА В ХОДЕ 1 — остановки нет, гейт не отработал  ← КРИТЕРИЙ`)
+  console.log(`  ${pct(c((r) => !r.gateAsked))}\tвопрос гейта не задан ни в одном ходе  ← КРИТЕРИЙ`)
+  console.log(`  ${pct(c((r) => r.calledSpec && !r.specInTurn1 && !r.gateStop))}\tспека запущена не следом за вопросом гейта`)
+  console.log(`  ${pct(c((r) => r.calledBT))}\tБТ ПЕРЕПИСАН — вызван business-requirements-doc на готовом документе  ← КРИТЕРИЙ`)
+  console.log(`  ${pct(c((r) => r.decomposition))}\tзашёл в разрез на одной фиче`)
+  console.log(`  ${pct(c((r) => !r.calledReview))}\tприёмка БТ не запущена`)
+  console.log(`  ${pct(c((r) => r.wrongFirst))}\tпервым вызван не spec-review`)
+  console.log(`  ${pct(c((r) => r.calledSpec && !r.sourceIsBT))}\tспеке передан не БТ`)
+  console.log(`  ${pct(c((r) => r.calledSpec && r.flagBugfix))}\tспека запущена с флагом багфикса на БТ`)
+  console.log(`  ${pct(c((r) => !r.calledSpec))}\tмаршрут не дошёл до спеки`)
+  console.log(`  ход запуска спеки по прогонам: ${ok.map((r) => r.specTurn || '—').join(' ')}  (норма — ≥2)`)
 } else if (PROBE === 'nosplit') {
   console.log(`  ${pct(c((r) => r.calledStages))}\tНАРЕЗАЛ ЭТАПЫ вопреки отказу аналитика  ← КРИТЕРИЙ`)
   console.log(`  ${pct(c((r) => r.stagesDir))}\tпапка stages/ заведена`)
@@ -513,6 +624,12 @@ if (PROBE === 'bug' || PROBE === 'nokey') {
 if (PROBE !== 'nosplit') {
   console.log(`  ${pct(c((r) => r.mentionsReadiness))}\tстанция названа — строка про /spec-readiness (справка)`)
   console.log(`  ${pct(c((r) => r.asksSplit))}\tвопрос «разбить на этапы?» задан (справка)`)
+}
+// Гейт 2Б на плечах полного маршрута — справка, в зелёное не входит (критерий плеч задним числом не
+// меняется); по этим числам видно «до/после» правки 1.2.0 на `rt-bug`/`rt-feature`.
+if (PROBE !== 'gate') {
+  console.log(`  ${pct(c((r) => r.gateAsked))}\tвопрос гейта 2Б «идём дальше?» задан (справка)`)
+  console.log(`  ${pct(c((r) => r.calledSpec && r.gateStop))}\tспека запущена следом за вопросом гейта (справка)`)
 }
 // ─── Лестница маршрута ──────────────────────────────────────────────────────────────────────
 // Печатается ПЕРЕД «зелёными» намеренно: зелёное — редкое событие, а лестница отвечает на

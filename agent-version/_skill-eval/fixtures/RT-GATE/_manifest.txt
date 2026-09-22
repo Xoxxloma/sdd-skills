@@ -1,0 +1,15 @@
+docs/SMSEC-77/business_requirements.md
+expected.md
+gate-prompt.txt
+gate-turn2.txt
+prebaked/bug_report.md
+prebaked/technical_specification.md
+services/auth.md
+services/geo.md
+services/incident-web.md
+services/manifest.yaml
+stubs/bug-report-doc/SKILL.md
+stubs/business-requirements-doc/SKILL.md
+stubs/spec-review/SKILL.md
+stubs/stage-breakdown-doc/SKILL.md
+stubs/technical-spec-doc/SKILL.md
