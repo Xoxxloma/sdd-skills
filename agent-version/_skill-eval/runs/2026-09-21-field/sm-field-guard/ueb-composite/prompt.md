@@ -1,0 +1,263 @@
+Ты — ведущий агент скилла `service-map` на Шаге 4. Черновик карточки прошёл проверки, и перед продвижением ты считаешь гард на утоньшение. Ниже — правило гарда из твоего скилла, дословно, и перечни ключей, которые дали грепы.
+
+### Гард (Шаг 4)
+
+**Гард на утоньшение — маршрутизатор записи, а не разрешение на неё.** Он отвечает не «писать или
+нет», а «куда писать», и отвечает формулой: у тебя нет места, где ты решаешь.
+
+**Зачем он вообще.** Все проверки выше сверяют субагента с его же описью. Не дочитал модуль —
+модуля нет ни в карточке, ни в описи, и числа сходятся идеально. Единственная независимая точка
+отсчёта — **прежняя карточка на диске**; гард сравнивает с ней. Прежней карточки нет — гарда нет,
+и от недочитанного модуля на первом скане защищает только маркерный гейт.
+
+**Считается по ключам, по классам, по таблице — не на глаз.** Ключ — заголовок блока `###` или
+названная колонка таблицы:
+
+| Класс | Где ключ |
+|---|---|
+| контракт | `###` в «Публичный контракт» / «Публичный API» |
+| сущности | `###` в «Владеет данными» |
+| задачи | `###` в «Фоновые задачи» |
+| топики | `###` в «События» (направление плюс топик) |
+| экраны | первая колонка «Экраны» |
+| потребляемые API | первая и вторая колонки «Потребляемые API» (сервис плюс вызов) |
+| роли | первая колонка «Роли и доступ» |
+| зависит от | первая колонка «Зависит от» |
+
+**Не считаются вовсе:** «Бизнес-правила» (их заголовки меняются при приведении формы к шаблону —
+это переформатирование, и оно у тебя уже гейтится против описи), «Что умеет для пользователя»
+(строки, не ключи), «Кто меня потребляет» (пуста по конструкции до Шага 5). Ключ нормализуй:
+без бэктиков, пробелы схлопнуты, регистр HTTP-глагола приведён к верхнему.
+
+По каждому классу `c` возьми множества ключей прежней карточки и черновика и посчитай **было_c,
+исчезло_c, появилось_c**. Дополнительно по каждому классу с блоками: **опустело_c** — ключ цел, тело
+блока было непустым, стало пустым (по счёту строк `- ` под заголовком).
+
+**Правило маршрута — одно на все классы:**
+
+```
+В КАРМАН, если хоть у одного класса c:
+    (исчезло_c ≥ 3  и  3·исчезло_c > было_c)
+ или (опустело_c ≥ 3  и  3·опустело_c > было_c)
+Иначе — ПОВЕРХ.
+```
+
+Три ключа из четырёх — карман; два из восьмидесяти девяти — поверх; тридцать три из сорока восьми
+— карман; один из двух — поверх, с именем в отчёте. Слов «законно», «форма», «урезали», «не
+дочитал» в правиле нет — и в твоём рассуждении их быть не должно: ты не отличишь одно от другого,
+потому что кода не видел, а решение, принятое вслепую, останавливало годные карточки и всё равно
+обходилось рассуждением.
+
+- **ПОВЕРХ** → продвижение в `services/<name>.md`. Исчезнувшие и опустевшие ключи — **именами в
+  отчёт** (Шаг 6), сколько бы их ни было. Названная именами потеря молчаливой не является.
+- **В КАРМАН** → продвижение в **`services/_pending/<name>.md`**. Прежняя карточка остаётся
+  **байт-в-байт, включая `scanned`**: прочтения, которому можно верить, не состоялось. В отчёт —
+  строка `ГАРД` с числами и именами и вопрос человеку: урезали сервис или скан не дочитал?
+  Принять кандидата — переместить файл поверх; отклонить — удалить. **Ты сам ни того, ни другого
+  не делаешь** и в `_pending/` ничего не правишь: это его решение, и он принимает его тогда, когда
+  читает отчёт, а не посреди прогона.
+
+Работа субагента не теряется ни при каком исходе — и поэтому нет мотива обходить гард.
+
+**Появилось ≈ исчезло по одному классу** (например, весь контракт сменил префикс) — это
+переименование, а не потеря; правило всё равно отправит в карман, и строка отчёта обязана это
+назвать: «появилось 96, исчезло 96 — похоже на переименование».
+
+**И восстанавливать из прежней карточки ничего не смей.** Прежнюю карточку ты не склеиваешь с
+черновиком и строк из неё не переносишь. Правило прежней формулировки на Шаге 3 — не то же самое:
+там прежний текст читает субагент, у которого есть код. Здесь у тебя кода нет, и любая перенесённая
+тобой строка — утверждение о сервисе, которого ты не видел.
+
+
+---
+
+Сервис `svc`, тип `backend`. Прежняя карточка есть. Ниже — ключи по классам, как их дали грепы
+`^### ` и `^\| ` по прежней карточке и по черновику. Ключи уже нормализованы.
+
+## ПРЕЖНЯЯ КАРТОЧКА
+контракт (38):
+  POST /api/v1/ueb/attributes/selected
+  GET /api/v1/ueb/attributes/selected
+  GET /api/v1/ueb/report/attributes
+  GET /api/v1/ueb/report/attributes/{employee}
+  POST /api/v1/ueb/report/attributes
+  PUT /api/v1/ueb/report/attributes/{attrId}
+  DELETE /api/v1/ueb/report/attributes/{attrId}
+  POST /api/v1/ueb/form/check
+  GET /api/v1/ueb/form/{id}
+  POST /api/v1/ueb/form
+  DELETE /api/v1/ueb/form/{frmId}
+  GET /api/v1/ueb/form
+  GET /api/v1/ueb/form/owner
+  POST /api/v1/ueb/form/owner
+  GET /api/v1/ueb/report
+  GET /api/v1/ueb/report/{employee}
+  POST /api/v1/ueb/report/{employee}
+  POST /api/v1/ueb/report
+  POST /api/v1/ueb/report/status
+  GET /api/v1/ueb/report/departments
+  GET /api/v1/ueb/report/consolidate/bydays
+  POST /api/v1/ueb/report/consolidate
+  POST /api/v1/ueb/report/consolidate/xlsx
+  GET /api/v1/ueb/report/availableDepartments
+  GET /api/v1/ueb/approval/requests
+  PATCH /api/v1/ueb/approval/{approveId}
+  POST /api/v1/ueb/approval/period
+  GET /api/v1/ueb/approval/period
+  POST /api/v1/ueb/approval/assignment
+  GET /api/v1/ueb/approval/assignment/{requestId}
+  PATCH /api/v1/ueb/approval/assignment/{requestId}
+  POST /api/v1/ueb/upload/cascade
+  GET /api/v1/ueb/upload/file-info
+  GET /api/v1/ueb/user
+  GET /api/v1/ueb/user/owners
+  GET /actuator/**
+  GET /ueb/swagger-ui.html
+  GET /ueb/v3/api-docs
+
+сущности (15):
+  Attribute
+  Analyst
+  Form
+  Report
+  ReportValue
+  PeriodApproveRequest
+  AssignmentApproveRequest
+  CascadeData
+  UploadFileInfo
+  EmployeeDepartmentMapping
+  Department
+  Bank
+  Gosb
+  adjutant_data_view
+  femida_data_view
+
+топики (1):
+  публикует auditTopic
+
+задачи (3):
+  OldReportsApproveRequestCreator
+  FemidaScheduleService
+  AdjutantScheduleService
+
+бизнес-правила (0):
+
+роли (8):
+  EFS_SVODKA_UEB_ANALYST
+  EFS_SECURITYTEAM_SV_UEB_ANALYST
+  EFS_SVODKA_UEB_EMPLOYEE
+  EFS_SECURITYTEAM_SV_UEB_EMPLOYEE
+  EFS_SVODKA_UEB_MANAGER
+  EFS_SECURITYTEAM_SV_UEB_MANAGER
+  EFS_SVODKA_UEB_ADMIN
+  EFS_SECURITYTEAM_SV_UEB_ADMIN
+
+зависит от (4):
+  summary-ms-consolidate
+  summary-ms-audit
+  Профиль сотрудника
+  SMTP
+
+кто меня потребляет (6):
+  `summary-ui-web` · GET /api/v1/ueb/report
+  `summary-ui-web` · POST /api/v1/ueb/report
+  `summary-ui-web` · GET /api/v1/ueb/form
+  `summary-ui-web` · GET /api/v1/ueb/approval/requests
+  `summary-ui-web` · POST /api/v1/ueb/upload/cascade
+  `summary-ms-import` · — · выгрузка Каскад
+
+## ЧЕРНОВИК
+контракт (38):
+  POST /api/v1/ueb/attributes/selected
+  GET /api/v1/ueb/attributes/selected
+  GET /api/v1/ueb/report/attributes
+  GET /api/v1/ueb/report/attributes/{employee}
+  POST /api/v1/ueb/report/attributes
+  PUT /api/v1/ueb/report/attributes/{attrId}
+  DELETE /api/v1/ueb/report/attributes/{attrId}
+  POST /api/v1/ueb/form/check
+  GET /api/v1/ueb/form/{id}
+  POST /api/v1/ueb/form
+  DELETE /api/v1/ueb/form/{frmId}
+  GET /api/v1/ueb/form
+  GET /api/v1/ueb/form/owner
+  POST /api/v1/ueb/form/owner
+  GET /api/v1/ueb/report
+  GET /api/v1/ueb/report/{employee}
+  POST /api/v1/ueb/report/{employee}
+  POST /api/v1/ueb/report
+  POST /api/v1/ueb/report/status
+  GET /api/v1/ueb/report/departments
+  GET /api/v1/ueb/report/consolidate/bydays
+  POST /api/v1/ueb/report/consolidate
+  POST /api/v1/ueb/report/consolidate/xlsx
+  GET /api/v1/ueb/report/availableDepartments
+  GET /api/v1/ueb/approval/requests
+  PATCH /api/v1/ueb/approval/{approveId}
+  POST /api/v1/ueb/approval/period
+  GET /api/v1/ueb/approval/period
+  POST /api/v1/ueb/approval/assignment
+  GET /api/v1/ueb/approval/assignment/{requestId}
+  PATCH /api/v1/ueb/approval/assignment/{requestId}
+  POST /api/v1/ueb/upload/cascade
+  GET /api/v1/ueb/upload/file-info
+  GET /api/v1/ueb/user
+  GET /api/v1/ueb/user/owners
+  GET /actuator/**
+  GET /ueb/swagger-ui.html
+  GET /ueb/v3/api-docs
+
+сущности (12):
+  Attribute
+  Analyst
+  Form
+  Report
+  ReportValue
+  PeriodApproveRequest
+  AssignmentApproveRequest
+  CascadeData
+  UploadFileInfo
+  EmployeeDepartmentMapping
+  adjutant_data_view
+  femida_data_view
+
+топики (1):
+  публикует auditTopic
+
+задачи (3):
+  OldReportsApproveRequestCreator
+  FemidaScheduleService
+  AdjutantScheduleService
+
+бизнес-правила (11):
+  Report — отчёт сотрудника за день
+  PeriodApproveRequest — запрос на открытие прошлого периода
+  AssignmentApproveRequest — запрос на переназначение владельца форм
+  UploadFileInfo — журнал загрузок CSV-файлов Каскад
+  сообщение «согласование отчёта АС Сводка»
+  сообщение «запрос на открытие периода»
+  сообщение «событие аудита»
+  ограничение «редактирование отчёта вне текущей недели»
+  ограничение «повторный запрос на открытие периода»
+  ограничение «даты отчёта вне одной недели»
+  ограничение «загрузка файла, не являющегося выгрузкой Каскад»
+
+роли (8):
+  EFS_SVODKA_UEB_ANALYST
+  EFS_SECURITYTEAM_SV_UEB_ANALYST
+  EFS_SVODKA_UEB_EMPLOYEE
+  EFS_SECURITYTEAM_SV_UEB_EMPLOYEE
+  EFS_SVODKA_UEB_MANAGER
+  EFS_SECURITYTEAM_SV_UEB_MANAGER
+  EFS_SVODKA_UEB_ADMIN
+  EFS_SECURITYTEAM_SV_UEB_ADMIN
+
+зависит от (4):
+  summary-ms-consolidate
+  summary-ms-audit
+  Профиль сотрудника
+  SMTP
+
+кто меня потребляет (0):
+
+Посчитай гард по правилу выше: по каждому классу назови было / исчезло / появилось и сработал ли порог. Последней строкой ответа — ровно одно из двух: `ГАРД: ПОВЕРХ` либо `ГАРД: В КАРМАН`.

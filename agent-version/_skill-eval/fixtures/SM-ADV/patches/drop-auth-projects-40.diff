@@ -1,0 +1,37 @@
+diff -ruN a/repairy-api/src/auth/auth.module.ts b/repairy-api/src/auth/auth.module.ts
+--- a/repairy-api/src/auth/auth.module.ts	2026-09-21 21:12:31.357115200 +0300
++++ b/repairy-api/src/auth/auth.module.ts	2026-09-21 21:12:31.374929000 +0300
+@@ -2,7 +2,6 @@
+ import { JwtModule } from '@nestjs/jwt'
+ import { PassportModule } from '@nestjs/passport'
+ import { FilesModule } from '../files/files.module'
+-import { AuthController } from './auth.controller'
+ import { AuthService } from './auth.service'
+ import { JwtStrategy } from './strategies/jwt.strategy'
+ 
+@@ -13,6 +12,6 @@
+     FilesModule,
+   ],
+   providers: [AuthService, JwtStrategy],
+-  controllers: [AuthController],
++  controllers: [],
+ })
+ export class AuthModule {}
+diff -ruN a/repairy-api/src/projects/projects.module.ts b/repairy-api/src/projects/projects.module.ts
+--- a/repairy-api/src/projects/projects.module.ts	2026-09-21 21:12:31.394362300 +0300
++++ b/repairy-api/src/projects/projects.module.ts	2026-09-21 21:12:31.412909400 +0300
+@@ -2,13 +2,12 @@
+ import { AiModule } from '../ai/ai.module'
+ import { FilesModule } from '../files/files.module'
+ import { EstimatePdfService } from './estimate-pdf.service'
+-import { ProjectsController } from './projects.controller'
+ import { ProjectsService } from './projects.service'
+ import { PublicController } from './public.controller'
+ 
+ @Module({
+   imports: [AiModule, FilesModule],
+   providers: [ProjectsService, EstimatePdfService],
+-  controllers: [ProjectsController, PublicController],
++  controllers: [PublicController],
+ })
+ export class ProjectsModule {}

@@ -1,0 +1,43 @@
+diff -ruN a/repairy-api/src/common/pipes/kaskad-format.pipe.ts b/repairy-api/src/common/pipes/kaskad-format.pipe.ts
+--- a/repairy-api/src/common/pipes/kaskad-format.pipe.ts	1970-01-01 03:00:00.000000000 +0300
++++ b/repairy-api/src/common/pipes/kaskad-format.pipe.ts	2026-09-21 21:12:31.472582000 +0300
+@@ -0,0 +1,17 @@
++import { BadRequestException, PipeTransform } from '@nestjs/common'
++
++// Смета принимается только в формате выгрузки АС Каскад: первая строка — фиксированный заголовок.
++// Это проверка формата входа, а не режим сервиса: включить или выключить её никто не может.
++const KASKAD_HEADER = 'Смета;Раздел;Работа;Ед.;Кол-во;Цена'
++
++export class KaskadFormatPipe implements PipeTransform<string, string> {
++  transform(value: string): string {
++    const firstLine = value.split(/\r?\n/, 1)[0]?.trim() ?? ''
++    if (firstLine !== KASKAD_HEADER) {
++      throw new BadRequestException(
++        `Файл не является выгрузкой АС Каскад: ожидается заголовок «${KASKAD_HEADER}»`,
++      )
++    }
++    return value
++  }
++}
+diff -ruN a/repairy-api/src/projects/projects.controller.ts b/repairy-api/src/projects/projects.controller.ts
+--- a/repairy-api/src/projects/projects.controller.ts	2026-09-21 21:12:31.432286200 +0300
++++ b/repairy-api/src/projects/projects.controller.ts	2026-09-21 21:12:31.451912900 +0300
+@@ -38,6 +38,7 @@
+ import { RolesGuard } from '../common/guards/roles.guard'
+ import { z } from 'zod'
+ import { ZodPipe } from '../common/pipes/zod-validation.pipe'
++import { KaskadFormatPipe } from '../common/pipes/kaskad-format.pipe'
+ import { ImportExcelSchema } from './dto/import-excel.dto'
+ import { MetricsService } from '../metrics/metrics.service'
+ import { EstimatePdfService } from './estimate-pdf.service'
+@@ -99,7 +100,9 @@
+     },
+   })
+   @ApiResponse({ status: 201 })
+-  parseExcel(@Body('csvText', new ZodPipe(z.string().min(1).max(50_000))) csvText: string) {
++  parseExcel(
++    @Body('csvText', new ZodPipe(z.string().min(1).max(50_000)), new KaskadFormatPipe()) csvText: string,
++  ) {
+     return this.projects.parseExcel(csvText)
+   }
+ 

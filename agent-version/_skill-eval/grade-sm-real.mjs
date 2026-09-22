@@ -198,8 +198,9 @@ function grade(runDir, label) {
     const caps = section(t, 'Что умеет для пользователя').split('\n')
       .filter((l) => /^\|/.test(l) && !/^\|\s*-|Возможность/.test(l))
     const codeish = caps.filter((l) => CODEISH.test(l.split('|')[1] || ''))
-    biz[name] = { purposeChars: purpose.length, caps: caps.length }
-    console.log(`    ${name}: description ${desc.length} зн. · «Назначение» ${purpose.length} зн., предложений ${sentences} · «Что умеет» строк ${caps.length}, с кодом ${codeish.length}`)
+    const purposeCodeish = (purpose.match(/`[^`]+`/g) || []).length
+    biz[name] = { purposeChars: purpose.length, caps: caps.length, purposeCodeish }
+    console.log(`    ${name}: description ${desc.length} зн. · «Назначение» ${purpose.length} зн., предложений ${sentences}, имён в бэктиках ${purposeCodeish} · «Что умеет» строк ${caps.length}, с кодом ${codeish.length}`)
   }
   // Секция «Бизнес-правила»: блоки объектов (заголовок — имя сущности) и сообщений (`сообщение «…»`).
   const rulesSec = section(api, 'Бизнес-правила')

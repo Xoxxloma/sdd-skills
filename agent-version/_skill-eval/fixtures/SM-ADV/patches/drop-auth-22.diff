@@ -1,0 +1,19 @@
+diff -ruN a/repairy-api/src/auth/auth.module.ts b/repairy-api/src/auth/auth.module.ts
+--- a/repairy-api/src/auth/auth.module.ts	2026-09-21 21:12:31.317185300 +0300
++++ b/repairy-api/src/auth/auth.module.ts	2026-09-21 21:12:31.338595200 +0300
+@@ -2,7 +2,6 @@
+ import { JwtModule } from '@nestjs/jwt'
+ import { PassportModule } from '@nestjs/passport'
+ import { FilesModule } from '../files/files.module'
+-import { AuthController } from './auth.controller'
+ import { AuthService } from './auth.service'
+ import { JwtStrategy } from './strategies/jwt.strategy'
+ 
+@@ -13,6 +12,6 @@
+     FilesModule,
+   ],
+   providers: [AuthService, JwtStrategy],
+-  controllers: [AuthController],
++  controllers: [],
+ })
+ export class AuthModule {}
