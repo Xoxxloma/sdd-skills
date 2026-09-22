@@ -33,7 +33,7 @@ for ans in "$FIX"/answer-*.md; do
     echo 'Прогони гейт «Бизнес-правила» по этому ответу. По каждому из пяти чисел напиши одной-двумя строками, что с чем сравнил и сошлось ли. Последней строкой ответа — ровно одно из двух: `ГЕЙТ: ПРОЙДЕН` либо `ГЕЙТ: ДОБОР — <что именно потребуешь у субагента>`.'
   } > "$OUT/$v/prompt.md"
   for i in $(seq 1 "$N"); do
-    ( cd "$OUT/$v" && claude -p "$(cat prompt.md)" --model "$MODEL" --output-format json > "out-$i.json" 2> "err-$i.log"
+    ( cd "$OUT/$v" && claude -p --model "$MODEL" --output-format json < prompt.md > "out-$i.json" 2> "err-$i.log"
       node -e 'const fs=require("fs");let j={};try{j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"))}catch(e){};fs.writeFileSync(process.argv[2],j.result||"");fs.writeFileSync(process.argv[3],String(j.total_cost_usd||0))' "out-$i.json" "answer-$i.md" "cost-$i.txt"; rm -f "out-$i.json" ) &
   done
   wait
