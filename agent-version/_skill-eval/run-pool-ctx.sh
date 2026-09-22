@@ -31,8 +31,14 @@ set -u
 # без `answer.md`, и всё плечо выглядит «не измеренным». Та же подмена стоит в раннере SM-REAL.
 command -v timeout > /dev/null || timeout() { local s="$1"; shift; perl -e 'alarm shift; exec @ARGV' "$s" "$@"; }
 
-SKILL="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
-PROMPT="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
+# ПУТИ В ПРОМПТ — В ФОРМЕ, КОТОРУЮ ЧИТАЕТ `Read` ПРОГОНА. Голый `pwd` в git-bash отдаёт `/tmp/…`,
+# а виндовый `Read` на нём отвечает «File does not exist» — прогон либо выкручивался `find`+`cat`,
+# либо (2026-09-22, `rt-gate-pilot2`: 0/2, `pilot3`: 1/3) не читал скилл вовсе и шёл к заглушкам по
+# смыслу промпта, а два прогона нашли и прочитали ЖИВОЙ `SKILL.md` из репозитория вместо снимка.
+# `pwd -W` (git-bash) даёт `C:/Users/…`; где его нет (macOS/Linux) — обычный `pwd`.
+abs_path() { local d; d="$(cd "$(dirname "$1")" && { pwd -W 2>/dev/null || pwd; })"; echo "$d/$(basename "$1")"; }
+SKILL="$(abs_path "$1")"
+PROMPT="$(abs_path "$2")"
 OUT="$3"
 N="$4"
 CONC="${5:-5}"

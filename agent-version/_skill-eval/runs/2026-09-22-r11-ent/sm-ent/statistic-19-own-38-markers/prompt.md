@@ -1,0 +1,92 @@
+Ты — ведущий агент скилла `service-map` на Шаге 4. Опись сверена сама с собой. Ниже — два правила из твоего скилла дословно: маркерный гейт со сверкой сущностей сверху и проверка «Сущности у ручек», затем данные грепов по одному сервису. Кода у тебя нет, черновик ты не открываешь — только эти числа и строки.
+
+### Из Шага 4
+
+**Второе — маркерный гейт (ГЕЙТ): опись против кода, класс за классом, только по маркерам с пометкой «да» в таблице 3.1.** Число ключей класса в
+описи против числа маркеров этого класса с Шага 3.1. Опись меньше **половины** маркеров — субагент
+не дочитал: добор с перечнем «класс X: по коду не меньше N, в описи M — найди недостающие, начни с
+файлов, где маркер встречается». Маркер дал ноль — сверки нет (это нижняя граница; верхняя сверка
+сущностей — абзацем ниже). Это единственная проверка, которая
+видит недочитанный модуль **на первом скане**: все остальные сверяют субагента с его же описью, и
+недочитанный модуль отсутствует в обеих.
+
+**Сущности — сверка и сверху (проверка, не гейт).** Блоков `###` в «Владеет данными» не больше
+числа маркеров сущностей по коду с Шага 3.1 (у класса с `@Entity` и `@Table` маркеров два — граница
+не строгая, но DTO ответов она ловит). Больше — субагент записал сущностями классы без маркера
+хранения: добор с перечнем «`X`, `Y` — маркера хранения в коде нет: убери из «Владеет данными»,
+поля — строками в блоки ручек; строку `сущности:` каждой затронутой ручки перепиши на
+`→ не сущность, агрегат по …` или `→ не сущность, ответ <сервис>`». Маркер по коду дал ноль, а
+блоки есть — добор на все блоки; исключение одно, и проверяется двумя грепами по описи: строки
+сущностей — `\([^)]*\)\s*$`, из них с маркером таблицы — `\(@Entity|\(@Table|\(model\b`; строки
+сущностей есть, а с маркером таблицы ни одной — маркер вне таблицы (Mongo и подобные), сверки нет.
+Не помог добор — карточка пишется, в отчёт строкой «Владеет данными: N блоков без маркера
+хранения»; прежняя карточка из-за этого не остаётся.
+
+
+- **Сущности у ручек:** у каждого блока «Публичного контракта», кроме служебных, стоит строка
+  `сущности:` — вход и выход именами из «Владеет данными» этой же карточки. Имя, которого в списке
+  сущностей нет и которое не помечено как проекция или как «не сущность», — выдумка: сверку с
+  описью она проходит, потому что попала в оба списка. Строки нет — **добор у субагента с перечнем
+  таких ключей**, не твоя дописка: чем ручка оперирует, видно из кода, а кода у тебя нет.
+
+---
+
+Сервис `summary-ms-statistic`, тип `backend`, стек Spring (маркеры из таблицы 3.1 применимы). Данные грепов:
+
+## Счёт маркеров по коду (Шаг 3.1)
+сущности `@Entity\b|^model |@Table\(`: 38
+
+## Строки сущностей в описи (класс «сущности»; служебные и прочие классы опущены)
+ArmataCard — entity/ArmataCard.java (@Entity)
+ArmataCardImportHistory — entity/ArmataCardImportHistory.java (@Entity)
+OperationRisk — entity/OperationRisk.java (@Entity)
+Setting — entity/Setting.java (@Entity)
+ArmataCardArea — entity/ArmataCardArea.java (@Entity)
+ArmataCardProduct — entity/ArmataCardProduct.java (@Entity)
+ArmataCardUser — entity/ArmataCardUser.java (@Entity)
+ArmataCardCategory — entity/ArmataCardCategory.java (@Entity)
+ArmataCardDamage — entity/ArmataCardDamage.java (@Entity)
+ArmataCardComment — entity/ArmataCardComment.java (@Entity)
+ArmataCardCriminalCase — entity/ArmataCardCriminalCase.java (@Entity)
+ArmataCardVulnerability — entity/ArmataCardVulnerability.java (@Entity)
+ArmataCardChannel — entity/ArmataCardChannel.java (@Entity)
+ArmataCardMethod — entity/ArmataCardMethod.java (@Entity)
+ArmataCardGroup — entity/ArmataCardGroup.java (@Entity)
+ArmataCardSchema — entity/ArmataCardSchema.java (@Entity)
+ArmataCardSample — entity/ArmataCardSample.java (@Entity)
+ArmataCardCameraAnalysis — entity/ArmataCardCameraAnalysis.java (@Entity)
+ArmataCardDenyReason — entity/ArmataCardDenyReason.java (@Entity)
+
+## Заголовки `###` в «Владеет данными» черновика (19)
+### `ArmataCard`
+### `ArmataCardImportHistory`
+### `OperationRisk`
+### `Setting`
+### `ArmataCardArea`
+### `ArmataCardProduct`
+### `ArmataCardUser`
+### `ArmataCardCategory`
+### `ArmataCardDamage`
+### `ArmataCardComment`
+### `ArmataCardCriminalCase`
+### `ArmataCardVulnerability`
+### `ArmataCardChannel`
+### `ArmataCardMethod`
+### `ArmataCardGroup`
+### `ArmataCardSchema`
+### `ArmataCardSample`
+### `ArmataCardCameraAnalysis`
+### `ArmataCardDenyReason`
+
+## Блоки «Публичного контракта» черновика (выдержка, 6 из 13)
+### `GET /api/v1/statistic/armata/card/area`
+Срез за период.
+сущности: → ArmataCardArea
+- ответ маппится без исключения полей
+
+### `GET /api/v1/statistic/slideshow/security`
+Срез за период.
+сущности: → не сущность, агрегат по ArmataCard
+- ответ маппится без исключения полей
+
+Реши по этим двум правилам: нужен ли добор по сущностям (сверка сверху или «Сущности у ручек»). Если нужен — напиши текст добора для субагента, как велит правило. Последней строкой ответа — ровно одно из двух: `СУЩНОСТИ: ПРОЙДЕН` либо `СУЩНОСТИ: ДОБОР`.

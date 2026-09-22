@@ -115,9 +115,13 @@ run_one() {
     task="${task/HINTBLOCK/$(cat "$SM_KEYED_HINT")}"
   fi
 
-  ( cd "$wd" && timeout 3600 claude -p "$task" --model "$MODEL" --permission-mode bypassPermissions ) \
-      > "$sb/answer.md" 2> "$sb/_stderr.log"
+  # stream-json: в `_stream.jsonl` лежит трасса ведущего (каждый tool_use с аргументами) и полные
+  # ответы субагентов (tool_result вызовов Agent). answer.md — текст result, как раньше; из него
+  # же берётся цена. Без этого стенд слеп к «читал ли ведущий соседнюю карточку» и к перенабору.
+  ( cd "$wd" && timeout 7200 claude -p "$task" --model "$MODEL" --permission-mode bypassPermissions --output-format stream-json --verbose ) \
+      > "$sb/_stream.jsonl" 2> "$sb/_stderr.log"
   local rc=$?
+  node "$EVAL/stream-extract.mjs" "$sb/_stream.jsonl" "$sb" 2>> "$sb/_stderr.log"
 
   # Отказ раннера обязан выпадать в «не измерено», а не в «провалено».
   if grep -qiE "API Error|Request not allowed|Please run /login|Credit balance|rate limit|session limit|usage limit" "$sb/answer.md" 2>/dev/null; then

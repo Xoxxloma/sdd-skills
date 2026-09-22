@@ -1,0 +1,3 @@
+проба SM-ADV; засев: fixtures/SM-ADV/seed.sh
+SM_ADV_PROMPT=/c/Users/Konstantin/projects/product-skills/agent-version/_skill-eval/runs/2026-08-24-sm-real/stand/prompt-scan.md
+SM_REAL_PATCH=/c/Users/Konstantin/projects/product-skills/agent-version/_skill-eval/fixtures/SM-ADV/patches/kaskad-validator.diff

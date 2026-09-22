@@ -222,6 +222,10 @@ case "$PROBE" in
   # по-прежнему уходить в `business-requirements-doc`, иначе правка входа сломала основной путь.
   rt-bug)      FIXTURE=RT-BUG; PROMPT_FILE=bug-prompt.txt;     SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
   rt-feature)  FIXTURE=RT-BUG; PROMPT_FILE=feature-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=feature-turn2.txt ;;
+  # `rt-feature-gate` — гейт 2Б после записи БТ: тот же маршрут, но промпт НЕ отвечает заранее про
+  # разрез (заглушка БТ пишет §4.5 «не применимо»). На `rt-feature` модель отвечала на вопрос гейта
+  # строкой промпта «резать не нужно» — стенд подсказывал ответ. Грейд: `--probe=feature-gate`.
+  rt-feature-gate) FIXTURE=RT-BUG; PROMPT_FILE=feature-gate-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=feature-turn2.txt ;;
   # ПОРЯДОК НА ВХОДЕ. Правка 2026-08-18 убрала лишний ход: проводник больше не спрашивает ключ
   # задачи сам — его спрашивает под-скилл своим Gate 0, и порядок теперь «кнопка → меню БТ/баг →
   # под-скилл». Два плеча выше этого НЕ ВИДЯТ: ключ подан в их промптах строкой «Ключ задачи: …»,
@@ -247,6 +251,11 @@ case "$PROBE" in
   # спеку с флагом багфикса, а не по кругу в `bug-report-doc`. Рядом чужая `ARS-102` с полным
   # комплектом — ловушка на подстановку соседнего документа.
   rt-cont)     FIXTURE=RT-CONT; PROMPT_FILE=cont-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs ;;
+  # `rt-gate` — гейт Шага 2Б (правка 1.2.0, 2026-09-22): на диске готовый чистый БТ, аналитик приносит
+  # его готовым. Верный исход — приёмка, чтение, ход ОСТАНОВЛЕН вопросом «принят — идём дальше?»;
+  # `technical-spec-doc` запускается только следующим ходом. Заглушки дают чистый документ нарочно:
+  # до правки такой документ уезжал в спеку без остановки.
+  rt-gate)     FIXTURE=RT-GATE; PROMPT_FILE=gate-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=gate-turn2.txt ;;
 
   # ── приёмка баг-репорта ───────────────────────────────────────────────────────────────────
   # Главное плечо здесь ЧИСТОЕ, а не грязное: у проверяющего инструмента худший отказ — покраснеть
@@ -305,7 +314,18 @@ fi
 # репы, — это путь к скиллу; получив его, часть прогонов уходит бродить по соседним папкам и
 # пишет результат в фикстуру (2026-08-14: три случая). В папке раунда снимок остаётся для
 # журнала, но читается он из /tmp — оттуда идти некуда.
-SNAP_ROOT="${SKILL_EVAL_SEED_ROOT:-/tmp/skill-eval-seed}/$(basename "$ROUND")-skills"
+# ПУТЬ К СНИМКУ — В ФОРМЕ, КОТОРУЮ ЧИТАЕТ ИНСТРУМЕНТ `Read`. Поймано 2026-09-22 на `rt-gate`: путь
+# `/tmp/…` — это git-bash, а `Read` у прогона виндовый, и на нём он отвечает «File does not exist».
+# Прогон либо выкручивался (`find` + `cat`, вывод уезжал в persisted-output — так было во всех
+# раундах с 2026-08-14, `rt-feat10` 10/10 прочитали, `rt-base10` 8/10), либо НЕ читал скилл вовсе и
+# шёл к заглушкам по смыслу промпта (`rt-gate-pilot2`: 0/2 прочитали). Второй исход — замер без
+# измеряемого текста, и он неотличим от «скилл прочитан, правило не сработало». Файлы стадий
+# `reference/stage-*.md` через `cat` не открыл ни один прогон.
+# `cygpath -m` даёт `C:/Users/…/Temp` — тот же каталог вне репозитория, но в форме, которую `Read`
+# принимает. Нет `cygpath` (не Windows) — прежний `/tmp`.
+SEED_TMP="/tmp"
+command -v cygpath >/dev/null 2>&1 && SEED_TMP="$(cygpath -m /tmp)"
+SNAP_ROOT="${SKILL_EVAL_SEED_ROOT:-$SEED_TMP/skill-eval-seed}/$(basename "$ROUND")-skills"
 mkdir -p "$SNAP_ROOT/$SKILL"
 SNAP="$SNAP_ROOT/$SKILL/SKILL.md"
 cp "$SNAP_KEEP" "$SNAP"
@@ -341,7 +361,9 @@ fi
 MANIFEST="$FIXTURE_DIR/_manifest.txt"
 CURRENT="$(cd "$FIXTURE_DIR" && find . -type f -not -name '_manifest.txt' | sed 's|^\./||' | sort)"
 if [ -f "$MANIFEST" ]; then
-  if ! printf '%s\n' "$CURRENT" | diff -q - "$MANIFEST" >/dev/null 2>&1; then
+  # Манифест сравнивается без CR: репозиторий с `core.autocrlf=true` отдаёт его с CRLF, а `find`
+  # печатает LF, и плечо отказывалось стартовать при неизменённой фикстуре (2026-09-22, `rt-feature`).
+  if ! printf '%s\n' "$CURRENT" | diff -q - <(tr -d '\r' < "$MANIFEST") >/dev/null 2>&1; then
     echo "!!! СОСТАВ ФИКСТУРЫ $FIXTURE НЕ СОВПАДАЕТ С МАНИФЕСТОМ — прогон не запускался."
     printf '%s\n' "$CURRENT" | diff - "$MANIFEST" | head -20
     echo "Разберись, откуда файл: обычно это прогон, записавший результат в фикстуру."

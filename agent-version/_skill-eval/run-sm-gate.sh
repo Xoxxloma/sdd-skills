@@ -5,13 +5,13 @@
 # SM_GATE_ONLY="g clean" — гонять только названные варианты (плечо «до» под один двойник).
 set -u
 SKILL="${1:?путь к SKILL.md}"; ROUND="${2:?папка раунда}"; N="${3:-3}"
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; FIX="$HERE/fixtures/SM-GATE"; OUT="$ROUND/sm-gate"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; FIX="${SM_FIX:-$HERE/fixtures/SM-GATE}"; OUT="$ROUND/${SM_OUT:-sm-gate}"
 MODEL="${SM_MODEL:-sonnet}"
 ln() { grep -n -m1 -- "$1" "$SKILL" | cut -d: -f1; }
-B1=$(ln '^- \*\*у `backend` и `fullstack` — строки'); B2=$(ln '^- три правила выше')
-O1=$(ln 'строки описи, из которых собираются'); O2=$(ln '^\*\*У каждого ключа контракта в описи стоит строка')
+B1=$(ln '^Ты — читающий субагент скилла'); B2=$(ln '^Ни чисел, ни пересказа')
+O1=$(ln '^## Опись → файл'); O2=$(ln '^## Прежняя карточка')
 G1=$(ln '^- \*\*Бизнес-правила (ГЕЙТ'); G2=$(ln '^- \*\*Хвост-файл (ГЕЙТ')
-U1=$(ln '^\*\*Бюджет: на один сервис'); U2=$(ln '^\*\*Пустой ответ, отказ или ответ без описи')
+U1=$(ln '^**Бюджет: не больше двух прогонов'); U2=$(ln '^**Вторая попытка не помогла')
 for x in "$B1" "$B2" "$O1" "$O2" "$G1" "$G2" "$U1" "$U2"; do [ -n "$x" ] || { echo "не нашёл якорь в $SKILL" >&2; exit 1; }; done
 mkdir -p "$OUT"; cp "$SKILL" "$OUT/_skill-snapshot.md"
 printf 'модель: %s\nпрогонов на вариант: %s\nякоря: бриф %s–%s, опись %s–%s, гейт %s–%s, бюджет %s–%s\n' "$MODEL" "$N" "$B1" "$B2" "$O1" "$O2" "$G1" "$G2" "$U1" "$U2" > "$OUT/_settings.txt"
@@ -24,12 +24,16 @@ for ans in "$FIX"/answer-*.md; do
     echo; echo '### Из брифа субагенту (Шаг 3)'; echo; sed -n "${B1},$((B2-1))p" "$SKILL"
     echo; echo '### Правила описи (Шаг 3)'; echo; sed -n "${O1},$((O2-1))p" "$SKILL"
     echo; echo '### Гейт (Шаг 4)'; echo; sed -n "${G1},$((G2-1))p" "$SKILL"
+    if [ -n "${SM_GATE_EXTRA_FROM:-}" ] && [ -n "${SM_GATE_EXTRA_TO:-}" ]; then
+      X1=$(ln "$SM_GATE_EXTRA_FROM"); X2=$(ln "$SM_GATE_EXTRA_TO")
+      [ -n "$X1" ] && [ -n "$X2" ] && { echo; echo '### Проверки рядом с гейтом (Шаг 4)'; echo; sed -n "${X1},$((X2-1))p" "$SKILL"; }
+    fi
     echo; echo '### Бюджет доборов'; echo; sed -n "${U1},$((U2-1))p" "$SKILL"
     echo; echo '---'; echo; cat "$ans"; echo
     echo 'Прогони гейт «Бизнес-правила» по этому ответу. По каждому из пяти чисел напиши одной-двумя строками, что с чем сравнил и сошлось ли. Последней строкой ответа — ровно одно из двух: `ГЕЙТ: ПРОЙДЕН` либо `ГЕЙТ: ДОБОР — <что именно потребуешь у субагента>`.'
   } > "$OUT/$v/prompt.md"
   for i in $(seq 1 "$N"); do
-    ( cd "$OUT/$v" && claude -p "$(cat prompt.md)" --model "$MODEL" --output-format json > "out-$i.json" 2> "err-$i.log"
+    ( cd "$OUT/$v" && claude -p --model "$MODEL" --output-format json < prompt.md > "out-$i.json" 2> "err-$i.log"
       node -e 'const fs=require("fs");let j={};try{j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"))}catch(e){};fs.writeFileSync(process.argv[2],j.result||"");fs.writeFileSync(process.argv[3],String(j.total_cost_usd||0))' "out-$i.json" "answer-$i.md" "cost-$i.txt"; rm -f "out-$i.json" ) &
   done
   wait
