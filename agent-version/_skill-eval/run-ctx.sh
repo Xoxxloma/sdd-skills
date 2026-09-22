@@ -222,6 +222,10 @@ case "$PROBE" in
   # по-прежнему уходить в `business-requirements-doc`, иначе правка входа сломала основной путь.
   rt-bug)      FIXTURE=RT-BUG; PROMPT_FILE=bug-prompt.txt;     SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
   rt-feature)  FIXTURE=RT-BUG; PROMPT_FILE=feature-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=feature-turn2.txt ;;
+  # `rt-feature-gate` — гейт 2Б после записи БТ: тот же маршрут, но промпт НЕ отвечает заранее про
+  # разрез (заглушка БТ пишет §4.5 «не применимо»). На `rt-feature` модель отвечала на вопрос гейта
+  # строкой промпта «резать не нужно» — стенд подсказывал ответ. Грейд: `--probe=feature-gate`.
+  rt-feature-gate) FIXTURE=RT-BUG; PROMPT_FILE=feature-gate-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=feature-turn2.txt ;;
   # ПОРЯДОК НА ВХОДЕ. Правка 2026-08-18 убрала лишний ход: проводник больше не спрашивает ключ
   # задачи сам — его спрашивает под-скилл своим Gate 0, и порядок теперь «кнопка → меню БТ/баг →
   # под-скилл». Два плеча выше этого НЕ ВИДЯТ: ключ подан в их промптах строкой «Ключ задачи: …»,
@@ -357,7 +361,9 @@ fi
 MANIFEST="$FIXTURE_DIR/_manifest.txt"
 CURRENT="$(cd "$FIXTURE_DIR" && find . -type f -not -name '_manifest.txt' | sed 's|^\./||' | sort)"
 if [ -f "$MANIFEST" ]; then
-  if ! printf '%s\n' "$CURRENT" | diff -q - "$MANIFEST" >/dev/null 2>&1; then
+  # Манифест сравнивается без CR: репозиторий с `core.autocrlf=true` отдаёт его с CRLF, а `find`
+  # печатает LF, и плечо отказывалось стартовать при неизменённой фикстуре (2026-09-22, `rt-feature`).
+  if ! printf '%s\n' "$CURRENT" | diff -q - <(tr -d '\r' < "$MANIFEST") >/dev/null 2>&1; then
     echo "!!! СОСТАВ ФИКСТУРЫ $FIXTURE НЕ СОВПАДАЕТ С МАНИФЕСТОМ — прогон не запускался."
     printf '%s\n' "$CURRENT" | diff - "$MANIFEST" | head -20
     echo "Разберись, откуда файл: обычно это прогон, записавший результат в фикстуру."

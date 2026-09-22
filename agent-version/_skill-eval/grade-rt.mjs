@@ -5,9 +5,11 @@
 //   node grade-rt.mjs <каталог с песочницами> --probe=bug|feature|menu|nokey|noreview|nosplit|gate
 //   node grade-rt.mjs --selftest
 //
-// ПЛЕЧО `gate` (2026-09-22, `analyst-workspace` 1.2.0): гейт Шага 2Б задаёт вопрос «идём дальше?»
-// всегда. Меряется ПО ХОДАМ (`stream*.jsonl` + `answer-NN.md`): спека обязана запуститься ходом,
-// следующим за вопросом. На остальных плечах те же счётчики печатаются справкой.
+// ГЕЙТ 2Б (2026-09-22): после ЗАПИСИ документа сверху вопрос «идём дальше?» задаётся всегда
+// (1.2.0); готовый документ идёт мимо приёмки и гейта (1.3.0). Меряется ПО ХОДАМ (`stream*.jsonl` +
+// `answer-NN.md`). `feature-gate` — БТ пишет заглушка: спека обязана запуститься ходом, следующим за
+// вопросом. `gate` — БТ готов на диске: приёмки и вопроса нет, спека первым ходом. На остальных
+// плечах те же счётчики печатаются справкой.
 //
 // ПОРЯДОК НА ВХОДЕ (плечи `menu` и `nokey`, заведены 2026-08-18). До правки маршрут спрашивал
 // ключ задачи ДВАЖДЫ: `analyst-workspace` своим ходом между меню «БТ или баг» и запуском
@@ -226,8 +228,10 @@ STATIONS.noreview = [
 // У пробы отказа от нарезки лестница кончается на принятой спеке: с правки 2026-09-17 этапы —
 // необязательный шаг, и при ответе «нет» их отсутствие — верное поведение, а не обрыв.
 STATIONS.nosplit = STATIONS.bug.slice(0, 4)
-// У пробы гейта БТ лежит на диске готовым — станции «БТ написано» нет, лестница начинается с приёмки.
-STATIONS.gate = STATIONS.feature.slice(1)
+// У пробы готового БТ станций «БТ написано» и «БТ принято» нет: он принят при записи, лестница
+// начинается со спеки. `feature-gate` — та же лестница, что `feature`.
+STATIONS.gate = STATIONS.feature.slice(2)
+STATIONS['feature-gate'] = STATIONS.feature
 // `menu` лестницы не имеет: там верный исход — остановка ДО первого вызова, и любая станция
 // на этом плече означает дефект, а не прогресс.
 
@@ -335,13 +339,21 @@ export function gradeRun (dir, probe) {
     r.wrongFirst = r.first !== null && r.first !== 'business-requirements-doc'
     r.pass = r.first === 'business-requirements-doc' && !r.calledBugReport
   } else if (probe === 'gate') {
-    // Готовый БТ на диске. Зачёт — конъюнкция: приёмка БТ была, БТ не переписан, разреза нет, спека
-    // запущена на БТ обычным флагом И ОСТАНОВКА: вопрос гейта задан ходом раньше запуска спеки.
-    // Без последней половины прогон, уехавший в спеку первым ходом, выглядел бы образцовым — это
-    // ровно дефект, ради которого проба заведена.
-    r.wrongFirst = r.first !== null && r.first !== 'spec-review'
-    r.pass = r.calledReview && !r.calledBT && !r.calledBugReport && !r.decomposition &&
-      r.calledSpec && r.sourceIsBT && !r.flagBugfix && r.gateStop
+    // Готовый БТ на диске (1.3.0, 2026-09-22): приёмка и гейт 2Б стоят только после ЗАПИСИ, готовый
+    // документ идёт мимо них. Зачёт — конъюнкция: приёмки БТ НЕ было, вопроса гейта НЕ было, БТ не
+    // переписан, разреза нет, спека запущена на БТ обычным флагом ПЕРВЫМ ходом. Гейт после записи
+    // меряет `feature-gate`. (До 1.3.0 плечо ждало обратного — остановки; числа `pilot4`/`pilot-sonnet`
+    // сняты по тому критерию и с этими не сравниваются.)
+    r.reviewedBT = r.lines.some((l) => l.startsWith('spec-review') && /business_requirements\.md/.test(l))
+    r.wrongFirst = r.first !== null && r.first !== 'technical-spec-doc'
+    r.pass = !r.reviewedBT && !r.gateAsked && !r.calledBT && !r.calledBugReport && !r.decomposition &&
+      r.calledSpec && r.sourceIsBT && !r.flagBugfix && r.specInTurn1
+  } else if (probe === 'feature-gate') {
+    // Тот же прогон, что `feature` (БТ пишет заглушка), но зачёт требует гейт 2Б: вопрос «идём
+    // дальше?» задан ходом раньше запуска спеки. Отдельное имя, чтобы критерий `feature` не менялся
+    // задним числом — его числа с 2026-08-20 остаются сопоставимыми.
+    r.wrongFirst = r.first !== null && r.first !== 'business-requirements-doc'
+    r.pass = r.first === 'business-requirements-doc' && !r.calledBugReport && r.calledSpec && r.gateStop
   } else {
     // `menu`: верный исход — ход ОСТАНОВЛЕН вопросом. Ни один под-скилл не вызван, ключ не
     // спрошен, показаны обе половины кнопки Шага 1Б — и это именно 1Б, а не переспрошенный Шаг 1.
@@ -518,8 +530,8 @@ if (argv.includes('--selftest')) process.exit(selftest() ? 0 : 1)
 const root = argv.find((x) => !x.startsWith('--'))
 const pa = argv.find((x) => x.startsWith('--probe='))
 const PROBE = pa ? pa.slice('--probe='.length) : ''
-if (!root || !['bug', 'feature', 'menu', 'nokey', 'noreview', 'nosplit', 'gate'].includes(PROBE)) {
-  console.error('usage: node grade-rt.mjs <каталог> --probe=bug|feature|menu|nokey|noreview|nosplit|gate'); process.exit(1)
+if (!root || !['bug', 'feature', 'menu', 'nokey', 'noreview', 'nosplit', 'gate', 'feature-gate'].includes(PROBE)) {
+  console.error('usage: node grade-rt.mjs <каталог> --probe=bug|feature|menu|nokey|noreview|nosplit|gate|feature-gate'); process.exit(1)
 }
 
 const all = readdirSync(root, { withFileTypes: true })
@@ -594,15 +606,21 @@ if (PROBE === 'bug' || PROBE === 'nokey') {
   console.log(`  ${pct(c((r) => !r.calledReview))}\tприёмка не запущена ни разу`)
   console.log(`  ${pct(c((r) => !r.calledStages))}\tэтапы не запущены`)
 } else if (PROBE === 'gate') {
-  console.log(`  ${pct(c((r) => r.specInTurn1))}\tСПЕКА ЗАПУЩЕНА В ХОДЕ 1 — остановки нет, гейт не отработал  ← КРИТЕРИЙ`)
-  console.log(`  ${pct(c((r) => !r.gateAsked))}\tвопрос гейта не задан ни в одном ходе  ← КРИТЕРИЙ`)
-  console.log(`  ${pct(c((r) => r.calledSpec && !r.specInTurn1 && !r.gateStop))}\tспека запущена не следом за вопросом гейта`)
+  console.log(`  ${pct(c((r) => r.reviewedBT))}\tПРИЁМКА ГОТОВОГО БТ ЗАПУЩЕНА — он принят при записи, лишний вызов  ← КРИТЕРИЙ`)
+  console.log(`  ${pct(c((r) => r.gateAsked))}\tВОПРОС ГЕЙТА ЗАДАН на готовом документе — переспрос выбора Шага 1  ← КРИТЕРИЙ`)
+  console.log(`  ${pct(c((r) => r.calledSpec && !r.specInTurn1))}\tспека запущена не первым ходом — лишняя остановка`)
   console.log(`  ${pct(c((r) => r.calledBT))}\tБТ ПЕРЕПИСАН — вызван business-requirements-doc на готовом документе  ← КРИТЕРИЙ`)
   console.log(`  ${pct(c((r) => r.decomposition))}\tзашёл в разрез на одной фиче`)
-  console.log(`  ${pct(c((r) => !r.calledReview))}\tприёмка БТ не запущена`)
-  console.log(`  ${pct(c((r) => r.wrongFirst))}\tпервым вызван не spec-review`)
+  console.log(`  ${pct(c((r) => r.wrongFirst))}\tпервым вызван не technical-spec-doc`)
   console.log(`  ${pct(c((r) => r.calledSpec && !r.sourceIsBT))}\tспеке передан не БТ`)
   console.log(`  ${pct(c((r) => r.calledSpec && r.flagBugfix))}\tспека запущена с флагом багфикса на БТ`)
+  console.log(`  ${pct(c((r) => !r.calledSpec))}\tмаршрут не дошёл до спеки`)
+  console.log(`  ход запуска спеки по прогонам: ${ok.map((r) => r.specTurn || '—').join(' ')}  (норма — 1)`)
+} else if (PROBE === 'feature-gate') {
+  console.log(`  ${pct(c((r) => r.calledSpec && r.specInTurn1))}\tСПЕКА В ТОМ ЖЕ ХОДЕ, ЧТО И БТ — остановки нет, гейт не отработал  ← КРИТЕРИЙ`)
+  console.log(`  ${pct(c((r) => !r.gateAsked))}\tвопрос гейта не задан ни в одном ходе  ← КРИТЕРИЙ`)
+  console.log(`  ${pct(c((r) => r.calledSpec && !r.specInTurn1 && !r.gateStop))}\tспека запущена не следом за вопросом гейта`)
+  console.log(`  ${pct(c((r) => r.calledBugReport))}\tушёл в баг-репорт на обычной задаче`)
   console.log(`  ${pct(c((r) => !r.calledSpec))}\tмаршрут не дошёл до спеки`)
   console.log(`  ход запуска спеки по прогонам: ${ok.map((r) => r.specTurn || '—').join(' ')}  (норма — ≥2)`)
 } else if (PROBE === 'nosplit') {
@@ -627,7 +645,7 @@ if (PROBE !== 'nosplit') {
 }
 // Гейт 2Б на плечах полного маршрута — справка, в зелёное не входит (критерий плеч задним числом не
 // меняется); по этим числам видно «до/после» правки 1.2.0 на `rt-bug`/`rt-feature`.
-if (PROBE !== 'gate') {
+if (PROBE !== 'gate' && PROBE !== 'feature-gate') {
   console.log(`  ${pct(c((r) => r.gateAsked))}\tвопрос гейта 2Б «идём дальше?» задан (справка)`)
   console.log(`  ${pct(c((r) => r.calledSpec && r.gateStop))}\tспека запущена следом за вопросом гейта (справка)`)
 }

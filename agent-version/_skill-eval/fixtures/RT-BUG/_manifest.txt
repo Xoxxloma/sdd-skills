@@ -1,6 +1,7 @@
 bug-prompt.txt
 bug-turn2.txt
 expected.md
+feature-gate-prompt.txt
 feature-prompt.txt
 feature-turn2.txt
 menu-prompt.txt
