@@ -1,6 +1,6 @@
 ---
 name: technical-spec-doc
-version: 1.0.2
+version: 1.0.3
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
 description: 'Turns a confirmed business-requirements doc (БТ/BRD/SRS) into ONE Russian Markdown technical spec (technical_specification.md, saved next to the БТ), organized around INTERACTIONS — the new and changed contracts crossing service or FE/BE boundaries — so a frontend agent and a backend agent code against the same contracts and meet without after-the-fact stitching. There is no code to read: NEW things are designed fully (path, schema, JSON example); anything about an EXISTING service is written only as the analyst confirmed it — inventing an endpoint of a service you cannot see is the worst failure of this skill. Requires a ready БТ: given only a brief or an idea it refuses and asks for the business requirements. Use when the БТ is ready and a dev spec is needed.'
@@ -234,9 +234,17 @@ passed and a real БТ is in hand.
 читают — на двадцати сервисах это две тысячи строк ради двух-трёх нужных. Открой описания одним
 `Grep pattern="^description:" path="services" glob="*.md"` — **папка идёт параметром `path`, маска
 файлов параметром `glob`**; склеенное `path="services/*.md"` инструмент не примет, он ждёт там
-существующий путь. Прочитай те карточки, что подходят под задачу. Мало —
-дочитай ещё, в первую очередь тех, кого открытые карточки называют в «Зависит от» и «Потребляемых
-API»: список соседей лежит в них самих, гадать второй раз не надо.
+существующий путь. Прочитай те карточки, что подходят под задачу. Открытая карточка называет
+соседа — в «Зависит от», в «Потребляемых API» или строкой `сущности: → не сущность, ответ <сервис>`
+у ручки, которую трогает задача, — иди к карточке соседа обязательно, не «если мало»: поля и
+состояния чужих данных лежат только у владельца, в карточке потребителя их нет по построению.
+Читай её кусками, не целиком: `Grep pattern="^### \`<имя сущности>\`" path="services/<сервис>.md"
+output_mode="content" -n` — заголовок `### \`Имя\`` стоит и в «Владеет данными», и в
+«Бизнес-правилах», один греп даёт обе строки с номерами; `Read path="services/<сервис>.md"
+offset=<строка>` и ограничь `limit` номером следующего заголовка (второй греп по `^### |^## `),
+иначе `Read` заберёт всё до конца карточки. Так по цепочке до владельца — только по задетым
+ручкам. Владелец назван, а карточки у него нет (система вне манифеста) — цепочка кончилась: это
+вопрос человеку, а не догадка.
 
 Проектируется новый сервис — описания тем более единственный вход: его имени в системе ещё нет,
 искать по содержимому не по чему, а стыки к соседям без их контрактов не спроектировать.
