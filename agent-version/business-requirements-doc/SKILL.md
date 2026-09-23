@@ -1,6 +1,6 @@
 ---
 name: business-requirements-doc
-version: 1.0.2
+version: 1.0.3
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
 description: 'Gathers business requirements and writes ONE Markdown spec (BRD→SRS) in Russian. It MAY read the repo as evidence, but nothing enters the spec on your own authority: before writing, every gate is either stated by the user themselves or put to the user and answered, and anything unconfirmed becomes TBD. The mandatory first question is the linked Jira/SberTrack task key (SMSEC-1234); without it the spec is not written. Before writing it also decides the business cut (§4.5) — several separately-shippable deliverables → it proposes the slice split; one deliverable → it says so explicitly («не применимо: причина») — and puts that proposal to the user in the handoff. Use whenever someone wants to write a ТЗ / BRD / SRS, formalize a request, or describe a task, feature, change, or integration for developers.'
@@ -159,9 +159,16 @@ explicit onto the 14 gates (see "The gates to cover").
 сервисах это две тысячи строк ради двух-трёх нужных. Открой описания одним
 `Grep pattern="^description:" path="services" glob="*.md"` — **папка идёт параметром `path`, маска
 файлов параметром `glob`**; склеенное `path="services/*.md"` инструмент не примет, он ждёт там
-существующий путь. Прочитай те карточки, что подходят под задачу. Мало —
-дочитай ещё, в первую очередь тех, кого открытые карточки называют в «Зависит от» и
-«Потребляемых API».
+существующий путь. Прочитай те карточки, что подходят под задачу. Открытая карточка называет
+соседа в «Зависит от» — иди к его карточке обязательно, не «если мало»: состояния и правила чужих
+объектов лежат только у владельца, в карточке потребителя их нет по построению. Читай её кусками,
+не целиком, и только свои секции: `Grep pattern="^### \`<имя объекта>\`" path="services/<сервис>.md"
+output_mode="content" -n` даёт номер блока объекта в «Бизнес-правилах» (тот же заголовок стоит и в
+«Владеет данными» — это не твоя секция, бери строку, что ниже `## Бизнес-правила`);
+`Read path="services/<сервис>.md" offset=<строка>` с `limit` до следующего заголовка (второй греп
+по `^### |^## `), иначе `Read` заберёт всё до конца карточки. Так по цепочке до владельца — только
+по объектам, которых касается задача. Владелец назван, а карточки у него нет (система вне
+манифеста) — цепочка кончилась: это вопрос человеку, а не догадка.
 
 Из открытой карточки твои — **«Назначение»**, **«Что умеет для пользователя»**,
 **«Бизнес-правила»**, **«Экраны»**, **«Роли и доступ»** и **«Заметки команды»**. Все они
