@@ -1,0 +1,16 @@
+services:
+  - name: dispatch-api
+    path: ../dispatch-api
+    type: backend
+
+  - name: dispatch-web
+    path: ../dispatch-web
+    type: frontend
+
+  - name: objects-registry
+    path: ../objects-registry
+    type: backend
+
+  - name: notify
+    path: ../notify-service
+    type: backend
