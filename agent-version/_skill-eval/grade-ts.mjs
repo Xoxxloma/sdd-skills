@@ -64,6 +64,129 @@ export function confirmedMarks(spec) {
   };
 }
 
+/**
+ * Fenced-блок ```plantuml … ``` в теле спеки (после stripLegend). Первый блок; `lines` —
+ * непустые строки без обрамления и без `\r`. Нет блока → `{ block: null, lines: [] }`.
+ */
+export function plantumlBlock(body) {
+  const m = body.match(/^[ \t]*```plantuml[^\n]*\n([\s\S]*?)\n[ \t]*```[ \t]*\r?$/m);
+  if (!m) return { block: null, lines: [] };
+  const block = m[1].split('\r').join('');
+  return { block, lines: block.split('\n').map((l) => l.trim()).filter((l) => l.length > 0) };
+}
+
+/** Номера INT-карточек по заголовкам `## / ### / #### INT-N` (в порядке файла, с повторами). */
+export function intHeaders(body) {
+  const out = [];
+  for (const l of body.split('\n')) {
+    const m = l.match(/^#{2,4}\s*INT-(\d+)/);
+    if (m) out.push(Number(m[1]));
+  }
+  return out;
+}
+
+/**
+ * Схема взаимодействий — проекция карточек §2 (PLAN-DIAGRAM §1 Р3–Р8, §5 Д1–Д8).
+ * Чистая функция от тела спеки, чтобы самопроверка гоняла её на рукописных мини-спеках.
+ * Возвращает [{ text, passed, evidence }]; в grade() все идут с `info: true` — якоря
+ * моложе базы 1.1.0 и в «зелёный целиком» не входят.
+ *
+ * Отсутствие блока при карточках красит Д1 и Д2; Д3–Д8 в этом случае «не применимо»
+ * (иначе один дефект считался бы шесть раз и счётчики Д3/Д7/Д8 ничего бы не различали).
+ */
+export function diagramChecks(body) {
+  const out = [];
+  const add = (text, passed, evidence) => out.push({ text, passed, evidence });
+  const { block, lines } = plantumlBlock(body);
+  const cardNums = intHeaders(body);
+  const hasBlock = block !== null;
+  const hasCards = cardNums.length > 0;
+  const NA_NONE = 'не применимо: карточек нет';
+  const NA_NOBLOCK = 'не применимо: блока нет (см. Д1)';
+  const bothAbsent = !hasBlock && !hasCards;
+  const na = (text) => add(text, true, bothAbsent ? NA_NONE : NA_NOBLOCK);
+
+  // Д1
+  add('Схема: блок plantuml есть ⇔ карточек INT ≥ 1', hasBlock === hasCards,
+    `блок: ${hasBlock ? 'есть' : 'нет'}; карточек INT: ${cardNums.length}`);
+
+  // Д2
+  const arrows = lines.filter((l) => /-{1,2}>/.test(l));
+  const hasStart = lines.some((l) => /^@startuml\b/.test(l));
+  const hasEnd = lines.some((l) => /^@enduml\b/.test(l));
+  if (bothAbsent) add('Схема: @startuml…@enduml и ≥1 стрелка', true, NA_NONE);
+  else if (!hasBlock) add('Схема: @startuml…@enduml и ≥1 стрелка', false, 'карточки есть, блока нет');
+  else add('Схема: @startuml…@enduml и ≥1 стрелка', hasStart && hasEnd && arrows.length > 0,
+    `@startuml: ${hasStart}; @enduml: ${hasEnd}; стрелок: ${arrows.length}`);
+
+  // Д3 — множество, не счёт: модель дублирует номер.
+  const setStr = (s) => `{${[...s].sort((a, b) => a - b).map((n) => `INT-${n}`).join(', ')}}`;
+  if (!hasBlock) na('Схема: множество INT-N в блоке == множеству заголовков');
+  else {
+    const inBlock = new Set((block.match(/INT-(\d+)/g) ?? []).map((s) => Number(s.slice(4))));
+    const inHeads = new Set(cardNums);
+    const same = inBlock.size === inHeads.size && [...inBlock].every((n) => inHeads.has(n));
+    add('Схема: множество INT-N в блоке == множеству заголовков', same,
+      `в блоке: ${setStr(inBlock)}; заголовки: ${setStr(inHeads)}`);
+  }
+
+  // Д4 — грамматика Р7: participant + стрелка `A -> B : INT-N …`.
+  const RE_ARROW = /^\w+\s*-{1,2}>\s*\w+\s*:\s*INT-\d+\s/;
+  const RE_SKIP = /^(@startuml|@enduml|participant\b)/;
+  if (!hasBlock) na('Схема: каждая стрелка по грамматике');
+  else {
+    const bad = lines.find((l) => !RE_SKIP.test(l) && !RE_ARROW.test(l));
+    add('Схема: каждая стрелка по грамматике', bad === undefined,
+      bad === undefined ? `строк-стрелок: ${arrows.length}` : `нарушитель: «${bad.slice(0, 80)}»`);
+  }
+
+  // Д5 — участник назван в «Граница/направление» хоть одной карточки (Р3).
+  if (!hasBlock) na('Схема: участники названы в «Граница/направление» карточек');
+  else {
+    const participants = lines
+      .map((l) => l.match(/^participant\s+"([^"]+)"\s+as\s+\w+/))
+      .filter(Boolean).map((m) => m[1]);
+    const boundaries = body.split('\n')
+      .map((l) => l.match(/^\s*-\s*\*\*Граница\/направление:\*\*\s*(.*)$/))
+      .filter(Boolean).map((m) => m[1]).join(' | ').toLowerCase();
+    const missing = participants.filter((p) => !boundaries.includes(p.toLowerCase()));
+    add('Схема: участники названы в «Граница/направление» карточек',
+      participants.length > 0 && missing.length === 0,
+      participants.length === 0 ? 'participant-строк в блоке нет'
+        : missing.length ? `не названы: ${missing.join(', ')}` : `участников: ${participants.length}, все названы`);
+  }
+
+  // Д6 — ветвления и оформление запрещены (Р7).
+  const RE_FORBIDDEN = /^(alt|loop|activate|note|box|skinparam)\b/;
+  if (!hasBlock) na('Схема: нет alt/loop/activate/note/box/skinparam');
+  else {
+    const bad = lines.find((l) => RE_FORBIDDEN.test(l));
+    add('Схема: нет alt/loop/activate/note/box/skinparam', bad === undefined,
+      bad === undefined ? 'нет' : `есть: «${bad.slice(0, 60)}»`);
+  }
+
+  // Д7 — путь на стрелке только у 🟢 (Р5/Р6): ключуется и по эмодзи, и по стилю.
+  const RE_PATH = /\b(GET|POST|PUT|PATCH|DELETE)\s+\//;
+  if (!hasBlock) na('Схема: на стрелках 🔵/🟡 и на пунктирных --> нет метода и пути');
+  else {
+    const bad = lines.find((l) => (l.includes('🔵') || l.includes('🟡') || /-->/.test(l)) && RE_PATH.test(l));
+    add('Схема: на стрелках 🔵/🟡 и на пунктирных --> нет метода и пути', bad === undefined,
+      bad === undefined ? 'нет' : `путь на чужой стрелке: «${bad.slice(0, 80)}»`);
+  }
+
+  // Д8 — плейсхолдер скелета `<…>` не заменён; стрелки убираем перед поиском.
+  if (!hasBlock) na('Схема: плейсхолдеров скелета нет');
+  else {
+    // `<-`/`<--` — обратная стрелка, а не плейсхолдер: её ловит Д4 (грамматика), здесь она не считается.
+    const stripped = block.replace(/<-{1,2}|-{1,2}>/g, '');
+    const ph = stripped.match(/<[^<>\n]*>?|>/);
+    add('Схема: плейсхолдеров скелета нет', ph === null,
+      ph === null ? 'нет' : `есть: «${ph[0].slice(0, 40)}»`);
+  }
+
+  return out;
+}
+
 // Литералы, а не собранные из кусков паттерны: \w в JS не покрывает кириллицу,
 // и склеенная регулярка молча перестаёт совпадать (замер прошлого раунда).
 const STATUS_NEEDS = /Требуются уточнения\s*\((\d+)\)/;
@@ -324,6 +447,10 @@ function grade(dir) {
   // Информационный якорь, в pass НЕ входит: он появился 2026-08-14, и включение его в pass
   // сделало бы базовые числа хуже задним числом — сравнивать было бы нечего.
 
+  // --- схема взаимодействий: проекция карточек §2 (Д1–Д8, PLAN-DIAGRAM §5) ---
+  // Все `info: true`: якоря заведены 2026-09-24 под 1.2.0, база 1.1.0 снята без них.
+  for (const c of diagramChecks(body)) add(c.text, c.passed, c.evidence, true);
+
   // --- ничего лишнего на диске ---
   // `answer.md` — файл СТЕНДА, а не скилла: раскладка просит прогон положить туда свой
   // финальный ответ, и часть агентов кладёт его внутрь песочницы. Считать его лишним
@@ -364,7 +491,30 @@ const CARD_TO_VALIDATE = [
 
 const CARD_CONFIRMED = CARD_TO_VALIDATE.replace('🟡 к валидации', '🔵 подтверждено аналитиком');
 
+// Мини-спека для Д1–Д8: две карточки (🟢 FE→BE, 🟡 BE→auth) и блок по скелету плана §3.
+const DIAG_CARDS = [
+  '### INT-1. Счётчик сессий — 🟢',
+  '- **Граница/направление:** Фронт Арсенала → Бэк Арсенала',
+  '- **Контракт (запрос):** `GET /v1/arsenal/sessions/count`',
+  '### INT-2. Число активных сессий — 🟡',
+  '- **Граница/направление:** Бэк Арсенала → Сервис auth',
+].join('\n');
+const DIAG_BLOCK_LINES = [
+  '@startuml',
+  'participant "Фронт Арсенала" as S1',
+  'participant "Бэк Арсенала" as S2',
+  'participant "Сервис auth" as S3',
+  'S1 -> S2 : INT-1 🟢 Счётчик сессий — GET /v1/arsenal/sessions/count',
+  'S2 --> S3 : INT-2 🟡 Число активных сессий',
+  '@enduml',
+];
+const diagBlock = (lines) => ['### Схема взаимодействий (проекция карточек)', '```plantuml', ...lines, '```'].join('\n');
+const DIAG_GREEN = `${LEGEND}\n${DIAG_CARDS}\n${diagBlock(DIAG_BLOCK_LINES)}\n### Каталог ошибок\n`;
+const diagWith = (mut) => `${LEGEND}\n${DIAG_CARDS}\n${diagBlock(mut([...DIAG_BLOCK_LINES]))}\n`;
+const dchk = (body, prefix) => diagramChecks(body).find((c) => c.text.startsWith(prefix));
+
 function selftest() {
+  const allGreen = diagramChecks(DIAG_GREEN);
   const checks = [
     // Красный: аналитик отказался подтверждать, а спека пишет «подтверждено аналитиком».
     ['красный: «подтверждено аналитиком» у чужого эндпоинта пойман',
@@ -385,6 +535,50 @@ function selftest() {
     ['легенда + голое упоминание эндпоинта = метки нет',
       nearestAuthMarks(stripLegend(`${LEGEND}\nВызов \`GET /v1/sessions/count\` при загрузке панели.`)).length === 0],
     ['строки легенды вырезаны', !stripLegend(LEGEND).includes('к валидации')],
+
+    // --- схема взаимодействий Д1–Д8 ---
+    ['схема: хелперы — блок найден, 7 строк, заголовки [1, 2]',
+      plantumlBlock(DIAG_GREEN).lines.length === 7 && intHeaders(DIAG_GREEN).join(',') === '1,2'],
+    ['схема: хелперы — без блока { block: null, lines: [] }',
+      plantumlBlock(DIAG_CARDS).block === null && plantumlBlock(DIAG_CARDS).lines.length === 0],
+    ['зелёный: образцовая спека проходит все Д1–Д8',
+      allGreen.length === 8 && allGreen.every((c) => c.passed)],
+    ['зелёный: ни блока, ни карточек — все Д1–Д8 «не применимо»',
+      diagramChecks(`${LEGEND}\n## 2. Взаимодействия\nне применимо: взаимодействий нет\n`).every((c) => c.passed)],
+    ['красный Д1: карточки есть, блока нет',
+      dchk(`${LEGEND}\n${DIAG_CARDS}\n`, 'Схема: блок plantuml').passed === false],
+    ['красный Д1: блок есть, карточек нет',
+      dchk(`${LEGEND}\n${diagBlock(DIAG_BLOCK_LINES)}\n`, 'Схема: блок plantuml').passed === false],
+    ['красный Д2: карточки есть, блока нет',
+      dchk(`${LEGEND}\n${DIAG_CARDS}\n`, 'Схема: @startuml').passed === false],
+    ['красный Д2: без @enduml',
+      dchk(diagWith((l) => l.filter((s) => s !== '@enduml')), 'Схема: @startuml').passed === false],
+    ['красный Д2: без стрелок',
+      dchk(diagWith((l) => l.filter((s) => !/->/.test(s))), 'Схема: @startuml').passed === false],
+    ['зелёный Д3: повтор номера в блоке — множество то же',
+      dchk(diagWith((l) => [...l.slice(0, 6), 'S1 -> S2 : INT-1 🟢 Счётчик сессий', '@enduml']), 'Схема: множество').passed === true],
+    ['красный Д3: лишний номер INT-3 в блоке',
+      dchk(diagWith((l) => [...l.slice(0, 6), 'S2 --> S3 : INT-3 🟡 Лишняя', '@enduml']), 'Схема: множество').passed === false],
+    ['красный Д4: стрелка без двоеточия',
+      dchk(diagWith((l) => { l[4] = 'S1 -> S2 INT-1 🟢 Счётчик сессий'; return l; }), 'Схема: каждая стрелка').passed === false],
+    ['красный Д4: кириллический алиас',
+      dchk(diagWith((l) => { l[5] = 'Бэк --> S3 : INT-2 🟡 Число активных сессий'; return l; }), 'Схема: каждая стрелка').passed === false],
+    ['красный Д5: participant «Kafka» не назван ни в одной границе',
+      dchk(diagWith((l) => { l[3] = 'participant "Kafka" as S3'; return l; }), 'Схема: участники').passed === false],
+    ['красный Д5: participant-строк нет',
+      dchk(diagWith((l) => l.filter((s) => !/^participant/.test(s))), 'Схема: участники').passed === false],
+    ['красный Д6: alt в блоке',
+      dchk(diagWith((l) => [...l.slice(0, 6), 'alt auth недоступен', 'end', '@enduml']), 'Схема: нет alt').passed === false],
+    ['зелёный Д7: путь на 🟢-стрелке `->` разрешён',
+      dchk(DIAG_GREEN, 'Схема: на стрелках').passed === true],
+    ['красный Д7: путь на 🟡-стрелке',
+      dchk(diagWith((l) => { l[5] = 'S2 --> S3 : INT-2 🟡 Число активных сессий — GET /v1/sessions/count'; return l; }), 'Схема: на стрелках').passed === false],
+    ['красный Д7: путь на пунктирной `-->` без эмодзи',
+      dchk(diagWith((l) => { l[5] = 'S2 --> S3 : INT-2 Число сессий — GET /v1/sessions/count'; return l; }), 'Схема: на стрелках').passed === false],
+    ['красный Д8: плейсхолдер <имя карточки> остался',
+      dchk(diagWith((l) => { l[5] = 'S2 --> S3 : INT-2 🟡 <имя карточки>'; return l; }), 'Схема: плейсхолдеров').passed === false],
+    ['зелёный Д8: стрелки `->`/`-->` за плейсхолдер не считаются',
+      dchk(DIAG_GREEN, 'Схема: плейсхолдеров').passed === true],
   ];
   let bad = 0;
   for (const [name, ok] of checks) {
@@ -513,4 +707,8 @@ console.log(`  ${pct(hits('Конвенция null применена: null = и
 console.log(`  ${pct(hits('Статус согласован с содержанием: есть открытые пункты → «Требуются уточнения (N)», нет → «Готово к разработке»'))}\tстатус разошёлся с содержанием`);
 console.log(`  ${pct(hits('Пометки происхождения расставлены (🟢 и существующее 🔵/🟡 присутствуют)'))}\tпометок происхождения нет`);
 console.log(`  ${pct(hits('Подтверждённое существующее помечено 🔵, а не 🟡'))}\tподтверждённое осталось под 🟡 (прежняя легенда)`);
+console.log(`  ${pct(hits('Схема: блок plantuml есть ⇔ карточек INT ≥ 1'))}\tсхема: блок plantuml не совпал с наличием карточек (info)`);
+console.log(`  ${pct(hits('Схема: множество INT-N в блоке == множеству заголовков'))}\tсхема: номера INT в блоке ≠ заголовкам (info)`);
+console.log(`  ${pct(hits('Схема: на стрелках 🔵/🟡 и на пунктирных --> нет метода и пути'))}\tсхема: путь на чужой стрелке (info)`);
+console.log(`  ${pct(hits('Схема: плейсхолдеров скелета нет'))}\tсхема: плейсхолдер скелета остался (info)`);
 console.log(`  ${pct(green)}\tзелёных целиком (все якоря сразу)`);
