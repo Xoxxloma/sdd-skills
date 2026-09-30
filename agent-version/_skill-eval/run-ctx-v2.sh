@@ -57,6 +57,12 @@ case "$PROBE" in
   # Сложный граф: кольцо, встречные пары, два имени одного сервиса, карточка без направления.
   ring-mmd)  FIXTURE=ID-RING;   PROMPT_FILE=mmd-prompt.txt;   SKILL=interaction-diagram ;;
   ring-puml) FIXTURE=ID-RING;   PROMPT_FILE=puml-prompt.txt;  SKILL=interaction-diagram ;;
+  # Направления `←`/`↔`, событие, «UI (страница …)» = «UI», путь «предположительно» — `fixtures/ID-DIR/README.md`.
+  dir-mmd)   FIXTURE=ID-DIR;    PROMPT_FILE=mmd-prompt.txt;   SKILL=interaction-diagram ;;
+  dir-puml)  FIXTURE=ID-DIR;    PROMPT_FILE=puml-prompt.txt;  SKILL=interaction-diagram ;;
+  # Реалистичная спека repairy REP-214 (полная форма шаблона) — `fixtures/ID-REP/README.md`.
+  rep-mmd)   FIXTURE=ID-REP;    PROMPT_FILE=mmd-prompt.txt;   SKILL=interaction-diagram ;;
+  rep-puml)  FIXTURE=ID-REP;    PROMPT_FILE=puml-prompt.txt;  SKILL=interaction-diagram ;;
   # ПЕРВЫЙ ХОД на богатом входе: то же БТ и те же карточки сервисов, что у ts-conv, но ответов
   # аналитика в промпте НЕТ — агент обязан спрашивать сам. Заведена 2026-08-26 под жалобу с
   # прода: варианты ответа мудрёные именно на подробном входе, а все существующие плечи спеки
@@ -302,7 +308,7 @@ case "$PROBE" in
   artype)    FIXTURE=AR-TYPE;   PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 id-mmd id-puml id-ask ring-mmd ring-puml ts-ctx ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-nosplit rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml ts-ctx ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-nosplit rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
 esac
 
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
