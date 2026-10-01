@@ -1,0 +1,1 @@
+Нарисуй сценарную схему взаимодействий по спецификации docs/PRK-9/technical_specification.md в формате Mermaid.

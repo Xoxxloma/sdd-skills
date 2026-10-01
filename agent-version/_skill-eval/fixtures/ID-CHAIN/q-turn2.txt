@@ -1,0 +1,4 @@
+Участники все разные, LabNet — отдельный участник.
+INT-2 — два звена: clinic-web → booking-api (POST /v1/appointments), booking-api → schedule-service (POST /internal/slots/{slotId}/hold).
+INT-3 — три звена: clinic-web → clinic-core, clinic-core → lab-service, lab-service → LabNet; gateway → records — внутри одного процесса, не рисовать. POST /v1/lab-orders — на первое звено, POST /internal/orders — на второе, третье без метода.
+Порядок по времени: INT-1 → INT-5 → INT-2 → INT-4 → INT-3.

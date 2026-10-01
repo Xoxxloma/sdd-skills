@@ -3,9 +3,11 @@ docs/DSP-330/business_requirements.md
 docs/DSP-330/technical_specification.md
 mmd-prompt.txt
 puml-prompt.txt
+q-turn2.txt
 README.md
 services/dispatch-api.md
 services/dispatch-web.md
 services/manifest.yaml
 services/notify.md
 services/objects-registry.md
+type-short-turn2.txt

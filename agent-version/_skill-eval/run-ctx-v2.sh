@@ -45,6 +45,12 @@ STUBS_SUB=""
 # пробам маршрута: их отказ наступает на стыке «под-скилл кончил ход → проводник продолжает сам»,
 # а одним ходом этот стык не воспроизводится.
 TURN2_FILE=""
+# Реплика ТРЕТЬЕГО хода (пусто → третий и дальше ходы получают реплику TURN2_FILE, как было). Нужна трёхходовым
+# пробам `interaction-diagram` 4.3.0: ход 2 — ответ о типе схемы, ход 3 — ответы на вопросы.
+TURN3_FILE=""
+# Жёсткий потолок ходов пробы (пусто → как было: внешний RT_MAX_TURNS или 8 в пуле). Нужен двухходовым пробам
+# без трассы: пул считает движение по `_trace.log`, без него ход «пустой», и реплика уходит второй раз.
+TURNS_CAP=""
 case "$PROBE" in
   ts-live)   FIXTURE=TS-LIVE;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-conv)   FIXTURE=TS-CONV;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
@@ -63,6 +69,61 @@ case "$PROBE" in
   # Реалистичная спека repairy REP-214 (полная форма шаблона) — `fixtures/ID-REP/README.md`.
   rep-mmd)   FIXTURE=ID-REP;    PROMPT_FILE=mmd-prompt.txt;   SKILL=interaction-diagram ;;
   rep-puml)  FIXTURE=ID-REP;    PROMPT_FILE=puml-prompt.txt;  SKILL=interaction-diagram ;;
+  # Граница-цепочка `A → B → C`, `→` в скобках, кривая скобка — `fixtures/ID-CHAIN/README.md`.
+  chain-mmd)  FIXTURE=ID-CHAIN;  PROMPT_FILE=mmd-prompt.txt;   SKILL=interaction-diagram ;;
+  chain-puml) FIXTURE=ID-CHAIN;  PROMPT_FILE=puml-prompt.txt;  SKILL=interaction-diagram ;;
+  # Подробная схема (тип назван в запросе): триггер, запрос, ответ, ошибки — `fixtures/ID-DET/README.md`.
+  det-mmd)   FIXTURE=ID-DET;    PROMPT_FILE=mmd-prompt.txt;   SKILL=interaction-diagram ;;
+  det-puml)  FIXTURE=ID-DET;    PROMPT_FILE=puml-prompt.txt;  SKILL=interaction-diagram ;;
+  # Подробная на реалистичной спеке REP-214; `-det-` в имени — признак типа для `grade-id.mjs`.
+  rep-det-mmd) FIXTURE=ID-REP;  PROMPT_FILE=det-mmd-prompt.txt; SKILL=interaction-diagram ;;
+  # Опросник (`PLAN-ID-DETAIL.md` §3): вопросы по поводам П1–П3 без файла схемы, затем схема по реплике аналитика.
+  # Реплика — утверждения с номером карточки и именем стороны. `chain-q-idk` — ответ «Не знаю.»: без переспроса.
+  # `ring-q-one` / `ring-q-two` — противоположные ответы про «бэкенд возвратов»: склеить с `returns-api` / оставить
+  # отдельным. Грейдер — `grade-id.mjs`, таблица QPROBES.
+  # Скилл 4.3.0 — три хода у всех проб ниже: ход 1 — только вопрос о типе схемы, ход 2 — ответ о типе (TURN2_FILE,
+  # `type-short-turn2.txt` «Короткую.» / `type-scen-turn2.txt` «Сценарную.») и вопросы, ход 3 — прежняя реплика
+  # (TURN3_FILE) и файл схемы. Ровно три хода: TURNS_CAP=3.
+  chain-q-mmd) FIXTURE=ID-CHAIN; PROMPT_FILE=mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=q-turn2.txt;   TURNS_CAP=3 ;;
+  chain-q-idk) FIXTURE=ID-CHAIN; PROMPT_FILE=mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=idk-turn2.txt; TURNS_CAP=3 ;;
+  ring-q-one)  FIXTURE=ID-RING;  PROMPT_FILE=puml-prompt.txt; SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=one-turn2.txt; TURNS_CAP=3 ;;
+  ring-q-two)  FIXTURE=ID-RING;  PROMPT_FILE=puml-prompt.txt; SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=two-turn2.txt; TURNS_CAP=3 ;;
+  rep-q-mmd)   FIXTURE=ID-REP;   PROMPT_FILE=mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=q-turn2.txt;   TURNS_CAP=3 ;;
+  # Подробная с поводом П4 (ответ цепочки INT-5): `det-q-mmd` / `det-q-puml` — реплика «от parking-api к parking-web»,
+  # `det-q-alt` — противоположная «от billing к parking-api» (читать парой). `id-q-mmd` — П3 «планшет группы».
+  # `det-q-*` на тип отвечают «Сценарную.» — ближайшее к «подробной (с ответами и ошибками)» из запроса.
+  # `det-short-mmd` — контроль: короткая по ID-DET, поводов нет, файл с первого хода.
+  det-q-mmd)   FIXTURE=ID-DET;  PROMPT_FILE=mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt;  TURN3_FILE=q-turn2.txt;     TURNS_CAP=3 ;;
+  det-q-puml)  FIXTURE=ID-DET;  PROMPT_FILE=puml-prompt.txt; SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt;  TURN3_FILE=q-turn2.txt;     TURNS_CAP=3 ;;
+  det-q-alt)   FIXTURE=ID-DET;  PROMPT_FILE=mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt;  TURN3_FILE=q-alt-turn2.txt; TURNS_CAP=3 ;;
+  id-q-mmd)    FIXTURE=ID-DIAG; PROMPT_FILE=mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=q-turn2.txt;     TURNS_CAP=3 ;;
+  det-short-mmd) FIXTURE=ID-DET; PROMPT_FILE=short-mmd-prompt.txt; SKILL=interaction-diagram ;;
+  # Этап К (`PLAN-ID-SCENARIO.md` §8, скилл 4.0.0): короткая схема по времени. Ход вопросов — об участниках и
+  # порядке карточек без файла схемы, следующий — схема по реплике. Пробы этапа: `det-o-one`, `det-o-two`, `det-t-short`,
+  # `id-q-mmd`, `chain-q-mmd`, `chain-q-idk`, `ring-q-one`, `ring-q-two`, `rep-q-mmd` — шесть последних заведены выше,
+  # реплики у них с порядком по времени. `det-o-one` / `det-o-two` — одна спека, разный порядок карточек в реплике
+  # (читать парой); они же контроль «лишнего вопроса о карточке нет». `det-t-short` — контроль типа: в запросе
+  # «сценарную», ответ «Короткую.», дальше как `det-o-one`; файл — `interaction_diagram.md`. Грейдер — `grade-id.mjs`,
+  # таблица STAGE, сводка `--round`.
+  det-o-one)   FIXTURE=ID-DET;  PROMPT_FILE=short-mmd-prompt.txt; SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=o-one-turn2.txt; TURNS_CAP=3 ;;
+  det-o-two)   FIXTURE=ID-DET;  PROMPT_FILE=short-mmd-prompt.txt; SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=o-two-turn2.txt; TURNS_CAP=3 ;;
+  det-t-short) FIXTURE=ID-DET;  PROMPT_FILE=scen-mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=o-one-turn2.txt; TURNS_CAP=3 ;;
+  # Этап С (`PLAN-ID-SCENARIO.md` §10, скилл 4.1.0): сценарная схема по PRK-9. Ход вопросов — список карточек с
+  # триггерами и вопросы (участники, цепочка INT-5, сценарии, внутренние шаги), следующий — файл
+  # `interaction_scenarios.*` по реплике. `det-s-mmd` / `det-s-puml` — реплика А; `det-s-alt` — реплика Б с другим
+  # составом и вложенностью сценариев (читать парой с `det-s-mmd`); `det-s-idk` — «Не знаю.». Грейдер — `grade-id.mjs`,
+  # таблица SCEN. С 4.3.0 запрос нейтральный (без «сценарную»): тип приходит только ответом «Сценарную.» на ходу 2.
+  det-s-mmd)   FIXTURE=ID-DET;  PROMPT_FILE=short-mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt; TURN3_FILE=s-turn2.txt;     TURNS_CAP=3 ;;
+  det-s-puml)  FIXTURE=ID-DET;  PROMPT_FILE=short-puml-prompt.txt; SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt; TURN3_FILE=s-turn2.txt;     TURNS_CAP=3 ;;
+  det-s-alt)   FIXTURE=ID-DET;  PROMPT_FILE=short-mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt; TURN3_FILE=s-alt-turn2.txt; TURNS_CAP=3 ;;
+  det-s-idk)   FIXTURE=ID-DET;  PROMPT_FILE=short-mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt; TURN3_FILE=idk-turn2.txt;   TURNS_CAP=3 ;;
+  # Ответ «Да, всё верно.» на ход 3 (`yes-turn2.txt`): схема по гипотезам самой модели. `det-y-short` — короткая, истина —
+  # карточки, как их читает скилл (порядок по номерам, INT-5 — два звена). `det-y-scen` — сценарная, истина динамическая:
+  # гипотеза сценариев из ответа хода 2. `rep-s-mmd` — сценарная на реалистичной REP-214 с полной репликой (`s-turn2.txt`):
+  # склейка имён, направление INT-9, четыре сценария, тела списком. Грейдер — `grade-id.mjs`, таблицы STAGE и SCEN.
+  det-y-short) FIXTURE=ID-DET;  PROMPT_FILE=short-mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=yes-turn2.txt; TURNS_CAP=3 ;;
+  det-y-scen)  FIXTURE=ID-DET;  PROMPT_FILE=short-mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt;  TURN3_FILE=yes-turn2.txt; TURNS_CAP=3 ;;
+  rep-s-mmd)   FIXTURE=ID-REP;  PROMPT_FILE=mmd-prompt.txt;        SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt;  TURN3_FILE=s-turn2.txt;   TURNS_CAP=3 ;;
   # ПЕРВЫЙ ХОД на богатом входе: то же БТ и те же карточки сервисов, что у ts-conv, но ответов
   # аналитика в промпте НЕТ — агент обязан спрашивать сам. Заведена 2026-08-26 под жалобу с
   # прода: варианты ответа мудрёные именно на подробном входе, а все существующие плечи спеки
@@ -308,8 +369,11 @@ case "$PROBE" in
   artype)    FIXTURE=AR-TYPE;   PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml ts-ctx ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-nosplit rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd ts-ctx ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-nosplit rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
 esac
+
+# Потолок пробы сильнее внешнего значения: пул — дочерний процесс и читает переменную из окружения.
+[ -n "$TURNS_CAP" ] && export RT_MAX_TURNS="$TURNS_CAP"
 
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
 [ -f "$POOL" ]  || { echo "нет раннера: $POOL"; exit 1; }
@@ -430,6 +494,12 @@ if [ -n "$TURN2_FILE" ]; then
   [ -f "$TURN2" ] || { echo "нет файла второго хода: $TURN2"; exit 1; }
   echo "реплика аналитика: $TURN2_FILE   ходов до 2 подряд без движения, потолок ${RT_MAX_TURNS:-8}"
 fi
+TURN3=""
+if [ -n "$TURN3_FILE" ]; then
+  TURN3="$FIXTURE_DIR/$TURN3_FILE"
+  [ -f "$TURN3" ] || { echo "нет файла третьего хода: $TURN3"; exit 1; }
+  echo "реплика хода 3: $TURN3_FILE"
+fi
 # НАСТРОЙКИ, КОТОРЫМИ ПОЛУЧЕНЫ ЧИСЛА, ПИШУТСЯ В ПАПКУ РАУНДА. Снимок скилла уже кладётся сюда по
 # той же причине: через неделю «прогоняли с эффортом или без» восстанавливается только из файла.
 mkdir -p "$ROUND/$PROBE"
@@ -438,11 +508,12 @@ mkdir -p "$ROUND/$PROBE"
   echo "модель: ${SM_MODEL:-haiku}"
   echo "effort: ${EFFORT:-умолчание CLI}"
   echo "реплика аналитика: ${TURN2_FILE:-нет, стенд одноходовой}"
+  [ -n "$TURN3_FILE" ] && echo "реплика хода 3: $TURN3_FILE"
   echo "потолок ходов: ${RT_MAX_TURNS:-8}"
   echo "прогонов: $N, параллельность: $CONC"
 } > "$ROUND/$PROBE/_settings.txt"
 echo "effort: ${EFFORT:-умолчание CLI}"
-bash "$POOL" "$SNAP" "$PROMPT" "$ROUND/$PROBE" "$N" "$CONC" "$SEED" "$STUBS_DIR" "$TURN2"
+bash "$POOL" "$SNAP" "$PROMPT" "$ROUND/$PROBE" "$N" "$CONC" "$SEED" "$STUBS_DIR" "$TURN2" ${TURN3:+"$TURN3"}
 
 # ─── Караул фикстуры ────────────────────────────────────────────────────────────────────────
 # Запрет в промпте изоляцией НЕ является. Замер 2026-08-14, плечо `ts-conv`: прогон получил

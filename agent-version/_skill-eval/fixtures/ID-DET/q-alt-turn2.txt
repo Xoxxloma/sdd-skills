@@ -1,0 +1,1 @@
+INT-5: ответ и ошибки 402, 502 возвращает billing в parking-api — одна пара, от billing к parking-api; в parking-web на схеме они не идут.
