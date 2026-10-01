@@ -9,7 +9,7 @@
 //     пробы этапа К (скилл 4.0.0) — по таблице `STAGE` (det-o-one, det-o-two, det-t-short, det-y-short, id-q-mmd, chain-q-mmd,
 //     chain-q-idk, ring-q-one, ring-q-two, rep-q-mmd): имя из `STAGE` главнее `QPROBES`;
 //     имя не распознано — ошибка
-//     сценарная — по таблице `SCEN` (det-s-mmd, det-s-puml, det-s-alt, det-s-idk, det-y-scen, rep-s-mmd);
+//     сценарная — по таблице `SCEN` (det-s-mmd, det-s-puml, det-s-alt, det-s-idk, det-y-scen, rep-s-mmd, chb-s-mmd, chb-s-idk);
 //   node grade-id.mjs --round <папка-раунда>   — сводка раунда по папкам проб из `STAGE` и `SCEN`, итог по порогам
 //   node grade-id.mjs --selftest
 //
@@ -66,6 +66,17 @@
 // REP-214 по полной реплике; тела списком — `bodies` по определению `reference/scenario.md`, места, где тело читается
 // двояко, — `MAYBE_REP` (пометка есть или нет). Спека, засеянная до правки фикстуры, — не правка: `SPEC_PAST`.
 // К1 не считает вопросом о карточке вопрос, один ли это сервис (`sameQuestion`).
+//
+// Тела по звеньям цепочки (`chb-s-mmd`, `chb-s-idk`, фикстура ID-CHB, ESS-31): эталон — по требованию владельца, не по
+// тексту скилла. Метод и тело одного вызова — на одном звене: методы раздаются звеньям по порядку, тело, описанное при
+// методе или рядом с названными сторонами звена, — у этого звена, тело ответа без метода и сторон — у звена своего запроса.
+// Пометка тела запроса — сразу после стрелки запроса этого звена, над получателем запроса; тела ответа — сразу после
+// пунктирного ответа этого звена, над его получателем. Строки истины `['q', n, j]` / `['p', n, j]` — пометка звена j (без j —
+// звено 1, как раньше); тела звеньев — `at` пробы поверх `bodies`. С5 у этих проб сверяет ещё, над кем пометка (`over`).
+// Карточка B (INT-2) — тела без метода и без сторон: звено не определить, В1 требует вопроса о её телах со знаком `?` и
+// номером (`askBody`, `bodyAsk`); пометки — по ответу аналитика, на «не знаю» у B их нет. Вне «схема верна» печатается
+// диагностика «лишний вопрос о звене тела INT-1» (`extraBody`): у A тела при методе среднего звена. В `--round` — секция
+// сценарной; отсутствие этих проб в раунде итог не красит (`opt`).
 
 import { readFileSync, existsSync, readdirSync, statSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -74,7 +85,7 @@ import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const FIXTURES = { id: 'ID-DIAG', ring: 'ID-RING', dir: 'ID-DIR', rep: 'ID-REP', chain: 'ID-CHAIN', det: 'ID-DET' };
+const FIXTURES = { id: 'ID-DIAG', ring: 'ID-RING', dir: 'ID-DIR', rep: 'ID-REP', chain: 'ID-CHAIN', det: 'ID-DET', chb: 'ID-CHB' };
 const fixDir = (k) => join(HERE, 'fixtures', FIXTURES[k]);
 const specRel = (k) => {
   const key = readdirSync(join(fixDir(k), 'docs')).find((d) => existsSync(join(fixDir(k), 'docs', d, 'technical_specification.md')));
@@ -151,8 +162,8 @@ const STAGE = {
 // `s-turn2.txt` (А), `s-alt-turn2.txt` (Б), `idk-turn2.txt`. Сценарии по порядку, в каждом — строки по порядку:
 // ['u', n] — стрелка пользователя с текстом «Триггера» карточки n к первой стороне её первого звена;
 // ['r', n, j] — запрос звена j карточки n (j с 1, по умолчанию 1); ['a', n, j] — пунктирный ответ на него;
-// ['q', n] — пометка тела запроса или события (сразу после запроса звена 1, над его получателем);
-// ['p', n] — пометка тела ответа (сразу после ответа на звено 1, над его получателем);
+// ['q', n, j] — пометка тела запроса или события (сразу после запроса звена j, над его получателем; j по умолчанию 1);
+// ['p', n, j] — пометка тела ответа (сразу после ответа на звено j, над его получателем; j по умолчанию 1);
 // ['s', кто, слово] — внутренний шаг: стрелка стороны на себя, в тексте — слово.
 // Вложенная карточка — между запросом и ответом внешней; остальные — друг за другом, каждая после ответа
 // предыдущей. Тела — `bodies(spec)` по определению `reference/scenario.md` (`fieldsOf`).
@@ -190,8 +201,26 @@ const SCEN_REP = [
 // INT-5 запрос «ключ `projects/…`, `Content-Type: …`»: заголовок — не тело, а «ключ» — параметр-поле или путь объекта;
 // INT-5 ответ «ETag объекта»: имя поля без кавычек или заголовок ответа.
 const MAYBE_REP = { q5: [['ключ'], ['key'], ['projects/']], p5: [['etag']] };
+// ESS-31 (ID-CHB) по репликам `s-turn2.txt` и `idk-turn2.txt`: три сценария, шагов нет. INT-1 — четыре участника, тела
+// описаны при среднем звене (`school-api` → `essay-checker`): пометка запроса после запроса звена 2 над essay-checker,
+// пометка ответа после ответа звена 2 над school-api; у звеньев 1 и 3 пометок нет. INT-2 — тела в полях шаблона без
+// метода и сторон: по реплике — звено 2 (`school-api` → `plagiarism-check`), на «не знаю» — без пометок. INT-3 — контроль `A → B`.
+const SCEN_CHB = [
+  [['u', 1], ['r', 1, 1], ['r', 1, 2], ['q', 1, 2], ['r', 1, 3], ['a', 1, 3], ['a', 1, 2], ['p', 1, 2], ['a', 1, 1]],
+  [['u', 2], ['r', 2, 1], ['r', 2, 2], ['q', 2, 2], ['a', 2, 2], ['p', 2, 2], ['a', 2, 1]],
+  [['r', 3], ['q', 3], ['a', 3], ['p', 3]],
+];
+const SCEN_CHB_IDK = [SCEN_CHB[0], SCEN_CHB[1].filter((x) => x[0] !== 'q' && x[0] !== 'p'), SCEN_CHB[2]];
+// Тела звеньев, которых `bodies` не видит (поле «Контракт (по звеньям)» — не поле шаблона): номер карточки → звено → тела.
+const CHB_AT = { 1: { 2: { req: ['essayText', 'gradeLevel'], ans: ['score'] } } };
+// Вопрос о звене тела: карточка и имена её полей — строка с номером и словом «тело» или именем поля, `?` в ней или следующей.
+const CHB_ASK = { n: 2, fields: ['language', 'threshold', 'similarity', 'matches'] };
+const CHB_EXTRA = { n: 1, fields: ['essayText', 'gradeLevel', 'score'] };
 // Пробы сценарной, ключ — имя папки. `known` — аналитик ответил о сценариях (фраза шапки, Ш1). `truth` — как в `STAGE`
 // (граница из ответа, склейка имён); `maybe` — пометки, которые годятся и есть, и нет; `dyn` — истина из гипотезы хода 2.
+// `at` — тела по звеньям поверх `bodies`; `over` — С5 сверяет, над кем пометка; `askBody` — В1 требует вопроса о звене тела
+// этой карточки; `extraBody` — диагностика вопроса о звене тела, которого задавать не нужно; `opt` — отсутствие пробы в
+// раунде итог не красит.
 const SCEN = {
   'det-s-mmd': { fx: 'det', format: 'mmd', turns: 3, scen: SCEN_A, known: true },
   'det-s-puml': { fx: 'det', format: 'puml', turns: 3, scen: SCEN_A, known: true },
@@ -199,6 +228,8 @@ const SCEN = {
   'det-s-idk': { fx: 'det', format: 'mmd', turns: 3, scen: SCEN_IDK, known: false },
   'det-y-scen': { fx: 'det', format: 'mmd', turns: 3, scen: null, dyn: true, known: true },
   'rep-s-mmd': { fx: 'rep', format: 'mmd', turns: 3, scen: SCEN_REP, known: true, truth: { borders: { 9: '1С → repairy-api' }, same: { YooKassa: 'ЮKassa' } }, maybe: MAYBE_REP },
+  'chb-s-mmd': { fx: 'chb', format: 'mmd', turns: 3, scen: SCEN_CHB, known: true, at: CHB_AT, over: true, askBody: CHB_ASK, extraBody: CHB_EXTRA, opt: true },
+  'chb-s-idk': { fx: 'chb', format: 'mmd', turns: 3, scen: SCEN_CHB_IDK, known: true, at: CHB_AT, over: true, askBody: CHB_ASK, extraBody: CHB_EXTRA, opt: true },
 };
 // Правило гипотезы сценариев (Step 3 скилла) для диагностики `det-y-scen`: карточки, чей «Триггер» — действие человека,
 // руками по спеке; номер другой карточки в «Триггере» — внутри неё; остальные — без пользователя, каждая своим сценарием.
@@ -841,6 +872,20 @@ export const scenBlocks = (text, format) => (text == null ? [] : format === 'mmd
 /** Стороны звена j (с 1) по ходу запроса: [от, к]; `A ← B` — от B к A. */
 const hopEnds = (c, j) => { const h = c.hops[j - 1]; return h.sign === '←' ? [h.b, h.a] : [h.a, h.b]; };
 
+/** Ключ пометки: `q5` / `p5` — звено 1 (как до тел по звеньям), `q1.2` / `p1.2` — звено 2 и дальше. */
+const noteKey = (k, n, j) => (j === 1 ? `${k}${n}` : `${k}${n}.${j}`);
+
+/** Тела карточки `{ n: { req, ans } }` с телами звеньев `at` (`{ n: { j: { req, ans } } }`) поверх. */
+const withAt = (body, at = {}) => Object.fromEntries(Object.entries(body).map(([n, x]) => [n, at[n] ? { ...x, at: at[n] } : x]));
+
+/** Поля пометки по её ключу: тела звена из `at`, иначе тела карточки (`req` у `q`, `ans` у `p`). */
+const bodyOf = (body, key, n) => {
+  const m = key.match(/^([qp])\d+(?:\.(\d+))?$/);
+  if (!m) return [];
+  const kind = m[1] === 'q' ? 'req' : 'ans';
+  return body[n]?.at?.[Number(m[2] ?? 1)]?.[kind] ?? body[n]?.[kind] ?? [];
+};
+
 /**
  * Строки истины сценария (`SCEN_*`) → события: у запроса и ответа — ключ `r5.2` / `a5.2` и стороны [от, к]. У стрелки
  * пользователя `['u', n, текст, …]` — текст (по умолчанию «Триггер» карточки n) и `texts`: годится любой, содержащий хоть один.
@@ -853,7 +898,7 @@ export function scenTruth(rows, cards) {
     if (k === 'u') return { cls: 'user', to: hopEnds(c, 1)[0], trigger: row[2] ?? c.trigger, texts: row.length > 2 ? row.slice(2) : [c.trigger] };
     if (k === 'r') return { cls: 'req', key: `r${n}.${j}`, n, ends: hopEnds(c, j), both: c.hops[j - 1].sign === '↔', event: c.event };
     if (k === 'a') return { cls: 'ans', key: `a${n}.${j}`, n, ends: hopEnds(c, j).reverse() };
-    return { cls: 'note', key: `${k}${n}`, n, over: k === 'q' ? hopEnds(c, 1)[1] : hopEnds(c, 1)[0] };
+    return { cls: 'note', key: noteKey(k, n, j), n, over: k === 'q' ? hopEnds(c, j)[1] : hopEnds(c, j)[0] };
   });
 }
 
@@ -861,7 +906,7 @@ export function scenTruth(rows, cards) {
  * События сценария из файла, по порядку. Стрелка от `actor` — действие пользователя; стрелка стороны на себя — шаг;
  * пунктир — ответ (звено — то, чьи стороны он повторяет в обратную сторону); остальное — запрос (j-я стрелка
  * карточки — её j-е звено). У пометки ключ — по стрелке прямо перед ней: `q5` после запроса звена 1 карточки 5,
- * `p5` после ответа на него, иначе `x`.
+ * `p5` после ответа на него, `q1.2` / `p1.2` — после запроса / ответа звена 2 карточки 1 (`noteKey`); иначе `x`.
  */
 function scenEvents(d, cards) {
   const name = (al) => d.parts.get(al);
@@ -870,7 +915,8 @@ function scenEvents(d, cards) {
   for (const x of d.seq) {
     const prev = ev[ev.length - 1];
     if (x.note) {
-      const key = prev?.cls === 'req' && prev.key.endsWith('.1') ? `q${prev.n}` : prev?.cls === 'ans' && prev.key.endsWith('.1') ? `p${prev.n}` : 'x';
+      const hop = /^[ra]/.test(prev?.key ?? '') ? Number(prev.key.split('.')[1]) : NaN; // у ответа без звена — `a5.?`
+      const key = prev?.cls === 'req' && hop > 0 ? noteKey('q', prev.n, hop) : prev?.cls === 'ans' && hop > 0 ? noteKey('p', prev.n, hop) : 'x';
       ev.push({ cls: 'note', key, n: prev?.n, over: name(x.over), text: flat(x.text) });
     } else if (d.actors.has(x.from)) ev.push({ cls: 'user', a: x, to: name(x.to), text: x.label });
     else if (x.from === x.to) ev.push({ cls: 'step', a: x, who: name(x.from), text: x.label });
@@ -912,8 +958,9 @@ const stepPlaces = (ev) => ev.flatMap((e, i) => {
  * С7 — пользователь: `actor` ровно там, где сценарий начинает человек, первая стрелка — от него к первой стороне
  * первого запроса, в тексте — «Триггер» (или текст из строки истины `['u', n, текст, …]`).
  * `maybe` — пометки, которые годятся и есть, и нет (`MAYBE_REP`): есть — непустая, с подстроками одного из вариантов.
+ * `over` — С5 сверяет ещё, над кем пометка истины (получатель запроса или ответа своего звена).
  */
-export function gradeScenarios(text, format, cards, scen, body, maybe = {}) {
+export function gradeScenarios(text, format, cards, scen, body, maybe = {}, { over = false } = {}) {
   const r = {};
   const blocks = scenBlocks(text, format);
   r['И2 синтаксис'] = blocks.length > 0 && blocks.every((d) => !!d && d.arrows.length > 0);
@@ -933,11 +980,13 @@ export function gradeScenarios(text, format, cards, scen, body, maybe = {}) {
     const extra = pick(F, 'note').map((e) => e.key);
     const lost = pick(T, 'note').filter((e) => { const i = extra.indexOf(e.key); if (i < 0) return true; extra.splice(i, 1); return false; });
     const must = new Set(pick(T, 'note').map((e) => e.key));
+    const overOf = new Map(pick(T, 'note').map((e) => [e.key, e.over]));
     if (lost.length || !uniq(extra) || !extra.every((k) => maybe[k]) || !pick(F, 'note').every((e) => {
       const low = e.text.toLowerCase();
       if (!must.has(e.key)) return !!low.trim() && maybe[e.key].some((alt) => alt.every((s) => low.includes(s.toLowerCase())));
+      if (over && e.over !== overOf.get(e.key)) return false;
       // Имя через точку (`amount.value`) годится как написано и свёрнутым до верхнего уровня (`amount`), в том числе вперемешку.
-      const fields = body[e.n]?.[e.key[0] === 'q' ? 'req' : 'ans'] ?? [];
+      const fields = bodyOf(body, e.key, e.n);
       return fields.every((f) => low.includes(f.toLowerCase()) || (f.includes('.') && low.includes(f.split('.')[0].toLowerCase())));
     })) ok.С5 = false;
     const [fs, ts] = [stepPlaces(F), stepPlaces(T)];
@@ -1224,11 +1273,25 @@ export function gradeHypo(text, format, cards, a2, body, person = [], maybe = {}
 
 const SCEN_FILES = { mmd: 'interaction_scenarios.md', puml: 'interaction_scenarios.puml' };
 
+// «Тело» словом (тело, тела, телом…), не частью слова: «учитель» — не тело.
+const BODY_WORD = /(?<![а-яё])тел(?:о|а|ом|у|е|ами|ах)?(?![а-яё])/iu;
+
+/**
+ * Вопрос о звене тела карточки n в вопросах хода 2: строка называет `INT-n` (INT-1 не засчитывается за INT-11), в ней слово
+ * «тело» или имя поля тела этой карточки (`fields`, обратные кавычки не в счёт), знак `?` — в ней или в следующей непустой.
+ */
+export function bodyAsk(answer, n, fields = []) {
+  const lines = questions(answer ?? '').split('\n').filter((l) => l.trim());
+  return lines.some((l, i) => mentions(l, `INT-${n}`) && (BODY_WORD.test(l) || fields.some((f) => l.replace(/`/g, '').includes(f)))
+    && (l.includes('?') || (lines[i + 1] ?? '').includes('?')));
+}
+
 /**
  * Прогон сценарной пробы (`sc` — строка `SCEN`). «Схема верна» — И0, С1–С7 и И-якоря файла; отдельным счётом:
  * Т1 (ход 1 — вопрос о типе), В1 (Т1 и вопросы хода 2), Ш1 (источник сценариев в шапке), Р1 (открыт `reference/scenario.md`). Отчёт не грейдится.
  * Карточки схемы — после ответа (`sc.truth`), вопросы хода 2 судятся по карточкам до ответа. `sc.dyn` — истина из гипотезы
- * хода 2 (`gradeHypo`), `diag` — диагностика гипотезы вне якорей.
+ * хода 2 (`gradeHypo`), `diag` — диагностика гипотезы вне якорей. `sc.askBody` — В1 требует ещё вопроса о звене тела этой
+ * карточки (промах «тело INT-N»); `sc.extraBody` — `extra`: задан ли вопрос о звене тела, которого задавать не нужно, вне якорей.
  */
 export function gradeScenRun(runDir, format, sc) {
   const FIX = fixDir(sc.fx);
@@ -1237,7 +1300,7 @@ export function gradeScenRun(runDir, format, sc) {
   const spec = read(join(FIX, SPEC_REL));
   const asIs = withTruth(parseCards(spec), sc.fx); // до ответа аналитика — их читает ход вопросов
   const cards = withAnswer(asIs, sc.truth ?? {});
-  const body = bodies(spec);
+  const body = withAt(bodies(spec), sc.at);
   const made = listFiles(runDir).filter((f) => !fixFiles.has(f) && !isJunk(f.split('/').pop()));
   const want = SPEC_REL.replace('technical_specification.md', SCEN_FILES[format]);
   const text = read(join(runDir, want));
@@ -1249,13 +1312,16 @@ export function gradeScenRun(runDir, format, sc) {
     const g = gradeHypo(text, format, cards, read(join(runDir, 'answer-02.md')), body, PERSON[sc.fx], sc.maybe);
     Object.assign(r, g.r);
     diag = g.diag;
-  } else Object.assign(r, gradeScenarios(text, format, cards, sc.scen, body, sc.maybe));
-  const miss = notAsked(runDir, asIs, unaskedScen);
+  } else Object.assign(r, gradeScenarios(text, format, cards, sc.scen, body, sc.maybe, { over: !!sc.over }));
+  const ask = sc.askBody;
+  const unasked = !ask ? unaskedScen : (a2, cs) => [...unaskedScen(a2, cs), ...(bodyAsk(a2, ask.n, ask.fields) ? [] : [`тело INT-${ask.n}`])];
+  const miss = notAsked(runDir, asIs, unasked);
   r['Т1 первый ход — вопрос о типе'] = typeTurn(runDir).length === 0;
   r['В1 спросил'] = miss.length === 0;
   r['Ш1 шапка: источник сценариев'] = headScen(text, sc.known);
   r['Р1 прочитан reference'] = readReference(runDir, 'scenario.md');
-  return { r, made, miss, diag };
+  const extra = sc.extraBody ? bodyAsk(qTurn(runDir)[0], sc.extraBody.n, sc.extraBody.fields) : null;
+  return { r, made, miss, diag, extra };
 }
 
 /**
@@ -1281,7 +1347,7 @@ function buildScen(format, scen, cards, body, { tail, step, known = true, key = 
         return arrow(al(e.ends[0]), op(e), al(e.ends[1]), `INT-${n}${tail(n, j) ? ` · ${tail(n, j)}` : ''}`);
       }
       if (e.cls === 'ans') return arrow(al(e.ends[0]), mmd ? '-->>' : '-->', al(e.ends[1]), `INT-${e.n} · ответ`);
-      const fields = `{ ${body[e.n][e.key[0] === 'q' ? 'req' : 'ans'].join(', ')} }`;
+      const fields = `{ ${bodyOf(body, e.key, e.n).join(', ')} }`;
       return mmd ? `    Note over ${al(e.over)}: ${fields}` : `note over ${al(e.over)} : ${fields}`;
     });
     const decl = [...(user ? [mmd ? '    actor U as Пользователь' : 'actor "Пользователь" as U'] : []),
@@ -1689,12 +1755,15 @@ function selftest() {
     && [SCEN_A, SCEN_B, SCEN_IDK].map((s) => s.filter((rows) => rows[0][0] === 'u').map((rows) => rows[0][1]).join('+')).join('|') === '1+5|1+5|'
     && JSON.stringify(stepPlaces(scenTruth(SCEN_A[0], det))) === JSON.stringify([{ who: 'parking-api', text: '', word: 'сессии', at: 'r1.1|r3.1' }])
     && [SCEN_B, SCEN_IDK].every((s) => s.every((rows) => rows.every((x) => x[0] !== 's'))));
-  check('сценарная: пробы — det-s-mmd, det-s-puml (А), det-s-alt (Б), det-s-idk (не знаю), det-y-scen (гипотеза хода 2), rep-s-mmd (REP-214); у всех три хода; имя разбирается, суффикс раунда не мешает; det-s, det-s-xyz, det-y, rep-s → не распознано',
+  check('сценарная: пробы — det-s-mmd, det-s-puml (А), det-s-alt (Б), det-s-idk (не знаю), det-y-scen (гипотеза хода 2), rep-s-mmd (REP-214), chb-s-mmd, chb-s-idk (ESS-31, тела по звеньям); у всех три хода; имя разбирается, суффикс раунда не мешает; det-s, det-s-xyz, det-y, rep-s, chb-s, chb-s-puml → не распознано',
     Object.keys(SCEN).map((k) => { const p = parseProbe(`${k}-r2`); return `${p.name}:${p.format}:${p.sc === SCEN[k]}:${SCEN[k].turns}:${!p.st && !p.q}`; }).join()
-      === 'det-s-mmd:mmd:true:3:true,det-s-puml:puml:true:3:true,det-s-alt:mmd:true:3:true,det-s-idk:mmd:true:3:true,det-y-scen:mmd:true:3:true,rep-s-mmd:mmd:true:3:true'
+      === 'det-s-mmd:mmd:true:3:true,det-s-puml:puml:true:3:true,det-s-alt:mmd:true:3:true,det-s-idk:mmd:true:3:true,det-y-scen:mmd:true:3:true,rep-s-mmd:mmd:true:3:true,'
+      + 'chb-s-mmd:mmd:true:3:true,chb-s-idk:mmd:true:3:true'
     && SCEN['det-s-mmd'].scen === SCEN_A && SCEN['det-s-puml'].scen === SCEN_A && SCEN['det-s-alt'].scen === SCEN_B && SCEN['det-s-idk'].scen === SCEN_IDK
     && SCEN['det-y-scen'].dyn && SCEN['det-y-scen'].scen === null && SCEN['rep-s-mmd'].scen === SCEN_REP && SCEN['rep-s-mmd'].fx === 'rep'
-    && ['det-s', 'det-s-xyz', 'det-s-mmdx', 'det-y', 'det-y-scenx', 'rep-s', 'rep-s-puml'].every((b) => parseProbe(b) === null) && parseProbe('det-short-mmd').sc == null);
+    && SCEN['chb-s-mmd'].scen === SCEN_CHB && SCEN['chb-s-idk'].scen === SCEN_CHB_IDK && ['chb-s-mmd', 'chb-s-idk'].every((k) => SCEN[k].fx === 'chb')
+    && Object.keys(SCEN).filter((k) => SCEN[k].opt).join() === 'chb-s-mmd,chb-s-idk'
+    && ['det-s', 'det-s-xyz', 'det-s-mmdx', 'det-y', 'det-y-scenx', 'rep-s', 'rep-s-puml', 'chb-s', 'chb-s-puml', 'chb-s-mmdx'].every((b) => parseProbe(b) === null) && parseProbe('det-short-mmd').sc == null);
   // Истина построчно — второй записью, чтобы правка таблицы `SCEN_*` не прошла молча (эталоны собираются из неё же).
   const flowOf = (scen) => scen.map((rows) => scenTruth(rows, det).map((e) => (e.cls === 'user' ? 'u' : e.cls === 'step' ? `s:${e.who}` : e.key)).join(' ')).join(' | ');
   check('сценарная: истина А построчно', flowOf(SCEN_A) === 'u r1.1 q1 s:parking-api r3.1 a3.1 p3 r4.1 a4.1 a1.1 p1 r2.1 q2 | u r5.1 r5.2 a5.2 a5.1 p5 | r6.1 q6 a6.1');
@@ -1709,13 +1778,19 @@ function selftest() {
   const RB = bodies(repSpec);
   const REPC = withAnswer(rp, SCEN['rep-s-mmd'].truth);
   const tailRep = (n) => Q1A.find((a) => a[0] === n)[4];
-  const FXS = { det: { cards: det, body: SB, tail: tailOf, key: 'PRK-9' }, rep: { cards: REPC, body: RB, tail: tailRep, key: 'REP-214' } };
+  // ESS-31 (тела по звеньям): карточки, тела с `CHB_AT`, хвосты подписей — методы контракта по звеньям.
+  const chbSpec = read(join(fixDir('chb'), specRel('chb')));
+  const chb = parseCards(chbSpec);
+  const CB = withAt(bodies(chbSpec), CHB_AT);
+  const tailChb = (n, j) => chb.find((c) => c.n === n).paths[j - 1]?.join(' ') ?? '';
+  const FXS = { det: { cards: det, body: SB, tail: tailOf, key: 'PRK-9' }, rep: { cards: REPC, body: RB, tail: tailRep, key: 'REP-214' },
+    chb: { cards: chb, body: CB, tail: tailChb, key: 'ESS-31' } };
   const SCEN_T = Object.fromEntries(Object.keys(SCEN).map((k) => [k, SCEN[k].scen]));
   const se2 = (k, format = SCEN[k].format, scen = SCEN_T[k], known = SCEN[k].known, body = FXS[SCEN[k].fx].body) => {
     const x = FXS[SCEN[k].fx];
     return buildScen(format, scen, x.cards, body, { tail: x.tail, step: () => 'проверить, что открытой сессии нет', known, key: x.key });
   };
-  const sg2 = (k, text, format = SCEN[k].format) => ({ ...gradeScenarios(text, format, FXS[SCEN[k].fx].cards, SCEN_T[k], FXS[SCEN[k].fx].body, SCEN[k].maybe),
+  const sg2 = (k, text, format = SCEN[k].format) => ({ ...gradeScenarios(text, format, FXS[SCEN[k].fx].cards, SCEN_T[k], FXS[SCEN[k].fx].body, SCEN[k].maybe, { over: !!SCEN[k].over }),
     'Ш1 шапка: источник сценариев': headScen(text, SCEN[k].known) });
   for (const k of Object.keys(SCEN).filter((x) => SCEN[x].fx === 'det' && SCEN[x].scen)) for (const f of ['mmd', 'puml']) green(`${k} ${f}: эталон сценарной зелёный`, sg2(k, se2(k, f), f));
   // Мутация строк истины: сценарий i пробы k переписан функцией `fn`, эталон собран заново и оценён по истине пробы.
@@ -1836,6 +1911,105 @@ function selftest() {
     && reds(sg2('rep-s-mmd', eR.replace('U->>S1: владелец компании нажимает «Вернуть» у оплаченного онлайн-платежа', 'U->>S1: владелец оформляет возврат'))) === 'С7');
   const yoo = eR.replace(/(## Сценарий 3[\s\S]*?)as ЮKassa/, '$1as YooKassa');
   check('rep-s-mmd: INT-8 к отдельному участнику YooKassa (склейку не учёл) → С3 и И6 среди красных', yoo !== eR && ['С3', 'И6'].every((k) => reds(sg2('rep-s-mmd', yoo)).split(',').includes(k)));
+
+  // chb-s-mmd, chb-s-idk: ESS-31 — тела по звеньям цепочки; эталон по требованию владельца, а не по тексту скилла.
+  check('chb: карточек 3, звеньев 3/2/1; стороны INT-1 — school-web, school-api, essay-checker, Lexa («(внешний LLM)» снято); вопрос по карточке — цепочки INT-1 и INT-2',
+    chb.map((c) => c.hops.length).join() === '3,2,1' && sides(chb[0].border).join() === 'school-web,school-api,essay-checker,Lexa'
+    && sidesOf(chb).join() === 'school-web,school-api,essay-checker,Lexa,plagiarism-check,journal-service'
+    && cardAsks(chb).map((p) => `${p.id} INT-${p.n}`).join() === 'цепочка INT-1,цепочка INT-2' && chb.every((c) => !c.event && c.hops.every((h) => h.sign === '→')));
+  check('chb: методы по звеньям — INT-1 из подпунктов «Контракт (по звеньям)» (у звена 3 метода нет), у INT-2 методов нет, у INT-3 один',
+    chb.map((c) => c.paths.map((p) => p.join(' ')).join('+')).join(' | ') === 'POST /v1/essays/{essayId}/review+POST /internal/reviews |  | POST /v1/journal/batch');
+  const subOf = (pre) => chbSpec.split('\n').find((l) => l.trimStart().startsWith(pre)) ?? '';
+  check('chb: тела — у INT-1 полей шаблона нет («по звеньям»), тела среднего звена — из его подпункта (`CHB_AT`), у звена 1 «тела нет», у звена 3 контракта нет; INT-2 и INT-3 — по `bodies`',
+    Object.entries(bodies(chbSpec)).map(([n, b]) => `${n}:${b.req.join('+')}/${b.ans.join('+')}`).join(' ') === '1:/ 2:language+threshold/similarity+matches 3:classId+grades/accepted+rejected'
+    && /^\s+- `school-api` → `essay-checker`: `POST \/internal\/reviews`, .*Запрос — JSON `ReviewRequest \{ essayText, gradeLevel \}`\. Ответ — JSON `ReviewResult \{ score \}`\.$/.test(subOf('- `school-api` → `essay-checker`'))
+    && /тела нет/.test(subOf('- `school-web` → `school-api`')) && /не описан/.test(subOf('- `essay-checker` → Lexa'))
+    && JSON.stringify(CHB_AT) === '{"1":{"2":{"req":["essayText","gradeLevel"],"ans":["score"]}}}'
+    && [['q1.2', 1], ['p1.2', 1], ['q1', 1], ['q2.2', 2], ['p2.2', 2], ['q3', 3], ['p3', 3]].map(([key, n]) => bodyOf(CB, key, n).join('+')).join(' ')
+      === 'essayText+gradeLevel score  language+threshold similarity+matches classId+grades accepted+rejected');
+  const bLines = chbSpec.split('\n').filter((l) => /^- \*\*Контракт \((запрос|ответ)\):\*\* .*(language|similarity)/.test(l));
+  check('chb: звено тел INT-2 из карточки не определить — в «Контракт (запрос)» и «Контракт (ответ)» только тела: ни метода с путём, ни имён сторон',
+    bLines.join('\n') === '- **Контракт (запрос):** тело `{ language, threshold }`\n- **Контракт (ответ):** `{ similarity, matches }`'
+    && bLines.every((l) => !PATH_RE.test(l) && !sidesOf(chb).some((nm) => l.includes(nm))));
+  check('chb: истина построчно — пометки INT-1 у звена 2 (запрос — после r1.2, ответ — после a1.2), у звеньев 1 и 3 нет; INT-2 — у звена 2 по реплике, на «не знаю» нет; INT-3 — контроль',
+    flowOfC(SCEN_CHB, chb) === 'u r1.1 r1.2 q1.2 r1.3 a1.3 a1.2 p1.2 a1.1 | u r2.1 r2.2 q2.2 a2.2 p2.2 a2.1 | r3.1 q3 a3.1 p3'
+    && flowOfC(SCEN_CHB_IDK, chb) === 'u r1.1 r1.2 q1.2 r1.3 a1.3 a1.2 p1.2 a1.1 | u r2.1 r2.2 a2.2 a2.1 | r3.1 q3 a3.1 p3');
+  check('chb: пометки над получателями — запрос INT-1 над essay-checker, ответ над school-api; INT-2 — над plagiarism-check и school-api; INT-3 — над journal-service и school-api',
+    SCEN_CHB.map((rows) => scenTruth(rows, chb).filter((e) => e.cls === 'note').map((e) => `${e.key}:${e.over}`).join()).join(' | ')
+      === 'q1.2:essay-checker,p1.2:school-api | q2.2:plagiarism-check,p2.2:school-api | q3:journal-service,p3:school-api');
+  const chbTurn = (f) => read(join(fixDir('chb'), f)) ?? '';
+  const [sT, iT] = [chbTurn('s-turn2.txt').split('\n'), chbTurn('idk-turn2.txt').split('\n')];
+  check('chb: реплики хода 3 различаются одной строкой о телах INT-2 (звено school-api → plagiarism-check / «не знаю»), о телах INT-1 молчат; сценарии реплики = истине; тип — «Сценарную.»; в запросе нет «сценар»',
+    sT.length === iT.length && sT.filter((l, i) => l !== iT[i]).join('|') === 'Тела INT-2 (запрос и ответ) — звена school-api → plagiarism-check.'
+    && iT.filter((l, i) => l !== sT[i]).join('|') === 'Тела INT-2 — не знаю, к какому звену они относятся.' && !/Тел[аоу]? INT-1/.test(sT.join('\n'))
+    && /1\) «ученик нажал «Проверить эссе» на странице задания» — INT-1; до ответа INT-1 и после него других карточек нет\. 2\) «учитель нажал «Проверить на заимствования» в карточке эссе» — INT-2; до ответа INT-2 и после него других карточек нет\. Без пользователя: INT-3\./.test(sT.join('\n'))
+    && [chb[0].trigger, chb[1].trigger].every((t) => sT.join('\n').includes(`«${t}»`)) && SCEN_CHB.map((rows) => rows[0][0]).join() === 'u,u,r'
+    && chbTurn('type-scen-turn2.txt').trim() === 'Сценарную.' && !/сценар/i.test(chbTurn('mmd-prompt.txt')) && /Mermaid/.test(chbTurn('mmd-prompt.txt')));
+  const chbMan = chbTurn('_manifest.txt').split('\n').filter(Boolean);
+  check('chb: манифест = файлам фикстуры (без него самого); реплики — `*-turn2.txt`, промпт — `*-prompt.txt`', chbMan.length === listFiles(fixDir('chb')).length - 1
+    && eqSet(chbMan, listFiles(fixDir('chb')).filter((f) => f !== '_manifest.txt'))
+    && ['docs/ESS-31/technical_specification.md', 's-turn2.txt', 'idk-turn2.txt', 'type-scen-turn2.txt', 'mmd-prompt.txt', 'README.md'].every((f) => chbMan.includes(f)));
+  const eC = { mmd: se2('chb-s-mmd'), idk: se2('chb-s-idk') };
+  for (const k of ['chb-s-mmd', 'chb-s-idk']) for (const f of ['mmd', 'puml']) green(`${k} ${f}: эталон сценарной зелёный`, sg2(k, se2(k, f), f));
+  check('chb-s-mmd: в эталоне пометка — сразу за стрелкой своего звена, над получателем',
+    eC.mmd.includes('    S2->>S3: INT-1 · POST /internal/reviews\n    Note over S3: { essayText, gradeLevel }\n    S3->>S4: INT-1\n    S4-->>S3: INT-1 · ответ\n    S3-->>S2: INT-1 · ответ\n    Note over S2: { score }\n    S2-->>S1: INT-1 · ответ\n')
+    && eC.mmd.includes('    S1->>S2: INT-2\n    S2->>S3: INT-2\n    Note over S3: { language, threshold }\n    S3-->>S2: INT-2 · ответ\n    Note over S2: { similarity, matches }\n    S2-->>S1: INT-2 · ответ\n')
+    && eC.mmd.includes('    S1->>S2: INT-3 · POST /v1/journal/batch\n    Note over S2: { classId, grades }\n    S2-->>S1: INT-3 · ответ\n    Note over S1: { accepted, rejected }\n')
+    && !eC.idk.includes('{ language, threshold }') && !eC.idk.includes('{ similarity, matches }'));
+  // Мутации эталона: пары [было, стало] по порядку; подстроки нет — строка-ошибка вместо красных якорей.
+  const cr = (k, ...pairs) => {
+    let t = eC[k];
+    for (const [a, b] of pairs) { if (!t.includes(a)) return `нет в эталоне: ${a}`; t = t.replace(a, b); }
+    return reds(sg2(k === 'mmd' ? 'chb-s-mmd' : 'chb-s-idk', t));
+  };
+  const A_Q = ['/review\n    S2->>S3: INT-1 · POST /internal/reviews\n    Note over S3: { essayText, gradeLevel }\n', '/review\n    Note over S2: { essayText, gradeLevel }\n    S2->>S3: INT-1 · POST /internal/reviews\n'];
+  const A_P = ['    Note over S2: { score }\n    S2-->>S1: INT-1 · ответ\n', '    S2-->>S1: INT-1 · ответ\n    Note over S1: { score }\n'];
+  const B_Q = ['    S1->>S2: INT-2\n    S2->>S3: INT-2\n    Note over S3: { language, threshold }\n', '    S1->>S2: INT-2\n    Note over S2: { language, threshold }\n    S2->>S3: INT-2\n'];
+  const B_P = ['    Note over S2: { similarity, matches }\n    S2-->>S1: INT-2 · ответ\n', '    S2-->>S1: INT-2 · ответ\n    Note over S1: { similarity, matches }\n'];
+  check('chb-s-mmd: тела по правилу «запрос — после первого запроса цепочки, ответ — после последнего ответа» (INT-1 и INT-2, порознь и вместе) → С5',
+    [[A_Q], [A_P], [B_Q], [B_P], [A_Q, A_P, B_Q, B_P]].every((ps) => cr('mmd', ...ps) === 'С5'));
+  check('chb-s-mmd: пометка на месте, но не над получателем (запрос INT-1 над school-api, ответ INT-2 над plagiarism-check, ответ INT-3 над journal-service) → С5; без сверки «над кем» тот же файл зелёный',
+    cr('mmd', ['    Note over S3: { essayText, gradeLevel }', '    Note over S2: { essayText, gradeLevel }']) === 'С5'
+    && cr('mmd', ['    Note over S2: { similarity, matches }', '    Note over S3: { similarity, matches }']) === 'С5'
+    && cr('mmd', ['    Note over S1: { accepted, rejected }', '    Note over S2: { accepted, rejected }']) === 'С5'
+    && Object.values(gradeScenarios(eC.mmd.replace('    Note over S3: { essayText, gradeLevel }', '    Note over S2: { essayText, gradeLevel }'), 'mmd', chb, SCEN_CHB, CB)).every(Boolean));
+  check('chb-s-mmd: нет пометки запроса INT-1, пометка у звена 3 (к Lexa), поле потеряно, лишняя пустая пометка, тела INT-1 повторены у звена 1 → С5; имя типа перед полями и поля без скобок — годятся',
+    cr('mmd', ['    Note over S3: { essayText, gradeLevel }\n', '']) === 'С5'
+    && cr('mmd', ['    S3->>S4: INT-1\n', '    S3->>S4: INT-1\n    Note over S4: { essayText, gradeLevel }\n']) === 'С5'
+    && cr('mmd', ['{ essayText, gradeLevel }', '{ essayText }']) === 'С5'
+    && cr('mmd', ['    S4-->>S3: INT-1 · ответ\n', '    S4-->>S3: INT-1 · ответ\n    Note over S3: { }\n']) === 'С5'
+    && cr('mmd', ['/review\n', '/review\n    Note over S2: { essayText, gradeLevel }\n']) === 'С5'
+    && cr('mmd', ['{ essayText, gradeLevel }', 'ReviewRequest { essayText, gradeLevel }'], ['{ score }', 'ReviewResult: score']) === '');
+  check('chb: пробы читаются парой — эталон chb-s-mmd на chb-s-idk → только С5 (пометки INT-2 лишние), эталон chb-s-idk на chb-s-mmd → только С5 (их нет); chb-s-idk с пометками INT-2 у звена 1 → С5',
+    reds(sg2('chb-s-idk', eC.mmd)) === 'С5' && reds(sg2('chb-s-mmd', eC.idk)) === 'С5'
+    && cr('idk', ['    S1->>S2: INT-2\n', '    S1->>S2: INT-2\n    Note over S2: { language, threshold }\n'], ['    S2-->>S1: INT-2 · ответ\n', '    S2-->>S1: INT-2 · ответ\n    Note over S1: { similarity, matches }\n']) === 'С5');
+  check('chb: контроль INT-3 (`A → B`) — нет пометки ответа → С5; пометка запроса над отправителем → С5; пометка ответа до ответа → С5',
+    cr('mmd', ['    Note over S1: { accepted, rejected }\n', '']) === 'С5'
+    && cr('mmd', ['    Note over S2: { classId, grades }', '    Note over S1: { classId, grades }']) === 'С5'
+    && cr('mmd', ['    S2-->>S1: INT-3 · ответ\n    Note over S1: { accepted, rejected }\n', '    Note over S1: { accepted, rejected }\n    S2-->>S1: INT-3 · ответ\n']) === 'С5');
+  check('chb: прежние пробы не задеты — ключи пометок звена 1 прежние (q5, p5), пометка после звена 2 у PRK-9 — по-прежнему лишняя (С5)',
+    scenTruth(SCEN_A[1], det).filter((e) => e.cls === 'note').map((e) => e.key).join() === 'p5'
+    && sm('det-s-mmd', 1, put(['r', 5, 2], ['q', 5, 2])) === 'С5' && sm('det-s-mmd', 1, (rows) => put(['a', 5, 2], ['p', 5, 2])(drop(['p', 5])(rows))) === 'С5');
+  // В1 и диагностика: вопрос о звене тел INT-2 обязателен, о звене тел INT-1 — лишний (тело однозначно при среднем звене).
+  const CQ = 'INT-2: тела `{ language, threshold }` и `{ similarity, matches }` — к какому звену относятся: school-web → school-api или school-api → plagiarism-check?';
+  const CA1 = 'INT-1: тела `{ essayText, gradeLevel }` и `{ score }` рисую у звена school-api → essay-checker. Верно?';
+  const CS1 = [...chb.map((c) => `INT-${c.n} «карточка» — триггер: «${c.trigger}»`),
+    `1. Участников 6: ${sidesOf(chb).join(', ')}. Считаю всех разными. Есть ли среди них один сервис под двумя именами?`,
+    '2. INT-1: рисую звенья school-web → school-api (`POST /v1/essays/{essayId}/review`), school-api → essay-checker (`POST /internal/reviews`), essay-checker → Lexa. Верно?',
+    '3. INT-2: рисую звенья school-web → school-api, school-api → plagiarism-check. Верно?',
+    `4. ${CQ}`,
+    '5. Сценарии: 1) «ученик нажал «Проверить эссе» на странице задания» — INT-1; 2) «учитель нажал «Проверить на заимствования» в карточке эссе» — INT-2. Без пользователя: INT-3. Верно?',
+    '6. Внутренних шагов в карточках нет — рисую без них. Верно?'].join('\n');
+  check('bodyAsk: вопрос о звене тел INT-2 — номер и «тело» или имя поля, `?` в той же строке или следующей → да',
+    bodyAsk(CQ, 2, CHB_ASK.fields) && bodyAsk('5. **INT-2** — к какому звену относится тело запроса и ответа?', 2)
+    && bodyAsk('INT-2: `language`, `threshold` — запрос какого звена?', 2, CHB_ASK.fields) && bodyAsk('5. INT-2: тело запроса и ответа рисую у звена school-web → school-api.\n   Верно?', 2));
+  check('bodyAsk: нет — вопрос о цепочке INT-2 без тел, «учитель» в триггере, тела без номера, INT-12 вместо INT-2, без `?`, номер и тело в разных строках',
+    !bodyAsk(CS1.split('\n')[5], 2, CHB_ASK.fields) && !bodyAsk(CS1.split('\n')[7], 2, CHB_ASK.fields)
+    && !bodyAsk('К какому звену относятся тела запроса и ответа?', 2, CHB_ASK.fields) && !bodyAsk('INT-12: к какому звену относится тело?', 2)
+    && !bodyAsk('INT-2: тела `{ language, threshold }` рисую у звена school-api → plagiarism-check.', 2, CHB_ASK.fields) && !bodyAsk('INT-2: рисую два звена.\nК какому звену тело?', 2));
+  check('chb, В1: полный набор (участники, цепочки INT-1 и INT-2, тела INT-2, сценарии, шаги) — вопросы Step 3 все, о телах INT-2 спрошено, о телах INT-1 — нет; лишний вопрос о телах INT-1 опознан',
+    unaskedScen(CS1, chb).join() === '' && bodyAsk(CS1, 2, CHB_ASK.fields) && !bodyAsk(CS1, 1, CHB_EXTRA.fields) && bodyAsk(`${CS1}\n7. ${CA1}`, 1, CHB_EXTRA.fields)
+    && !bodyAsk(CS1.replace(`4. ${CQ}\n`, ''), 2, CHB_ASK.fields) && unaskedScen(CS1.replace(`4. ${CQ}\n`, ''), chb).join() === '');
 
   // det-y-scen: гипотеза хода 2 → прочтения (формы из t-pool1), правило триггеров, выбор прочтения при оценке.
   const DQ = {
@@ -2245,7 +2419,7 @@ function selftest() {
       && flowOfC(SCEN_T['det-y-scen'], det) === 'u r1.1 q1 r3.1 a3.1 p3 a1.1 p1 | u r5.1 r5.2 a5.2 a5.1 p5 | r2.1 q2 | r4.1 a4.1 | r6.1 q6 a6.1');
     const refScen = ev('Read', { file_path: 'C:/Users/u/AppData/Local/Temp/skill-eval-seed/r-skills/interaction-diagram/reference/scenario.md' });
     const sfile = (k) => specRel(SCEN[k].fx).replace('technical_specification.md', SCEN_FILES[SCEN[k].format]);
-    const QS = { det: S1, rep: RS1 };
+    const QS = { det: S1, rep: RS1, chb: CS1 };
     const sbox = (k, over = {}) => {
       const a1 = QS[SCEN[k].fx];
       const a2 = `схема: ${sfile(k)}\nсценариев: ${SCEN_T[k].length}\nсценарии: ${SCEN[k].known ? 'со слов аналитика' : 'не подтверждены, по карточке на сценарий'}`;
@@ -2274,23 +2448,54 @@ function selftest() {
     check('rep-s-mmd, песочница: схема без склейки YooKassa → красный; «Сценарную.» без пометок INT-5 и с ними — зелёный',
       !Object.values(ssr('rep-s-mmd', 'run-02', { [sfile('rep-s-mmd')]: yoo })).every(Boolean)
       && Object.values(ssr('rep-s-mmd', 'run-03', { [sfile('rep-s-mmd')]: withNotes(true, true, { req: ['ключ'], ans: ['ETag'] }) })).every(Boolean));
+    // chb: В1 с вопросом о телах INT-2, диагностика вопроса о телах INT-1, файл по прежнему правилу «первый запрос / последний ответ».
+    const oldRule = [A_Q, A_P, B_Q, B_P].reduce((t, [a, b]) => t.replace(a, b), eC.mmd);
+    check('chb-s-mmd, песочница: без вопроса о телах INT-2 → только В1 (промах «тело INT-2»); вопрос о телах INT-1 сверх набора — зелёный; файл по правилу «первый запрос / последний ответ» → С5; chb-s-idk с пометками INT-2 → С5',
+      reds(ssr('chb-s-mmd', 'run-02', { 'answer-01.md': CS1.replace(`4. ${CQ}\n`, '') })) === 'В1'
+      && reds(ssr('chb-s-mmd', 'run-03', { 'answer-01.md': `${CS1}\n7. ${CA1}` })) === ''
+      && oldRule !== eC.mmd && reds(ssr('chb-s-mmd', 'run-04', { [sfile('chb-s-mmd')]: oldRule })) === 'С5'
+      && reds(ssr('chb-s-idk', 'run-02', { [sfile('chb-s-idk')]: eC.mmd })) === 'С5');
+    const gcp = gradePool(join(sx, 'chb-s-mmd'), parseProbe('chb-s-mmd'));
+    check('chb-s-mmd, пул: строка прогона — промах В1 и диагностика «лишний вопрос о звене тела INT-1: да/нет»; сводная строка диагностики вне «схема верна»; «схема верна» 3/4 (В1 не красит)',
+      gcp.out.includes('run-01: зелёный  новые файлы: docs/ESS-31/interaction_scenarios.md  лишний вопрос о звене тела INT-1: нет')
+      && gcp.out.includes('run-02: красный В1  новые файлы: docs/ESS-31/interaction_scenarios.md  В1: тело INT-2  лишний вопрос о звене тела INT-1: нет')
+      && gcp.out.includes('run-03: зелёный  новые файлы: docs/ESS-31/interaction_scenarios.md  лишний вопрос о звене тела INT-1: да')
+      && gcp.out.includes('run-04: красный С5  новые файлы: docs/ESS-31/interaction_scenarios.md  лишний вопрос о звене тела INT-1: нет')
+      && gcp.out.includes('лишний вопрос о звене тела INT-1 (вне «схема верна» и порогов): 1/4') && gcp.out.includes('схема верна (якоря И и С): 3/4')
+      && gcp.out.includes('спросил (В1): 3/4') && gcp.extraQ === 1);
     const sgp = gradePool(join(sx, 'det-s-alt'), parseProbe('det-s-alt'));
     check('сценарная, пул: «схема верна» по якорям И и С, отдельный счёт не красит; строка «спросил (В1)»', sgp.core === 3 && sgp.whole === 1
       && sgp.out.includes('схема верна (якоря И и С): 3/3') && sgp.out.includes('спросил (В1): 1/3') && sgp.out.includes('run-03: красный В1  новые файлы: docs/PRK-9/interaction_scenarios.md  В1: шаги'));
     const sround = join(tmp, 'sround');
     for (const k of Object.keys(SCEN)) ssr(k, 'run-01', {}, sround);
     const sa = gradeRound(sround);
-    check('раунд сценарной: короткой нет — её пороги не оцениваются; спросил 6/6, схема верна 6/6 (det-y-scen и rep-s-mmd в сводке сценарной), пара 2/2; итог зелёный',
-      sa.out.includes('--- короткая: проб в раунде нет — пороги не оцениваются') && sa.out.includes('спросил: 6/6 (100%) — порог 90%: да')
-      && sa.out.includes('схема верна: 6/6 (100%) — порог 70%: да') && sa.out.includes('пара det-s-mmd + det-s-alt: 2/2 — порог 2/2: да')
+    check('раунд сценарной: короткой нет — её пороги не оцениваются; спросил 8/8, схема верна 8/8 (det-y-scen, rep-s-mmd и chb-* в сводке сценарной), пара 2/2; итог зелёный',
+      sa.out.includes('--- короткая: проб в раунде нет — пороги не оцениваются') && sa.out.includes('спросил: 8/8 (100%) — порог 90%: да')
+      && sa.out.includes('схема верна: 8/8 (100%) — порог 70%: да') && sa.out.includes('пара det-s-mmd + det-s-alt: 2/2 — порог 2/2: да')
       && sa.out.includes('det-s-idk: схема верна 1/1 · спросил 1/1 · Т1 1/1 · Ш1 1/1 · Р1 1/1 · сбой API 0')
       && sa.out.includes('det-y-scen: схема верна 1/1 · спросил 1/1 · Т1 1/1 · Ш1 1/1 · Р1 1/1 · по правилу триггеров 0/1 · сбой API 0')
-      && sa.out.includes('rep-s-mmd: схема верна 1/1 · спросил 1/1 · Т1 1/1 · Ш1 1/1 · Р1 1/1 · сбой API 0') && sa.green && sa.out[sa.out.length - 1] === 'ИТОГ: ЗЕЛЁНЫЙ');
+      && sa.out.includes('rep-s-mmd: схема верна 1/1 · спросил 1/1 · Т1 1/1 · Ш1 1/1 · Р1 1/1 · сбой API 0')
+      && sa.out.includes('chb-s-mmd: схема верна 1/1 · спросил 1/1 · Т1 1/1 · Ш1 1/1 · Р1 1/1 · лишний вопрос о теле INT-1 0/1 · сбой API 0')
+      && sa.out.includes('chb-s-idk: схема верна 1/1 · спросил 1/1 · Т1 1/1 · Ш1 1/1 · Р1 1/1 · лишний вопрос о теле INT-1 0/1 · сбой API 0')
+      && sa.green && sa.out[sa.out.length - 1] === 'ИТОГ: ЗЕЛЁНЫЙ');
     ssr('det-s-alt', 'run-02', { [sfile('det-s-alt')]: se2('det-s-mmd') }, sround); // реплика Б, а схема по реплике А
     const sb2 = gradeRound(sround);
-    check('раунд сценарной: схема det-s-alt по реплике А → пара 2/3 ниже порога 3/3, схема верна 6/7 (85.7%) проходит; итог красный',
-      sb2.out.includes('пара det-s-mmd + det-s-alt: 2/3 — порог 3/3: нет') && sb2.out.includes('схема верна: 6/7 (85.7%) — порог 70%: да') && !sb2.green
+    check('раунд сценарной: схема det-s-alt по реплике А → пара 2/3 ниже порога 3/3, схема верна 8/9 (88.8%) проходит; итог красный',
+      sb2.out.includes('пара det-s-mmd + det-s-alt: 2/3 — порог 3/3: нет') && sb2.out.includes('схема верна: 8/9 (88.8%) — порог 70%: да') && !sb2.green
       && sb2.scen.pair.join('/') === '2/3');
+    // Старый раунд (шесть прежних проб, chb-* нет) сводится как до chb: ни строки, ни «нет прогонов» о chb-*. Раунд из одних chb-* —
+    // секция сценарной, прежние пробы названы непрогнанными (итог красный, как у любого неполного раунда).
+    const sold = join(tmp, 'sold');
+    for (const k of Object.keys(SCEN).filter((x) => !SCEN[x].opt)) ssr(k, 'run-01', {}, sold);
+    const so = gradeRound(sold);
+    const sonly = join(tmp, 'sonly');
+    for (const k of ['chb-s-mmd', 'chb-s-idk']) ssr(k, 'run-01', {}, sonly);
+    const sn = gradeRound(sonly);
+    check('раунд без chb-*: спросил 6/6, схема верна 6/6, итог зелёный, о chb-* ни слова; раунд из одних chb-*: сценарная 2/2, «нет прогонов» — шесть прежних, итог красный',
+      so.out.includes('спросил: 6/6 (100%) — порог 90%: да') && so.out.includes('схема верна: 6/6 (100%) — порог 70%: да') && so.green
+      && !so.out.some((l) => l.includes('chb')) && so.out.length === sa.out.length - 2
+      && sn.out.includes('спросил: 2/2 (100%) — порог 90%: да') && sn.out.includes('схема верна: 2/2 (100%) — порог 70%: да')
+      && sn.out.includes('нет прогонов пробы: det-s-mmd, det-s-puml, det-s-alt, det-s-idk, det-y-scen, rep-s-mmd') && !sn.green);
     const mixed = join(tmp, 'mixed');
     mk3('run-01', box('det-o-one'), 'det', join(mixed, 'det-o-one'));
     ssr('det-s-mmd', 'run-01', {}, mixed);
@@ -2363,20 +2568,23 @@ export function gradePool(dir, { fx, detailed, format, q, st = null, sc = null }
   // (И0–И13, И15): Т1, В1, В4, К1, Ш1, Р1 считаются отдельно. У сценарной — якоря И и С; Т1, В1, Ш1, Р1 — отдельно.
   let core = 0;
   let ruled = 0; // `det-y-scen`: гипотеза хода 2 совпала с правилом триггеров — диагностика вне «схема верна»
+  let extraQ = 0; // `chb-*`: задан вопрос о звене тела, которого задавать не нужно (`extraBody`), — диагностика вне «схема верна»
   const cells = [0, 0, 0]; // В3: спросил и верно / спросил и неверно / не спросил
   for (const run of all) {
     if (failed.includes(run)) { out.push(`${run}: сбой API — в счёт не идёт`); continue; }
-    const { r, made, miss = [], diag = null } = sc ? gradeScenRun(join(dir, run), format, sc) : gradeRun(join(dir, run), format, fx, detailed, q, st);
+    const { r, made, miss = [], diag = null, extra = null } = sc ? gradeScenRun(join(dir, run), format, sc) : gradeRun(join(dir, run), format, fx, detailed, q, st);
     const green = Object.values(r).every(Boolean);
     if (green) whole += 1;
     if (Object.entries(r).every(([k, v]) => v || (sc ? !/^[ИС]\d+ /.test(k) : st ? !/^И\d+ /.test(k) : /^(И14|Д5|В4) /.test(k)))) core += 1;
     if (q && !st) cells[!r['В1 спросил'] ? 2 : r['В3 схема по ответу'] ? 0 : 1] += 1;
     for (const [k, v] of Object.entries(r)) tally[k] = (tally[k] ?? 0) + (v ? 1 : 0);
     if (diag?.rule) ruled += 1;
+    if (extra) extraQ += 1;
     const red = Object.entries(r).filter(([, v]) => !v).map(([k]) => k.split(' ')[0]);
     const hypo = !diag ? '' : `  гипотеза: ${diag.found ? diag.sig : 'не найдена (эталон — правило триггеров)'}${diag.readings > 1 ? ` (прочтений ${diag.readings})` : ''}`
       + ` · по правилу триггеров: ${diag.rule ? 'да' : 'нет'}`;
-    out.push(`${run}: ${green ? 'зелёный' : 'красный ' + red.join(',')}${made.length ? '  новые файлы: ' + made.join(', ') : ''}${miss.length ? '  В1: ' + miss.join(', ') : ''}${hypo}`);
+    const xq = extra == null ? '' : `  лишний вопрос о звене тела INT-${sc.extraBody.n}: ${extra ? 'да' : 'нет'}`;
+    out.push(`${run}: ${green ? 'зелёный' : 'красный ' + red.join(',')}${made.length ? '  новые файлы: ' + made.join(', ') : ''}${miss.length ? '  В1: ' + miss.join(', ') : ''}${hypo}${xq}`);
   }
   out.push('---');
   for (const [k, v] of Object.entries(tally)) out.push(`${k}: ${v}/${runs.length}`);
@@ -2385,6 +2593,7 @@ export function gradePool(dir, { fx, detailed, format, q, st = null, sc = null }
     out.push(`схема верна (якоря И и С): ${core}/${runs.length}`);
     out.push(`спросил (В1): ${tally['В1 спросил'] ?? 0}/${runs.length}`);
     if (sc.dyn) out.push(`гипотеза по правилу триггеров (вне «схема верна» и порогов): ${ruled}/${runs.length}`);
+    if (sc.extraBody) out.push(`лишний вопрос о звене тела INT-${sc.extraBody.n} (вне «схема верна» и порогов): ${extraQ}/${runs.length}`);
   } else if (st) {
     out.push(`схема верна (И0–И13, И15): ${core}/${runs.length}`);
     out.push(`спросил (В1): ${tally['В1 спросил'] ?? 0}/${runs.length}`);
@@ -2396,7 +2605,7 @@ export function gradePool(dir, { fx, detailed, format, q, st = null, sc = null }
     }
   }
   out.push(`сбой API: ${failed.length}${failed.length ? ` (${failed.join(', ')})` : ''}`);
-  return { out, n: runs.length, failed, whole, core, cells, tally, ruled };
+  return { out, n: runs.length, failed, whole, core, cells, tally, ruled, extraQ };
 }
 
 /** Порог пройден: доля не ниже `pct` процентов; без прогонов порог не пройден. */
@@ -2406,7 +2615,8 @@ export const passes = ([k, n], pct) => n > 0 && k * 100 >= n * pct;
  * Сводка раунда: строка на папку пробы из `STAGE` (короткая) и `SCEN` (сценарная), затем по каждому типу — сводные
  * доли, пары и пороги `GATES`. Проб типа в раунде нет — его пороги не оцениваются, об этом строка. Прогоны со сбоем
  * API — вне знаменателей, отдельной строкой. Проба оцениваемого типа без единого прогона в счёте — итог красный: порог
- * пары по одному плечу не меряется. Итог зелёный, только если оценён хотя бы один тип и все его пороги пройдены.
+ * пары по одному плечу не меряется; кроме проб `opt` (`chb-*`) — их нет в старых раундах, и без них сводка та же, что была.
+ * Итог зелёный, только если оценён хотя бы один тип и все его пороги пройдены.
  */
 export function gradeRound(roundDir) {
   const out = [];
@@ -2424,7 +2634,8 @@ export function gradeRound(roundDir) {
       ? `${e}: схема верна ${g.core}/${g.n} · спросил ${t('В1 спросил')} · ${t1} · К1 ${t('К1 лишнего вопроса о карточке нет')} · Ш1 ${t('Ш1 шапка: порядок')}`
         + ` · Р1 ${t('Р1 прочитан reference')} · В4 ${t('В4 со слов аналитика', !!p.st.said)} · сбой API ${g.failed.length}`
       : `${e}: схема верна ${g.core}/${g.n} · спросил ${t('В1 спросил')} · ${t1} · Ш1 ${t('Ш1 шапка: источник сценариев')} · Р1 ${t('Р1 прочитан reference')}`
-        + `${p.sc.dyn ? ` · по правилу триггеров ${g.ruled}/${g.n}` : ''} · сбой API ${g.failed.length}`);
+        + `${p.sc.dyn ? ` · по правилу триггеров ${g.ruled}/${g.n}` : ''}${p.sc.extraBody ? ` · лишний вопрос о теле INT-${p.sc.extraBody.n} ${g.extraQ}/${g.n}` : ''}`
+        + ` · сбой API ${g.failed.length}`);
     rows.push({ name: p.name, n: g.n, core: g.core, asked: g.tally['В1 спросил'] ?? 0, solo: g.tally['К1 лишнего вопроса о карточке нет'] ?? 0 });
     failed.push(...g.failed.map((run) => `${e}/${run}`));
   }
@@ -2456,7 +2667,7 @@ export function gradeRound(roundDir) {
     for (const [label, s, gate, share] of lines) {
       out.push(`${label}: ${s[0]}/${s[1]}${share ? ` (${pct(s)})` : ''} — порог ${share ? `${gate}%` : need(s, gate)}: ${passes(s, gate) ? 'да' : 'нет'}`);
     }
-    const none = names.filter((k) => sum('core', [k])[1] === 0);
+    const none = names.filter((k) => !SCEN[k]?.opt && sum('core', [k])[1] === 0); // `opt` — в раунде по желанию
     if (none.length) out.push(`нет прогонов пробы: ${none.join(', ')}`);
     empty.push(...none);
     green = green && none.length === 0 && lines.every(([, s, gate]) => passes(s, gate));

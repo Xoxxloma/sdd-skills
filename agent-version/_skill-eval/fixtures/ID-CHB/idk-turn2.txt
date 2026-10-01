@@ -1,0 +1,4 @@
+Участники все разные. INT-1 — три звена: school-web → school-api (POST /v1/essays/{essayId}/review), school-api → essay-checker (POST /internal/reviews), essay-checker → Lexa. INT-2 — два звена: school-web → school-api, school-api → plagiarism-check.
+Тела INT-2 — не знаю, к какому звену они относятся.
+Сценарии: 1) «ученик нажал «Проверить эссе» на странице задания» — INT-1; до ответа INT-1 и после него других карточек нет. 2) «учитель нажал «Проверить на заимствования» в карточке эссе» — INT-2; до ответа INT-2 и после него других карточек нет. Без пользователя: INT-3.
+Внутренних шагов нет.
