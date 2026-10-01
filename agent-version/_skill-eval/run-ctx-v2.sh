@@ -55,6 +55,12 @@ case "$PROBE" in
   ts-live)   FIXTURE=TS-LIVE;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-conv)   FIXTURE=TS-CONV;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-conv2)  FIXTURE=TS-CONV2;  PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
+  # Пробелы контракта (2026-10-01): повтор создания, одновременная правка, частичный сбой с чужим сервисом,
+  # переходы статусов, старые строки изменённой таблицы, ограничения полей, риски/не-цели, дата редакции.
+  # ts-gaps — запись (ответы на классические гейты, про пробелы ни слова), ts-gaps-q — первый ход, только вопросы.
+  # Грейдер grade-gaps.mjs (`--q` для вопросной). Состав и ловушки — fixtures/TS-GAPS/README.md.
+  ts-gaps)   FIXTURE=TS-GAPS;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
+  ts-gaps-q) FIXTURE=TS-GAPS;   PROMPT_FILE=q-prompt.txt;     SKILL=technical-spec-doc ;;
   # interaction-diagram: схема по готовой спеке DSP-330; формат назван (mmd/puml) или нет (ask).
   # Состав и ловушки — `fixtures/ID-DIAG/README.md`.
   id-mmd)    FIXTURE=ID-DIAG;   PROMPT_FILE=mmd-prompt.txt;   SKILL=interaction-diagram ;;
@@ -374,7 +380,7 @@ case "$PROBE" in
   artype)    FIXTURE=AR-TYPE;   PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-nosplit rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-nosplit rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
 esac
 
 # Потолок пробы сильнее внешнего значения: пул — дочерний процесс и читает переменную из окружения.

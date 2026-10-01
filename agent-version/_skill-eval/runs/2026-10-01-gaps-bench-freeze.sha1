@@ -1,0 +1,11 @@
+cfac1a6f808d84b6b95470cae00fb39565778ce6 *grade-gaps.mjs
+bb18b5071c58b50633e500146070049a0eda3e8d *grade-2t.mjs
+9d65fcf264db7611f3a751c78079901e01977547 *grade-ts.mjs
+17c591af154358dde0bad6c6fdb32ef343fa6a59 *grade-ctx.mjs
+85d5bb268148391db3b091532e8c9b727fd6346a *grade-invent.mjs
+b7ce1e3222cfd0373a7233fb3d8c6688aec2f116 *grade-bf.mjs
+68e6f2f1ae46a5209632f7fcd97252cc51912a5c *run-ctx-v2.sh
+d3b8c614d794347914e388d0946721521e4cf1ad *run-pool-ctx-v2.sh
+31db5d60f6bcf23dad2411625dc5e472fa3cef01 *fixtures/TS-GAPS/docs/TRP-418/business_requirements.md
+f5e2b43262a7a79f85e5e5f67c91d5aa676c2ee5 *fixtures/TS-GAPS/spec-prompt.txt
+638ba0d9fd3288688b433078472c88bc0925ac9b *fixtures/TS-GAPS/q-prompt.txt
