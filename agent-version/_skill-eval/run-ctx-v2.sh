@@ -124,6 +124,11 @@ case "$PROBE" in
   det-y-short) FIXTURE=ID-DET;  PROMPT_FILE=short-mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=yes-turn2.txt; TURNS_CAP=3 ;;
   det-y-scen)  FIXTURE=ID-DET;  PROMPT_FILE=short-mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt;  TURN3_FILE=yes-turn2.txt; TURNS_CAP=3 ;;
   rep-s-mmd)   FIXTURE=ID-REP;  PROMPT_FILE=mmd-prompt.txt;        SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt;  TURN3_FILE=s-turn2.txt;   TURNS_CAP=3 ;;
+  # Тела по звеньям цепочки, сценарная по ESS-31 (`fixtures/ID-CHB/README.md`): метод и тело одного вызова — на одном
+  # звене; у INT-2 тела без метода и сторон — звено спрашивается. `chb-s-mmd` — реплика называет звено тел INT-2;
+  # `chb-s-idk` — на звено тел INT-2 «не знаю», пометок у INT-2 нет (читать парой). Грейдер — `grade-id.mjs`, таблица SCEN.
+  chb-s-mmd)   FIXTURE=ID-CHB;  PROMPT_FILE=mmd-prompt.txt;        SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt;  TURN3_FILE=s-turn2.txt;   TURNS_CAP=3 ;;
+  chb-s-idk)   FIXTURE=ID-CHB;  PROMPT_FILE=mmd-prompt.txt;        SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt;  TURN3_FILE=idk-turn2.txt; TURNS_CAP=3 ;;
   # ПЕРВЫЙ ХОД на богатом входе: то же БТ и те же карточки сервисов, что у ts-conv, но ответов
   # аналитика в промпте НЕТ — агент обязан спрашивать сам. Заведена 2026-08-26 под жалобу с
   # прода: варианты ответа мудрёные именно на подробном входе, а все существующие плечи спеки
@@ -369,7 +374,7 @@ case "$PROBE" in
   artype)    FIXTURE=AR-TYPE;   PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd ts-ctx ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-nosplit rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-nosplit rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
 esac
 
 # Потолок пробы сильнее внешнего значения: пул — дочерний процесс и читает переменную из окружения.

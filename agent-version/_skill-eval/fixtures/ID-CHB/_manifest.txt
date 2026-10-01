@@ -1,0 +1,6 @@
+docs/ESS-31/technical_specification.md
+idk-turn2.txt
+mmd-prompt.txt
+README.md
+s-turn2.txt
+type-scen-turn2.txt
