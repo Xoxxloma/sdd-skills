@@ -70,6 +70,15 @@ if [ -n "$TURN2" ]; then
   [ -f "$TURN2" ] || { echo "нет файла второго хода: $TURN2"; exit 1; }
   TURN2="$(cd "$(dirname "$TURN2")" && pwd)/$(basename "$TURN2")"
 fi
+# ХОДЫ 3, 4, … — свой файл реплики на ход: аргументы 9, 10, … Нет файла на ход — ход получает реплику TURN2, как
+# было: пробы, повторяющие одну реплику на все ходы (`rt-*`, `bg-*`, `ar*`), этих аргументов не передают.
+TURN_FILES=()
+if [ "$#" -gt 8 ]; then
+  for f in "${@:9}"; do
+    [ -f "$f" ] || { echo "нет файла реплики хода: $f"; exit 1; }
+    TURN_FILES+=("$(cd "$(dirname "$f")" && pwd)/$(basename "$f")")
+  done
+fi
 mkdir -p "$OUT"
 
 # Настоящий отказ CLI: короткий вывод либо маркер в первых 200 байтах.
@@ -248,10 +257,13 @@ $(cat "$PROMPT")
   local idle=0 turn=1 apifail=0
   if [ -n "$TURN2" ] && [ $rc -eq 0 ] && [ -s "$sb/answer.md" ] && ! is_api_failure "$sb/answer.md"; then
     cp "$sb/answer.md" "$sb/answer-01.md"
-    local reply; reply="$(cat "$TURN2")"
+    local reply
     while [ "$turn" -lt "$MAX_TURNS" ] && [ "$idle" -lt 2 ]; do
       local before; before="$(trace_len "$sb")"
       turn=$((turn + 1))
+      local tf="$TURN2"
+      [ "$turn" -ge 3 ] && [ -n "${TURN_FILES[$((turn - 3))]:-}" ] && tf="${TURN_FILES[$((turn - 3))]}"
+      reply="$(cat "$tf")"
       ( cd "$sb" && timeout "${RUN_TIMEOUT:-900}" claude -p "$reply" --model "${SM_MODEL:-haiku}" --permission-mode bypassPermissions \
             ${EFFORT:+--effort "$EFFORT"} \
             --resume "$sid" --output-format stream-json --verbose ) \

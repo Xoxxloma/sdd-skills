@@ -1,7 +1,10 @@
 docs/RET-512/business_requirements.md
 docs/RET-512/technical_specification.md
 mmd-prompt.txt
+one-turn2.txt
 puml-prompt.txt
 README.md
 services/billing.md
 services/warehouse-service.md
+two-turn2.txt
+type-short-turn2.txt

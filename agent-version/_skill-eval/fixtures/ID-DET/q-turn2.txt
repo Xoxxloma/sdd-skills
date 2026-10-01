@@ -1,0 +1,1 @@
+INT-5: ответ и ошибки 402, 502 возвращает parking-api в parking-web — одна пара, от parking-api к parking-web.

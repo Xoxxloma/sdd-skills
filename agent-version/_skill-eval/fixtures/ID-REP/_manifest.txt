@@ -1,4 +1,9 @@
+det-mmd-prompt.txt
 docs/REP-214/technical_specification.md
 mmd-prompt.txt
 puml-prompt.txt
+q-turn2.txt
 README.md
+s-turn2.txt
+type-scen-turn2.txt
+type-short-turn2.txt

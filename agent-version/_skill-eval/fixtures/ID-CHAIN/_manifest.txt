@@ -1,0 +1,7 @@
+docs/CHN-4/technical_specification.md
+idk-turn2.txt
+mmd-prompt.txt
+puml-prompt.txt
+q-turn2.txt
+README.md
+type-short-turn2.txt
