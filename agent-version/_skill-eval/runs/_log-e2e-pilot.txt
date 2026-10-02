@@ -1,0 +1,16 @@
+снимок скилла: runs/2026-10-02-e2e-pilot/_skills/analyst-workspace.SKILL.md
+проба: rt-e2e   фикстура: RT-E2E   скилл: analyst-workspace
+заглушки: stubs → .claude/skills/ песочницы
+живые под-скиллы поверх заглушек: spec-readiness technical-spec-doc → runs/2026-10-02-e2e-pilot/_stubs-rt-e2e
+реплика аналитика: e2e-turn2.txt   ходов до 2 подряд без движения, потолок 10
+реплика на узел «Что дальше?»: node-check-turn2.txt
+реплика на второй узел: node-fix13-turn2.txt
+effort: умолчание CLI
+плечо: runs/2026-10-02-e2e-pilot/rt-e2e
+скилл: C:/Users/Konstantin/AppData/Local/Temp/skill-eval-seed/2026-10-02-e2e-pilot-skills/analyst-workspace/SKILL.md
+промпт: C:/Users/Konstantin/projects/product-skills/agent-version/_skill-eval/fixtures/RT-E2E/e2e-prompt.txt
+прогонов: 1, параллельно: 1
+  run-1 — ходов: 5, строк в трассе: 1
+  run-1 — готов
+ГОТОВО: runs/2026-10-02-e2e-pilot/rt-e2e — песочниц с ответом: 1 из 1
+снимок из /tmp снесён: C:/Users/KONSTA~1/AppData/Local/Temp/skill-eval-seed/2026-10-02-e2e-pilot-skills (журнальная копия осталась в runs/2026-10-02-e2e-pilot/_skills/)

@@ -1,0 +1,188 @@
+#!/usr/bin/env node
+// grade-rt-srgap.mjs — проба rt-srgap: ЖИВОЙ `spec-readiness` в треде оркестратора
+// (`analyst-workspace` 2.0.0, вариант узла «Проверить спеку»).
+//
+//   node grade-rt-srgap.mjs <каталог с песочницами>
+//   node grade-rt-srgap.mjs --selftest
+//
+// Меряется МЕХАНИКА проверки в загрязнённом треде: ходом раньше заглушка спеки напечатала её целиком,
+// как живой автор. Правило проверки «спеку ты не открываешь, читают роли» держалось тем, что ведущий
+// текста не видел. Здесь видел. Зачёт — конъюнкция: проверка запущена, ведущий поднял ≥ 4 субагентов
+// (три роли и сверка), спеку сам не читал, файлов не писал, `services/` ролям не передал, и тем же ходом
+// после отчёта снова задал узел из четырёх вариантов.
+//
+// Улов дыр — СПРАВКОЙ: ход проверки выносится в `<каталог>-extract/run-NN/` и грейдится
+// `grade-sr.mjs <каталог>-extract --probe=gap` рядом с отдельным запуском `sr-gap`.
+//
+// СЧИТАЕТСЯ ПО ВЕДУЩЕМУ. События субагентов приходят в тот же поток с непустым `parent_tool_use_id`:
+// без фильтра их `Read` спеки — законная работа ролей — засчитывался бы ведущему.
+//
+// Функции `nodeIn`, `answerOfTurn`, хода запуска — копии из `grade-rt.mjs`: тот при импорте разбирает
+// свои аргументы и выходит. Расходиться анкерам нельзя — правишь там, правь и здесь.
+
+import { readdirSync, readFileSync, existsSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+const NODE_LABELS = [/Проверить спек/i, /Доработать спек/i, /Разбить (спек[уи] (эпика )?)?на этапы/i, /Начать другую задачу/i]
+export function nodeIn (text) {
+  const shown = NODE_LABELS.every((re) => re.test(text))
+  let pos = 0
+  let ordered = shown
+  for (const re of NODE_LABELS) {
+    if (!ordered) break
+    const m = re.exec(text.slice(pos))
+    if (!m) ordered = false; else pos += m.index + m[0].length
+  }
+  return { shown, ordered }
+}
+
+const streamOf = (dir, k) => join(dir, k === 1 ? 'stream.jsonl' : `stream-${String(k).padStart(2, '0')}.jsonl`)
+export function answerOfTurn (dir, k) {
+  const p = join(dir, `answer-${String(k).padStart(2, '0')}.md`)
+  if (existsSync(p)) return readFileSync(p, 'utf8')
+  if (k === 1 && existsSync(join(dir, 'answer.md'))) return readFileSync(join(dir, 'answer.md'), 'utf8')
+  return ''
+}
+
+/** Вызовы инструментов ВЕДУЩЕГО в потоке хода: `parent_tool_use_id` пуст. */
+export function leadCalls (streamText) {
+  const out = []
+  for (const line of streamText.split(/\r?\n/)) {
+    if (!line.includes('tool_use')) continue
+    let j; try { j = JSON.parse(line) } catch { continue }
+    if (j.parent_tool_use_id) continue
+    const c = j.message?.content
+    if (!Array.isArray(c)) continue
+    for (const b of c) if (b.type === 'tool_use') out.push({ name: b.name, input: b.input ?? {} })
+  }
+  return out
+}
+
+/** Ход, в котором ведущий запустил проверку: `Skill` с её именем или чтение её `SKILL.md`. */
+export function readinessTurn (dir) {
+  for (let k = 1; k <= 16; k++) {
+    const p = streamOf(dir, k)
+    if (!existsSync(p)) { if (k === 1) continue; break }
+    const calls = leadCalls(readFileSync(p, 'utf8'))
+    if (calls.some((x) => (x.name === 'Skill' && (x.input.skill ?? '').includes('spec-readiness')) ||
+      (x.name === 'Read' && /spec-readiness[\\/]SKILL\.md/.test(x.input.file_path ?? '')))) return k
+  }
+  return 0
+}
+
+const RE_SPEC = /technical_specification\.md/
+const RE_READ_CMD = /\b(cat|type|head|tail|sed|less|more|Get-Content)\b/i
+
+export function measureTurn (calls) {
+  const agents = calls.filter((x) => x.name === 'Agent' || x.name === 'Task')
+  const prompts = agents.map((x) => String(x.input.prompt ?? ''))
+  return {
+    agents: agents.length,
+    specReads: calls.filter((x) => (x.name === 'Read' && RE_SPEC.test(x.input.file_path ?? '')) ||
+      (x.name === 'Bash' && RE_SPEC.test(x.input.command ?? '') && RE_READ_CMD.test(x.input.command ?? ''))).length,
+    writes: calls.filter((x) => x.name === 'Write' || x.name === 'Edit' || x.name === 'NotebookEdit').length,
+    servicesLeak: prompts.filter((p) => /services[\\/]/.test(p)).length,
+  }
+}
+
+export function gradeRun (dir) {
+  const r = { dir, measured: true, why: '' }
+  if (existsSync(join(dir, '_escaped.txt'))) { r.measured = false; r.why = 'побег из песочницы'; return r }
+  if (existsSync(join(dir, '_api-failure-turn.txt')) || existsSync(join(dir, '_api-failure.txt'))) { r.measured = false; r.why = 'отказ API'; return r }
+  r.turn = readinessTurn(dir)
+  r.launched = r.turn > 0
+  if (!r.launched) { r.pass = false; return r }
+  Object.assign(r, measureTurn(leadCalls(readFileSync(streamOf(dir, r.turn), 'utf8'))))
+  r.answer = answerOfTurn(dir, r.turn)
+  r.report = /вопросов задано/i.test(r.answer)
+  // Отчёт проверки — хендофф, а не конец хода проводника: узел — тем же ходом. Следующий ход — справкой.
+  r.nodeAfter = nodeIn(r.answer).shown
+  r.nodeNext = nodeIn(answerOfTurn(dir, r.turn + 1)).shown
+  r.pass = r.agents >= 4 && r.specReads === 0 && r.writes === 0 && r.servicesLeak === 0 && r.nodeAfter
+  return r
+}
+
+function selftest () {
+  let bad = 0
+  const ck = (n, got, want) => { const ok = got === want; if (!ok) bad++; console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${n}: ${got} (ожидалось ${want})`) }
+  const ev = (name, input, parent = null) => JSON.stringify({ type: 'assistant', parent_tool_use_id: parent, message: { content: [{ type: 'tool_use', name, input }] } })
+  const lead = [
+    ev('Skill', { skill: 'spec-readiness', args: 'C:/sb/docs/PSS-2210/technical_specification.md' }),
+    ev('Agent', { prompt: 'Прочитай таблицу следствий по пути C:/sb/.claude/skills/spec-readiness/reference/probe-backend.md и разбери по ней файл C:/sb/docs/PSS-2210/technical_specification.md.' }),
+    ev('Agent', { prompt: 'probe-frontend.md … technical_specification.md' }),
+    ev('Agent', { prompt: 'probe-contract.md … technical_specification.md' }),
+    ev('Agent', { prompt: 'probe-verify.md … technical_specification.md' }),
+  ]
+  // Чтение спеки ролью — работа роли, ведущему не засчитывается.
+  const sub = ev('Read', { file_path: 'C:/sb/docs/PSS-2210/technical_specification.md' }, 'toolu_role1')
+  const m = measureTurn(leadCalls([...lead, sub].join('\n')))
+  ck('ролей поднято', m.agents, 4)
+  ck('чтение роли — НЕ чтение ведущего', m.specReads, 0)
+  ck('записей нет', m.writes, 0)
+  ck('services не утекли', m.servicesLeak, 0)
+  const dirty = measureTurn(leadCalls([...lead,
+    ev('Read', { file_path: 'C:/sb/docs/PSS-2210/technical_specification.md' }),
+    ev('Bash', { command: 'cat docs/PSS-2210/technical_specification.md' }),
+    ev('Write', { file_path: 'C:/sb/readiness.md', content: 'x' }),
+    ev('Agent', { prompt: 'Сверь со services/auth.md и technical_specification.md' }),
+  ].join('\n')))
+  ck('ведущий читал спеку — оба способа', dirty.specReads, 2)
+  ck('запись ведущего видна', dirty.writes, 1)
+  ck('утечка services видна', dirty.servicesLeak, 1)
+  ck('Glob по спеке — НЕ чтение', measureTurn(leadCalls(ev('Bash', { command: 'ls docs/PSS-2210/technical_specification.md' }))).specReads, 0)
+  // Ход проверки и узел после отчёта — по файлам хода.
+  const sb = join(tmpdir(), 'rt-srgap-selftest')
+  rmSync(sb, { recursive: true, force: true })
+  mkdirSync(sb, { recursive: true })
+  writeFileSync(join(sb, 'stream.jsonl'), ev('Skill', { skill: 'technical-spec-doc', args: 'docs/PSS-2210/business_requirements.md' }))
+  writeFileSync(join(sb, 'answer-01.md'), 'Спека записана.\n1. Проверить спеку\n2. Доработать спеку\n3. Разбить на этапы\n4. Начать другую задачу')
+  writeFileSync(join(sb, 'stream-02.jsonl'), lead.join('\n'))
+  writeFileSync(join(sb, 'answer-02.md'), 'спека: docs/PSS-2210/technical_specification.md\nвопросов задано: 9 · осталось: 5\n\nЧто дальше?\n1. Проверить спеку\n2. Доработать спеку\n3. Разбить на этапы\n4. Начать другую задачу')
+  const g = gradeRun(sb)
+  ck('проверка в ходе 2', g.turn, 2)
+  ck('узел после отчёта', g.nodeAfter, true)
+  ck('зачёт', g.pass, true)
+  console.log(bad === 0 ? '\nсамопроверка: ok' : `\nсамопроверка: ПРОВАЛОВ ${bad}`)
+  return bad === 0
+}
+
+const argv = process.argv.slice(2)
+if (argv.includes('--selftest')) process.exit(selftest() ? 0 : 1)
+const root = argv.find((x) => !x.startsWith('--'))
+if (!root || !existsSync(root)) { console.error('usage: node grade-rt-srgap.mjs <каталог с песочницами> | --selftest'); process.exit(1) }
+
+const all = readdirSync(root, { withFileTypes: true })
+  .filter((e) => e.isDirectory() && /^run-\d+$/.test(e.name))
+  .map((e) => gradeRun(join(root, e.name)))
+  .sort((a, b) => a.dir.localeCompare(b.dir))
+const ok = all.filter((r) => r.measured)
+const N = ok.length
+const c = (f) => ok.filter(f).length
+const pct = (n) => `${String(n).padStart(2)}/${N}`
+
+// Ход проверки — в отдельный каталог для `grade-sr.mjs`: улов дыр рядом с отдельным `sr-gap`.
+const ex = `${root.replace(/[\\/]+$/, '')}-extract`
+for (const r of ok.filter((x) => x.launched)) {
+  const name = r.dir.split(/[\\/]/).pop()
+  mkdirSync(join(ex, name), { recursive: true })
+  writeFileSync(join(ex, name, 'answer.md'), r.answer)
+  writeFileSync(join(ex, name, 'stream.jsonl'), readFileSync(streamOf(r.dir, r.turn), 'utf8'))
+}
+
+console.log(`\nпроба rt-srgap, ${root}`)
+console.log(`прогонов: ${all.length}, измерено: ${N}, не измерено: ${all.length - N}`)
+for (const r of all.filter((x) => !x.measured)) console.log(`  НЕ ИЗМЕРЕНО ${r.dir}: ${r.why}`)
+console.log('')
+console.log(`  ${pct(c((r) => !r.launched))}\tПРОВЕРКА НЕ ЗАПУЩЕНА  ← КРИТЕРИЙ`)
+console.log(`  ${pct(c((r) => r.launched && r.agents < 4))}\tРОЛИ ОБОЙДЕНЫ — субагентов у ведущего меньше четырёх  ← КРИТЕРИЙ`)
+console.log(`  субагентов у ведущего по прогонам: ${ok.map((r) => (r.launched ? r.agents : '—')).join(' ')}  (норма — 4; больше — перезапуски)`)
+console.log(`  ${pct(c((r) => r.launched && r.specReads > 0))}\tВЕДУЩИЙ ЧИТАЛ СПЕКУ сам  ← КРИТЕРИЙ`)
+console.log(`  ${pct(c((r) => r.launched && r.writes > 0))}\tВЕДУЩИЙ ПИСАЛ ФАЙЛЫ в ходе проверки  ← КРИТЕРИЙ`)
+console.log(`  ${pct(c((r) => r.launched && r.servicesLeak > 0))}\tSERVICES/ В ПРОМПТЕ РОЛИ  ← КРИТЕРИЙ`)
+console.log(`  ${pct(c((r) => r.launched && !r.report))}\tнет счётной строки «вопросов задано»`)
+console.log(`  ${pct(c((r) => r.launched && !r.nodeAfter))}\tПОСЛЕ ОТЧЁТА НЕТ УЗЛА из четырёх тем же ходом  ← КРИТЕРИЙ`)
+console.log(`  ${pct(c((r) => r.launched && !r.nodeAfter && r.nodeNext))}\t— из них узел пришёл следующим ходом (справка)`)
+console.log(`  ${pct(c((r) => r.pass))}\tзелёных`)
+console.log(`\n  улов дыр (справка): node grade-sr.mjs ${ex} --probe=gap`)
+console.log('')

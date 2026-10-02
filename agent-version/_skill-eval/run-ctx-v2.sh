@@ -48,6 +48,14 @@ TURN2_FILE=""
 # Реплика ТРЕТЬЕГО хода (пусто → третий и дальше ходы получают реплику TURN2_FILE, как было). Нужна трёхходовым
 # пробам `interaction-diagram` 4.3.0: ход 2 — ответ о типе схемы, ход 3 — ответы на вопросы.
 TURN3_FILE=""
+# Реплика на узел «Что дальше?» (пусто → как было). Только пробам маршрута `rt-*`: пул подставляет её,
+# опознав узел в ответе прошлого хода (`RT_NODE_REPLY` в `run-pool-ctx-v2.sh`).
+NODE_FILE=""
+# Реплика на ВТОРОЙ узел (пусто → как было). Сквозной пробе `rt-e2e`: первый узел — «Проверить», второй —
+# «Доработать» (`RT_NODE_REPLY2` в `run-pool-ctx-v2.sh`).
+NODE2_FILE=""
+# Живые под-скиллы поверх заглушек, по именам через пробел (пусто → как было). См. блок заглушек ниже.
+REAL_SUBS=""
 # Жёсткий потолок ходов пробы (пусто → как было: внешний RT_MAX_TURNS или 8 в пуле). Нужен двухходовым пробам
 # без трассы: пул считает движение по `_trace.log`, без него ход «пустой», и реплика уходит второй раз.
 TURNS_CAP=""
@@ -151,6 +159,10 @@ case "$PROBE" in
   # «с новой уликой». Здесь улика известна до вопросов. Гонять с RT_MAX_TURNS=2: трассы у пробы нет,
   # без потолка пул отправит реплику дважды.
   ts-conv-2t) FIXTURE=TS-CONV;  PROMPT_FILE=opt-prompt.txt;   SKILL=technical-spec-doc; TURN2_FILE=conv-turn2.txt ;;
+  # `ts-fix` — доработка по находкам проверки готовности (`technical-spec-doc` 1.3.0): спека PSS-2210 и
+  # настоящий отчёт `spec-readiness` (29 вопросов). Ход 1 — вопросы аналитику, файл не тронут; ход 2 —
+  # ответы по номерам (три «не знаю»); ход 3 — «Да, годится.». Грейд — `grade-fix.mjs`, ключ — `KEY.md`.
+  ts-fix)     FIXTURE=TS-FIX;   PROMPT_FILE=fix-prompt.txt;   SKILL=technical-spec-doc; TURN2_FILE=fix-turn2.txt; TURN3_FILE=fix-yes-turn2.txt; TURNS_CAP=3 ;;
   ts-ctx)    FIXTURE=TS-CTX;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-nodesc) FIXTURE=TS-NODESC; PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-noctx)  FIXTURE=TS-NOCTX;  PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
@@ -308,12 +320,12 @@ case "$PROBE" in
   #
   # `rt-bug` — багфикс мимо БТ и мимо разреза; `rt-feature` — сторож: обычная задача обязана
   # по-прежнему уходить в `business-requirements-doc`, иначе правка входа сломала основной путь.
-  rt-bug)      FIXTURE=RT-BUG; PROMPT_FILE=bug-prompt.txt;     SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
-  rt-feature)  FIXTURE=RT-BUG; PROMPT_FILE=feature-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=feature-turn2.txt ;;
+  rt-bug)      FIXTURE=RT-BUG; PROMPT_FILE=bug-prompt.txt;     SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt NODE_FILE=node-split-turn2.txt ;;
+  rt-feature)  FIXTURE=RT-BUG; PROMPT_FILE=feature-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=feature-turn2.txt NODE_FILE=node-split-turn2.txt ;;
   # `rt-feature-gate` — гейт 2Б после записи БТ: тот же маршрут, но промпт НЕ отвечает заранее про
   # разрез (заглушка БТ пишет §4.5 «не применимо»). На `rt-feature` модель отвечала на вопрос гейта
   # строкой промпта «резать не нужно» — стенд подсказывал ответ. Грейд: `--probe=feature-gate`.
-  rt-feature-gate) FIXTURE=RT-BUG; PROMPT_FILE=feature-gate-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=feature-turn2.txt ;;
+  rt-feature-gate) FIXTURE=RT-BUG; PROMPT_FILE=feature-gate-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=feature-turn2.txt NODE_FILE=node-split-turn2.txt ;;
   # ПОРЯДОК НА ВХОДЕ. Правка 2026-08-18 убрала лишний ход: проводник больше не спрашивает ключ
   # задачи сам — его спрашивает под-скилл своим Gate 0, и порядок теперь «кнопка → меню БТ/баг →
   # под-скилл». Два плеча выше этого НЕ ВИДЯТ: ключ подан в их промптах строкой «Ключ задачи: …»,
@@ -325,15 +337,37 @@ case "$PROBE" in
   # `rt-nokey` — тот же дефект, что в `rt-bug`, но ключа нет НИГДЕ. Маршрут обязан дойти до
   # `bug-report-doc`, а не встать с требованием назвать ключ. Заглушка при непереданном ключе
   # берёт `ARS-312`, поэтому пути ниже по маршруту те же и числа сопоставимы с `rt-bug` напрямую.
-  rt-nokey)    FIXTURE=RT-BUG; PROMPT_FILE=nokey-prompt.txt;   SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=nokey-turn2.txt ;;
-  rt-noreview) FIXTURE=RT-BUG; PROMPT_FILE=noreview-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
-  rt-noreview-bare) FIXTURE=RT-BUG; PROMPT_FILE=noreview-bare-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
-  rt-noreview-ru) FIXTURE=RT-BUG; PROMPT_FILE=noreview-ru-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt ;;
-  # `rt-nosplit` — хвост Шага 5 после правки 2026-09-17: нарезка на этапы необязательна, маршрут о
-  # ней спрашивает. Реплика аналитика отказывается от нарезки; верный исход — `stage-breakdown-doc`
-  # не вызван, папки `stages/` нет, строка про `/spec-readiness` названа, маршрут дошёл до развилки
-  # Шага 6. Ветку «да» меряют `rt-bug`/`rt-feature`: их «Да, годится.» на вопрос про этапы — согласие.
-  rt-nosplit)  FIXTURE=RT-BUG; PROMPT_FILE=bug-prompt.txt;     SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=nosplit-turn2.txt ;;
+  rt-nokey)    FIXTURE=RT-BUG; PROMPT_FILE=nokey-prompt.txt;   SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=nokey-turn2.txt NODE_FILE=node-split-turn2.txt ;;
+  rt-noreview) FIXTURE=RT-BUG; PROMPT_FILE=noreview-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt NODE_FILE=node-split-turn2.txt ;;
+  rt-noreview-bare) FIXTURE=RT-BUG; PROMPT_FILE=noreview-bare-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt NODE_FILE=node-split-turn2.txt ;;
+  rt-noreview-ru) FIXTURE=RT-BUG; PROMPT_FILE=noreview-ru-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt NODE_FILE=node-split-turn2.txt ;;
+  # УЗЕЛ «ЧТО ДАЛЬШЕ?» (`analyst-workspace` 2.0.0): после спеки один вопрос из четырёх вариантов.
+  # `NODE_FILE` — реплика аналитика на узел (раннер подставляет её, опознав узел в ответе прошлого
+  # хода); остальные ходы — прежняя нейтральная реплика. Плечи выше идут по ветке «Разбить на этапы».
+  # `rt-check` — ветка «Проверить спеку»: `spec-readiness` вызван на путь спеки, узел задан снова тем
+  # же ходом, этапы не тронуты. Заменяет `rt-nosplit`: двоичного вопроса про этапы больше нет.
+  rt-check)    FIXTURE=RT-BUG; PROMPT_FILE=bug-prompt.txt;     SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt NODE_FILE=node-check-turn2.txt ;;
+  # `rt-fix` — ветка «Доработать спеку»: спека запущена второй раз, после неё приёмка, затем узел снова.
+  # Потолок 12: Haiku тратит ход на каждый под-скилл, и в пилоте восьми не хватило дойти до второго узла.
+  rt-fix)      FIXTURE=RT-BUG; PROMPT_FILE=bug-prompt.txt;     SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt NODE_FILE=node-fix-turn2.txt TURNS_CAP=12 ;;
+  # `rt-other` — ветка «Начать другую задачу»: после выбора — стартовый вопрос, и ни одного вызова сверх маршрута.
+  rt-other)    FIXTURE=RT-BUG; PROMPT_FILE=bug-prompt.txt;     SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt NODE_FILE=node-other-turn2.txt ;;
+  # `rt-open` — тот же маршрут, что `rt-bug`, но спека «Требуются уточнения (2)»: порядок вариантов узла
+  # обязан совпасть с `rt-bug` (в 3.2 первый вариант развилки выбирался по статусу). Грейд `--probe=bug`.
+  rt-open)     FIXTURE=RT-OPEN; PROMPT_FILE=bug-prompt.txt;    SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=bug-turn2.txt NODE_FILE=node-split-turn2.txt ;;
+  # `rt-epic` — «Продолжить начатое» на эпике с готовыми спеками (#0 + три ребёнка): узел первым ходом,
+  # затем «Проверить спеку» — `spec-readiness` на каждую спеку уровня, #0 первой, и узел снова.
+  rt-epic)     FIXTURE=RT-EPIC; PROMPT_FILE=epic-prompt.txt;   SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=epic-turn2.txt NODE_FILE=node-check-turn2.txt ;;
+  # `rt-srgap` — ЖИВОЙ `spec-readiness` в треде оркестратора: готовый БТ PSS-2210 → спека (заглушка
+  # печатает спеку `SR-GAP` целиком, как живой автор) → узел → «Проверить спеку». Меряется, держит ли
+  # проверка свои правила в загрязнённом треде: роли подняты, ведущий спеку не читал. Грейд —
+  # `grade-rt-srgap.mjs`. Дорого: четыре субагента на прогон.
+  # `rt-e2e` — СКВОЗНОЙ стык «проверка → доработка», оба под-скилла ЖИВЫЕ: готовая спека PSS-2210 (спека `SR-GAP`)
+  # подхвачена «Продолжить начатое» → узел → «Проверить спеку» (живой `spec-readiness`) → узел → «Доработать
+  # спеку по пунктам 1–3» (живой `technical-spec-doc`, проход доработки) → вопросы гипотезой → ответ
+  # «1, 2 — да; 3 — не знаю» → запись → приёмка (заглушка) → узел. Грейд — `grade-rt-e2e.mjs` + дифф глазами.
+  rt-e2e)      FIXTURE=RT-E2E; PROMPT_FILE=e2e-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=e2e-turn2.txt NODE_FILE=node-check-turn2.txt NODE2_FILE=node-fix13-turn2.txt REAL_SUBS="spec-readiness technical-spec-doc" TURNS_CAP=10 ;;
+  rt-srgap)    FIXTURE=RT-SRGAP; PROMPT_FILE=srgap-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=srgap-turn2.txt NODE_FILE=node-check-turn2.txt REAL_SUBS=spec-readiness ;;
   # Ветка «Продолжить начатое»: на диске лежит ТОЛЬКО баг-репорт, спеки под него нет. Проверяется,
   # опознан ли он сводкой состояния (глоб ветки его раньше не видел вовсе) и уходит ли маршрут в
   # спеку с флагом багфикса, а не по кругу в `bug-report-doc`. Рядом чужая `ARS-102` с полным
@@ -343,7 +377,7 @@ case "$PROBE" in
   # его готовым. Верный исход — приёмка, чтение, ход ОСТАНОВЛЕН вопросом «принят — идём дальше?»;
   # `technical-spec-doc` запускается только следующим ходом. Заглушки дают чистый документ нарочно:
   # до правки такой документ уезжал в спеку без остановки.
-  rt-gate)     FIXTURE=RT-GATE; PROMPT_FILE=gate-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=gate-turn2.txt ;;
+  rt-gate)     FIXTURE=RT-GATE; PROMPT_FILE=gate-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=gate-turn2.txt NODE_FILE=node-split-turn2.txt ;;
 
   # ── приёмка баг-репорта ───────────────────────────────────────────────────────────────────
   # Главное плечо здесь ЧИСТОЕ, а не грязное: у проверяющего инструмента худший отказ — покраснеть
@@ -380,7 +414,7 @@ case "$PROBE" in
   artype)    FIXTURE=AR-TYPE;   PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-nosplit rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
 esac
 
 # Потолок пробы сильнее внешнего значения: пул — дочерний процесс и читает переменную из окружения.
@@ -498,6 +532,19 @@ if [ -n "$STUBS_SUB" ]; then
   [ -d "$STUBS_DIR" ] || { echo "нет папки заглушек: $STUBS_DIR"; exit 1; }
   echo "заглушки: $STUBS_SUB → .claude/skills/ песочницы"
 fi
+# ЖИВЫЕ ПОД-СКИЛЛЫ ПОВЕРХ ЗАГЛУШЕК (`REAL_SUBS`, пусто → как было). Нужно пробе, которая меряет живой
+# под-скилл в треде оркестратора (`rt-srgap`: `spec-readiness`). Набор собирается один раз на раунд в
+# его папке: заглушки фикстуры плюс снимок скилла из репозитория вместе с `reference/`; снимок остаётся
+# в раунде для журнала, и повторный запуск раунда читает его, а не живой текст.
+if [ -n "${REAL_SUBS:-}" ] && [ -n "$STUBS_DIR" ]; then
+  MIX="$ROUND/_stubs-$PROBE"
+  if [ ! -d "$MIX" ]; then
+    mkdir -p "$MIX" && cp -r "$STUBS_DIR"/. "$MIX"/
+    for s in $REAL_SUBS; do cp -r "$HERE/../$s" "$MIX/"; done
+  fi
+  STUBS_DIR="$(cd "$MIX" && pwd)"
+  echo "живые под-скиллы поверх заглушек: $REAL_SUBS → $MIX"
+fi
 
 TURN2=""
 if [ -n "$TURN2_FILE" ]; then
@@ -511,6 +558,16 @@ if [ -n "$TURN3_FILE" ]; then
   [ -f "$TURN3" ] || { echo "нет файла третьего хода: $TURN3"; exit 1; }
   echo "реплика хода 3: $TURN3_FILE"
 fi
+if [ -n "$NODE_FILE" ]; then
+  [ -f "$FIXTURE_DIR/$NODE_FILE" ] || { echo "нет файла реплики на узел: $FIXTURE_DIR/$NODE_FILE"; exit 1; }
+  export RT_NODE_REPLY="$FIXTURE_DIR/$NODE_FILE"
+  echo "реплика на узел «Что дальше?»: $NODE_FILE"
+fi
+if [ -n "$NODE2_FILE" ]; then
+  [ -f "$FIXTURE_DIR/$NODE2_FILE" ] || { echo "нет файла реплики на второй узел: $FIXTURE_DIR/$NODE2_FILE"; exit 1; }
+  export RT_NODE_REPLY2="$FIXTURE_DIR/$NODE2_FILE"
+  echo "реплика на второй узел: $NODE2_FILE"
+fi
 # НАСТРОЙКИ, КОТОРЫМИ ПОЛУЧЕНЫ ЧИСЛА, ПИШУТСЯ В ПАПКУ РАУНДА. Снимок скилла уже кладётся сюда по
 # той же причине: через неделю «прогоняли с эффортом или без» восстанавливается только из файла.
 mkdir -p "$ROUND/$PROBE"
@@ -520,6 +577,9 @@ mkdir -p "$ROUND/$PROBE"
   echo "effort: ${EFFORT:-умолчание CLI}"
   echo "реплика аналитика: ${TURN2_FILE:-нет, стенд одноходовой}"
   [ -n "$TURN3_FILE" ] && echo "реплика хода 3: $TURN3_FILE"
+  [ -n "$NODE_FILE" ] && echo "реплика на узел: $NODE_FILE"
+  [ -n "$NODE2_FILE" ] && echo "реплика на второй узел: $NODE2_FILE"
+  [ -n "$REAL_SUBS" ] && echo "живые под-скиллы: $REAL_SUBS"
   echo "потолок ходов: ${RT_MAX_TURNS:-8}"
   echo "прогонов: $N, параллельность: $CONC"
 } > "$ROUND/$PROBE/_settings.txt"
