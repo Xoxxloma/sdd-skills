@@ -97,6 +97,26 @@ EFFORT="${EFFORT:-}"
 # файл реплики (восьмой аргумент), то есть на пробах маршрута. Остальной набор одноходовой и
 # цикла не видит.
 MAX_TURNS="${RT_MAX_TURNS:-8}"
+# `RT_NODE_REPLY` — файл реплики на узел «Что дальше?» (`analyst-workspace` 2.0.0). Пусто → цикл
+# побайтно прежний. Узел опознаётся в ответе прошлого хода по двум подписям, которых нет больше нигде
+# в маршруте. Нейтральное «да, годится» вариант из четырёх не выбирает, поэтому в узле реплика — выбор;
+# второй раз узел получает `RT_NODE_DONE`, и цикл гаснет на пустых ходах.
+NODE_REPLY="${RT_NODE_REPLY:-}"
+if [ -n "$NODE_REPLY" ]; then
+  [ -f "$NODE_REPLY" ] || { echo "нет файла реплики на узел: $NODE_REPLY"; exit 1; }
+fi
+NODE_DONE="${RT_NODE_DONE:-На сегодня всё, спасибо.}"
+# `RT_NODE_REPLY2` — реплика на ВТОРОЙ узел (сквозная проба: «Проверить», затем «Доработать»). Пусто →
+# цикл побайтно прежний. Задана — ещё два отличия, оба только для такой пробы: (1) движение — не только рост
+# трассы, но и `Skill`/`Write`/`Edit` ведущего в потоке хода: живые под-скиллы трассу не пишут, и ход
+# проверки или вопросов доработки иначе считался бы пустым; (2) после `RT_NODE_DONE` цикл кончается —
+# следующая реплика-ответ ушла бы в законченный разговор и снова запустила доработку.
+NODE_REPLY2="${RT_NODE_REPLY2:-}"
+if [ -n "$NODE_REPLY2" ]; then
+  [ -f "$NODE_REPLY2" ] || { echo "нет файла реплики на второй узел: $NODE_REPLY2"; exit 1; }
+fi
+lead_moved() { grep -v '"parent_tool_use_id":"' "$1" 2>/dev/null | grep -qE '"type":"tool_use","id":"[^"]*","name":"(Skill|Write|Edit)"'; }
+is_node() { grep -q 'Проверить спек' "$1" 2>/dev/null && grep -q 'Начать другую задачу' "$1" 2>/dev/null; }
 
 is_api_failure() {
   local f="$1"
@@ -257,13 +277,20 @@ $(cat "$PROMPT")
   local idle=0 turn=1 apifail=0
   if [ -n "$TURN2" ] && [ $rc -eq 0 ] && [ -s "$sb/answer.md" ] && ! is_api_failure "$sb/answer.md"; then
     cp "$sb/answer.md" "$sb/answer-01.md"
-    local reply
-    while [ "$turn" -lt "$MAX_TURNS" ] && [ "$idle" -lt 2 ]; do
+    local reply node_used=0 prev done_sent=0
+    while [ "$turn" -lt "$MAX_TURNS" ] && [ "$idle" -lt 2 ] && [ "$done_sent" = "0" ]; do
       local before; before="$(trace_len "$sb")"
+      prev="$sb/answer-$(printf '%02d' "$turn").md"
       turn=$((turn + 1))
       local tf="$TURN2"
       [ "$turn" -ge 3 ] && [ -n "${TURN_FILES[$((turn - 3))]:-}" ] && tf="${TURN_FILES[$((turn - 3))]}"
       reply="$(cat "$tf")"
+      if [ -n "$NODE_REPLY" ] && is_node "$prev"; then
+        if [ "$node_used" = "0" ]; then reply="$(cat "$NODE_REPLY")"; node_used=1
+        elif [ "$node_used" = "1" ] && [ -n "$NODE_REPLY2" ]; then reply="$(cat "$NODE_REPLY2")"; node_used=2
+        else reply="$NODE_DONE"; [ -n "$NODE_REPLY2" ] && done_sent=1; fi
+        echo "ход $turn: узел — реплика «$reply»" >> "$sb/_node-replies.txt"
+      fi
       ( cd "$sb" && timeout "${RUN_TIMEOUT:-900}" claude -p "$reply" --model "${SM_MODEL:-haiku}" --permission-mode bypassPermissions \
             ${EFFORT:+--effort "$EFFORT"} \
             --resume "$sid" --output-format stream-json --verbose ) \
@@ -278,7 +305,9 @@ $(cat "$PROMPT")
       if [ ! -s "$last" ] || { [ -s "$last" ] && is_api_failure "$last"; }; then apifail=1; break; fi
       if [ $rc -ne 0 ]; then apifail=1; break; fi
       local after; after="$(trace_len "$sb")"
-      if [ "$after" -gt "$before" ]; then idle=0; else idle=$((idle + 1)); fi
+      if [ "$after" -gt "$before" ]; then idle=0
+      elif [ -n "$NODE_REPLY2" ] && lead_moved "$sb/stream-$(printf '%02d' "$turn").jsonl"; then idle=0
+      else idle=$((idle + 1)); fi
     done
     # `answer.md` — склейка ВСЕХ ходов: грейдеры набора читают именно его и ищут в нём анкеры
     # (спрошен ли ключ, показано ли меню). Склейка сохраняет находки каждого хода.

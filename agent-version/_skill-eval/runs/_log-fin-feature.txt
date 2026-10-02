@@ -1,0 +1,32 @@
+снимок скилла: runs/2026-10-02-fin-feature/_skills/analyst-workspace.SKILL.md
+проба: rt-feature   фикстура: RT-BUG   скилл: analyst-workspace
+заглушки: stubs → .claude/skills/ песочницы
+реплика аналитика: feature-turn2.txt   ходов до 2 подряд без движения, потолок 8
+реплика на узел «Что дальше?»: node-split-turn2.txt
+effort: умолчание CLI
+плечо: runs/2026-10-02-fin-feature/rt-feature
+скилл: C:/Users/Konstantin/AppData/Local/Temp/skill-eval-seed/2026-10-02-fin-feature-skills/analyst-workspace/SKILL.md
+промпт: C:/Users/Konstantin/projects/product-skills/agent-version/_skill-eval/fixtures/RT-BUG/feature-prompt.txt
+прогонов: 10, параллельно: 5
+  run-01 — ходов: 8, строк в трассе: 6
+  run-01 — готов
+  run-03 — ходов: 8, строк в трассе: 5
+  run-03 — готов
+  run-02 — ходов: 8, строк в трассе: 6
+  run-02 — готов
+  run-05 — ходов: 8, строк в трассе: 6
+  run-05 — готов
+  run-04 — ходов: 5, строк в трассе: 6
+  run-04 — готов
+  run-06 — ходов: 8, строк в трассе: 6
+  run-06 — готов
+  run-07 — ходов: 5, строк в трассе: 6
+  run-07 — готов
+  run-08 — ходов: 8, строк в трассе: 6
+  run-08 — готов
+  run-10 — ходов: 8, строк в трассе: 6
+  run-10 — готов
+  run-09 — ходов: 8, строк в трассе: 6
+  run-09 — готов
+ГОТОВО: runs/2026-10-02-fin-feature/rt-feature — песочниц с ответом: 10 из 10
+снимок из /tmp снесён: C:/Users/KONSTA~1/AppData/Local/Temp/skill-eval-seed/2026-10-02-fin-feature-skills (журнальная копия осталась в runs/2026-10-02-fin-feature/_skills/)

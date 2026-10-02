@@ -1,0 +1,8 @@
+проба: rt-srgap
+модель: sonnet
+effort: умолчание CLI
+реплика аналитика: srgap-turn2.txt
+реплика на узел: node-check-turn2.txt
+живые под-скиллы: spec-readiness
+потолок ходов: 8
+прогонов: 10, параллельность: 2

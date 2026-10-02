@@ -1,6 +1,6 @@
 ---
 name: technical-spec-doc
-version: 1.2.0
+version: 1.3.0
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
 description: 'Turns a confirmed business-requirements doc (БТ/BRD/SRS) into ONE Russian Markdown technical spec (technical_specification.md, saved next to the БТ), organized around INTERACTIONS — the new and changed contracts crossing service or FE/BE boundaries — so a frontend agent and a backend agent code against the same contracts and meet without after-the-fact stitching. There is no code to read: NEW things are designed fully (path, schema, JSON example); anything about an EXISTING service is written only as the analyst confirmed it — inventing an endpoint of a service you cannot see is the worst failure of this skill. Requires a ready БТ (or, by orchestrator flag, a bug report, a change request or an epic-БТ for foundation node #0): given only a brief or an idea it refuses and asks for the business requirements. Use when the БТ is ready and a dev spec is needed.'
@@ -523,8 +523,7 @@ business-requirements doc or any repo/code file (you may, on a later refinement 
 
 Число вес оценить не даёт. Ты сначала считаешь `N` по блоку, который сам только что собрал, и
 только потом получаешь значение статуса — подставить «Готово к разработке» при `N = 6` нельзя, не
-написав `N = 0` рядом с шестью перечисленными пунктами. Это тот же приём, которым разрез этапов
-перевели с суждения «есть ли своя логика у этапа» на счёт стыков.
+написав `N = 0` рядом с шестью перечисленными пунктами.
 
 **Единственные два вычета из `N`** — и они вычитаются ЯВНО, до подсчёта, а не задним числом:
 унаследованные из БТ бизнес-пробелы (они закрываются на стороне БТ) и `🔵 depends-on #0`
@@ -606,7 +605,9 @@ When the user returns to fill open questions (they answer some «Открыты�
 a 🟡 assumption, or resolve a ❓ fork):
 
 - The entry guard and "turn-1 = questions only" rule are for the **initial** run and do
-  **not** re-apply here — the БТ and a spec already exist. Go ahead and update.
+  **not** re-apply here — the БТ and a spec already exist. Флаг режима пришёл — файл режима открой и
+  работай по нему, кроме его вопросов первой записи: ответы на них уже в спеке. Go ahead and update
+  (пришли вопросы без ответов — сначала спроси, см. ниже).
 - **Update your own previously-produced tech spec in place** (edit that `.md`; do not
   spawn a second parallel spec unless the user asks). Apply only what the user actually
   answered:
@@ -615,6 +616,10 @@ a 🟡 assumption, or resolve a ❓ fork):
     валидировать при интеграции)` and write it as fact; the path field stays as the analyst wrote
     it — a nod does not fill it;
   - still deferred → it stays `TBD` / 🟡-к-валидации.
+- **К доработке пришли вопросы к спеке без ответов — все или часть** — задай их аналитику
+  гипотезой, как гейты интервью, и веди по реестру Step 3.5, как гейты. Пишешь только ✅ и ровно то,
+  что сказал аналитик; гипотезу, которую его ответ не покрыл, спроси ещё раз одним ходом, не покрыл и
+  тогда — ⏭️ в «Открытые вопросы». «Не знаю» → ⏭️: в спеке `❓ TBD`, о чужой системе — 🟡 к валидации.
 - **Изменился состав §2 — скажи об этом в хендоффе доработки.** Появилось или исчезло
   взаимодействие либо сущность §3.2 → назови это отдельной строкой: инвентарь стыков изменился.
   Что с этим делать дальше — решает тот, кто тебя позвал (Step 6).
