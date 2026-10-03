@@ -9,10 +9,16 @@
 
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const REL = 'docs/RMS-5102/business_requirements.md'
-const HERE = new URL('.', import.meta.url).pathname
-const SEED = readFileSync(join(HERE, 'fixtures/BR-REWORK', REL), 'utf8')
+// `fileURLToPath`, а не `.pathname`: на Windows `.pathname` даёт `/C:/…`, и `join` склеивал
+// `C:\C:\…` — грейдер падал на первом же чтении засева (2026-10-02).
+const HERE = fileURLToPath(new URL('.', import.meta.url))
+// Концы строк приводятся к LF: при `core.autocrlf=true` засев приезжает с CRLF, и самопроверка
+// (замены по `\n`) молча не находила, что менять.
+const lf = (s) => s.replace(/\r\n/g, '\n')
+const SEED = lf(readFileSync(join(HERE, 'fixtures/BR-REWORK', REL), 'utf8'))
 const RE_API_FAILURE = /API Error|Request not allowed|Please run \/login|Credit balance|rate limit|session limit|usage limit/i
 const RE_ASKS_KEY = /(укажите|назовите|пришлите|сообщите|дайте|нужен|требуется|не передан|не указан)[^.\n]{0,40}ключ|ключ[^.\n]{0,40}(не передан|не указан|❓)/i
 
@@ -43,6 +49,13 @@ export function gradeDoc (text, answer, otherDocs) {
   r.asksKey = RE_ASKS_KEY.test(answer)
   r.questions = (answer.match(/\?/g) || []).length
   r.pass = !r.newDocs.length && r.fix1 && r.fix2 && !r.rewritten && r.s45 && r.s53 && r.status && !r.asksKey
+  // Плечо `-q` (ответов аналитика нет). Критерий назван до чтения прогонов (PLAN-BR-COMB §1): нового
+  // файла нет, ключ не спрошен, вопрос задан, критерий FR-3 НЕ выдуман без ответа, §4.5/§5.3 целы.
+  // Убрать `PassportDto` сам — законно (K5, 2026-09-17). «Вопросы только по двум находкам» — вручную.
+  // Вопрос — не только «?»: дым Sonnet 2026-10-02 спросил гипотезой с вариантами («Я понял так: … Что
+  // выбрать: 1. Да, так …») без единого вопросительного знака — верное поведение красилось.
+  r.asks = r.questions > 0 || /понял\s+так|что\s+выбрать|скажите|ответьте|напишите\s+своими/i.test(answer)
+  r.passQ = !r.newDocs.length && !r.rewritten && !r.asksKey && !r.fix2 && r.s45 && r.s53 && r.asks
   return r
 }
 
@@ -52,7 +65,8 @@ function listMd (dir, base = dir) {
     if (e.name.startsWith('.')) continue
     const p = join(dir, e.name)
     if (e.isDirectory()) out.push(...listMd(p, base))
-    else if (e.name.endsWith('.md') && !/^answer/.test(e.name)) out.push(relative(base, p))
+    // Разделитель — `/`: на Windows `relative` даёт `\`, и свой же файл засчитывался «новым» (2026-10-02).
+    else if (e.name.endsWith('.md') && !/^answer/.test(e.name)) out.push(relative(base, p).split('\\').join('/'))
   }
   return out
 }
@@ -71,15 +85,20 @@ function selftest () {
   const rewritten = good.split('\n').map((l) => (l.startsWith('#') || l.startsWith('>') || !l.trim()) ? l : l + ' ').join('\n').replace(/ {1}$/gm, ' — уточнено')
   ck('переписан целиком — пойман', gradeDoc(rewritten, '', []).rewritten, true)
   ck('тронута §4.5 — поймано', gradeDoc(good.replace('Не применимо: один деливербл.', 'Не применимо: деливербл один.'), '', []).s45, false)
+  ck('-q: файл цел, два вопроса — зелёный', gradeDoc(SEED, 'Вы называли PassportDto сами? Какой критерий у FR-3?', []).passQ, true)
+  ck('-q: критерий FR-3 выдуман без ответа — красный', gradeDoc(good, 'Поправил. Верно?', []).passQ, false)
+  ck('-q: гипотеза вариантами без «?» — зелёный', gradeDoc(SEED, 'Я понял так: Дано… Что выбрать:\n1. Да, так.', []).passQ, true)
+  ck('-q: ни вопроса, ни гипотезы — красный', gradeDoc(SEED, 'Пункт 1 исправлен.', []).passQ, false)
   console.log(bad === 0 ? '\nсамопроверка: ok' : `\nсамопроверка: ПРОВАЛОВ ${bad}`)
   process.exit(bad === 0 ? 0 : 1)
 }
 
 const arg = process.argv[2]
+const Q = process.argv.includes('--q')
 if (arg === '--selftest') selftest()
-if (!arg || !existsSync(arg)) { console.error('usage: node grade-br-rework.mjs <каталог с песочницами> | --selftest'); process.exit(1) }
+if (!arg || !existsSync(arg)) { console.error('usage: node grade-br-rework.mjs <каталог с песочницами> [--q] | --selftest'); process.exit(1) }
 const runs = readdirSync(arg).filter((n) => /^run-\d+$/.test(n) && statSync(join(arg, n)).isDirectory()).sort()
-console.log(`\nпроба br-rework, ${arg}`)
+console.log(`\nпроба br-rework${Q ? '-q' : ''}, ${arg}`)
 let measured = 0; let green = 0
 for (const n of runs) {
   const dir = join(arg, n)
@@ -87,9 +106,10 @@ for (const n of runs) {
   if (existsSync(join(dir, '_api-failure.txt')) || !ans.trim() || RE_API_FAILURE.test(ans.slice(0, 300))) { console.log(`  ${n}: НЕ ИЗМЕРЕНО`); continue }
   measured++
   const p = join(dir, REL)
-  const text = existsSync(p) ? readFileSync(p, 'utf8') : null
+  const text = existsSync(p) ? lf(readFileSync(p, 'utf8')) : null
   const others = existsSync(join(dir, 'docs')) ? listMd(join(dir, 'docs'), dir).filter((f) => f !== REL) : []
   const r = gradeDoc(text, ans, others)
+  if (Q) r.pass = r.passQ
   if (r.pass) green++
   const outcome = !r.exists ? 'ФАЙЛ ИСЧЕЗ' : r.untouched ? 'файл НЕ ТРОНУТ' : r.rewritten ? `ПЕРЕПИСАН (дословно дожило ${(r.kept * 100).toFixed(0)}% строк)` : `правка на месте (дожило ${(r.kept * 100).toFixed(0)}% строк)`
   const notes = [
@@ -104,4 +124,6 @@ for (const n of runs) {
   ].filter(Boolean)
   console.log(`  ${n}: ${r.pass ? 'зелёный' : 'красный'}  ${outcome}  · ${notes.join(' · ')}`)
 }
-console.log(`\n  ${green}/${measured}\tзелёных — поправил свой файл на месте, без вопросов по закрытому и без побочных правок  ← КРИТЕРИЙ\n`)
+console.log(Q
+  ? `\n  ${green}/${measured}\tзелёных — спросил по находкам, критерий FR-3 не выдумал, ключ не переспросил, нового файла нет  ← КРИТЕРИЙ («вопросы только по находкам» — читать answer.md)\n`
+  : `\n  ${green}/${measured}\tзелёных — поправил свой файл на месте, без вопросов по закрытому и без побочных правок  ← КРИТЕРИЙ\n`)

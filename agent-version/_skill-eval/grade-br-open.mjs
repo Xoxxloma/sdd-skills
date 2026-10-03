@@ -93,6 +93,12 @@ const RE_SUBSTANCE = [
   // знал и красил образцовый ход красным — самый дорогой из ложняков, потому что наказывал
   // ровно за то поведение, которого скилл добивается.
   { label: 'понял так … верно? (канон скилла)', re: /(понял|понимаю)\s+так[^?]{0,300}?(верно|так\s+ли|правильно)\s*\?/isu },
+  // Подтверждено прогонами раунда br-comb 2026-10-02: `brc-a-br-open-q/run-01` — «Уточню суть:
+  // Главное, чтобы юрист нашёл договор…? Или главное не пропустить срок?» (развилка без «это про»);
+  // `brc-base-br-open-q/run-03` — «Что именно нужно делать? (найти договор, не пропустить срок…)»
+  // («нужно делать» — не «сделать», прежняя строка её не брала).
+  { label: 'главное — X? или Y? (развилка гипотез)', re: /главное[^?]{0,160}\?[^?]{0,40}(или|либо)\s/iu },
+  { label: 'что нужно делать (с вариантами)', re: /что\s+(именно\s+)?(нужно|надо|должн\p{L}*)\s+(делать|уметь|происходить)\s*\?/iu },
 ]
 
 // Вода в речи к человеку. СЧЁТЧИК, А НЕ КРИТЕРИЙ: в `pass` не входит.
@@ -156,9 +162,15 @@ export function gradeAnswer(text) {
 
 /** §1.0 записанной спеки: тип выведен или оставлен пустым. */
 export function gradeSection10(spec) {
-  const m = spec.match(RE_SECTION_10)
-  if (!m) return { has10: false, typeFilled: false, body: '' }
-  const body = m[1].trim()
+  // Построчно, а не `RE_SECTION_10`: с флагом `m` хвост `(?=\n*$)` срабатывал на конце ПЕРВОЙ же
+  // строки, и пустая строка после заголовка давала пустое тело — «§1.0 ПУСТА» при «Доработка
+  // существующего…» под ней (раунд br-comb 2026-10-02: база2 run-06, после A run-02/03/09).
+  const lines = spec.split(/\r?\n/)
+  const at = lines.findIndex((l) => /^#{2,4}\s*1\.0[.\s]/.test(l))
+  if (at < 0) return { has10: false, typeFilled: false, body: '' }
+  const rest = lines.slice(at + 1)
+  const end = rest.findIndex((l) => /^#{2,4}\s/.test(l))
+  const body = (end < 0 ? rest : rest.slice(0, end)).join('\n').trim()
   return {
     has10: true,
     body,
@@ -391,6 +403,14 @@ for (const r of measured) {
 const green = measured.filter((r) => r.pass).length
 console.log(`\nИТОГ: ${green}/${measured.length}` +
   (measured.length ? ` (${Math.round((green / measured.length) * 100)}%)` : ''))
+// Решение человека 2026-10-02 (раунд br-comb): «только ключ, суть следующим ходом» — не красный; по букве
+// скилла это разрешено («можешь задать остальные в том же ответе»). Красное = тип спрошен, файл записан
+// или ключ не спрошен. ИТОГ выше — прежнее строгое правило, для сравнения с раундами до 2026-10-02.
+if (mode === 'questions') {
+  const notRed = measured.filter((r) => !r.wrote && r.asksKey && !r.typeAsked).length
+  const keyOnly = measured.filter((r) => !r.wrote && r.asksKey && !r.typeAsked && !r.substance.length).length
+  console.log(`НЕ КРАСНЫХ (ключ отдельно — допустимо): ${notRed}/${measured.length}  · из них «только ключ»: ${keyOnly}`)
+}
 
 // Счётчик воды печатается ОТДЕЛЬНО и в ИТОГ не входит — см. шапку RE_WATER.
 const wet = measured.filter((r) => r.water?.length)
