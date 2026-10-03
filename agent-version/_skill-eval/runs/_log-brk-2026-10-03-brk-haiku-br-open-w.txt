@@ -1,0 +1,14 @@
+снимок скилла: runs/2026-10-03-brk-haiku-br-open-w/_skills/business-requirements-doc.SKILL.md
+проба: br-open-w   фикстура: BR-OPEN   скилл: business-requirements-doc
+effort: умолчание CLI
+плечо: runs/2026-10-03-brk-haiku-br-open-w/br-open-w
+скилл: C:/Users/Konstantin/AppData/Local/Temp/skill-eval-seed/2026-10-03-brk-haiku-br-open-w-skills/business-requirements-doc/SKILL.md
+промпт: C:/Users/Konstantin/projects/product-skills/agent-version/_skill-eval/fixtures/BR-OPEN/w-prompt.txt
+прогонов: 5, параллельно: 5
+  run-4 — готов
+  run-1 — готов
+  run-2 — готов
+  run-3 — готов
+  run-5 — готов
+ГОТОВО: runs/2026-10-03-brk-haiku-br-open-w/br-open-w — песочниц с ответом: 5 из 5
+снимок из /tmp снесён: C:/Users/KONSTA~1/AppData/Local/Temp/skill-eval-seed/2026-10-03-brk-haiku-br-open-w-skills (журнальная копия осталась в runs/2026-10-03-brk-haiku-br-open-w/_skills/)

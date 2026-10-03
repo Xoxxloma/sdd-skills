@@ -1,0 +1,19 @@
+снимок скилла: runs/2026-10-03-brk-sonnet-br-open-w/_skills/business-requirements-doc.SKILL.md
+проба: br-open-w   фикстура: BR-OPEN   скилл: business-requirements-doc
+effort: умолчание CLI
+плечо: runs/2026-10-03-brk-sonnet-br-open-w/br-open-w
+скилл: C:/Users/Konstantin/AppData/Local/Temp/skill-eval-seed/2026-10-03-brk-sonnet-br-open-w-skills/business-requirements-doc/SKILL.md
+промпт: C:/Users/Konstantin/projects/product-skills/agent-version/_skill-eval/fixtures/BR-OPEN/w-prompt.txt
+прогонов: 10, параллельно: 5
+  run-03 — готов
+  run-04 — готов
+  run-05 — готов
+  run-02 — готов
+  run-01 — готов
+  run-08 — готов
+  run-06 — готов
+  run-09 — готов
+  run-10 — готов
+  run-07 — готов
+ГОТОВО: runs/2026-10-03-brk-sonnet-br-open-w/br-open-w — песочниц с ответом: 10 из 10
+снимок из /tmp снесён: C:/Users/KONSTA~1/AppData/Local/Temp/skill-eval-seed/2026-10-03-brk-sonnet-br-open-w-skills (журнальная копия осталась в runs/2026-10-03-brk-sonnet-br-open-w/_skills/)
