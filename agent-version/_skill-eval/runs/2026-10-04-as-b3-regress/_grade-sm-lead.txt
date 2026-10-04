@@ -1,0 +1,8 @@
+
+проба sm-field/lead, runs\2026-10-04-as-b3-regress\sm-lead
+  interrupted-first            ожидание ПЕРЕЗАПУСК      3/3  [ПЕРЕЗАПУСК, ПЕРЕЗАПУСК, ПЕРЕЗАПУСК]
+  interrupted-second           ожидание В ОТЧЁТ         3/3  [В ОТЧЁТ, В ОТЧЁТ, В ОТЧЁТ]
+  dobor-brief                  ожидание EDIT            3/3  [EDIT, EDIT, EDIT]
+
+  9/9 зелёных · цена: $0.81
+

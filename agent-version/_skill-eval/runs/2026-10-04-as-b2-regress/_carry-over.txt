@@ -1,0 +1,1 @@
+перенесены из as-b1-regress (вырезки md5 те же: gate f8334ba0…, guard 079040ef…): sm-gate, sm-guard, sm-guard-haiku

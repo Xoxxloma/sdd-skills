@@ -1,0 +1,4 @@
+кусок: nrs-exchange (K-2, nrs-tail: cargonet; пути: src/main/java/ru/cargonet/v2/exchange src/main/java/ru/cargonet/v2/seal)
+модель: sonnet; прогонов: 2, одновременно: 1; Agent: запрещён
+снимок скилла: _skills/service-map.SKILL.md (1030 строк); источник: ../service-map-2.0/SKILL.md
+дата: 2026-10-04

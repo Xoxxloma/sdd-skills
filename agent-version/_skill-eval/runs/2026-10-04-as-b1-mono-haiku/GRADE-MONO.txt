@@ -1,0 +1,21 @@
+проба sm-mono, runs/2026-10-04-as-b1-mono-haiku
+фикстура NRS-TAIL, сервис cargonet; правда по дереву: контракт 139, сущности 88, задачи 9, топики 18 (= expected.md)
+
+mono-01: карточка записана
+  контракт  133/139 (95.7 %)  лишних 6, повторов 0  · нет: PUT /api/v2/settlement/2/{}; PUT /api/v2/settlement/6/{}; PUT /api/v2/settlement/10/{}; PUT /api/v2/tariffbook/2/{}; PUT /api/v2/tariffbook/6/{}; PUT /api/v2/tariffbook/10/{}
+            лишние: GET /api/v2/settlement/10/{id} | GET /api/v2/settlement/2/{id} | GET /api/v2/settlement/6/{id} | GET /api/v2/tariffbook/10/{id} | GET /api/v2/tariffbook/2/{id} …и ещё 1
+  сущности  80/88 (90.9 %)  лишних 1, повторов 0  · нет: Terminal0Entity; Terminal1Entity; Vehicle0Entity; Vehicle1Entity; Warehouse0Entity; Waybill0Entity …и ещё 2
+            лишние: `Permit0Entity`
+  задачи    9/9 (100.0 %)  лишних 0, повторов 0
+  топики    18/18 (100.0 %)  лишних 0, повторов 0
+  трасса: субагентов 13; plan.sh 1+0, assemble.sh 4+1, promote.sh 1+0, check.sh 2+1 (ведущий+субагенты); Read .work ведущим 9 (субагентами 29)
+  пик ведущего 128102; субагенты: «Разведчик skill service-map: найти помет» 89240, «Разведчик skill service-map: найти помет» 91768, «Счётчик service-map: считать маркеры в c» 35443, «Читающий субагент part-01: legacy контро» 56783, «Читающий субагент part-02: аналитика, шт» 86068, «Читающий субагент part-03: consignment c» 70181, «Читающий субагент part-04: consignment e» 65196, «Читающий субагент part-05: контракт, эки» 84542, «Читающий субагент part-06: поселение, та» 84132, «Читающий субагент part-07: терминал, тра» 77883, «Читающий субагент остаток (часть 08): вн» 76260, «Голова service-map: каркас и общие секци» 50642, «Execute service-map head brief with subs» 88379, «Голова service-map (перезапуск): каркас » 62826
+  Б-5 НЕТ · Б-6 НЕТ · цена $4.85
+
+mono-02: НЕ ИЗМЕРЕНО — отказ API / обрыв
+
+mono-03: НЕ ИЗМЕРЕНО — отказ API / обрыв
+
+измерено 1, не измерено 2, цена $4.85
+Б-5 (карточка записана; ключей по каждому классу ≥ 95 % правды; топиков 18/18): 0/1 — КРАСНЫЙ
+Б-6 (пик ведущего ≤ 150 000; Read ведущего по .work/ = 0): 0/1 — КРАСНЫЙ

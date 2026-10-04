@@ -1,0 +1,31 @@
+проба sm-mono, runs/2026-10-04-as-b2-mono-haiku
+фикстура NRS-TAIL, сервис cargonet; правда по дереву: контракт 139, сущности 88, задачи 9, топики 18 (= expected.md)
+
+mono-01: карточка записана  !!! ТРОГАЛ ПАПКУ СЕРВИСА (_dirt.txt)
+  контракт  0/139 (0.0 %)  лишних 0, повторов 0  · нет: GET /legacy/health; POST /legacy/health; GET /legacy/info; POST /legacy/info; GET /legacy/metrics; POST /legacy/metrics …и ещё 133
+  сущности  0/88 (0.0 %)  лишних 0, повторов 0  · нет: Barcode0Entity; Barcode1Entity; Calendar0Entity; Carrier0Entity; Checklist0Entity; Checklist1Entity …и ещё 82
+  задачи    0/9 (0.0 %)  лишних 0, повторов 0  · нет: DispatcherJob0; DispatcherJob1; DispatcherJob2; DispatcherJob3; DispatcherJob4; DispatcherJob5 …и ещё 3
+  топики    0/18 (0.0 %)  лишних 0, повторов 0  · нет: consignment.created; consignment.updated; consignment.cancelled; consignment.delivered; waybill.issued; waybill.voided …и ещё 12
+  трасса: субагентов 4; plan.sh 0+0, assemble.sh 0+0, promote.sh 0+0, check.sh 0+0 (ведущий+субагенты); Read .work ведущим 3 (субагентами 14)
+  пик ведущего 127349; субагенты: «Scout for markers in cargonet backend se» 75662, «Count markers in cargonet code by grep» 47158, «Read cargonet backend service and create» 78643, «Fix empty contract blocks in cargonet ca» 85706, «Rewrite cargonet.md with correct endpoin» 95024
+  Б-5 НЕТ · Б-6 НЕТ · цена $2.83
+
+mono-02: карточка НЕТ
+  трасса: субагентов 4; plan.sh 0+0, assemble.sh 0+0, promote.sh 0+0, check.sh 2+0 (ведущий+субагенты); Read .work ведущим 1 (субагентами 2)
+  пик ведущего 97858; субагенты: «Разведчик skкилла service-map для опреде» 76286, «Счётчик маркеров для service-map по коду» 35263, «Читающий субагент для карточки cargonet» 84222, «Добор для развёртывания недостающих ключ» 93583
+  Б-5 НЕТ · Б-6 НЕТ · цена $1.33
+
+mono-03: карточка записана
+  контракт  24/139 (17.3 %)  лишних 0, повторов 0  · нет: POST /legacy/health; GET /legacy/info; POST /legacy/info; GET /legacy/metrics; POST /legacy/metrics; GET /legacy/ping …и ещё 109
+  сущности  0/88 (0.0 %)  лишних 7, повторов 0  · нет: Barcode0Entity; Barcode1Entity; Calendar0Entity; Carrier0Entity; Checklist0Entity; Checklist1Entity …и ещё 82
+            лишние: `Consignment` | `Route` | `Settlement` | `Crew` | `Vehicle` …и ещё 2
+  задачи    0/9 (0.0 %)  лишних 3, повторов 0  · нет: DispatcherJob0; DispatcherJob1; DispatcherJob2; DispatcherJob3; DispatcherJob4; DispatcherJob5 …и ещё 3
+            лишние: `DispatcherJob` | `FuelingJob` | `InsuranceJob`
+  топики    10/18 (55.6 %)  лишних 0, повторов 0  · нет: consignment.cancelled; waybill.voided; crew.released; vehicle.returned; customs.cleared; settlement.reversed …и ещё 2
+  трасса: субагентов 5; plan.sh 0+0, assemble.sh 0+0, promote.sh 0+0, check.sh 0+0 (ведущий+субагенты); Read .work ведущим 2 (субагентами 1)
+  пик ведущего 101755; субагенты: «Разведчик скилла service-map для определ» 79574, «Счётчик маркеров скилла service-map» 48236, «Читающий субагент скилла service-map для» 84007, «Копировщик карточки service-map» 31776, «Удаление рабочих файлов скилла service-m» 22513
+  Б-5 НЕТ · Б-6 НЕТ · цена $1.22
+
+измерено 3, не измерено 0, цена $5.38
+Б-5 (карточка записана; ключей по каждому классу ≥ 95 % правды; топиков 18/18): 0/3 — КРАСНЫЙ
+Б-6 (пик ведущего ≤ 200 000; Read ведущего по .work/ = 0): 0/3 — КРАСНЫЙ

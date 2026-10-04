@@ -1,0 +1,13 @@
+проба sm-guard, runs\2026-10-04-as-b2-regress\sm-guard
+  class-zeroed-19              ожидание В _pending 3/3  [В _pending, В _pending, В _pending]
+  cut-33-of-48                 ожидание В _pending 3/3  [В _pending, В _pending, В _pending]  слов-причин в 1
+  entities-3-of-4              ожидание В _pending 3/3  [В _pending, В _pending, В _pending]
+  mirror-1-not-counted         ожидание ПОВЕРХ    3/3  [ПОВЕРХ, ПОВЕРХ, ПОВЕРХ]
+  renamed-prefix-96            ожидание В _pending 3/3  [В _pending, В _pending, В _pending]
+  rules-8-of-22-not-counted    ожидание ПОВЕРХ    3/3  [ПОВЕРХ, ПОВЕРХ, ПОВЕРХ]  слов-причин в 2
+  task-1-of-2                  ожидание ПОВЕРХ    3/3  [ПОВЕРХ, ПОВЕРХ, ПОВЕРХ]
+  ueb-foreign-3-of-20          ожидание ПОВЕРХ    3/3  [ПОВЕРХ, ПОВЕРХ, ПОВЕРХ]
+  web-2-of-89                  ожидание ПОВЕРХ    3/3  [ПОВЕРХ, ПОВЕРХ, ПОВЕРХ]
+  web-3-of-128                 ожидание ПОВЕРХ    3/3  [ПОВЕРХ, ПОВЕРХ, ПОВЕРХ]
+
+  30/30 зелёных · ответов со словами-причинами 3 · цена: $2.48

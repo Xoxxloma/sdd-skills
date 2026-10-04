@@ -1,0 +1,4 @@
+кусок: api-58 (K-1, repairy: repairy-api; пути: src/company src/documents src/estimate-history src/files src/health src/notifications src/projects src/purchases src/push src/rooms src/shopping src/works)
+модель: sonnet; прогонов: 2, одновременно: 1; Agent: запрещён
+снимок скилла: _skills/service-map.SKILL.md (1030 строк); источник: ../service-map-2.0/SKILL.md
+дата: 2026-10-04
