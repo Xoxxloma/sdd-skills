@@ -1,0 +1,4 @@
+  dobor-brief — готов
+  interrupted-first — готов
+  interrupted-second — готов
+ГОТОВО: runs/2026-10-05-as-c1-regress/sm-lead

@@ -1,0 +1,6 @@
+фикстура: NRS-TAIL, сервис: cargonet
+модель: sonnet; прогонов: 3; параллельность: 3; таймаут: 7200 c
+папка скилла: /Users/macbook/Documents/Projects/sdd-skills/agent-version/service-map-2.0
+снимок: _skills/service-map (    1353 строк SKILL.md,        8 файлов reference/); подмена: K=как в тексте w=как в тексте
+копия для прогона: /tmp/sm-mono-skills/2026-10-05-as-c1-mono/service-map
+claude: /Users/macbook/.local/bin/claude

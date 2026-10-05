@@ -1,0 +1,7 @@
+  bakery-scout-refused — готов
+  ferry-contract-153-over-14 — готов
+  greenhouse-contract-18-of-45 — готов
+  library-all-close — готов
+  skipass-entities-11-of-30-contract-64-over-9 — готов
+  vetclinic-topics-orientir-3-of-20 — готов
+ГОТОВО: runs/2026-10-05-as-c1-regress/sm-mark

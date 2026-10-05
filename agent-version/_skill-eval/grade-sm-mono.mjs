@@ -16,6 +16,9 @@
 //   задачи   — классы с @Scheduled (у всех метод `run`, поэтому ключ — класс; `Класс.run` тоже годится);
 //   топики   — имена из application.yaml под `topics`/`topic`; направление — `producers` → публикует,
 //              иначе потребляет. Доля — по имени; расхождение направления печатается отдельно.
+//   REST из спецификации — операция `src/main/resources/openapi.yaml` в правде, только если её operationId
+//              реализован методом класса `implements …Api`; объявленная без реализации и топик из
+//              `src/test` — «призраки»: в правду не идут, в карточке считаются отдельно (критерий Б-7).
 // КАРТОЧКА — `w/AI-SDD/services/<сервис>.md`; ключи — заголовки `###` в секциях «Публичный контракт»,
 // «Владеет данными», «Фоновые задачи», «События». Грейдится файл, не формулировка отчёта.
 // ТРАССА — `_stream.jsonl` (не `_trace.jsonl` и не ответ): ведущий — события без parent_tool_use_id.
@@ -29,6 +32,8 @@ const HERE = import.meta.dirname
 const FIXT = {
   'NRS-TAIL': { svc: 'cargonet', expect: { contract: 139, entities: 88, jobs: 9, topics: 18 } },
   'SM-MONO-DGS': { svc: 'casedesk', expect: { contract: 120, entities: 60, jobs: 10, topics: 12 } },
+  // casedesk плюс REST из openapi.yaml без аннотаций (28 реализовано, 2 только объявлены) и тестовый конфиг с 4 топиками
+  'SM-MONO-SPEC': { svc: 'casedesk', expect: { contract: 148, entities: 60, jobs: 10, topics: 12 } },
 }
 const CLASSES = ['contract', 'entities', 'jobs', 'topics']
 const RU = { contract: 'контракт', entities: 'сущности', jobs: 'задачи', topics: 'топики' }
@@ -60,7 +65,7 @@ const annoPath = (args) => {
 }
 
 export function extractTruth (tree) {
-  const T = { contract: new Map(), entities: new Map(), jobs: new Map(), topics: new Map() }
+  const T = { contract: new Map(), entities: new Map(), jobs: new Map(), topics: new Map(), ghost: { contract: new Map(), topics: new Map() } }
   // T[class]: каноничный ключ → { aliases: Set, dir?, file }
   const add = (cls, key, aliases, extra = {}) => {
     if (!T[cls].has(key)) T[cls].set(key, { aliases: new Set(), ...extra })
@@ -113,8 +118,29 @@ export function extractTruth (tree) {
       add('jobs', className, [className.toLowerCase(), `${className}.${m[1]}`.toLowerCase(), `${className}#${m[1]}`.toLowerCase()], { file: rel, method: m[1] })
     }
   }
-  // топики — application.yaml
+  // REST из файла спецификации: реализованные операции — в правду, только объявленные — в призраки
+  const spec = join(tree, 'src', 'main', 'resources', 'openapi.yaml')
+  if (existsSync(spec)) {
+    const impl = new Map()
+    for (const f of javaFiles) {
+      const t = read(f); if (!/\bimplements\s+\w+Api\b/.test(t)) continue
+      for (const m of t.matchAll(/@Override\s+public\s+[^\n(]+?\s(\w+)\s*\(/g)) impl.set(m[1], relative(tree, f).split(sep).join('/'))
+    }
+    let p = null; let verb = null
+    for (const raw of read(spec).split('\n')) {
+      let m
+      if ((m = raw.match(/^ {2}(\/\S*):\s*$/))) { p = m[1]; verb = null; continue }
+      if ((m = raw.match(/^ {4}(get|post|put|patch|delete):\s*$/))) { verb = m[1]; continue }
+      if (p && verb && (m = raw.match(/^ {6}operationId:\s*(\w+)/))) {
+        const k = restKey(verb, p)
+        if (impl.has(m[1])) add('contract', k, [k], { file: impl.get(m[1]) }); else T.ghost.contract.set(k, m[1])
+      }
+    }
+  }
+  // топики — application.yaml; конфиг из src/test — призраки
   for (const y of walk(join(tree, 'src')).filter((f) => /application[^/\\]*\.ya?ml$/.test(f))) {
+    const inTest = /[\\/]src[\\/]test[\\/]/.test(y)
+    const addTopic = (name, path) => (inTest ? T.ghost.topics.set(name, 'src/test') : add('topics', name, [name.toLowerCase()], { dir: path.some((k) => /producer/i.test(k)) ? 'публикует' : 'потребляет' }))
     const stack = []
     for (const raw of read(y).split('\n')) {
       if (!raw.trim() || /^\s*#/.test(raw)) continue
@@ -125,7 +151,7 @@ export function extractTruth (tree) {
         const path = stack.map((s) => s.key)
         if (/^topics?$/.test(path[path.length - 1] || '')) {
           const name = li[1].replace(/['"]/g, '')
-          add('topics', name, [name.toLowerCase()], { dir: path.some((k) => /producer/i.test(k)) ? 'публикует' : 'потребляет' })
+          addTopic(name, path)
         }
         continue
       }
@@ -136,7 +162,7 @@ export function extractTruth (tree) {
       if (kv[2] && /^topics?$/.test(kv[1])) {
         const name = kv[2].replace(/['"]/g, '')
         const path = stack.map((s) => s.key)
-        add('topics', name, [name.toLowerCase()], { dir: path.some((k) => /producer/i.test(k)) ? 'публикует' : 'потребляет' })
+        addTopic(name, path)
       }
     }
   }
@@ -234,6 +260,14 @@ export function gradeCard (text, truth) {
     const missing = [...truth.T[c].keys()].filter((k) => !found.has(k))
     res[c] = { found: found.size, truth: truth.T[c].size, share: truth.T[c].size ? found.size / truth.T[c].size : 1, extras, dups, missing, dirMismatch }
   }
+  // призраки среди лишних: операция спецификации без реализации и топик тестового конфига
+  const g = truth.T.ghost || { contract: new Map(), topics: new Map() }
+  const restOf = (h) => { const r = h.replace(/`/g, ' ').match(/\b(GET|POST|PUT|PATCH|DELETE)\b\s+(\/\S*)/i); return r ? restKey(r[1], r[2].replace(/[),.;:]+$/, '')) : null }
+  res.ghost = {
+    contract: res.contract.extras.filter((h) => g.contract.has(restOf(h))),
+    topics: res.topics.extras.filter((h) => [...g.topics.keys()].some((n) => h.toLowerCase().includes(n.toLowerCase()))),
+    has: g.contract.size + g.topics.size > 0,
+  }
   return res
 }
 
@@ -288,7 +322,9 @@ export function gradeRun (dir, truth) {
   const topicsFull = cardOk && keys.topics.found === keys.topics.truth
   const b5 = cardOk && sharesOk && topicsFull
   const b6 = st.events > 0 && st.lead.peak > 0 && st.lead.peak <= PEAK_LEAD_MAX && st.lead.readWork === 0
-  return { name, measured: true, card: cardOk, keys, st, cost, dirt, bg, b5, b6 }
+  // Б-7: в карточке нет призраков и ни один ключ контракта не описан дважды; null — у фикстуры призраков нет
+  const b7 = (truth.T.ghost.contract.size + truth.T.ghost.topics.size) === 0 ? null : cardOk && keys.ghost.contract.length === 0 && keys.ghost.topics.length === 0 && keys.contract.dups.length === 0
+  return { name, measured: true, card: cardOk, keys, st, cost, dirt, bg, b5, b6, b7 }
 }
 
 function detectFixture (round) {
@@ -314,6 +350,8 @@ export function gradeRound (round, { build = false } = {}) {
     measured: m.length, notMeasured: runs.length - m.length,
     b5: { ok: m.filter((r) => r.b5).length, n: m.length, verdict: verdict(m.filter((r) => r.b5).length, m.length) },
     b6: { ok: m.filter((r) => r.b6).length, n: m.length, verdict: verdict(m.filter((r) => r.b6).length, m.length) },
+    b7: truth.T.ghost.contract.size + truth.T.ghost.topics.size === 0 ? null : { ok: m.filter((r) => r.b7).length, n: m.length, verdict: verdict(m.filter((r) => r.b7).length, m.length) },
+    ghostCounts: { contract: truth.T.ghost.contract.size, topics: truth.T.ghost.topics.size },
     cost: runs.reduce((a, r) => a + (r.cost || 0), 0),
   }
 }
@@ -337,12 +375,14 @@ function report (R) {
     const s = r.st
     L.push(`  трасса: субагентов ${s.lead.agents}; ${SCRIPTS.map((x) => `${x} ${s.scripts[x].lead}+${s.scripts[x].sub}`).join(', ')} (ведущий+субагенты); Read .work ведущим ${s.lead.readWork} (субагентами ${s.sub.readWork})`)
     L.push(`  пик ведущего ${s.lead.peak}${s.lead.peak > PEAK_LEAD_MAX ? ' > 150k' : ''}; субагенты: ${s.subs.map((x) => `«${String(x.desc).slice(0, 40)}» ${x.peak}`).join(', ') || '—'}`)
-    L.push(`  Б-5 ${r.b5 ? 'да' : 'НЕТ'} · Б-6 ${r.b6 ? 'да' : 'НЕТ'} · цена $${r.cost.toFixed(2)}`)
+    if (r.card && r.keys.ghost.has) L.push(`  призраки в карточке: операций без реализации ${r.keys.ghost.contract.length}${r.keys.ghost.contract.length ? ' (' + r.keys.ghost.contract.join(' | ') + ')' : ''}, тестовых топиков ${r.keys.ghost.topics.length}${r.keys.ghost.topics.length ? ' (' + r.keys.ghost.topics.join(' | ') + ')' : ''}`)
+    L.push(`  Б-5 ${r.b5 ? 'да' : 'НЕТ'} · Б-6 ${r.b6 ? 'да' : 'НЕТ'}${r.b7 == null ? '' : ` · Б-7 ${r.b7 ? 'да' : 'НЕТ'}`} · цена $${r.cost.toFixed(2)}`)
   }
   L.push('')
   L.push(`измерено ${R.measured}, не измерено ${R.notMeasured}, цена $${R.cost.toFixed(2)}`)
   L.push(`Б-5 (карточка записана; ключей по каждому классу ≥ 95 % правды; топиков ${R.truthCounts.topics}/${R.truthCounts.topics}): ${R.b5.verdict}`)
   L.push(`Б-6 (пик ведущего ≤ 200 000; Read ведущего по .work/ = 0): ${R.b6.verdict}`)
+  if (R.b7) L.push(`Б-7 (в карточке нет операций без реализации (в дереве их ${R.ghostCounts.contract}) и тестовых топиков (${R.ghostCounts.topics}); повторов в контракте 0): ${R.b7.verdict}`)
   return L.join('\n')
 }
 

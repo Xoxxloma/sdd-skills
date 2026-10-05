@@ -11,16 +11,18 @@
 //                     (все регэкспы — в одной и той же строке);
 //   report_forbid     [[регэксп, зачем]] — ни одна строка «ОТЧЁТ:» не отвечает;
 //   action_forbid     [[регэксп, зачем]] — ни одна строка «ДЕЙСТВИЕ:» без отрицания («не», «нельзя») не отвечает;
+//   action_must       [[регэксп, зачем]] — на каждый регэксп есть строка «ДЕЙСТВИЕ:» (любая: «…4, а не 5» — не отказ);
 //   soft_action_must / soft_action_forbid — то же, но только пометкой «(мягко)», не провал.
 // Пустой ответ и _api-failure-N.txt — НЕ ИЗМЕРЕНО, в знаменатель не идут. Грейдится файл ответа.
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const HERE = import.meta.dirname
-const FIX = join(HERE, 'fixtures', 'SM-SLICE-LEAD')
+const FIX = process.env.SM_FIX || join(HERE, 'fixtures', 'SM-SLICE-LEAD')   // SM_FIX — другая фикстура того же формата (SM-SLICE-LEAD-2)
 const loadExpect = () => JSON.parse(readFileSync(join(FIX, 'expect.json'), 'utf8'))
 
-const VERDICTS = ['ОДИН ЧИТАЮЩИЙ', 'НАРЕЗКА', 'ДОБОР', 'СКЛЕЙКА ЗАНОВО', 'ПРОДВИЖЕНИЕ', 'КАРТОЧКУ НЕ ПИСАТЬ']
+// «В PENDING» — это «В _PENDING»: подчёркивание снимается вместе с разметкой; «СКЛЕЙКА» стоит после «СКЛЕЙКА ЗАНОВО»
+const VERDICTS = ['ОДИН ЧИТАЮЩИЙ', 'НАРЕЗКА', 'ВТОРОЙ ЗАПУСК СЧЁТЧИКА', 'ДОБОР', 'СКЛЕЙКА ЗАНОВО', 'СКЛЕЙКА', 'ПРОДВИЖЕНИЕ', 'В PENDING', 'КАРТОЧКУ НЕ ПИСАТЬ']
 const RE_LINE = (tag) => new RegExp(`^[\\s>*_\\-•\\d.)]*${tag}[\\s*_]*:(.*)$`, 'i')
 const RE_REPORT = RE_LINE('ОТЧ[ЁЕ]Т')
 const RE_ACTION = RE_LINE('ДЕЙСТВИЕ')
@@ -66,6 +68,7 @@ export function grade (text, w) {
   if (w.report_must?.length && !rep.some((l) => w.report_must.every(([re]) => new RegExp(re, 'i').test(l)))) fail(`нет строки ОТЧЁТ: ${w.report_must.map(([, why]) => why).join('; ')}`)
   for (const [re, why] of w.report_forbid || []) { const l = rep.find((x) => new RegExp(re, 'i').test(x)); if (l) fail(`${why}: «${l.slice(0, 70)}»`) }
   for (const [re, why] of w.action_forbid || []) { const l = act.find((x) => new RegExp(re, 'i').test(x)); if (l) fail(`${why}: «${l.slice(0, 70)}»`) }
+  for (const [re, why] of w.action_must || []) if (!actionLines(text).some((x) => new RegExp(re, 'i').test(x))) fail(`нет действия: ${why}`)
   for (const [re, why] of w.soft_action_forbid || []) if (act.some((x) => new RegExp(re, 'i').test(x))) notes.push(`(мягко) ${why}`)
   for (const [re, why] of w.soft_action_must || []) if (!act.some((x) => new RegExp(re, 'i').test(x))) notes.push(`(мягко) нет действия: ${why}`)
   return { verdict: shown, pass, note: notes.join('; ') }

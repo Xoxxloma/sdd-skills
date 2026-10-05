@@ -4,6 +4,8 @@
 #
 #   фикстура NRS-TAIL     → сервис cargonet (2100 java, контракт 139, сущности 88, задачи 9, топики 18 в yaml)
 #   фикстура SM-MONO-DGS  → сервис casedesk (1052 java, DGS 104 + REST 16, сущности 60, задачи 10, топики 12)
+#   фикстура SM-MONO-SPEC → тот же casedesk плюс 28 REST-операций из openapi.yaml без аннотаций (ещё 2 объявлены
+#                           без реализации) и тестовый конфиг с 4 топиками; контракт 148
 #
 # Песочница: <раунд>/sandbox/mono-NN/w/{AI-SDD/services/manifest.yaml, <сервис>/} (у NRS-TAIL ещё weather-api,
 # как в её seed.sh). Рабочая директория прогона — w/AI-SDD, аргумент запуска — имя сервиса. Деревья фикстур
@@ -34,8 +36,8 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; FIXROOT="$HERE/fixtures"; 
 MODEL="${SM_MODEL:-sonnet}"; CONC="${SM_MONO_CONC:-1}"; TMO="${SM_MONO_TIMEOUT:-7200}"
 case "$FX" in
   NRS-TAIL) SVC=cargonet ;;
-  SM-MONO-DGS) SVC=casedesk ;;
-  *) echo "неизвестная фикстура: $FX (NRS-TAIL | SM-MONO-DGS)" >&2; exit 1 ;;
+  SM-MONO-DGS|SM-MONO-SPEC) SVC=casedesk ;;
+  *) echo "неизвестная фикстура: $FX (NRS-TAIL | SM-MONO-DGS | SM-MONO-SPEC)" >&2; exit 1 ;;
 esac
 [ -f "$SRC/SKILL.md" ] || { echo "нет $SRC/SKILL.md" >&2; exit 1; }
 [ -d "$SRC/reference" ] || { echo "нет $SRC/reference/ — снимок без скриптов лжёт" >&2; exit 1; }
@@ -112,7 +114,7 @@ seed() {  # seed <w>
   rm -rf "$w"; mkdir -p "$w"
   case "$FX" in
     NRS-TAIL) bash "$FIXROOT/NRS-TAIL/seed.sh" "$w" ;;
-    SM-MONO-DGS)
+    SM-MONO-DGS|SM-MONO-SPEC)
       cp -r "$FXOUT/casedesk" "$w/casedesk"
       mkdir -p "$w/AI-SDD/services"
       printf '%s\n' '# Слепок соседних сервисов. Этот файл ведёт человек.' 'services:' '  - name: casedesk' '    path: ../casedesk' '    type: backend' > "$w/AI-SDD/services/manifest.yaml"
