@@ -172,7 +172,7 @@ export function parseOpis(text) {
       continue;
     }
     if (line.startsWith('<!--')) { cur = null; continue; } // строка свежести части — не ключ (A10)
-    if (line.startsWith('#') || line.startsWith('(')) { cur = null; continue; }
+    if (line.startsWith('#') || line.startsWith('(') || line.startsWith('>')) { cur = null; continue; } // «> пройдено: …» остатка — не ключ
     if (line.startsWith('справочник:')) { cur = null; continue; }
     const i = line.indexOf(SEP);
     if (i < 0 && line.trim().endsWith(':')) { cur = null; continue; } // подпись «Эндпоинты:» (A9)
@@ -190,7 +190,7 @@ export function parseOpis(text) {
       key = norm('ограничение ' + kt.slice('ограничение:'.length));
       kind = 'lim';
     } else {
-      key = norm(kt);
+      key = norm(kt.replace(/^[Рр]оль:\s*/, '')); // «роль: OWNER» ↔ строка таблицы «OWNER»
     }
     if (!hasFile(line)) nofile.push(key);
     if (!keys.has(key)) keys.set(key, { kind, fact: false });
@@ -258,17 +258,31 @@ export function analyze(opisText, draftText, prevText) {
   for (const c of d.tables.api) add('потребляет', norm(c[1] ?? ''));
   for (const c of d.tables.зависит) add('зависит', norm(c[0]));
 
+  // Пара ключу описи: точная; иначе — без хвоста параметров запроса («…/filter?field=x» ↔ «…/filter»),
+  // и только среди ключей черновика, оставшихся без точной пары: «?action=list» и «?action=delete»
+  // не сливаются.
+  const noq = (k) => k.replace(/\?[A-Za-z_][^=?/ ]*=.*$/, '');
+  const pair = new Map();
+  const taken = new Set();
+  for (const k of o.keys.keys()) if (idx.has(k)) { pair.set(k, k); taken.add(k); }
+  const free = new Map();
+  for (const k of idx.keys()) if (!taken.has(k) && !free.has(noq(k))) free.set(noq(k), k);
+  for (const k of o.keys.keys()) {
+    if (pair.has(k)) continue;
+    const dk = free.get(noq(k));
+    if (dk !== undefined && !taken.has(dk)) { pair.set(k, dk); taken.add(dk); }
+  }
   const byClass = {};
   let missingInDraft = 0;
   let factEmpty = 0;
   for (const [k, v] of o.keys) {
-    const e = idx.get(k);
+    const e = pair.has(k) ? idx.get(pair.get(k)) : undefined;
     if (!e) { missingInDraft++; byClass['без пары'] = (byClass['без пары'] ?? 0) + 1; continue; }
     byClass[e.cls] = (byClass[e.cls] ?? 0) + 1;
     if (v.fact && e.blocks.length > 0 && e.blocks.every((b) => !b.body)) factEmpty++;
   }
   let missingInOpis = 0;
-  for (const set of Object.values(classKeys)) for (const k of set) if (!o.keys.has(k)) missingInOpis++;
+  for (const set of Object.values(classKeys)) for (const k of set) if (!taken.has(k)) missingInOpis++;
 
   const groups = new Set();
   for (const k of classKeys.контракт) {

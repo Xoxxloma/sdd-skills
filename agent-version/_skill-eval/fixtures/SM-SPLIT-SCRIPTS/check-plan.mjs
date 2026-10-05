@@ -1,6 +1,6 @@
 // Проверка вывода plan.sh: разбор строк контракта, сверка с expect.json (руками) и с оракулом, инварианты.
 // Исход каждой проверки: ok | ОШИБКА | неоднозначность | устойчивость | справочно.
-import { plan, parseCounts, canon, relOf, round, variant, VARIANTS } from './plan-oracle.mjs'
+import { plan, parseCounts, canon, relOf, round, variant, VARIANTS, resolve, isTest } from './plan-oracle.mjs'
 
 const num = (s) => Number(String(s).replace(',', '.'))
 const classList = (s) => {
@@ -13,7 +13,7 @@ const classList = (s) => {
 }
 
 export function parsePlan (text) {
-  const r = { itog: null, none: null, head: null, parts: [], tail: null, outside: null, other: [] }
+  const r = { itog: null, none: null, head: null, parts: [], tail: null, outside: null, sverka: null, rest: [], refuse: null, testsLine: false, looseOri: null, other: [] }
   for (const line of String(text).split(/\r?\n/)) {
     let m
     if ((m = line.match(/^итог по классам:\s*(.*)$/))) {
@@ -25,6 +25,13 @@ export function parsePlan (text) {
       r.parts.push({ nn: Number(m[1]), w: num(m[2]), cls: classList(m[3] || ''), kind: m[4], paths: m[5].split(/;\s*/).map((s) => s.trim()).filter(Boolean) })
     } else if ((m = line.match(/^частей\s+(\d+);\s*остаток\s*—\s*(.*)$/))) r.tail = { S: Number(m[1]), rest: m[2] }
     else if ((m = line.match(/^вне корней сервиса:\s*вес\s+([\d.,]+)/))) r.outside = num(m[1])
+    else if ((m = line.match(/^к сверке:\s*(.*)$/))) {
+      const [a, b] = m[1].split('|')
+      r.sverka = { ключ: classList(a), ориентир: classList((b || '').replace(/^\s*ориентир:\s*/, '')) }
+    } else if ((m = line.match(/^\s+(папка|файлы прямо в)\s+(.*?)\s*$/))) r.rest.push({ kind: m[1], path: m[2] })
+    else if ((m = line.match(/^ОТКАЗ:\s*(.*)$/))) r.refuse = m[1]
+    else if (/^в тестовых папках:/.test(line)) r.testsLine = true
+    else if ((m = line.match(/^остатку по ориентиру:\s*(.*)$/))) r.looseOri = m[1].split(/;\s*/).reduce((a, x) => a + (Number((x.match(/ (\d+)$/) || [])[1]) || 0), 0)
     else if (line.trim()) r.other.push(line)
   }
   return r
@@ -62,11 +69,12 @@ export function invariants (parsed, countsText, K, w, rootsArg) {
   const bad = []
   const files = new Map()
   for (const l of parseCounts(countsText)) {
-    const p = canon(l.path)
-    if (!roots.some((r) => p.startsWith(r + '/'))) continue
-    const f = files.get(p) || { w: 0, cls: {} }
+    const p = resolve(l.path, roots)
+    const root = roots.filter((r) => p.startsWith(r + '/')).sort((a, b) => b.length - a.length)[0]
+    if (!root || isTest(p.slice(root.length + 1))) continue
+    const f = files.get(p) || { w: 0, kw: 0, cls: {}, ori: {}, on: 0 }
     f.w += l.type === 'ключ' ? l.n : w * l.n
-    if (l.type === 'ключ') f.cls[l.cls] = (f.cls[l.cls] || 0) + l.n
+    if (l.type === 'ключ') { f.kw += l.n; f.cls[l.cls] = (f.cls[l.cls] || 0) + l.n } else { f.ori[l.cls] = (f.ori[l.cls] || 0) + l.n; f.on += l.n }
     files.set(p, f)
   }
   const W = round([...files.values()].reduce((a, f) => a + f.w, 0))
@@ -75,7 +83,7 @@ export function invariants (parsed, countsText, K, w, rootsArg) {
   let sum = 0
   const dirW = (d) => [...files.entries()].filter(([p]) => p.startsWith(d + '/')).reduce((a, [, f]) => a + f.w, 0)
   for (const p of parsed.parts) {
-    let pw = 0; const cls = {}
+    let pw = 0; const cls = {}; const ori = {}
     for (const x of p.paths) {
       const a = abs(x)
       const hit = p.kind === 'файлы' ? [...files.keys()].filter((f) => f === a) : [...files.keys()].filter((f) => f.startsWith(a + '/'))
@@ -85,8 +93,11 @@ export function invariants (parsed, countsText, K, w, rootsArg) {
         cover.set(f, (cover.get(f) || 0) + 1)
         pw += files.get(f).w
         for (const [c, n] of Object.entries(files.get(f).cls)) cls[c] = (cls[c] || 0) + n
+        for (const [c, n] of Object.entries(files.get(f).ori)) ori[c] = (ori[c] || 0) + n
       }
     }
+    for (const [c, n] of Object.entries(ori)) if (n && p.cls['ориентир ' + c] !== n) bad.push(`часть ${p.nn}: ориентир ${c} напечатан ${p.cls['ориентир ' + c] ?? '—'}, по путям ${n}`)
+    for (const k of Object.keys(p.cls)) if (k.startsWith('ориентир ') && !ori[k.slice(9)]) bad.push(`часть ${p.nn}: напечатан «${k}», а ориентира в её путях нет`)
     if (round(pw) !== round(p.w)) bad.push(`часть ${p.nn}: напечатан вес ${p.w}, по её путям ${round(pw)}`)
     const single = p.kind === 'файлы' && p.paths.length === 1
     if (round(p.w) > K && !single) bad.push(`часть ${p.nn}: вес ${p.w} > K=${K}, а это не один файл`)
@@ -95,11 +106,16 @@ export function invariants (parsed, countsText, K, w, rootsArg) {
     void keyPrinted
     sum += p.w
   }
+  let loose = 0; let looseOn = 0
   for (const [f, fw] of files) {
     const n = cover.get(f) || 0
-    if (fw.w > 0 && n !== 1) bad.push(`файл с весом ${round(fw.w)} в частях ${n} раз: …${f.slice(-60)}`)
+    if (!n) looseOn += fw.on
+    if (fw.kw > 0 && n !== 1) bad.push(`файл с ключами (вес ${round(fw.w)}) в частях ${n} раз: …${f.slice(-60)}`)
+    else if (n > 1) bad.push(`файл в частях ${n} раз: …${f.slice(-60)}`)
+    if (!n) loose += fw.w
   }
-  if (parsed.parts.length && round(sum) !== W) bad.push(`сумма весов частей ${round(sum)} ≠ общий вес ${W}`)
+  if (parsed.parts.length && round(sum + loose) !== W) bad.push(`сумма весов частей ${round(sum)} + ориентир вне частей ${round(loose)} ≠ общий вес ${W}`)
+  if (parsed.parts.length && (parsed.looseOri || 0) !== looseOn) bad.push(`«остатку по ориентиру» в сумме ${parsed.looseOri ?? 'нет строки'}, по счёту вне частей ${looseOn}`)
   const nns = parsed.parts.map((p) => p.nn)
   if (nns.some((n, i) => n !== i + 1)) bad.push(`номера частей не 01…S подряд: ${nns.join(',')}`)
   if (parsed.tail && parsed.tail.S !== parsed.parts.length) bad.push(`«частей ${parsed.tail.S}», а строк частей ${parsed.parts.length}`)
@@ -113,8 +129,14 @@ export function checkPlanCase (ex, out) {
   const add = (check, ok, detail, status) => res.push({ check, status: ok ? 'ok' : (status || cat), detail: ok ? '' : detail })
   const [K, w, rootsArg] = out.args
   const roots = String(rootsArg).split(',').map(canon)
-  add('код выхода 0', out.rc === 0, `код ${out.rc}; stderr: ${out.stderr.trim().split('\n').slice(0, 2).join(' / ')}`)
   const P = parsePlan(out.stdout)
+  if (ex.mode === 'отказ') {
+    add('код выхода 3', out.rc === 3, `код ${out.rc}`)
+    add('строка «ОТКАЗ: …»', P.refuse !== null, `вывод: ${out.stdout.trim().split('\n').slice(0, 2).join(' / ')}`)
+    add('плана нет', P.parts.length === 0 && !P.head && !P.none && !P.tail, `строк частей ${P.parts.length}`)
+    return res
+  }
+  add('код выхода 0', out.rc === 0, `код ${out.rc}; stderr: ${out.stderr.trim().split('\n').slice(0, 2).join(' / ')}`)
   // итоги
   if (!P.itog) add('строка «итог по классам»', false, 'нет строки')
   else {
@@ -126,8 +148,10 @@ export function checkPlanCase (ex, out) {
   }
   if (ex.no_outside) add('нет строки «вне корней сервиса» (все файлы внутри корня)', P.outside === null, `напечатано «вне корней сервиса: вес ${P.outside}» — корень или пути счёта не приведены к одному виду`)
   if (ex.outside) add('строка «вне корней сервиса»', P.outside !== null && round(P.outside) === ex.outside, `получено ${P.outside ?? 'нет строки'}, ждали ${ex.outside}`)
+  if (ex.sverka) add('строка «в тестовых папках»', P.testsLine, 'нет строки')
+  if (ex.sverka) add('строка «к сверке» (без тестовых папок)', !!P.sverka && sameMap(P.sverka.ключ, ex.sverka.ключ) && sameMap(P.sverka.ориентир, ex.sverka.ориентир), P.sverka ? `получено ${fmtMap(P.sverka.ключ)} | ${fmtMap(P.sverka.ориентир)}` : 'нет строки')
   if (ex.mode === 'не нужна') {
-    add('«нарезка не нужна: вес W ≤ K»', !!P.none && P.none.W === ex.W && P.none.K === ex.K, P.none ? `W=${P.none.W}, K=${P.none.K}; ждали W=${ex.W}, K=${ex.K}` : 'нет строки')
+    add('«нарезка не нужна: вес W ≤ K»', !!P.none && P.none.W === (ex.none_W ?? ex.W) && P.none.K === ex.K, P.none ? `W=${P.none.W}, K=${P.none.K}; ждали W=${ex.W}, K=${ex.K}` : 'нет строки')
     add('частей нет', P.parts.length === 0 && !P.head, `строк частей ${P.parts.length}`)
     return res
   }
@@ -146,8 +170,14 @@ export function checkPlanCase (ex, out) {
     const badp = P.parts.flatMap((p) => p.paths).filter((x) => /\\|\/\.{1,2}(\/|$)|\/\/|^\.{1,2}\/|.\/$|^\/[a-zA-Z]\//.test(x))
     add('пути частей в нормальном виде (без обратного слеша, «..», «/./», «//», хвостового «/», «/c/…»)', badp.length === 0, `например: ${badp.slice(0, 2).join(' ¦ ')}`)
   }
+  if (ex.rest) {
+    const gotR = P.rest.map((x) => `${x.kind} ${relOf(x.path, roots)}`).sort()
+    const wantR = ex.rest.map((x) => x.replace(/^(папка|файлы прямо в) (?!R\d:)/, (_, k) => `${k} R1:`)).sort()
+    if (!wantR.length) add('«остаток — пусто»', !!P.tail && /пусто/.test(P.tail.rest), P.tail ? P.tail.rest : 'нет строки')
+    add('остаток списком', gotR.length === wantR.length && gotR.every((x, i) => x === wantR[i]), `получено [${gotR.join(' ¦ ') || '—'}], ждали [${wantR.join(' ¦ ')}]`)
+  }
   const inv = invariants(P, out.counts, K, w, rootsArg)
-  add('инварианты (каждый файл с весом ровно в одной части, веса, ≤ K, сумма)', inv.bad.length === 0, inv.bad.slice(0, 4).join('; '))
+  add('инварианты (файл с ключами ровно в одной части, остальные не больше чем в одной, веса, ≤ K, сумма)', inv.bad.length === 0, inv.bad.slice(0, 4).join('; '))
   return res
 }
 
@@ -159,6 +189,7 @@ export function checkPlanReal (out) {
   add('код выхода 0', out.rc === 0, `код ${out.rc}; stderr: ${out.stderr.trim().split('\n').slice(0, 2).join(' / ')}`)
   const P = parsePlan(out.stdout)
   const o = plan(out.counts, K, w, rootsArg)
+  if (o.mode === 'отказ') { add('отказ, как у оракула', out.rc === 3 && P.refuse !== null, `код ${out.rc}`); return res }
   add('итог по классам = суммы counts', !!P.itog && sameMap(P.itog.ключ, o.itog.ключ) && sameMap(P.itog.ориентир, o.itog.ориентир), P.itog ? `получено ${fmtMap(P.itog.ключ)} | ${fmtMap(P.itog.ориентир)}; оракул ${fmtMap(o.itog.ключ)} | ${fmtMap(o.itog.ориентир)}` : 'нет строки')
   if (o.mode === 'не нужна') { add('нарезка не нужна', !!P.none, 'нет строки'); return res }
   add('вес сервиса', !!P.head && round(P.head.W) === o.W, P.head ? `W=${P.head.W}, оракул ${o.W}` : 'нет строки')
@@ -180,6 +211,7 @@ export function checkOracle (ex, counts, args) {
   const [K, w, rootsArg] = args
   const bad = []
   const o = plan(counts, K, w, rootsArg)
+  if (ex.mode === 'отказ' || o.mode === 'отказ') { if (o.mode !== ex.mode) bad.push(`режим ${o.mode} ≠ ${ex.mode}`); return bad }
   if (!sameMap(o.itog.ключ, ex.itog.ключ)) bad.push(`итог ${fmtMap(o.itog.ключ)} ≠ ${fmtMap(ex.itog.ключ)}`)
   if (!sameMap(o.itog.ориентир, ex.itog.ориентир)) bad.push(`ориентир ${fmtMap(o.itog.ориентир)} ≠ ${fmtMap(ex.itog.ориентир)}`)
   if (ex.itog_alt && !sameMap(plan(counts, K, w, rootsArg, variant('itog=inroot')).itog.ключ, ex.itog_alt.ключ)) bad.push('itog_alt ≠ вариант itog=inroot')

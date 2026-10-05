@@ -104,7 +104,7 @@ parse_opis() {
       } else if (head ~ /^ограничение:/) {
         h = head; sub(/^ограничение:[ ]*/, "", h); key = norm("ограничение " h)
       } else {
-        key = norm(head)
+        h = head; sub(/^(роль|Роль):[ ]*/, "", h); key = norm(h)   # «роль: OWNER» ↔ строка таблицы «OWNER»
       }
       facts = 0
     }
@@ -154,19 +154,31 @@ printf 'строк без файла-источника: %d' "$(wc -l < "$TMP/no
 echo "итоги описи:"; grep -E '^⟹' "$OPIS" | sed 's/\r$//; s/^/  /'
 
 # Сверка поключево. Ключ описи найден, если совпал с ключом черновика целиком или своим хвостом после
-# последней точки (роли: «UserRole.OWNER» ↔ «OWNER»).
+# последней точки (роли: «UserRole.OWNER» ↔ «OWNER»). Оставшиеся без пары сводятся ещё раз — без хвоста
+# параметров запроса («…/filter?field=name» ↔ «…/filter»): точное совпадение всегда старше, поэтому
+# два ключа, которые различаются только параметром («?action=list» и «?action=delete»), не сливаются.
 echo "== СВЕРКА ОПИСЬ → ЧЕРНОВИК"
 awk -F'\t' '
-  FILENAME == ARGV[1] { d[$2] = $3; cl[$2] = $1; if ($1 == "потребляет") { split($2, pp, " :: "); alt[pp[2]] = $2 }; next }
-  {
-    k = $1; hit = (k in d) ? k : ""
-    if (hit == "" && (k in alt)) hit = alt[k]
-    if (hit == "") { t = k; sub(/.*\./, "", t); if (t in d) hit = t }
-    if (hit == "") { print "MISS\t" k; print "CLS\tбез пары"; next }
-    used[hit] = 1; print "CLS\t" cl[hit]
-    if ($2 > 0 && d[hit] == 0 && cl[hit] != "экраны" && cl[hit] != "роли" && cl[hit] != "зависит" && cl[hit] != "потребляет") print "EMPTY\t" k
+  function noq(k) { sub(/\?[A-Za-z_][^=?\/ ]*=.*$/, "", k); return k }
+  FILENAME == ARGV[1] { d[$2] = $3; cl[$2] = $1; dk[++nd] = $2; if ($1 == "потребляет") { split($2, pp, " :: "); alt[pp[2]] = $2 }; next }
+  { ok[++m] = $1; fc[m] = $2 }
+  END {
+    for (i = 1; i <= m; i++) {
+      k = ok[i]; hit = (k in d) ? k : ""
+      if (hit == "" && (k in alt)) hit = alt[k]
+      if (hit == "") { t = k; sub(/.*\./, "", t); if (t in d) hit = t }
+      oh[i] = hit; if (hit != "") used[hit] = 1
+    }
+    for (j = 1; j <= nd; j++) if (!(dk[j] in used)) { q = noq(dk[j]); if (!(q in byq)) byq[q] = dk[j] }
+    for (i = 1; i <= m; i++) if (oh[i] == "") { q = noq(ok[i]); if ((q in byq) && !(byq[q] in used)) { oh[i] = byq[q]; used[byq[q]] = 1 } }
+    for (i = 1; i <= m; i++) {
+      k = ok[i]; hit = oh[i]
+      if (hit == "") { print "MISS\t" k; print "CLS\tбез пары"; continue }
+      print "CLS\t" cl[hit]
+      if (fc[i] > 0 && d[hit] == 0 && cl[hit] != "экраны" && cl[hit] != "роли" && cl[hit] != "зависит" && cl[hit] != "потребляет") print "EMPTY\t" k
+    }
+    for (k in d) if (!(k in used) && cl[k] != "зависит" && cl[k] != "потребляет") print "EXTRA\t" cl[k] ": " k
   }
-  END { for (k in d) if (!(k in used) && cl[k] != "зависит" && cl[k] != "потребляет") print "EXTRA\t" cl[k] ": " k }
 ' "$TMP/draft.k" "$TMP/opis" > "$TMP/join"
 for t in MISS EXTRA EMPTY; do grep "^$t	" "$TMP/join" | cut -f2- | sort > "$TMP/$t"; done
 printf 'нет в черновике: %d' "$(wc -l < "$TMP/MISS")"; [ -s "$TMP/MISS" ] && { printf ' — '; list "$TMP/MISS"; } || echo

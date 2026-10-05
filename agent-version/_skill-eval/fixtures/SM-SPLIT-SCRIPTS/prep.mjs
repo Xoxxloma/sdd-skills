@@ -27,7 +27,7 @@ if (mode === 'plan') {
   const wdir = path.join(baseWin, 'w')
   // искажённые формы пути (args_form — корень 4-м аргументом, counts_form — пути в файле счёта):
   // dotdot «…/AI-SDD/../svc», dotdot2 «…/a/b/../../svc», dotslash «…/./svc/», mixslash — слеши вперемешку,
-  // msys «/c/…», lowerdrive «c:/…», fwd — «C:/…» с прямыми слешами
+  // msys «/c/…», lowerdrive «c:/…», fwd — «C:/…» с прямыми слешами; rel «./src/…» и relbare «src/…» — без корня
   const MIX = ['\\\\', '//', '\\', '/\\', '\\/', '///']
   const mutate = (name, root, rest) => {
     const fwd = root.replace(/\\/g, '/').replace(/\/$/, '')
@@ -41,6 +41,8 @@ if (mode === 'plan') {
       case 'msys': return (fwd + tail).replace(/^([A-Za-z]):/, (_, d) => '/' + d.toLowerCase())
       case 'lowerdrive': return (fwd + tail).replace(/^([A-Za-z]):/, (_, d) => d.toLowerCase() + ':')
       case 'fwd': return fwd + tail
+      case 'rel': return './' + rest
+      case 'relbare': return rest
       default: throw new Error('форма ' + name)
     }
   }
