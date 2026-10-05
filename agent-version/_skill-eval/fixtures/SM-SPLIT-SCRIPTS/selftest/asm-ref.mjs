@@ -3,7 +3,7 @@
 //   node asm-ref.mjs <папка частей> <S> <дата> <черновик> <опись>
 import fs from 'node:fs'
 import path from 'node:path'
-import { parseCard, splitBlocks, tableOf, lf, normKey, blockCmp, rowCmp, sumTotals } from '../asm-lib.mjs'
+import { parseCard, splitBlocks, tableOf, lf, normKey, blockCmp, rowCmp, sumTotals, PART_SECTIONS, callBare } from '../asm-lib.mjs'
 
 const [, , dir, S, date, draftOut, opisOut] = process.argv
 // SM_REF_BUG — намеренные порчи эталона, чтобы убедиться, что проверки краснеют: nodedup, sortplain, keepstubs, nosum, nodate, lastbody
@@ -23,6 +23,17 @@ for (const f of files) {
 }
 const head = parseCard(text['head.md'])
 const parts = Array.from({ length: +S }, (_, i) => parseCard(text[`part-${nn(i + 1)}.md`]))
+// L7: секции частей без метки у головы
+const marked = new Set(head.sections.filter((s) => s.lines.some((l) => l.trim() === '<!-- части -->')).map((s) => s.name))
+const headNames = new Set(head.sections.map((s) => s.name))
+parts.forEach((p, i) => { for (const ps of p.sections) {
+  if (marked.has(ps.name)) continue
+  const { pre, blocks } = splitBlocks(ps.lines)
+  if (!blocks.length && !tableOf(pre).rows.length) continue
+  if (PART_SECTIONS.test(ps.name)) { console.log(`ОТКАЗ: голова — в каркасе нет метки в секции «${ps.name}»`); process.exit(3) }
+  if (!headNames.has(ps.name)) { console.log(`ОТКАЗ: часть ${nn(i + 1)} — секция «${ps.name}» не из шаблона`); process.exit(3) }
+  console.log(`отброшено: секция «${ps.name}» у части ${nn(i + 1)} — её пишет голова`)
+} })
 const out = [...head.preamble]
 const blocksBySec = {}; const dups = []
 for (const s of head.sections) {
@@ -30,6 +41,9 @@ for (const s of head.sections) {
   const at = s.lines.findIndex((l) => l.trim() === '<!-- части -->')
   if (at < 0) { out.push(...s.lines); continue }
   const seen = new Map(); const rows = []; const stubs = []
+  // L6: ключи секции у всех частей — чтобы свести «вызовом» и «без скобок»
+  const allKeys = new Set(parts.flatMap((p) => p.sections.filter((x) => x.name === s.name).flatMap((ps) => splitBlocks(ps.lines).blocks.map((b) => normKey(b.heading)))))
+  const canon = (k) => (/^Публичный (контракт|API)/.test(s.name) && callBare(k) !== k && allKeys.has(callBare(k)) ? callBare(k) : k)
   for (const p of parts) {
     for (const ps of p.sections.filter((x) => x.name === s.name)) {
       const { pre, blocks } = splitBlocks(ps.lines)
@@ -37,7 +51,7 @@ for (const s of head.sections) {
       for (const r of t.rows) if (!rows.includes(r)) rows.push(r)
       for (const l of t.other) if (l.trim() === '—' || /^не определено/.test(l.trim())) stubs.push(l.trim())
       for (const b of blocks) {
-        const k = normKey(b.heading)
+        const k = canon(normKey(b.heading))
         if (BUG.has('nodup') || BUG.has('nodedup')) { seen.set(k + '#' + seen.size, { heading: b.heading, body: [...b.body] }); continue }
         if (!seen.has(k)) { seen.set(k, { heading: b.heading, body: [...b.body] }); continue }
         const cur = seen.get(k); if (BUG.has('lastbody')) { cur.heading = b.heading; cur.body = [...b.body] } if (!dups.includes(`${s.name}: ${k}`)) dups.push(`${s.name}: ${k}`)

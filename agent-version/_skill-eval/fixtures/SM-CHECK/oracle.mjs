@@ -216,6 +216,10 @@ function pathPrefix(p) {
 export function analyze(opisText, draftText, prevText) {
   const d = parseCard(draftText);
   const o = parseOpis(opisText);
+  { // ключ описи вызовом при том же ключе без скобок — один ключ (после склейки частей бывают оба)
+    const callBare = (k) => (/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /.test(k) || !/[^ (]\(.*\)$/.test(k) ? k : k.replace(/\(.*\)$/, ''));
+    for (const [k, v] of [...o.keys]) { const b = callBare(k); if (b !== k && o.keys.has(b)) { if (v.fact) o.keys.get(b).fact = true; o.keys.delete(k); } }
+  }
 
   const cnt = (list) => [list.length, list.filter((b) => b.body).length, list.filter((b) => !b.body).length];
   const topicDir = (b) => headKey(b.header).split(' ')[0];
@@ -272,6 +276,17 @@ export function analyze(opisText, draftText, prevText) {
     const dk = free.get(noq(k));
     if (dk !== undefined && !taken.has(dk)) { pair.set(k, dk); taken.add(dk); }
   }
+  // третий проход — ключ контракта без HTTP-глагола сводится без хвоста в скобках («query goal(id)», «Svc.Assign(Req)»)
+  const HTTP = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /;
+  const nop = (k) => (HTTP.test(k) || !/[^ (]\(.*\)$/.test(k) ? k : k.replace(/\(.*\)$/, '')); // хвост-вызов: скобка без пробела перед ней
+  const freeP = new Map();
+  for (const [k, e] of idx) if (!taken.has(k) && e.cls === 'контракт' && !freeP.has(nop(k))) freeP.set(nop(k), k);
+  for (const k of o.keys.keys()) {
+    if (pair.has(k)) continue;
+    const dk = freeP.get(nop(k));
+    if (dk !== undefined && !taken.has(dk)) { pair.set(k, dk); taken.add(dk); }
+  }
+  const dups = [...idx].filter(([k, e]) => e.cls === 'контракт' && nop(k) !== k && idx.get(nop(k))?.cls === 'контракт').length;
   const byClass = {};
   let missingInDraft = 0;
   let factEmpty = 0;
@@ -292,7 +307,12 @@ export function analyze(opisText, draftText, prevText) {
   for (const k of classKeys.задачи) groups.add('задача ' + k);
   for (const k of classKeys.топики) if (k.startsWith('потребляет')) groups.add(k);
 
+  // гейт ключей: «Бизнес-правила» и факты в него не идут
+  const bizMiss = [...o.keys].filter(([k, v]) => !pair.has(k) && v.kind !== 'other').length;
+  const bizExtra = [...classKeys.бизнес].filter((k) => !taken.has(k)).length;
+  const G = [missingInDraft - bizMiss, missingInOpis - bizExtra, dups, o.nofile.length];
   const sverka = {
+    'гейт': G.every((x) => x === 0) ? 'пройден' : `не пройден ${G.join('/')}`,
     'нет в черновике': missingInDraft,
     'нет в описи': missingInOpis,
     'факт, пустой блок': factEmpty,

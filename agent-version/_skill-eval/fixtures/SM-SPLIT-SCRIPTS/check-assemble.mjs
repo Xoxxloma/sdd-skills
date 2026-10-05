@@ -78,6 +78,7 @@ export function checkAsmCase (ex, d) {
     add('строка «ОТКАЗ: …»', /ОТКАЗ:/.test(stdout), stdout.trim().split('\n').slice(0, 2).join(' / '))
     add('черновик не тронут', draft === 'СТОРОЖ: прежний черновик\n', draft === null ? 'файл удалён' : `содержимое заменено (${draft.length} байт)`)
     add('опись не записана', opis === null, 'файл описи создан')
+    if (ex.mentions) add(`отказ называет виновного (${ex.mentions})`, new RegExp(ex.mentions).test(stdout), stdout.trim().split('\n').slice(0, 2).join(' / '))
     return res
   }
   if (ex.want === 'any') {
@@ -87,6 +88,7 @@ export function checkAsmCase (ex, d) {
   add('код выхода 0', rc === 0, `код ${rc}; ${stdout.trim().split('\n').slice(0, 2).join(' / ')}`)
   add('без «ОТКАЗ»', !/ОТКАЗ:/.test(stdout), stdout.trim().split('\n').find((l) => /ОТКАЗ/.test(l)) || '')
   add('печатает «собрано: …»', /собрано:/.test(stdout), 'нет строки')
+  if (ex.mentions) add(`в выводе есть «${ex.mentions}»`, new RegExp(ex.mentions).test(stdout), 'нет')
   if (draft === null) { add('черновик записан', false, 'нет файла'); return res }
   const head = lf(read(path.join(partsDir, 'head.md')) || '')
   const H = sectionMap(head); const G = sectionMap(lf(draft))

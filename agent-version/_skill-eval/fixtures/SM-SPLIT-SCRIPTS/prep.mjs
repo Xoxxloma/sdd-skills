@@ -148,6 +148,9 @@ if (mode === 'asm') {
     if (m.op === 'date') lines[0] = lines[0].replace(/\d{4}-\d{2}-\d{2}/, m.date)
     if (m.op === 'strip-first') lines.shift()
     if (m.op === 'number') lines[0] = lines[0].replace(/часть \d+/, `часть ${m.nn}`)
+    if (m.op === 'append') { fs.writeFileSync(p, lines.join('\n').replace(/\n*$/, '\n') + m.text); continue }
+    if (m.op === 'replace') { const t = lines.join('\n'); if (!t.includes(m.from)) throw new Error(`replace: в ${m.file} нет «${m.from}»`); fs.writeFileSync(p, t.replace(m.from, m.to)); continue }
+    if (m.op === 'chomp') { fs.writeFileSync(p, lines.join('\n').replace(/\n+$/, '')); continue }   // файл без перевода строки в конце
     fs.writeFileSync(p, lines.join('\n'))
   }
   for (const f of ex.crlf || []) { const p = path.join(to, f); fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace(/\r?\n/g, '\r\n')) }

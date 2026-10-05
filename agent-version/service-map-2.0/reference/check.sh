@@ -2,6 +2,7 @@
 # check.sh — счёты Шага 4 и гарда по файлам, без чтения их моделью.
 #
 #   bash check.sh <опись> <черновик> [<прежняя карточка>]
+#   CHECK_LISTS=<файл> — туда же пишутся списки сверки целиком, без обрезки на 40 именах.
 #
 # Печатает: состав черновика по секциям; ключи описи и строки без файла-источника; сверку
 # «опись → черновик» поключево (нет в черновике, нет в описи, факт в описи — пустой блок);
@@ -115,7 +116,15 @@ parse_opis() {
 TMP="$(mktemp -d 2>/dev/null || echo "/tmp/check.$$")"; mkdir -p "$TMP"
 trap 'rm -rf "$TMP"' EXIT
 parse_card "$DRAFT" > "$TMP/draft"
-parse_opis "$OPIS" | awk -F'\t' '!seen[$1]++' > "$TMP/opis"
+# Повтор ключа в описи — один ключ (так бывает после склейки частей): и точный, и «вызовом и без скобок».
+parse_opis "$OPIS" > "$TMP/opis.raw"
+awk -F'\t' '
+  function bare(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
+  FNR == NR { have[$1] = 1; next }
+  { k = $1; b = bare(k); if (b != k && (b in have)) k = b
+    if (!(k in f)) { order[++n] = k; f[k] = $2; s[k] = $3 } else if ($2 > f[k]) f[k] = $2 }
+  END { for (i = 1; i <= n; i++) print order[i] "\t" f[order[i]] "\t" s[order[i]] }
+' "$TMP/opis.raw" "$TMP/opis.raw" > "$TMP/opis"
 
 # Ключ блока «Бизнес-правил» в карточке приводится к ключу описи: `Имя` → «объект Имя»,
 # «сообщение «вид»» и «ограничение «условие»» — как есть.
@@ -155,11 +164,16 @@ echo "итоги описи:"; grep -E '^⟹' "$OPIS" | sed 's/\r$//; s/^/  /'
 
 # Сверка поключево. Ключ описи найден, если совпал с ключом черновика целиком или своим хвостом после
 # последней точки (роли: «UserRole.OWNER» ↔ «OWNER»). Оставшиеся без пары сводятся ещё раз — без хвоста
-# параметров запроса («…/filter?field=name» ↔ «…/filter»): точное совпадение всегда старше, поэтому
-# два ключа, которые различаются только параметром («?action=list» и «?action=delete»), не сливаются.
+# параметров запроса («…/filter?field=name» ↔ «…/filter») и, у ключей контракта без HTTP-глагола, без
+# хвоста-вызова («query goal(id: ID!)», «Svc.Assign(Req)» ↔ то же без скобок; скобка после пробела,
+# как у роли «FOREMAN (на проект)», — не вызов). Точное совпадение
+# всегда старше: «?action=list» и «?action=delete», «format(a)» и «format(a, b)» не сливаются.
+# ГЕЙТ КЛЮЧЕЙ считает только разницу ключей: нет в черновике, нет в описи, один ключ дважды, ключ без
+# файла-источника. Блоки «Бизнес-правил» ключами не считаются — их расхождение печатается отдельно.
 echo "== СВЕРКА ОПИСЬ → ЧЕРНОВИК"
 awk -F'\t' '
   function noq(k) { sub(/\?[A-Za-z_][^=?\/ ]*=.*$/, "", k); return k }
+  function nop(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
   FILENAME == ARGV[1] { d[$2] = $3; cl[$2] = $1; dk[++nd] = $2; if ($1 == "потребляет") { split($2, pp, " :: "); alt[pp[2]] = $2 }; next }
   { ok[++m] = $1; fc[m] = $2 }
   END {
@@ -171,19 +185,36 @@ awk -F'\t' '
     }
     for (j = 1; j <= nd; j++) if (!(dk[j] in used)) { q = noq(dk[j]); if (!(q in byq)) byq[q] = dk[j] }
     for (i = 1; i <= m; i++) if (oh[i] == "") { q = noq(ok[i]); if ((q in byq) && !(byq[q] in used)) { oh[i] = byq[q]; used[byq[q]] = 1 } }
+    for (j = 1; j <= nd; j++) if (!(dk[j] in used) && cl[dk[j]] == "контракт") { q = nop(dk[j]); if (!(q in byp)) byp[q] = dk[j] }
+    for (i = 1; i <= m; i++) if (oh[i] == "") { q = nop(ok[i]); if ((q in byp) && !(byp[q] in used)) { oh[i] = byp[q]; used[byp[q]] = 1 } }
+    # один ключ контракта двумя блоками: с хвостом в скобках и без него
+    for (j = 1; j <= nd; j++) { k = dk[j]; q = nop(k); if (cl[k] == "контракт" && q != k && (q in d) && cl[q] == "контракт") print "DUP\t" q " ~ " k }
     for (i = 1; i <= m; i++) {
       k = ok[i]; hit = oh[i]
       if (hit == "") { print "MISS\t" k; print "CLS\tбез пары"; continue }
       print "CLS\t" cl[hit]
       if (fc[i] > 0 && d[hit] == 0 && cl[hit] != "экраны" && cl[hit] != "роли" && cl[hit] != "зависит" && cl[hit] != "потребляет") print "EMPTY\t" k
+      if (fc[i] == 0 && d[hit] == 0 && (cl[hit] == "контракт" || cl[hit] == "задачи" || cl[hit] == "топики")) print "NOFACT\t" cl[hit] ": " k
     }
     for (k in d) if (!(k in used) && cl[k] != "зависит" && cl[k] != "потребляет") print "EXTRA\t" cl[k] ": " k
   }
 ' "$TMP/draft.k" "$TMP/opis" > "$TMP/join"
-for t in MISS EXTRA EMPTY; do grep "^$t	" "$TMP/join" | cut -f2- | sort > "$TMP/$t"; done
+for t in MISS EXTRA EMPTY DUP NOFACT; do grep "^$t	" "$TMP/join" | cut -f2- | sort > "$TMP/$t"; done
 printf 'нет в черновике: %d' "$(wc -l < "$TMP/MISS")"; [ -s "$TMP/MISS" ] && { printf ' — '; list "$TMP/MISS"; } || echo
 printf 'нет в описи: %d' "$(wc -l < "$TMP/EXTRA")"; [ -s "$TMP/EXTRA" ] && { printf ' — '; list "$TMP/EXTRA"; } || echo
 printf 'факт в описи, пустой блок: %d' "$(wc -l < "$TMP/EMPTY")"; [ -s "$TMP/EMPTY" ] && { printf ' — '; list "$TMP/EMPTY"; } || echo
+# Гейт ключей: только разница ключей. «Бизнес-правила» и факты в него не идут.
+bm=$(grep -c -E '^(объект|сообщение|ограничение) ' "$TMP/MISS"); be=$(grep -c '^бизнес: ' "$TMP/EXTRA")
+km=$(( $(wc -l < "$TMP/MISS") - bm )); ke=$(( $(wc -l < "$TMP/EXTRA") - be )); kd=$(( $(wc -l < "$TMP/DUP") + 0 )); ks=$(( $(wc -l < "$TMP/nosrc") + 0 ))
+printf 'вне ключей — «Бизнес-правила»: нет в черновике %d, нет в описи %d\n' "$bm" "$be"
+printf 'один ключ дважды — с хвостом в скобках и без: %d' "$kd"; [ -s "$TMP/DUP" ] && { printf ' — '; list "$TMP/DUP"; } || echo
+printf 'ключи без единого факта и в описи, и в карточке: %d' "$(wc -l < "$TMP/NOFACT")"; [ -s "$TMP/NOFACT" ] && { printf ' — '; list "$TMP/NOFACT"; } || echo
+if [ $(( km + ke + kd + ks )) -eq 0 ]; then echo 'ГЕЙТ КЛЮЧЕЙ: пройден'
+else printf 'ГЕЙТ КЛЮЧЕЙ: НЕ ПРОЙДЕН — нет в черновике %d, нет в описи %d, дважды %d, без файла-источника %d\n' "$km" "$ke" "$kd" "$ks"; fi
+if [ -n "${CHECK_LISTS:-}" ]; then
+  { for t in 'MISS:нет в черновике' 'EXTRA:нет в описи' 'DUP:один ключ дважды' 'EMPTY:факт в описи, пустой блок' 'NOFACT:ключи без единого факта' 'nosrc:строки описи без файла-источника'; do
+      echo "## ${t#*:}"; cat "$TMP/${t%%:*}"; echo; done; } > "$CHECK_LISTS" && echo "списки целиком: $CHECK_LISTS"
+fi
 printf 'опись по классам (класс — по паре в черновике): '
 grep "^CLS	" "$TMP/join" | cut -f2 | sort | uniq -c | awk '{n=$1; $1=""; sub(/^ /,""); printf "%s%s %d", (NR>1?", ":""), $0, n} END{print ""}'
 

@@ -11,6 +11,10 @@
 # пути, затем по глаголу; «События» — потребляет, затем публикует; «Бизнес-правила» — объекты,
 # сообщения, ограничения); заглушки частей (`—`, `не определено…`) остаются, только если блоков нет
 # ни у одной части. Опись — списки частей подряд, итоги `⟹` суммируются.
+# Ключ контракта, записанный вызовом (`query task(id: ID!)`, `Svc.Assign(Req)`), — тот же ключ, что без
+# скобок, если у другой части он стоит без скобок: один блок. У частей есть блоки в секции, которой в
+# каркасе головы нет или в ней нет метки, — отказ с именем виновного: молча блоки не выбрасываются.
+# Секцию, которую пишет голова («Зависит от», «Роли и доступ»), у части отбрасывает со строкой в выводе.
 set -u
 DIR="${1:?папка частей}"; S="${2:?число частей}"; DATE="${3:?дата}"; OUT="${4:?черновик}"; OPIS="${5:?опись}"
 export LC_ALL=C
@@ -52,18 +56,18 @@ awk '
     return k
   }
   function flush() {
-    if (key != "") { sub(/(\001)+$/, "", txt); print "B\t" sec "\t" skey(sec, key) "\t" key "\t" txt }
+    if (key != "") { sub(/(\001)+$/, "", txt); print "B\t" sec "\t" skey(sec, key) "\t" key "\t" txt "\t" pn }
     key = ""; txt = ""; rowout()
   }
   function rowout(   n, c, k) {                            # отложенная строка таблицы — данные
     if (pend == "") return
     n = split(pend, c, "|"); k = norm(c[2])
     if (psec ~ /^Потребляемые API/) k = k " :: " norm(c[3])
-    if (k != "" && k != "—" && k != "— :: ") print "R\t" psec "\t" k "\t" k "\t" pend
+    if (k != "" && k != "—" && k != "— :: ") print "R\t" psec "\t" k "\t" k "\t" pend "\t" pn
     pend = ""
   }
   { gsub(/\t/, " ") }
-  FNR == 1 { flush(); sec = ""; next }                       # строка свежести
+  FNR == 1 { flush(); sec = ""; pn = FILENAME; sub(/.*part-/, "", pn); sub(/\.md$/, "", pn); next }   # строка свежести
   { sub(/\r$/, "") }
   /^## / { flush(); sec = substr($0, 4); sub(/[ \t]+$/, "", sec); next }
   sec == "" { next }
@@ -79,7 +83,35 @@ awk '
   { rowout() }
   /^(—|не определено)/ { print "P\t" sec "\t\t\t" $0; next }
   END { flush() }
-' $PARTS > "$TMP/rec"
+' $PARTS > "$TMP/rec.raw"
+
+# 1а. Ключ контракта вызовом и он же без скобок — один ключ (точное совпадение старше: две перегрузки
+# с разными аргументами остаются двумя ключами).
+awk -F'\t' -v OFS='\t' -v NEAR="$TMP/near" '
+  function bare(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
+  FNR == NR { if ($1 == "B") have[$2 SUBSEP $4] = 1; next }
+  $1 == "B" && $2 ~ /^Публичный (контракт|API)/ { b = bare($4); if (b != $4 && (($2 SUBSEP b) in have)) { print $2 ": " b " ~ " $4 >> NEAR; $4 = b; $3 = b } }
+  { print }
+' "$TMP/rec.raw" "$TMP/rec.raw" > "$TMP/rec"
+: >> "$TMP/near"
+
+# 1б. Каждой секции с блоками или строками частей нужна метка в каркасе головы.
+awk '{ sub(/\r$/, "") } /^## / { sec = substr($0, 4); sub(/[ \t]+$/, "", sec); print "H\t" sec; next }
+     { l = $0; gsub(/^[ \t]+|[ \t]+$/, "", l); if (l == "<!-- части -->") print "M\t" sec }' "$DIR/head.md" > "$TMP/frame"
+awk -F'\t' '
+  FILENAME == ARGV[1] { if ($1 == "M") mark[$2] = 1; else hs[$2] = 1; next }
+  ($1 == "B" || $1 == "R") && !($2 in mark) { if (!(($2 SUBSEP $6) in seen)) { seen[$2 SUBSEP $6] = 1; who[$2] = who[$2] (who[$2] == "" ? "" : ", ") $6 } }
+  END {
+    for (s in who) {
+      if (s ~ /^(Публичный (контракт|API)|Владеет данными|События|Фоновые задачи|Бизнес-правила|Потребляемые API)/) print "HEAD\t" s "\t" who[s]
+      else if (s in hs) print "DROP\t" s "\t" who[s]
+      else print "PART\t" s "\t" who[s]
+    }
+  }' "$TMP/frame" "$TMP/rec" | sort > "$TMP/unplaced"
+u="$(grep '^HEAD	' "$TMP/unplaced" | head -n1)"
+[ -n "$u" ] && fail "голова — в каркасе нет строки «<!-- части -->» в секции «$(printf '%s' "$u" | cut -f2)»: блоки частей $(printf '%s' "$u" | cut -f3) вставить некуда"
+u="$(grep '^PART	' "$TMP/unplaced" | head -n1)"
+[ -n "$u" ] && fail "часть $(printf '%s' "$u" | cut -f3) — секция «$(printf '%s' "$u" | cut -f2)» не из шаблона: её блоки вставить некуда"
 
 sort -t"$(printf '\t')" -k1,1 -k2,2 -k3,3 -s "$TMP/rec" > "$TMP/rec.s"
 
@@ -118,7 +150,8 @@ awk -F'\t' '
   FNR == 1 { next }
   { sub(/\r$/, "") }
   /^## / { sec = substr($0, 4); sub(/[ \t]+$/, "", sec) }
-  $0 == "<!-- части -->" {
+  { l = $0; gsub(/^[ \t]+|[ \t]+$/, "", l) }
+  l == "<!-- части -->" {
     s = c[sec]; if (s == "") { print "—"; next }
     gsub(/\001/, "\n", s); sub(/\n+$/, "", s); print s; next
   }
@@ -135,7 +168,8 @@ awk 'prev != "" && /^### / { print "" } { print; prev = $0 }' "$OUT.tmp" | cat -
     tail -n +2 "$f" | tr -d '\r' | grep -v '^⟹'
     echo
   done
-  { [ -f "$DIR/head.opis.md" ] && cat "$DIR/head.opis.md"; cat "$DIR"/part-*.opis.md; } | tr -d '\r' | grep '^⟹' | awk '
+  # echo после каждого файла: опись без перевода строки в конце иначе склеит свой итог с первой строкой следующей
+  for f in "$DIR/head.opis.md" "$DIR"/part-*.opis.md; do [ -f "$f" ] || continue; cat "$f"; echo; done | tr -d '\r' | grep '^⟹' | awk '
     { form = $0; gsub(/[0-9]+/, "#", form); n = 0; line = $0
       while (match(line, /[0-9]+/)) { n++; sum[form, n] += substr(line, RSTART, RLENGTH); line = substr(line, RSTART + RLENGTH) }
       if (!(form in seen)) { seen[form] = 1; order[++m] = form; cnt[form] = n } }
@@ -147,4 +181,6 @@ awk 'prev != "" && /^### / { print "" } { print; prev = $0 }' "$OUT.tmp" | cat -
 echo "собрано: $OUT"
 awk '/^## /{s=$0} /^### /{n[s]++} END{for (k in n) printf "  %s — блоков %d\n", k, n[k]}' "$OUT" | sort
 [ -s "$TMP/dups" ] && { echo "дубли ключей склеены:"; sed 's/^#DUP\t/  /' "$TMP/dups"; }
+[ -s "$TMP/near" ] && { echo "из них один ключ вызовом и без скобок:"; sed 's/^/  /' "$TMP/near"; }
+grep '^DROP	' "$TMP/unplaced" | while IFS="$(printf '\t')" read -r _ s w; do echo "отброшено: секция «$s» у частей $w — её пишет голова"; done
 echo "опись: $OPIS ($(grep -c ' — ' "$OPIS") строк с источником)"
