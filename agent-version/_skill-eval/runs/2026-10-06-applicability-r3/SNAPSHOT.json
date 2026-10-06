@@ -1,0 +1,42 @@
+[
+  {
+    "path": "spec-review/reference/checklist-bt.md",
+    "sha256": "f351dccdf3357a2743cfabbc9658fd71bd0b7c800d411bfd42024d7d6023505a"
+  },
+  {
+    "path": "spec-review/reference/checklist-bugreport.md",
+    "sha256": "3076eb12a7afa3ac71f923e52e44a1ff71a93eaaf96514c843f18e5719750fa0"
+  },
+  {
+    "path": "spec-review/reference/checklist-changerequest.md",
+    "sha256": "713716c09c60cf25010310d50fa084210ff294ce16ce2e8a7c6806d883a5e15f"
+  },
+  {
+    "path": "spec-review/reference/checklist-spec.md",
+    "sha256": "3396dc31c69901d26b5e406da39ede4af3d62d05dc3041e4efeac06f0584134f"
+  },
+  {
+    "path": "spec-review/reference/checklist-stage.md",
+    "sha256": "e7a7e1ff2874065d192b3a28b76165003fe0f6341fe3863a09f72fda4e6ec211"
+  },
+  {
+    "path": "spec-review/SKILL.md",
+    "sha256": "07afdb29c20ef28d371b8cc12fca7f40ae7773e85c7f81d7b85dc44fec132986"
+  },
+  {
+    "path": "technical-spec-doc/reference/bugfix-mode.md",
+    "sha256": "35ee09938e8bad3707d7580b25147ead961ed977b15e79a966a9be05e036e5b6"
+  },
+  {
+    "path": "technical-spec-doc/reference/foundation-node.md",
+    "sha256": "50739cdf9c1f19922c6563ab26ca12ee7e015dea095982694438b42f8a8c0635"
+  },
+  {
+    "path": "technical-spec-doc/reference/small-change-mode.md",
+    "sha256": "1e8498bf448615767b17aeac727aa788ea324104c2671d0d7e7ee35d6f138177"
+  },
+  {
+    "path": "technical-spec-doc/SKILL.md",
+    "sha256": "e569a07bcd4749239c02736850c029456c6be268f5c4d395676c9553022e72ed"
+  }
+]

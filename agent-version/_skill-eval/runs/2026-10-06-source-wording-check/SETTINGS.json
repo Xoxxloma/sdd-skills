@@ -1,0 +1,12 @@
+{
+  "model": "gpt-6-luna",
+  "reasoning_effort": "max",
+  "fork_turns": "none",
+  "scope": "ua-label only",
+  "before": "Frozen C, before source wording cleanup",
+  "after": "Live user text; only technical-spec-doc/SKILL.md differs in normalized content",
+  "baseline": "agent-version/_skill-eval/runs/2026-10-06-applicability-comparison",
+  "stage2Response": "agent-version/_skill-eval/runs/2026-10-06-applicability-comparison/_inputs/ua-label/turn2-response.txt",
+  "stage2Sha256": "51add8e10d91078b10aaaab78ad6da2dedd51c69274903692e045ef2fcb8d5fc",
+  "criteriaFrozenBeforeRun": true
+}

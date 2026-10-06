@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-06",
+  "reason": "User feedback: changed UI is not automatically inapplicable because no new INT exists. The original plan requires substantive section-7 traceability, not compulsory N/A in every cell without a new contract. Mandatory strikethrough for such a cell was an excessive grading criterion.",
+  "previousAssessments": {
+    "ua-label": {
+      "terminal": true,
+      "agent": "/root/r3_label",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "turns": 1,
+      "verdict": "skill-red",
+      "roundRedForProbe": 3,
+      "evidence": "Прочитаны источник, инструкция и итоговый файл. Заголовок §3.1 и чекбоксы теперь корректны; все обязательные содержательные разделы сохранены. Но ячейка 'Взаимодействие(я)' в §7 содержит обычное 'UI portal-web (§4.1–4.2); новых/изменённых взаимодействий нет', без зачёркивания. Новых/изменённых INT действительно нет, §2 неприменим. Правило оформления в снимке прямо распространяется на ячейку без INT в §7 (строки 722–723); матрица до прогонов также задаёт неприменимую ячейку с причиной. Это подтверждённый вручную дефект формы, который автоматический grade-na не ловит, поскольку фраза не содержит 'Не применимо'."
+    },
+    "ua-timeout": {
+      "terminal": true,
+      "agent": "/root/r3_timeout",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "turns": 1,
+      "verdict": "skill-red",
+      "roundRedForProbe": 3,
+      "evidence": "Прочитаны исходный вход, снимок скилла и сохранённая спека. Изменённые условия loading/success/error_source и §4.3.1 теперь содержательны правильно. Однако полностью отсутствует обязательный отдельный заголовок 'Каталог ошибок (сводно) — последний подраздел §2, после всех INT-карточек'; вместо подраздела одна фраза 'Каталог ошибок отдельно не применяется' включена в тело §2. Все секции шаблона обязаны присутствовать, неприменимость не разрешает пропуск. Это реальный дефект скилла: файл создан, источники неизменны, прогон не падал, автоматическое missing подтверждено вручную. Дополнительно ячейка без INT в §7 осталась незачёркнутой."
+    }
+  },
+  "currentAssessments": {
+    "ua-label": "green",
+    "ua-timeout": "skill-red"
+  },
+  "skillSnapshotsChanged": false,
+  "newModelRuns": 0
+}

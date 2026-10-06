@@ -1,0 +1,105 @@
+{
+  "latest": "2026-10-06-applicability-r2",
+  "totalProbes": 38,
+  "terminalOnLatest": 1,
+  "fullGreen": false,
+  "exitRed": [],
+  "counts": [
+    {
+      "id": "ua-label",
+      "skillRed": 1,
+      "green": 0,
+      "excluded": 0
+    },
+    {
+      "id": "ua-timeout",
+      "skillRed": 1,
+      "green": 0,
+      "excluded": 0
+    },
+    {
+      "id": "ua-damaged",
+      "skillRed": 1,
+      "green": 0,
+      "excluded": 0
+    },
+    {
+      "id": "ua-review-clean",
+      "skillRed": 0,
+      "green": 1,
+      "excluded": 0
+    },
+    {
+      "id": "ua-review-reliability",
+      "skillRed": 1,
+      "green": 1,
+      "excluded": 0
+    }
+  ],
+  "rows": [
+    {
+      "round": "2026-10-06-applicability-r1",
+      "id": "ua-label",
+      "terminal": true,
+      "agent": "/root/r1_label",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "verdict": "skill-red",
+      "roundRedForProbe": 1,
+      "evidence": "Семантика применимости, заголовки и путь корректны. В §6.5 все пять строк '- ~~[ ] ...~~' захватывают служебную разметку checkbox внутри ~~ вместо '- [ ] ~~...~~'. Прямое нарушение правила о служебной разметке. grade-na этого класса пока не ловит; красный подтверждён вручную по готовому артефакту."
+    },
+    {
+      "round": "2026-10-06-applicability-r1",
+      "id": "ua-timeout",
+      "terminal": true,
+      "agent": "/root/r1_timeout",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "verdict": "skill-red",
+      "roundRedForProbe": 1,
+      "evidence": "Артефакт записан. §4.3.1/§5.1 и обязательные проверки содержательны правильно. Но целиком неприменимые §2, каталог ошибок, §3.1 без зачёркивания; неприменимые пункты BE/DDL в §6.4 и ячейка §7 без зачёркивания; в §6.5 ~~ включает служебные [ ]. Ошибка воспроизведена в готовом файле и противоречит явному правилу оформления скилла; не сбой стенда и не ошибка грейдера."
+    },
+    {
+      "round": "2026-10-06-applicability-r1",
+      "id": "ua-damaged",
+      "terminal": true,
+      "agent": "/root/r1_damaged",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "verdict": "skill-red",
+      "roundRedForProbe": 1,
+      "evidence": "Содержание данных правильно: старая порча, отбор и пересчёт сохранены без DDL. Все пять строк §6.5 оформлены как '~~- [ ] ...~~', служебные bullet и checkbox попали в зачёркивание. Нарушение правила оформления скилла подтверждено готовым артефактом; не падение и не ошибка грейдера."
+    },
+    {
+      "round": "2026-10-06-applicability-r1",
+      "id": "ua-review-clean",
+      "terminal": true,
+      "agent": "/root/r1_review_clean",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "verdict": "green",
+      "evidence": "Все применимые разделы содержательны, неприменимое оформлено, источник CR и отрицательные ответы §8 приняты; ложных замечаний нет."
+    },
+    {
+      "round": "2026-10-06-applicability-r1",
+      "id": "ua-review-reliability",
+      "terminal": true,
+      "agent": "/root/r1_review_reliability",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "verdict": "skill-red",
+      "roundRedForProbe": 1,
+      "evidence": "Вход §5.2 зачёркнут и закрыт 'Не применимо: сбои не меняются'. Источник подтверждает конкретное поведение при сбое. Чек-лист п.11 прямо требует содержательный §5.2. Приёмка вернула 0, не выявив посаженное нарушение. Источники и снимок неизменны; ошибки грейдера нет, оценка подтверждена чтением входа и ответа."
+    },
+    {
+      "round": "2026-10-06-applicability-r2",
+      "id": "ua-review-reliability",
+      "terminal": true,
+      "agent": "/root/r2_review_reliability",
+      "model": "gpt-6-luna",
+      "reasoning_effort": "max",
+      "verdict": "green",
+      "evidence": "Найдено ровно посаженное нарушение §5.2; цитата соответствует входу, ложных замечаний нет. Правильная неприменимость остальных разделов сохранена."
+    }
+  ]
+}

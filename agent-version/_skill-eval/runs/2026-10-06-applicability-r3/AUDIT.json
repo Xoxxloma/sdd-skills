@@ -1,0 +1,523 @@
+{
+  "unchangedHeadings": true,
+  "snapshotChanged": [],
+  "rows": [
+    {
+      "id": "ua-label",
+      "kind": "write",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r3_label",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "turns": 1,
+        "verdict": "green",
+        "evidence": "Regraded after user feedback: section 7 links to changed UI and states that technical interactions are unchanged. This is substantive traceability, not an inapplicable task. Mandatory strikethrough for every cell without INT was an excessive grading criterion, not a decision in the original plan. Headings, checkboxes, required content and the FR-1 test are preserved. The previous red assessment is retained in GRADING-CORRECTION.json and does not count as a red round."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": true,
+        "missing": [],
+        "order": true,
+        "naSections": 11,
+        "format": true,
+        "defects": [],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Новых сущностей и полей нет; текущие данные и поля остаются прежними.\n- 🔵 Миграция не нужна; старые записи не пересчитываются и не исправляются."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 При отказе отправки показывается прежнее сообщение «Не удалось отправить».\n- 🔵 После отказа заявка остаётся черновиком; повторная попытка доступна вручную.\n- 🔵 После успешной отправки выполняется прежний переход.\n- 🔵 Ошибки и их обработка не меняются."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Контракты и взаимодействия FE/BE не меняются; потребители бэкенда продолжают работать с прежним контрактом.\n- 🔵 В portal-web меняется только подпись кнопки; отправка заявки, права и их проверка, автосохранение, переход после отправки, состояния и их отображение, загрузка, таймауты, polling и обработка ошибок остаются прежними.\n- 🔵 Данные, поля и старые записи не меняются."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|----------|-------------------|------------------------------|\n| FR-1 — назвать кнопку «Отправить на согласование» 🔵 | UI portal-web (§4.1–4.2); новых/изменённых взаимодействий нет | Дано: открыт список заявок; когда пользователь видит кнопку, тогда её текст — «Отправить на согласование». Дано: заявка доступна для отправки; когда пользователь нажимает кнопку, тогда заявка отправлена на согласование как прежде. |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": ">\n> **"
+      }
+    },
+    {
+      "id": "ua-timeout",
+      "kind": "write",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r3_timeout",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "turns": 1,
+        "verdict": "skill-red",
+        "roundRedForProbe": 3,
+        "evidence": "The input, snapshot and saved artifact were inspected. Changed loading/success/error_source conditions and section 4.3.1 are substantive and correct. The separate error-catalogue heading is missing; a negative statement about the catalogue is folded into section 2. This is a confirmed structure defect. The file was successfully created and immutable inputs did not change. The unstruck UI reference in section 7 is valid traceability after regrading and is not a basis for this red round."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": false,
+        "missing": [
+          "### Каталог ошибок (сводно) — последний подраздел §2, после всех INT-карточек"
+        ],
+        "order": true,
+        "naSections": 7,
+        "format": true,
+        "defects": [],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Новых сущностей и полей нет; существующие данные и поля не меняются.\n- 🔵 Миграции, пересчёт и исправление старых записей не нужны."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 При отказе отправки или истечении таймаута portal-web показывает прежнее сообщение «Не удалось отправить»; заявка остаётся черновиком, повторная попытка доступна вручную. После успеха выполняется прежний переход. Бэкенд и взаимодействия на границах не меняются."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Контракт и взаимодействия на границах, права и их проверка, автосохранение, переход после успешной отправки, остальные состояния и их отображение, загрузка, polling, ошибки и их обработка остаются прежними. Изменяется только таймаут первого и последующих вызовов отправки в FE с 3 до 10 секунд."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|----------|-------------------|------------------------------|\n| 🔵 FR-1: ожидать ответ отправки 10 секунд вместо 3 (решение аналитика Иванова) | UI portal-web: таймаут ожидания ответа при отправке; новых/изменённых взаимодействий нет | Дано, что ответ отправки приходит на 7-й секунде, когда пользователь отправляет заявку, тогда отправка принимается успешно. Дано, что ответа нет 10 секунд, когда таймаут истекает, тогда показывается прежняя ошибка. |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": ">\r\n> **"
+      }
+    },
+    {
+      "id": "ua-damaged",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-feature",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-state",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-access",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-reliability-q",
+      "kind": "question",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-reliability-deferred",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-source-q",
+      "kind": "question",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-refine",
+      "kind": "refine",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": true,
+        "missing": [],
+        "order": true,
+        "naSections": 11,
+        "format": true,
+        "defects": [],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено аналитиком: новых/изменённых сущностей и полей нет; старые записи целы, миграции и пересчёт не нужны."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено источником: при сбое отправки — «Не удалось отправить», заявка остаётся черновиком, ручной повтор доступен. Поведение неизменно."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено аналитиком: отправка, права и их проверка, автосохранение и переход после отправки остаются прежними."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|---|---|---|\n| FR-1 | ~~Не применимо: новых/изменённых взаимодействий нет~~ | Дано: список заявок; когда открыт — новый текст; нажать — отправлено как прежде |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": ""
+      },
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-clean",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-format",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-reliability",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-source",
+      "kind": "review",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r3_review_source",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "turns": 1,
+        "verdict": "green",
+        "evaluation_scope": "Независимый leaf-checker по четырём входам spec-review; маршрут выбора источника оркестратором здесь не проверяется.",
+        "evidence": "Найдены ровно два заранее посаженных нарушения в пунктах §8: неприменимость из-за источника 'не БТ'. Цитаты и номера строк соответствуют входу, рекомендации используют подтверждённое отсутствие из change_request. Ложных замечаний к допустимой неприменимости прежних FE-состояний, данным и §5.2 нет."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": "2"
+    },
+    {
+      "id": "ua-review-flags",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-open",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-live",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-conv",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-conv2",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-opt",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-conv-2t",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-ctx",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-noctx",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-gaps",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-gaps-q",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-fix",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-fix-yes",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "bf-spec",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "bfg-scroll",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "bfg-role",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-clean",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-conv",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-fe",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-tpl-clean",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-tpl-dirty",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-tpl-count",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-bug-spec",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-bug-src",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    }
+  ]
+}

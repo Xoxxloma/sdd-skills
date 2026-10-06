@@ -1,0 +1,534 @@
+{
+  "unchangedHeadings": true,
+  "snapshotChanged": [],
+  "rows": [
+    {
+      "id": "ua-label",
+      "kind": "write",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r4_label",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "turns": 1,
+        "verdict": "green",
+        "evidence": "Прочитан сохранённый итоговый файл и сопоставлен с исходным запросом. §7 содержательно указывает изменение подписи кнопки и §4.1, тест FR-1 сохранён; ячейка не объявлена неприменимой и не зачёркнута. Каталог ошибок сохранён отдельным подразделом с полным заголовком. Неприменимые разделы, пункты отката и все пять чекбоксов оформлены корректно. §3.2, §5.2, §6.1, §6.2 и §6.4 содержательны; подтверждённое отсутствие в §8 записано обычным текстом. Структура и семантика сохранены."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": true,
+        "missing": [],
+        "order": true,
+        "naSections": 11,
+        "format": true,
+        "defects": [],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Новых сущностей и полей нет; данные и существующие поля не меняются, миграция, пересчёт и исправление старых записей не нужны."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 При отказе отправки показывается прежнее сообщение «Не удалось отправить»; заявка остаётся черновиком, повторная попытка доступна вручную.\n- 🔵 После успешной отправки выполняется прежний переход."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Меняется только подпись кнопки; отправка, права и их проверка, автосохранение и переход после отправки остаются прежними.\n- 🔵 Все состояния и их отображение, загрузка, таймауты и polling остаются прежними.\n- 🔵 Ошибки и их обработка остаются прежними; границы взаимодействий с бэкендом не меняются."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|----------|-------------------|------------------------------|\n| 🔵 FR-1: назвать кнопку «Отправить на согласование»; решение аналитика Иванова | Изменение подписи кнопки в portal-web (§4.1) | Дано: открыт список заявок; когда отображается кнопка, тогда её текст — «Отправить на согласование». Когда пользователь нажимает кнопку, тогда заявка отправляется на согласование как прежде. |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": ">\n> **"
+      }
+    },
+    {
+      "id": "ua-timeout",
+      "kind": "write",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r4_timeout",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "turns": 1,
+        "verdict": "skill-red",
+        "roundRedForProbe": 4,
+        "redInRequestedRetest": 1,
+        "targetedChangesPassed": true,
+        "evidence": "Каталог ошибок сохранён отдельным подразделом с полным заголовком; §7 содержательно указывает FE-логику без принудительной неприменимости. §4.3/§4.3.1 и §5.1 корректно описывают 10 секунд. Однако в §6.4 строки '- **Откат только BE** — ~~Не применимо: BE не меняется и не деплоится.~~' и '- **Откат DDL** — ~~Не применимо: DDL-миграций нет.~~' оставляют названия целиком неприменимых пунктов вне зачёркивания. Общее правило требует зачёркивать весь неприменимый пункт; автоматический body подтверждён вручную. Это дефект формы, не ошибка логики таймаута и не замечание к содержательной UI-ссылке."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": true,
+        "missing": [],
+        "order": true,
+        "naSections": 6,
+        "format": false,
+        "defects": [
+          {
+            "type": "body",
+            "line": 103,
+            "text": "**Откат только BE** — ~~Не применимо: BE не меняется и не деплоится.~~"
+          },
+          {
+            "type": "body",
+            "line": 103,
+            "text": "**Откат DDL** — ~~Не применимо: DDL-миграций нет.~~"
+          }
+        ],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено аналитиком: новых сущностей и полей нет; существующие данные и поля не меняются; миграции, пересчёт и исправление старых записей не нужны."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 При отказе отправки FE показывает прежнее сообщение «Не удалось отправить»; заявка остаётся черновиком, ручная повторная попытка доступна.\n- 🔵 Если ответ не получен за 10 секунд, FE показывает прежнюю ошибку.\n- 🔵 После успешного ответа сохраняется прежний переход после отправки.\n- 🔵 Обработка остальных ошибок не меняется."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Контракт и взаимодействия на границах остаются прежними; изменения backend не требуются.\n- 🔵 Данные и поля остаются прежними; старые записи не мигрируются, не пересчитываются и не исправляются.\n- 🔵 Права, их проверка, автосохранение и переход после успешной отправки остаются прежними.\n- 🔵 Состояния и их отображение, загрузка и polling остаются прежними; изменяется только срок ожидания первого и последующих вызовов отправки — с 3 до 10 секунд.\n- 🔵 Откат FE на предыдущий бандл возвращает прежнее значение таймаута 3 секунды."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|----------|-------------------|------------------------------|\n| FR-1 — ждать ответ отправки 10 секунд вместо 3 (docs/UA-410/change_request.md) | Изменение внутренней логики FE portal-web, §4.3.1; новых/изменённых взаимодействий нет | Дано: отправка заявки ожидает ответ; когда ответ приходит на 7-й секунде, тогда отправка принимается успешно и выполняется прежний переход. 🔵 |\n| FR-1 — ждать ответ отправки 10 секунд вместо 3 (docs/UA-410/change_request.md) | Изменение внутренней логики FE portal-web, §4.3.1; новых/изменённых взаимодействий нет | Дано: отправка заявки ожидает ответ; когда ответ не получен за 10 секунд, тогда отображается прежняя ошибка. 🔵 |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": ""
+      }
+    },
+    {
+      "id": "ua-damaged",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-feature",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-state",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-access",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-reliability-q",
+      "kind": "question",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-reliability-deferred",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-source-q",
+      "kind": "question",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-refine",
+      "kind": "refine",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": true,
+        "missing": [],
+        "order": true,
+        "naSections": 11,
+        "format": true,
+        "defects": [],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено аналитиком: новых/изменённых сущностей и полей нет; старые записи целы, миграции и пересчёт не нужны."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено источником: при сбое отправки — «Не удалось отправить», заявка остаётся черновиком, ручной повтор доступен. Поведение неизменно."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено аналитиком: отправка, права и их проверка, автосохранение и переход после отправки остаются прежними."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|---|---|---|\n| FR-1 | ~~Не применимо: новых/изменённых взаимодействий нет~~ | Дано: список заявок; когда открыт — новый текст; нажать — отправлено как прежде |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": ""
+      },
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-clean",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-format",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-reliability",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-source",
+      "kind": "review",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r4_review_source",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "turns": 1,
+        "verdict": "green",
+        "evaluation_scope": "Независимый проверяющий по четырём входам spec-review; маршрут оркестратора не измеряется.",
+        "evidence": "Найдены ровно два заранее заданных нарушения §8 из-за источника не БТ. Цитаты соответствуют входу, рекомендации используют подтверждённое отсутствие из change_request. Ложных замечаний к допустимой неприменимости и содержательной проверке FR-1 нет. Исходные документы совпадают с r3; вход и ответ сопоставлены вручную."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": "2"
+    },
+    {
+      "id": "ua-review-flags",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-open",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-live",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-conv",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-conv2",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-opt",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-conv-2t",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-ctx",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-noctx",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-gaps",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-gaps-q",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-fix",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-fix-yes",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "bf-spec",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "bfg-scroll",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "bfg-role",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-clean",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-conv",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-fe",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-tpl-clean",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-tpl-dirty",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-tpl-count",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-bug-spec",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-bug-src",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    }
+  ]
+}

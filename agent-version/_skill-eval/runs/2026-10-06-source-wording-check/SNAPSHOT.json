@@ -1,0 +1,34 @@
+[
+  {
+    "path": "after/technical-spec-doc/reference/bugfix-mode.md",
+    "sha256": "93c6402956331ffcf9306d4d4a021da24e8f8fc972c22e4b481bf46a3d91e58b"
+  },
+  {
+    "path": "after/technical-spec-doc/reference/foundation-node.md",
+    "sha256": "50739cdf9c1f19922c6563ab26ca12ee7e015dea095982694438b42f8a8c0635"
+  },
+  {
+    "path": "after/technical-spec-doc/reference/small-change-mode.md",
+    "sha256": "cb2568db724eea0307ffd6265037faf381c8612d08b3c226f6e6d616e6baf3ef"
+  },
+  {
+    "path": "after/technical-spec-doc/SKILL.md",
+    "sha256": "f06771931ea669718b9a1a07f0a0236861203fa034f061f9421a80ff2171d4bd"
+  },
+  {
+    "path": "before/technical-spec-doc/reference/bugfix-mode.md",
+    "sha256": "93c6402956331ffcf9306d4d4a021da24e8f8fc972c22e4b481bf46a3d91e58b"
+  },
+  {
+    "path": "before/technical-spec-doc/reference/foundation-node.md",
+    "sha256": "50739cdf9c1f19922c6563ab26ca12ee7e015dea095982694438b42f8a8c0635"
+  },
+  {
+    "path": "before/technical-spec-doc/reference/small-change-mode.md",
+    "sha256": "cb2568db724eea0307ffd6265037faf381c8612d08b3c226f6e6d616e6baf3ef"
+  },
+  {
+    "path": "before/technical-spec-doc/SKILL.md",
+    "sha256": "41e5ff3bc81d2fb85f6e87fba226e0da0db568a622d1abc2c555932b3dac14d2"
+  }
+]

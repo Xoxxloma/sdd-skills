@@ -1,0 +1,42 @@
+# 2026-10-06-applicability-r4
+
+Модель gpt-6-luna, reasoning max; снимок неизменяемый.
+
+- ua-label: green — Прочитан сохранённый итоговый файл и сопоставлен с исходным запросом. §7 содержательно указывает изменение подписи кнопки и §4.1, тест FR-1 сохранён; ячейка не объявлена неприменимой и не зачёркнута. Каталог ошибок сохранён отдельным подразделом с полным заголовком. Неприменимые разделы, пункты отката и все пять чекбоксов оформлены корректно. §3.2, §5.2, §6.1, §6.2 и §6.4 содержательны; подтверждённое отсутствие в §8 записано обычным текстом. Структура и семантика сохранены.
+- ua-timeout: skill-red — Каталог ошибок сохранён отдельным подразделом с полным заголовком; §7 содержательно указывает FE-логику без принудительной неприменимости. §4.3/§4.3.1 и §5.1 корректно описывают 10 секунд. Однако в §6.4 строки '- **Откат только BE** — ~~Не применимо: BE не меняется и не деплоится.~~' и '- **Откат DDL** — ~~Не применимо: DDL-миграций нет.~~' оставляют названия целиком неприменимых пунктов вне зачёркивания. Общее правило требует зачёркивать весь неприменимый пункт; автоматический body подтверждён вручную. Это дефект формы, не ошибка логики таймаута и не замечание к содержательной UI-ссылке.
+- ua-damaged: pending
+- ua-feature: pending
+- ua-state: pending
+- ua-access: pending
+- ua-reliability-q: pending
+- ua-reliability-deferred: pending
+- ua-source-q: pending
+- ua-refine: pending
+- ua-review-clean: pending
+- ua-review-format: pending
+- ua-review-reliability: pending
+- ua-review-source: green — Найдены ровно два заранее заданных нарушения §8 из-за источника не БТ. Цитаты соответствуют входу, рекомендации используют подтверждённое отсутствие из change_request. Ложных замечаний к допустимой неприменимости и содержательной проверке FR-1 нет. Исходные документы совпадают с r3; вход и ответ сопоставлены вручную.
+- ua-review-flags: pending
+- ua-review-open: pending
+- ts-live: pending
+- ts-conv: pending
+- ts-conv2: pending
+- ts-opt: pending
+- ts-conv-2t: pending
+- ts-ctx: pending
+- ts-noctx: pending
+- ts-gaps: pending
+- ts-gaps-q: pending
+- ts-fix: pending
+- ts-fix-yes: pending
+- bf-spec: pending
+- bfg-scroll: pending
+- bfg-role: pending
+- rv-clean: pending
+- rv-conv: pending
+- rv-fe: pending
+- rv-tpl-clean: pending
+- rv-tpl-dirty: pending
+- rv-tpl-count: pending
+- rv-bug-spec: pending
+- rv-bug-src: pending

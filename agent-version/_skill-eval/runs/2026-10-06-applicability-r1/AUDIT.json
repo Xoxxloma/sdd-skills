@@ -1,0 +1,693 @@
+{
+  "unchangedHeadings": true,
+  "snapshotChanged": [],
+  "rows": [
+    {
+      "id": "ua-label",
+      "kind": "write",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r1_label",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "verdict": "skill-red",
+        "roundRedForProbe": 1,
+        "evidence": "Семантика применимости, заголовки и путь корректны. В §6.5 все пять строк '- ~~[ ] ...~~' захватывают служебную разметку checkbox внутри ~~ вместо '- [ ] ~~...~~'. Прямое нарушение правила о служебной разметке. grade-na этого класса пока не ловит; красный подтверждён вручную по готовому артефакту."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": true,
+        "missing": [],
+        "order": true,
+        "naSections": 11,
+        "format": false,
+        "defects": [
+          {
+            "type": "markup-struck",
+            "line": 128,
+            "text": "- ~~[ ] Роли в security-сервисе — не применимо: права и их проверка не меняются.~~"
+          },
+          {
+            "type": "markup-struck",
+            "line": 129,
+            "text": "- ~~[ ] DDL-миграция в репо владеющего сервиса — не применимо: миграций нет.~~"
+          },
+          {
+            "type": "markup-struck",
+            "line": 130,
+            "text": "- ~~[ ] Конфиги по окружениям (dev/staging/prod) — не применимо: конфигурация не меняется.~~"
+          },
+          {
+            "type": "markup-struck",
+            "line": 131,
+            "text": "- ~~[ ] Сервисные аккаунты для межсервисных вызовов — не применимо: межсервисные вызовы не меняются.~~"
+          },
+          {
+            "type": "markup-struck",
+            "line": 132,
+            "text": "- ~~[ ] Фиче-флаги заведены — не применимо: задача не использует фиче-флаги.~~"
+          }
+        ],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Новых сущностей и полей нет; существующие данные и поля не меняются.\n- 🔵 Миграция, пересчёт и исправление старых записей не нужны."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 При отказе отправки показывается прежнее сообщение «Не удалось отправить», заявка остаётся черновиком, повторная попытка доступна вручную.\n🔵 После успешной отправки выполняется прежний переход.\n🔵 Правка не меняет обработку ошибок."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Изменение не затрагивает контракты на границах и данные; бэкенд и его текущие потребители продолжают работать по прежним контрактам.\n🔵 При нажатии кнопки отправка заявки, автосохранение, переход после отправки, состояния и их отображение, загрузка, таймауты, polling, права и проверки остаются прежними.\n🔵 Откат к предыдущему FE-бандлу возвращает прежний текст кнопки; поведение отправки не меняется."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|----------|-------------------|------------------------------|\n| FR-1 | portal-web: подпись кнопки | Дано открыт список заявок, когда отображается кнопка отправки, тогда её текст «Отправить на согласование»; когда пользователь нажимает кнопку, тогда заявка отправляется на согласование как прежде. |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": ">\n> **"
+      }
+    },
+    {
+      "id": "ua-timeout",
+      "kind": "write",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r1_timeout",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "verdict": "skill-red",
+        "roundRedForProbe": 1,
+        "evidence": "Артефакт записан. §4.3.1/§5.1 и обязательные проверки содержательны правильно. Но целиком неприменимые §2, каталог ошибок, §3.1 без зачёркивания; неприменимые пункты BE/DDL в §6.4 и ячейка §7 без зачёркивания; в §6.5 ~~ включает служебные [ ]. Ошибка воспроизведена в готовом файле и противоречит явному правилу оформления скилла; не сбой стенда и не ошибка грейдера."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": true,
+        "missing": [],
+        "order": true,
+        "naSections": 8,
+        "format": false,
+        "defects": [
+          {
+            "type": "markup-struck",
+            "line": 104,
+            "text": "- ~~[ ] Роли в security-сервисе — 🔵 Не применимо: права и их проверка не меняются.~~"
+          },
+          {
+            "type": "markup-struck",
+            "line": 105,
+            "text": "- ~~[ ] DDL-миграция в репо владеющего сервиса — 🔵 Не применимо: миграций нет.~~"
+          },
+          {
+            "type": "markup-struck",
+            "line": 106,
+            "text": "- ~~[ ] Конфиги по окружениям (dev/staging/prod) — 🔵 Не применимо: отдельной подготовки до релиза нет; изменение включено в поставку FE.~~"
+          },
+          {
+            "type": "markup-struck",
+            "line": 107,
+            "text": "- ~~[ ] Сервисные аккаунты для межсервисных вызовов — 🔵 Не применимо: новые межсервисные вызовы не добавляются.~~"
+          },
+          {
+            "type": "markup-struck",
+            "line": 108,
+            "text": "- ~~[ ] Фиче-флаги заведены — 🔵 Не применимо: фиче-флаги не используются.~~"
+          },
+          {
+            "type": "heading",
+            "line": 33,
+            "title": "2. Взаимодействия (ядро)"
+          },
+          {
+            "type": "body",
+            "line": 33,
+            "text": "🔵 Не применимо: новых или изменённых взаимодействий нет; затронуто ожидание ответа при отправке заявки на согласование в FE `portal-web`."
+          },
+          {
+            "type": "heading",
+            "line": 36,
+            "title": "Каталог ошибок (сводно) — последний подраздел §2, после всех INT-карточек"
+          },
+          {
+            "type": "body",
+            "line": 36,
+            "text": "🔵 Не применимо: правка не меняет ошибки и их обработку; новых ошибок нет."
+          },
+          {
+            "type": "heading",
+            "line": 40,
+            "title": "3.1. По сервисам"
+          },
+          {
+            "type": "body",
+            "line": 40,
+            "text": "🔵 Не применимо: работ на бэкенде нет; бэкенд и взаимодействия на границах не меняются."
+          },
+          {
+            "type": "body",
+            "line": 98,
+            "text": "**Откат только BE:** 🔵 Не применимо: бэкенд не деплоится."
+          },
+          {
+            "type": "body",
+            "line": 98,
+            "text": "**Откат DDL:** 🔵 Не применимо: DDL и данные не меняются."
+          },
+          {
+            "type": "body",
+            "line": 110,
+            "text": "Не применимо: взаимодействие не меняется; проверяется поведение UI в `portal-web`"
+          }
+        ],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Новых сущностей и полей нет; существующие данные и поля не меняются. Миграции, пересчёт и исправление старых записей не нужны."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 При отказе отправки отображается прежнее сообщение «Не удалось отправить», заявка остаётся черновиком, ручной повтор доступен. После успешной отправки сохраняется прежний переход. Правка не меняет это поведение."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Меняется только ожидание ответа конкретного запроса отправки в `portal-web`; бэкенд, взаимодействия на границах и остальные потребители остаются прежними.\n- 🔵 Права и их проверка, автосохранение, переход после отправки, состояния и их отображение остаются прежними.\n- 🔵 Загрузка, polling и обработка ошибок остаются прежними; после отказа заявка остаётся черновиком и доступен ручной повтор.\n- 🔵 Данные и поля остаются прежними; старые записи не мигрируются, не пересчитываются и не исправляются.\n- 🔵 При откате прежний FE-бандл возвращает прежнее поведение с таймаутом 3 секунды."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из запроса на правку | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|-------------------------|-------------------|------------------------------|\n| FR-1: ожидать ответ отправки 10 секунд вместо 3 | Не применимо: взаимодействие не меняется; проверяется поведение UI в `portal-web` | Дано отправка заявки на согласование, когда ответ приходит на 7-й секунде, тогда отправка завершается успешно. Дано успешный ответ не получен, когда истекают 10 секунд, тогда показывается прежняя ошибка «Не удалось отправить». |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": "> Все технические решения приняты, спецификация готова к разработке."
+      }
+    },
+    {
+      "id": "ua-damaged",
+      "kind": "write",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r1_damaged",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "verdict": "skill-red",
+        "roundRedForProbe": 1,
+        "evidence": "Содержание данных правильно: старая порча, отбор и пересчёт сохранены без DDL. Все пять строк §6.5 оформлены как '~~- [ ] ...~~', служебные bullet и checkbox попали в зачёркивание. Нарушение правила оформления скилла подтверждено готовым артефактом; не падение и не ошибка грейдера."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": true,
+        "missing": [],
+        "order": true,
+        "naSections": 13,
+        "format": false,
+        "defects": [
+          {
+            "type": "markup-struck",
+            "line": 95,
+            "text": "~~- [ ] Роли в security-сервисе — Не применимо: доступ и роли не меняются.~~"
+          },
+          {
+            "type": "markup-struck",
+            "line": 96,
+            "text": "~~- [ ] DDL-миграция в репо владеющего сервиса — Не применимо: схема не меняется и миграции нет.~~"
+          },
+          {
+            "type": "markup-struck",
+            "line": 97,
+            "text": "~~- [ ] Конфиги по окружениям (dev/staging/prod) — Не применимо: конфигурация не меняется.~~"
+          },
+          {
+            "type": "markup-struck",
+            "line": 98,
+            "text": "~~- [ ] Сервисные аккаунты для межсервисных вызовов — Не применимо: новых межсервисных вызовов нет.~~"
+          },
+          {
+            "type": "markup-struck",
+            "line": 99,
+            "text": "~~- [ ] Фиче-флаги заведены — Не применимо: фиче-флаги не используются.~~"
+          }
+        ],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Сущность «Заявка» (из репорта) — существующая сумма; для отбора старых записей используются статус `approved` и дата создания с 2026-10-01 по 2026-10-05 включительно.\n- 🔵 Новых сущностей и полей нет; схема и существующие поля не меняются.\n- 🔵 Миграция схемы не нужна.\n- 🔵 Уже записанные суммы заявок в указанном диапазоне пересчитать после выката; повторный запуск пересчёта безопасен."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено аналитиком по репорту: при сбое пересчёта прежняя сумма остаётся записанной, ошибка логируется, повтора нет. Повторный запуск выбранного пересчёта безопасен (🔵 подтверждено аналитиком)."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Контракт и использование на границе, схема/поля, роли/доступ, обработка ошибок, нагрузка, кэш и таймауты остаются прежними.\n- 🟢 Меняется только правило повторного пересчёта: повтор не меняет итоговую сумму (FR-1).\n- 🔵 При откате кода уже исправленные суммы не откатываются; аналитик подтвердил, что такое поведение допустимо."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|----------|-------------------|------------------------------|\n| FR-1: повторный пересчёт не меняет итоговую сумму | Нового/изменённого взаимодействия нет; внутренняя логика `billing-service` | Дано: существует заявка; когда запустить пересчёт её суммы дважды, тогда итог после второго запуска равен итогу после первого. Для обязательного пересчёта старых данных проверить заявки со статусом `approved`, созданные 01–05.10.2026 включительно; повторный прогон оставляет полученную сумму без изменений. |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": "> Все технические решения приняты, спецификация готова к разработке."
+      }
+    },
+    {
+      "id": "ua-feature",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-state",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-access",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-reliability-q",
+      "kind": "question",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-reliability-deferred",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-source-q",
+      "kind": "question",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-refine",
+      "kind": "refine",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": true,
+        "missing": [],
+        "order": true,
+        "naSections": 11,
+        "format": true,
+        "defects": [],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено аналитиком: новых/изменённых сущностей и полей нет; старые записи целы, миграции и пересчёт не нужны."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено источником: при сбое отправки — «Не удалось отправить», заявка остаётся черновиком, ручной повтор доступен. Поведение неизменно."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено аналитиком: отправка, права и их проверка, автосохранение и переход после отправки остаются прежними."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|---|---|---|\n| FR-1 | ~~Не применимо: новых/изменённых взаимодействий нет~~ | Дано: список заявок; когда открыт — новый текст; нажать — отправлено как прежде |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": ""
+      },
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-clean",
+      "kind": "review",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r1_review_clean",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "verdict": "green",
+        "evidence": "Все применимые разделы содержательны, неприменимое оформлено, источник CR и отрицательные ответы §8 приняты; ложных замечаний нет."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": "0"
+    },
+    {
+      "id": "ua-review-format",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-reliability",
+      "kind": "review",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r1_review_reliability",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "verdict": "skill-red",
+        "roundRedForProbe": 1,
+        "evidence": "Вход §5.2 зачёркнут и закрыт 'Не применимо: сбои не меняются'. Источник подтверждает конкретное поведение при сбое. Чек-лист п.11 прямо требует содержательный §5.2. Приёмка вернула 0, не выявив посаженное нарушение. Источники и снимок неизменны; ошибки грейдера нет, оценка подтверждена чтением входа и ответа."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": "0"
+    },
+    {
+      "id": "ua-review-source",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-flags",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-open",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-live",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-conv",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-conv2",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-opt",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-conv-2t",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-ctx",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-noctx",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-gaps",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-gaps-q",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-fix",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-fix-yes",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "bf-spec",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "bfg-scroll",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "bfg-role",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-clean",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-conv",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-fe",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-tpl-clean",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-tpl-dirty",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-tpl-count",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-bug-spec",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-bug-src",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    }
+  ]
+}

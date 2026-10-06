@@ -1,0 +1,42 @@
+# 2026-10-06-applicability-r5
+
+Модель gpt-6-luna, reasoning max; снимок неизменяемый.
+
+- ua-label: grading-uncertain — Каталог и содержательная UI-трассировка сохранены, откат полностью оформлен. Однако агент заменил названия пунктов §8 и колонку FR из БТ на документ-источник. Исходный критерий точности явно проверял Markdown-заголовки, но не определял статус таких названий полей. При спорном критерии оценка не превращается в skill-red; первичный файл сохранён, неоднозначность зафиксирована. Корректный вопрос первого хода не красный.
+- ua-timeout: skill-red — Каталог сохранён отдельно, §7 содержателен, откат оформлен целиком. Но уровень заголовка §6.5 изменён с ### на ##. План явно требует сохранить уровни; ошибка подтверждена исходным шаблоном и файлом. Замечания грейдера к запятой после 'не применимо' не засчитываются: причина действительно названа.
+- ua-damaged: pending
+- ua-feature: pending
+- ua-state: pending
+- ua-access: pending
+- ua-reliability-q: pending
+- ua-reliability-deferred: pending
+- ua-source-q: pending
+- ua-refine: pending
+- ua-review-clean: pending
+- ua-review-format: pending
+- ua-review-reliability: pending
+- ua-review-source: pending
+- ua-review-flags: pending
+- ua-review-open: pending
+- ts-live: pending
+- ts-conv: pending
+- ts-conv2: pending
+- ts-opt: pending
+- ts-conv-2t: pending
+- ts-ctx: pending
+- ts-noctx: pending
+- ts-gaps: pending
+- ts-gaps-q: pending
+- ts-fix: pending
+- ts-fix-yes: pending
+- bf-spec: pending
+- bfg-scroll: pending
+- bfg-role: pending
+- rv-clean: pending
+- rv-conv: pending
+- rv-fe: pending
+- rv-tpl-clean: pending
+- rv-tpl-dirty: pending
+- rv-tpl-count: pending
+- rv-bug-spec: pending
+- rv-bug-src: pending

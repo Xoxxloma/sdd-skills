@@ -1,0 +1,42 @@
+# 2026-10-06-applicability-r3
+
+Модель gpt-6-luna, reasoning max; снимок неизменяемый.
+
+- ua-label: green — Regraded after user feedback: section 7 links to changed UI and states that technical interactions are unchanged. This is substantive traceability, not an inapplicable task. Mandatory strikethrough for every cell without INT was an excessive grading criterion, not a decision in the original plan. Headings, checkboxes, required content and the FR-1 test are preserved. The previous red assessment is retained in GRADING-CORRECTION.json and does not count as a red round.
+- ua-timeout: skill-red — The input, snapshot and saved artifact were inspected. Changed loading/success/error_source conditions and section 4.3.1 are substantive and correct. The separate error-catalogue heading is missing; a negative statement about the catalogue is folded into section 2. This is a confirmed structure defect. The file was successfully created and immutable inputs did not change. The unstruck UI reference in section 7 is valid traceability after regrading and is not a basis for this red round.
+- ua-damaged: pending
+- ua-feature: pending
+- ua-state: pending
+- ua-access: pending
+- ua-reliability-q: pending
+- ua-reliability-deferred: pending
+- ua-source-q: pending
+- ua-refine: pending
+- ua-review-clean: pending
+- ua-review-format: pending
+- ua-review-reliability: pending
+- ua-review-source: green — Найдены ровно два заранее посаженных нарушения в пунктах §8: неприменимость из-за источника 'не БТ'. Цитаты и номера строк соответствуют входу, рекомендации используют подтверждённое отсутствие из change_request. Ложных замечаний к допустимой неприменимости прежних FE-состояний, данным и §5.2 нет.
+- ua-review-flags: pending
+- ua-review-open: pending
+- ts-live: pending
+- ts-conv: pending
+- ts-conv2: pending
+- ts-opt: pending
+- ts-conv-2t: pending
+- ts-ctx: pending
+- ts-noctx: pending
+- ts-gaps: pending
+- ts-gaps-q: pending
+- ts-fix: pending
+- ts-fix-yes: pending
+- bf-spec: pending
+- bfg-scroll: pending
+- bfg-role: pending
+- rv-clean: pending
+- rv-conv: pending
+- rv-fe: pending
+- rv-tpl-clean: pending
+- rv-tpl-dirty: pending
+- rv-tpl-count: pending
+- rv-bug-spec: pending
+- rv-bug-src: pending

@@ -1,0 +1,686 @@
+{
+  "unchangedHeadings": true,
+  "snapshotChanged": [],
+  "rows": [
+    {
+      "id": "ua-label",
+      "kind": "write",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r2_label",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "turns": 2,
+        "verdict": "skill-red",
+        "roundRedForProbe": 2,
+        "evidence": "В корректно созданном итоговом файле §3.1 целиком неприменим, тело зачёркнуто, но заголовок '### 3.1. По сервисам' остался обычным. Остальное оформление исправлено. Это явное нарушение правила заголовка; грейдер и ручное чтение совпадают. Правильный вопрос первого хода не считается красным и сохранён в TURN1.json."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": true,
+        "missing": [],
+        "order": true,
+        "naSections": 11,
+        "format": false,
+        "defects": [
+          {
+            "type": "heading",
+            "line": 41,
+            "title": "3.1. По сервисам"
+          }
+        ],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено аналитиком: новых сущностей нет; существующие данные и поля не меняются; миграции, перерасчёт и исправление старых записей не нужны."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено документом-источником: при отказе отправки пользователь видит прежнее сообщение «Не удалось отправить», заявка остаётся черновиком, повторная попытка доступна вручную; после успеха выполняется прежний переход. Правка это поведение не меняет."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Надпись меняется только на кнопке списка заявок; в других местах она не используется — подтверждено аналитиком.\n- 🔵 Отправка заявки, права и их проверка остаются прежними.\n- 🔵 Автосохранение, переход после отправки, все состояния и их отображение, загрузка, таймауты и polling остаются прежними.\n- 🔵 Обработка ошибок остаётся прежней: при отказе показывается «Не удалось отправить», заявка остаётся черновиком, ручная повторная попытка доступна; после успеха выполняется прежний переход."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|----------|-------------------|------------------------------|\n| FR-1 🔵 | ~~Новых/изменённых взаимодействий нет~~; поведение UI — §4.1–4.2 | Дано: пользователь открыл список заявок; когда смотрит на кнопку, тогда видит «Отправить на согласование»; когда нажимает её, заявка отправляется на согласование как прежде. |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": ">\n> **"
+      }
+    },
+    {
+      "id": "ua-timeout",
+      "kind": "write",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r2_timeout",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "turns": 2,
+        "verdict": "skill-red",
+        "roundRedForProbe": 2,
+        "evidence": "§4.3 закрыт неприменимостью и зачёркнут, при этом §4.3.1 содержателен. В источнике UI-таймаут меняет условие перехода в ошибку с 3 на 10 секунд: §4.3 обязан описать изменённое прежнее состояние. Также общий критерий прямо запрещает зачёркивать заголовок §4.3 при живом §4.3.1. Ошибка подтверждена вручную; правильный вопрос первого хода о старом дефолте исключён из красного."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": true,
+        "missing": [],
+        "order": true,
+        "naSections": 8,
+        "format": false,
+        "defects": [
+          {
+            "type": "applied-heading-struck",
+            "line": 60,
+            "title": "4.3. Состояния (именованные — обязательно, если есть FE)"
+          }
+        ],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Новых сущностей и полей нет; существующие поля остаются прежними.\n- 🔵 Миграция, пересчёт и исправление существующих записей не требуются."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 При отказе отправки или истечении таймаута показывается прежнее сообщение «Не удалось отправить»; заявка остаётся черновиком, повторная попытка доступна вручную.\n- 🔵 После успешной отправки сохраняется прежний переход."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Контракт и поля на границе с бэкендом остаются прежними; бэкенд и другие потребители не затрагиваются.\n- 🔵 Значение 3 секунды используется только для ожидания ответа отправки заявки в `portal-web`, для первого и последующих вызовов; в инструкциях, тестах и других местах оно не зафиксировано.\n- 🔵 Права и их проверка, автосохранение, переход после отправки, состояния и их отображение, загрузка и polling остаются прежними.\n- 🔵 Существующие данные и записи не меняются; миграция, пересчёт и исправление записей не нужны."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|----------|-------------------|------------------------------|\n| FR-1: ожидать ответ отправки 10 секунд вместо 3 | Поведение UI при отправке в `portal-web` (без INT; граница не меняется) | Дано отправку заявки, когда ответ приходит на 7-й секунде, тогда отправка принимается успешно; когда ответа нет до истечения 10 секунд, тогда показывается прежняя ошибка «Не удалось отправить». 🔵 |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": ">\n> **"
+      }
+    },
+    {
+      "id": "ua-damaged",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-feature",
+      "kind": "write",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r2_feature",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "verdict": "skill-red",
+        "roundRedForProbe": 1,
+        "evidence": "Новые FE-состояния open/closed спроектированы, данные и сбои содержательны правильно. Но отсутствие новых/изменённых взаимодействий в §2 оформлено обычным подтверждением, без единого отрицательного ответа 'Не применимо' и без зачёркнутого заголовка, хотя каталог также неприменим. Это именно расхождение формы, для устранения которого задан план. grade-na этот семантический случай не ловит; подтверждён вручную по условиям источника и правилу §2."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": true,
+        "missing": [],
+        "order": true,
+        "naSections": 6,
+        "format": true,
+        "defects": [],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Подтверждено аналитиком: новых и изменённых сущностей и полей нет; данные остаются прежними.\n- 🔵 Подтверждено аналитиком: миграции, пересчёт и исправление старых записей не нужны."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 При недоступности соседних сервисов справка открывается локально и остаётся доступной, как прежде (БТ). Запись данных и вызовы зависимостей при открытии диалога отсутствуют."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Контракты на границах и данные не меняются; существующие потребители не требуют изменений."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|----------|-------------------|------------------------------|\n| FR-1: новая кнопка открывает локальный диалог с текстом «Заявку рассматривает руководитель» | ~~Не применимо: взаимодействия на границах сервисов нет; локальное UI-поведение описано в §4.~~ | Дано: сотрудник находится в portal-web; когда нажимает кнопку справки; тогда открывается диалог и дословно отображается текст «Заявку рассматривает руководитель». |\n| FR-1: новая кнопка открывает локальный диалог с текстом «Заявку рассматривает руководитель» | ~~Не применимо: взаимодействия на границах сервисов нет; локальное UI-поведение описано в §4.~~ | Дано: соседние сервисы недоступны; когда сотрудник нажимает кнопку справки; тогда локальный диалог открывается. |\n| FR-2: закрыть диалог кнопкой «Закрыть», Escape или по фону; фокус вернуть на кнопку открытия | ~~Не применимо: взаимодействия на границах сервисов нет; локальное UI-поведение описано в §4.~~ | Дано: диалог открыт; когда нажата кнопка «Закрыть»; тогда диалог закрывается и фокус возвращается на кнопку открытия. |\n| FR-2: закрыть диалог кнопкой «Закрыть», Escape или по фону; фокус вернуть на кнопку открытия | ~~Не применимо: взаимодействия на границах сервисов нет; локальное UI-поведение описано в §4.~~ | Дано: диалог открыт; когда нажата клавиша Escape; тогда диалог закрывается и фокус возвращается на кнопку открытия. |\n| FR-2: закрыть диалог кнопкой «Закрыть», Escape или по фону; фокус вернуть на кнопку открытия | ~~Не применимо: взаимодействия на границах сервисов нет; локальное UI-поведение описано в §4.~~ | Дано: диалог открыт; когда нажата область фона; тогда диалог закрывается и фокус возвращается на кнопку открытия. |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": ">\n> **"
+      }
+    },
+    {
+      "id": "ua-state",
+      "kind": "write",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r2_state",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "turns": 2,
+        "verdict": "skill-red",
+        "roundRedForProbe": 1,
+        "evidence": "Прочитаны вход и итоговая спека. Изменённое действие прежнего error_source описано содержательно в §4.3, каталог ошибок независим от отсутствующего INT, §5.2 и данные сохранены. Однако заголовок каталога ошибок сокращён до 'Каталог ошибок (сводно)' и потерял буквальный суффикс шаблона '— последний подраздел §2, после всех INT-карточек'. Требование дословных заголовков явно сохранено планом и скиллом; это реальное нарушение, не сбой грейдера. Правильный вопрос первого хода об остальных местах кнопки сохранён отдельно и не является красным."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": false,
+        "missing": [
+          "### Каталог ошибок (сводно) — последний подраздел §2, после всех INT-карточек"
+        ],
+        "order": true,
+        "naSections": 7,
+        "format": false,
+        "defects": [
+          {
+            "type": "open-struck",
+            "line": 124,
+            "text": "~~**🟡 К валидации:** неподтверждённых допущений нет.~~"
+          },
+          {
+            "type": "open-struck",
+            "line": 124,
+            "text": "~~**❓ Открытые решения:** незакрытых архитектурных решений нет.~~"
+          },
+          {
+            "type": "open-struck",
+            "line": 124,
+            "text": "~~**⚠️ Требует уточнения:** подтверждённых, но расплывчатых решений нет.~~"
+          }
+        ],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Новых или изменённых сущностей и полей нет.\n- 🔵 Миграция, пересчёт и исправление старых записей не нужны; существующие данные остаются без изменений."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 При отказе отправки пользователь видит прежнее сообщение «Не удалось отправить».\n- 🔵 После отказа заявка остаётся черновиком; повторная попытка доступна вручную через кнопку «Повторить».\n- 🔵 После успешной повторной отправки выполняется прежний переход."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Вызов отправки и взаимодействия на границах остаются прежними.\n- 🔵 Права и их проверка, автосохранение, переход после отправки и набор состояний остаются прежними.\n- 🔵 Загрузка, таймауты, polling и обновление остаются прежними.\n- 🔵 При отказе сохраняются прежние сообщение и черновик; добавляется только ручное повторение отправки в состоянии `error_source`.\n- 🔵 Других мест с упоминанием кнопки нет; инструкции, письма и обучение не меняются."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|----------|-------------------|------------------------------|\n| FR-1 🔵 — в состоянии `error_source` показать кнопку «Повторить» | UI portal-web (§4.1, §4.3; взаимодействий на границах нет) | 🔵 Дано отказ отправки заявки, когда отображается состояние `error_source`, тогда видна кнопка «Повторить»; при нажатии повторяется прежний вызов отправки. |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": ">\n> **"
+      }
+    },
+    {
+      "id": "ua-access",
+      "kind": "write",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r2_access",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "turns": 1,
+        "verdict": "skill-red",
+        "roundRedForProbe": 1,
+        "evidence": "Прочитаны вход и сохранённый итоговый файл. Прежняя роль author не скрыла новую проверку владельца заявки: §4.3, §4.4 и §5.3 содержательны, §3.3 сохраняет подтверждённую серверную границу без выдуманного кода ошибки. Семантика применимости и зачёркивание корректны. Однако заголовок каталога сокращён до 'Каталог ошибок (сводно)', потерян буквальный суффикс шаблона '— последний подраздел §2, после всех INT-карточек'. Требование дословных заголовков явно сохранено планом и скиллом; автоматическая диагностика подтверждена вручную. Первоначальная зелёная оценка до сверки заголовков исправлена, это не дополнительный круг."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": false,
+        "missing": [
+          "### Каталог ошибок (сводно) — последний подраздел §2, после всех INT-карточек"
+        ],
+        "order": true,
+        "naSections": 7,
+        "format": true,
+        "defects": [],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Новых и изменяемых сущностей и полей нет; существующие поля остаются прежними.\n- 🔵 Миграция, изменение старых записей и пересчёт не требуются; старые записи не меняются."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 При отказе отправки portal-web показывает прежнее сообщение «Не удалось отправить», оставляет заявку черновиком и позволяет повторить отправку вручную; после успеха выполняется прежний переход (подтверждено источником)."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "- 🔵 Отправка и набор ролей остаются прежними.\n- 🟢 FE дополнительно проверяет владельца заявки перед доступностью кнопки.\n- 🔵 Бэкенд продолжает отклонять чужую отправку; взаимодействия на границах и поля данных не меняются.\n- 🔵 Автосохранение, переход после отправки, прочие состояния и их отображение, загрузка, таймауты, polling, ошибки и их обработка остаются прежними."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|----------|-------------------|------------------------------|\n| 🔵 FR-1: при прежней роли author разрешать кнопку только владельцу заявки | ~~🔵 Новых/изменённых взаимодействий нет; меняется поведение кнопки в portal-web~~ | Дано роль author и заявка пользователя, когда он открывает собственную заявку, тогда кнопка доступна; когда открывает чужую, тогда кнопка недоступна. |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": ">\n> **"
+      }
+    },
+    {
+      "id": "ua-reliability-q",
+      "kind": "question",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-reliability-deferred",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-source-q",
+      "kind": "question",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-refine",
+      "kind": "refine",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": true,
+        "missing": [],
+        "order": true,
+        "naSections": 11,
+        "format": true,
+        "defects": [],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено аналитиком: новых/изменённых сущностей и полей нет; старые записи целы, миграции и пересчёт не нужны."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено источником: при сбое отправки — «Не удалось отправить», заявка остаётся черновиком, ручной повтор доступен. Поведение неизменно."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено аналитиком: отправка, права и их проверка, автосохранение и переход после отправки остаются прежними."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|---|---|---|\n| FR-1 | ~~Не применимо: новых/изменённых взаимодействий нет~~ | Дано: список заявок; когда открыт — новый текст; нажать — отправлено как прежде |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": ""
+      },
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-clean",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-format",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-reliability",
+      "kind": "review",
+      "completed": true,
+      "result": {
+        "terminal": true,
+        "agent": "/root/r2_review_reliability",
+        "model": "gpt-6-luna",
+        "reasoning_effort": "max",
+        "verdict": "green",
+        "evidence": "Найдено ровно посаженное нарушение §5.2; цитата соответствует входу, ложных замечаний нет. Правильная неприменимость остальных разделов сохранена."
+      },
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": "1"
+    },
+    {
+      "id": "ua-review-source",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-flags",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-open",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-live",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-conv",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-conv2",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-opt",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-conv-2t",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-ctx",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-noctx",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-gaps",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-gaps-q",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-fix",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-fix-yes",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "bf-spec",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "bfg-scroll",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "bfg-role",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-clean",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-conv",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-fe",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-tpl-clean",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-tpl-dirty",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-tpl-count",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-bug-spec",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-bug-src",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    }
+  ]
+}

@@ -73,6 +73,17 @@ function content (lines) {
 export function gradeText (text, { expectedHeadings = [], scenario = null } = {}) {
   const ss = sections(text)
   const defects = []
+  let markupFence = null
+  text.split(/\r?\n/).forEach((line, i) => {
+    const mark = /^\s{0,3}(`{3,}|~{3,})/.exec(line)
+    if (mark) {
+      if (!markupFence) markupFence = mark[1]
+      else if (mark[1][0] === markupFence[0] && mark[1].length >= markupFence.length) markupFence = null
+      return
+    }
+    if (markupFence) return
+    if (/^(?:\s*[-*+]\s+~~\[[ xX]\]\s|\s*~~[-*+]\s+(?:\[[ xX]\]\s)?)/.test(line)) defects.push({ type: 'markup-struck', line: i + 1, text: line })
+  })
   const plainHeads = ss.map((s) => '#'.repeat(s.level) + ' ' + s.title)
   const missing = expectedHeadings.filter((h) => !plainHeads.includes(h))
   const positions = expectedHeadings.filter((h) => plainHeads.includes(h)).map((h) => plainHeads.indexOf(h))
@@ -159,7 +170,12 @@ export function selftest () {
   assert.equal(gradeText(good.replace('~~Не применимо: бэкенд прежний.~~', '~~Бэкенд не меняется.~~')).format, true)
   assert.equal(gradeText(good.replace('Отправка остаётся прежней.', '~~Отправка остаётся прежней.~~')).format, false)
   assert.equal(gradeText(good.replace('~~Не применимо: роли прежние.~~', '~~Роли: не применимо, доступ прежний.~~')).format, true)
-  console.log('grade-na: 17 самотестов пройдены')
+  assert.equal(gradeText(good.replace('- ~~Не применимо: роли прежние.~~', '- [ ] ~~Не применимо: роли прежние.~~')).format, true)
+  assert.equal(gradeText(good.replace('- ~~Не применимо: роли прежние.~~', '- ~~[ ] Не применимо: роли прежние.~~')).format, false)
+  assert.equal(gradeText(good.replace('- ~~Не применимо: роли прежние.~~', '- ~~[x] Не применимо: роли прежние.~~')).format, false)
+  assert.equal(gradeText(good.replace('- ~~Не применимо: роли прежние.~~', '~~- [ ] Не применимо: роли прежние.~~')).format, false)
+  assert.equal(gradeText(good + '\n```markdown\n- ~~[ ] пример~~\n```\n').format, true)
+  console.log('grade-na: 22 самотеста пройдены')
 }
 
 function report (round) {

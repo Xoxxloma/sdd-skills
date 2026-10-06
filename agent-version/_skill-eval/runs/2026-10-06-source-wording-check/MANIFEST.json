@@ -1,0 +1,16 @@
+[
+  {
+    "arm": "before",
+    "id": "ua-label",
+    "work": "C:\\Users\\Konstantin\\projects\\product-skills\\agent-version\\_skill-eval\\runs\\2026-10-06-source-wording-check\\before\\ua-label\\run-01",
+    "skill": "C:\\Users\\Konstantin\\projects\\product-skills\\agent-version\\_skill-eval\\runs\\2026-10-06-source-wording-check\\_skills\\before\\technical-spec-doc\\SKILL.md",
+    "target": "docs/UA-410/technical_specification.md"
+  },
+  {
+    "arm": "after",
+    "id": "ua-label",
+    "work": "C:\\Users\\Konstantin\\projects\\product-skills\\agent-version\\_skill-eval\\runs\\2026-10-06-source-wording-check\\after\\ua-label\\run-01",
+    "skill": "C:\\Users\\Konstantin\\projects\\product-skills\\agent-version\\_skill-eval\\runs\\2026-10-06-source-wording-check\\_skills\\after\\technical-spec-doc\\SKILL.md",
+    "target": "docs/UA-410/technical_specification.md"
+  }
+]

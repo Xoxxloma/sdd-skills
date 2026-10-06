@@ -1,0 +1,56 @@
+{
+  "model": "gpt-6-luna",
+  "reasoning_effort": "max",
+  "totalProbes": 38,
+  "completedMeasurements": 14,
+  "completedUniqueProbes": 9,
+  "green": 4,
+  "skillRed": 10,
+  "fullGreen": false,
+  "exitRed": [
+    {
+      "id": "ua-timeout",
+      "skillRed": 3,
+      "green": 0,
+      "excluded": 0
+    }
+  ],
+  "excludedTurns": [
+    {
+      "round": "2026-10-06-applicability-r2",
+      "id": "ua-label",
+      "terminal": true,
+      "verdict": "fixture-gap",
+      "red": false,
+      "reason": "В корректном вопросе запрошены обязательные сведения о других местах использования UI-текста; исходный вход их не дал. Ни одного артефакта до ответа не создано."
+    },
+    {
+      "round": "2026-10-06-applicability-r2",
+      "id": "ua-timeout",
+      "terminal": true,
+      "verdict": "fixture-gap",
+      "red": false,
+      "reason": "В корректном вопросе запрошена обязательная причина прежнего значения конфигурации; исходный вход её не дал. Ни одного артефакта до ответа не создано."
+    },
+    {
+      "round": "2026-10-06-applicability-r2",
+      "id": "ua-state",
+      "terminal": true,
+      "verdict": "fixture-gap",
+      "red": false,
+      "reason": "Корректный вопрос об обязательных границах изменения интерфейса; в исходном входе не было сведений о других местах использования элемента. Спеки до ответа нет."
+    }
+  ],
+  "liveChanged": [],
+  "immutableSnapshotsChanged": [],
+  "immutableInputsChanged": [],
+  "unchangedHeadings": true,
+  "validation": {
+    "diffCheck": true,
+    "scriptSyntax": true,
+    "graderSelftests": 22,
+    "quickValidate": "repository-frontmatter-incompatible"
+  },
+  "haltedAfterRound3": true,
+  "gradingCorrection": "GRADING-CORRECTION.json: compulsory strikethrough of a substantive UI reference in section 7 was removed as an excessive criterion. ua-label/r3 is green; ua-timeout/r3 remains red solely because the error-catalogue heading is missing."
+}

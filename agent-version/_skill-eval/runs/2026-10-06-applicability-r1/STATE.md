@@ -1,0 +1,42 @@
+# 2026-10-06-applicability-r1
+
+Модель gpt-6-luna, reasoning max; снимок неизменяемый.
+
+- ua-label: skill-red — Семантика применимости, заголовки и путь корректны. В §6.5 все пять строк '- ~~[ ] ...~~' захватывают служебную разметку checkbox внутри ~~ вместо '- [ ] ~~...~~'. Прямое нарушение правила о служебной разметке. grade-na этого класса пока не ловит; красный подтверждён вручную по готовому артефакту.
+- ua-timeout: skill-red — Артефакт записан. §4.3.1/§5.1 и обязательные проверки содержательны правильно. Но целиком неприменимые §2, каталог ошибок, §3.1 без зачёркивания; неприменимые пункты BE/DDL в §6.4 и ячейка §7 без зачёркивания; в §6.5 ~~ включает служебные [ ]. Ошибка воспроизведена в готовом файле и противоречит явному правилу оформления скилла; не сбой стенда и не ошибка грейдера.
+- ua-damaged: skill-red — Содержание данных правильно: старая порча, отбор и пересчёт сохранены без DDL. Все пять строк §6.5 оформлены как '~~- [ ] ...~~', служебные bullet и checkbox попали в зачёркивание. Нарушение правила оформления скилла подтверждено готовым артефактом; не падение и не ошибка грейдера.
+- ua-feature: pending
+- ua-state: pending
+- ua-access: pending
+- ua-reliability-q: pending
+- ua-reliability-deferred: pending
+- ua-source-q: pending
+- ua-refine: pending
+- ua-review-clean: green — Все применимые разделы содержательны, неприменимое оформлено, источник CR и отрицательные ответы §8 приняты; ложных замечаний нет.
+- ua-review-format: pending
+- ua-review-reliability: skill-red — Вход §5.2 зачёркнут и закрыт 'Не применимо: сбои не меняются'. Источник подтверждает конкретное поведение при сбое. Чек-лист п.11 прямо требует содержательный §5.2. Приёмка вернула 0, не выявив посаженное нарушение. Источники и снимок неизменны; ошибки грейдера нет, оценка подтверждена чтением входа и ответа.
+- ua-review-source: pending
+- ua-review-flags: pending
+- ua-review-open: pending
+- ts-live: pending
+- ts-conv: pending
+- ts-conv2: pending
+- ts-opt: pending
+- ts-conv-2t: pending
+- ts-ctx: pending
+- ts-noctx: pending
+- ts-gaps: pending
+- ts-gaps-q: pending
+- ts-fix: pending
+- ts-fix-yes: pending
+- bf-spec: pending
+- bfg-scroll: pending
+- bfg-role: pending
+- rv-clean: pending
+- rv-conv: pending
+- rv-fe: pending
+- rv-tpl-clean: pending
+- rv-tpl-dirty: pending
+- rv-tpl-count: pending
+- rv-bug-spec: pending
+- rv-bug-src: pending

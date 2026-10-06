@@ -1,0 +1,423 @@
+{
+  "unchangedHeadings": true,
+  "snapshotChanged": [],
+  "rows": [
+    {
+      "id": "ua-label",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-timeout",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-damaged",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-feature",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-state",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-access",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-reliability-q",
+      "kind": "question",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-reliability-deferred",
+      "kind": "write",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-source-q",
+      "kind": "question",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-refine",
+      "kind": "refine",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": {
+        "structure": true,
+        "missing": [],
+        "order": true,
+        "naSections": 11,
+        "format": true,
+        "defects": [],
+        "fr": true,
+        "restoredFlag": true,
+        "required": [
+          {
+            "id": "3.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено аналитиком: новых/изменённых сущностей и полей нет; старые записи целы, миграции и пересчёт не нужны."
+          },
+          {
+            "id": "5.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено источником: при сбое отправки — «Не удалось отправить», заявка остаётся черновиком, ручной повтор доступен. Поведение неизменно."
+          },
+          {
+            "id": "6.2",
+            "present": true,
+            "struck": false,
+            "own": "🔵 Подтверждено аналитиком: отправка, права и их проверка, автосохранение и переход после отправки остаются прежними."
+          },
+          {
+            "id": "7",
+            "present": true,
+            "struck": false,
+            "own": "| FR из БТ | Взаимодействие(я) | Тест-кейс (Дано–Когда–Тогда) |\n|---|---|---|\n| FR-1 | ~~Не применимо: новых/изменённых взаимодействий нет~~ | Дано: список заявок; когда открыт — новый текст; нажать — отправлено как прежде |"
+          }
+        ],
+        "status": "Готово к разработке",
+        "openBlock": ""
+      },
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-clean",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-format",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-reliability",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-source",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-flags",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ua-review-open",
+      "kind": "review",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": true,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-live",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-conv",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-conv2",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-opt",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-conv-2t",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-ctx",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-noctx",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-gaps",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-gaps-q",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-fix",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "ts-fix-yes",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "bf-spec",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "bfg-scroll",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "bfg-role",
+      "kind": "regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-clean",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-conv",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-fe",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-tpl-clean",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-tpl-dirty",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-tpl-count",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-bug-spec",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    },
+    {
+      "id": "rv-bug-src",
+      "kind": "review-regression",
+      "completed": false,
+      "result": null,
+      "changedInputs": [],
+      "wrote": false,
+      "diagnostic": null,
+      "reviewCount": null
+    }
+  ]
+}

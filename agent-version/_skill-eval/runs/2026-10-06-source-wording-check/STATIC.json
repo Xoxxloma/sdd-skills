@@ -1,0 +1,15 @@
+{
+  "provenanceRulesMatchHead": true,
+  "userWordingPreserved": true,
+  "crlf": 906,
+  "loneLf": 0,
+  "snapshotChanged": [],
+  "liveSkillUnchangedSinceSnapshot": true,
+  "pairedStage1Inputs": true,
+  "pairedStage2Inputs": true,
+  "allSourceHashesIntact": true,
+  "bothRunsCompleted": true,
+  "section8ChangeChecksPassedBeforeAndAfter": true,
+  "wholeProbeGreen": false,
+  "confirmedChangeDefects": 0
+}
