@@ -307,12 +307,22 @@ export function analyze(opisText, draftText, prevText) {
   for (const k of classKeys.задачи) groups.add('задача ' + k);
   for (const k of classKeys.топики) if (k.startsWith('потребляет')) groups.add(k);
 
-  // гейт ключей: «Бизнес-правила» и факты в него не идут
-  const bizMiss = [...o.keys].filter(([k, v]) => !pair.has(k) && v.kind !== 'other').length;
-  const bizExtra = [...classKeys.бизнес].filter((k) => !taken.has(k)).length;
-  const G = [missingInDraft - bizMiss, missingInOpis - bizExtra, dups, o.nofile.length];
+  // перечень добора (SKILL.md 3.0.8): ключ описи с источником без блока и ключ описи без источника
+  // при блоке в карточке (оба — кроме «Бизнес-правил»), факт описи при пустом блоке, один ключ двумя
+  // блоками. Сверка запись не останавливает.
+  const nofile = new Set(o.nofile);
+  const missSrc = [...o.keys].filter(([k, v]) => !pair.has(k) && v.kind === 'other' && !nofile.has(k)).length;
+  const pairNoSrc = [...o.keys].filter(([k, v]) => pair.has(k) && v.kind === 'other' && nofile.has(k)).length;
+  // ключи карточки по классам — для маркерного гейта: ключ контракта вызовом при том же ключе
+  // без скобок — один ключ; перегрузки без голого ключа — разные.
+  const cardKeys = {};
+  for (const c of ['контракт', 'сущности', 'задачи', 'топики', 'экраны']) {
+    const set = classKeys[c];
+    cardKeys[c] = [...set].filter((k) => !(c === 'контракт' && nop(k) !== k && set.has(nop(k)))).length;
+  }
+  draft['ключи'] = cardKeys;
   const sverka = {
-    'гейт': G.every((x) => x === 0) ? 'пройден' : `не пройден ${G.join('/')}`,
+    'добор': `${missSrc}/${pairNoSrc}/${factEmpty}/${dups}`,
     'нет в черновике': missingInDraft,
     'нет в описи': missingInOpis,
     'факт, пустой блок': factEmpty,
