@@ -1,0 +1,6 @@
+README.md
+seed/AI-SDD/docs/PSS-40/business_requirements.md
+seed/AI-SDD/services/manifest.yaml
+seed/docs/deploy.md
+seed/docs/index.md
+w-prompt.txt

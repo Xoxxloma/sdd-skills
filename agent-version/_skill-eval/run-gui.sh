@@ -35,7 +35,9 @@ else
   echo "снимок уже есть — прогон читает ЕГО ($(wc -l < "$ROUND/_skills/analyst-workspace.SKILL.md") строк)"
 fi
 
-SNAP="/tmp/gui-skills/$(basename "$ROUND")"
+# Имя фикстуры в пути обязательно: две фикстуры одного раунда, запущенные параллельно, иначе делят
+# снимок, и та, что кончила первой, сносит его из-под второй (`rm -rf "$SNAP"` в конце). 2026-10-06.
+SNAP="/tmp/gui-skills/$(basename "$ROUND")-$FIX_NAME"
 rm -rf "$SNAP"; mkdir -p "$SNAP/analyst-workspace"
 cp "$ROUND/_skills/analyst-workspace.SKILL.md" "$SNAP/analyst-workspace/SKILL.md"
 [ -d "$ROUND/_skills/analyst-workspace.reference" ] && cp -r "$ROUND/_skills/analyst-workspace.reference" "$SNAP/analyst-workspace/reference"
@@ -61,7 +63,7 @@ run_one() {
   local task
   task="$(awk 'FNR==NR{t=t $0 ORS; next} /^TASKTEXT$/{printf "%s", t; next} {print}' "$FIX/task.txt" "$TPL" \
         | sed -e "s|WORKDIR|$abs|g" -e "s|SKILLDIR|$SNAP_WIN|g")"
-  ( cd "$sb/w" && timeout 1800 claude -p "$task" --model haiku --permission-mode bypassPermissions ) \
+  ( cd "$sb/w" && timeout 1800 claude -p "$task" --model "${SM_MODEL:-haiku}" --permission-mode bypassPermissions ) \
       > "$sb/answer.md" 2> "$sb/_stderr.log"
   local rc=$?
   if grep -qiE "API Error|Please run /login|Credit balance|rate limit|session limit|usage limit" "$sb/answer.md" 2>/dev/null; then
@@ -78,7 +80,9 @@ run_one() {
   if [ $rc -ne 0 ] || [ ! -s "$dst/answer.md" ]; then echo "  run-$i — ОТКАЗ (rc=$rc)"; else echo "  run-$i — готов"; fi
 }
 
-echo "фикстура: $FIX_NAME   прогонов: $N   скилл: $SKILL_SRC"
+# Модель — как у run-ctx-v2.sh: `SM_MODEL=sonnet ./run-gui.sh …`; пусто → haiku, как было.
+echo "модель: ${SM_MODEL:-haiku}" > "$OUT/_settings.txt"
+echo "фикстура: $FIX_NAME   прогонов: $N   скилл: $SKILL_SRC   модель: ${SM_MODEL:-haiku}"
 r=0; for i in $(seq -w 1 "$N"); do run_one "$i" & r=$((r+1)); [ "$r" -ge "$CONC" ] && { wait -n 2>/dev/null || wait; r=$((r-1)); }; done; wait
 echo "ГОТОВО: $(find "$OUT" -maxdepth 2 -name answer.md -size +0 | wc -l) из $N"
 rm -rf "$SNAP"

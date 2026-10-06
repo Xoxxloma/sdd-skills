@@ -122,7 +122,8 @@ function checkWrite(run) {
     return hits.length !== 1 || hits[0] !== owner;
   }).map(([fr]) => fr);
 
-  const epicTouched = read(join(run, EPIC_BT)) !== read(join(HERE, 'fixtures', 'TD-PATH', LAYOUT.seed, EPIC_BT));
+  // `TD_FIXTURE=TD-RU` — копия засева на словах 5.35 (проба `td-ru-w`); эпик сверяется с СВОИМ засевом.
+  const epicTouched = read(join(run, EPIC_BT)) !== read(join(HERE, 'fixtures', process.env.TD_FIXTURE || 'TD-PATH', LAYOUT.seed, EPIC_BT));
   const strays = written.filter((r) => !posix(r).startsWith(posix(join(...EPIC_DIR)) + '/'));
 
   return {

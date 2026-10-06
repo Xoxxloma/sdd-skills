@@ -243,6 +243,9 @@ case "$PROBE" in
   # потребителям/интеграциям закрывает гейты → файл этим ходом (одноходовая, «ПРОДОЛЖЕНИЕ»).
   br-nocrit)  FIXTURE=BR-NOCRIT; PROMPT_FILE=brief-prompt.txt; SKILL=business-requirements-doc; TURN2_FILE=nocrit-turn2.txt; TURN3_FILE=nocrit-t3-turn2.txt; TURNS_CAP=3 ;;
   br-yes)     FIXTURE=BR-YES; PROMPT_FILE=yes-prompt.txt; SKILL=business-requirements-doc ;;
+  # Замена терминов 5.35 (2026-10-06): БТ с несколькими частями → таблица §4.5 и вопрос в ответе, без «слайс»/
+  # «деливербл». Одноходовая, «ПРОДОЛЖЕНИЕ». Грейдер — `grade-terms.mjs --case=cut`.
+  br-cut)     FIXTURE=BR-CUT; PROMPT_FILE=cut-prompt.txt; SKILL=business-requirements-doc ;;
   # То же, что br-nocrit, но стоп после хода 2: прод — это ход 2, ход 3 сам подсказывает исправление (2026-10-03).
   br-nocrit2) FIXTURE=BR-NOCRIT; PROMPT_FILE=brief-prompt.txt; SKILL=business-requirements-doc; TURN2_FILE=nocrit-turn2.txt; TURNS_CAP=2 ;;
   # Та же тема на других входах (2026-10-03), стоп после хода 2. `br-ncl` — отпуска: критерии по номерам у (1) и
@@ -267,6 +270,9 @@ case "$PROBE" in
   # шаблон «ключ задачи → своя папка под docs/» прогон видит на диске. Красный исход отсюда и
   # приехал: дети легли СИБЛИНГАМИ папки эпика.
   td-alias)   FIXTURE=TD-PATH; PROMPT_FILE=alias-prompt.txt; SKILL=task-decomposition-doc; SEED_SUB=seed-alias ;;
+  # Тот же эпик, что `td-path-w`, но БТ и реплика аналитика — в словах 5.35 («части», не «слайсы»). Меряется
+  # §4.5 ребёнка «это часть эпика» и отсутствие старых слов. Грейдеры — `grade-td-path.mjs` + `grade-terms.mjs --case=td`.
+  td-ru-w)    FIXTURE=TD-RU;   PROMPT_FILE=w-prompt.txt;     SKILL=task-decomposition-doc; SEED_SUB=seed ;;
   # ── `context-doc`: импорт документа человека в `context/` ─────────────────────────────────
   # Главная проба набора — `cdoc-xlsx`: источник НЕ читается (конвертера в окружении нет), и
   # законный исход — отсутствие файла. Гейт описания в её промпте снят заранее, иначе «файла нет»
@@ -438,7 +444,7 @@ case "$PROBE" in
   artype)    FIXTURE=AR-TYPE;   PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q br-var br-half br-nocrit br-yes cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
 esac
 
 # Потолок пробы сильнее внешнего значения: пул — дочерний процесс и читает переменную из окружения.
