@@ -1,0 +1,91 @@
+{
+  "model": "gpt-6-luna",
+  "reasoning": "medium",
+  "status": "stopped_at_authorized_exit",
+  "baseline": "3.0.7",
+  "stages": {
+    "0": "in_progress",
+    "1": "in_progress",
+    "2": "in_progress",
+    "4": "in_progress",
+    "5": "not_started",
+    "6": "in_progress_docs_only",
+    "7": "in_progress",
+    "8": "not_started",
+    "1б": "in_progress",
+    "3а": "in_progress",
+    "3б": "in_progress"
+  },
+  "probes": {
+    "sm-mark/protocol-gap": {
+      "redRounds": 1,
+      "rounds": [
+        {
+          "round": "round-1",
+          "green": 0,
+          "total": 3,
+          "missingTrials": 0
+        },
+        {
+          "round": "round-2",
+          "green": 3,
+          "total": 3,
+          "missingTrials": 0
+        }
+      ]
+    },
+    "sm-mark/card-same-opis-low": {
+      "redRounds": 0,
+      "latest": "round-1",
+      "green": 3,
+      "total": 3
+    },
+    "sm-slice-lead/j-glue-failed-budget": {
+      "redRounds": 0,
+      "latest": "round-1",
+      "green": 3,
+      "total": 3
+    },
+    "sm-slice-lead/n-rest-empty": {
+      "redRounds": 0,
+      "latest": "round-1",
+      "green": 3,
+      "total": 3
+    },
+    "sm-facts": {
+      "redRounds": 3,
+      "decisions": "facts-decisions.json",
+      "thirdRound": "finished-red",
+      "automaticScoresProvisional": true
+    }
+  },
+  "comparability": "historical-t-u-calibrated-limited",
+  "calibration": {
+    "trials": 6,
+    "automatedGreen": 3,
+    "manualGreen": 3,
+    "comparison": "calibration/COMPARISON.json"
+  },
+  "verification": {
+    "semantic": "13/13",
+    "directed": "19/19",
+    "syntheticCheck": "43 cases, oracle and script: 0 differences; 10 real cases not measured",
+    "realCheck": "not measured: ten original input sets absent",
+    "completeRegression": false,
+    "summaryAssembly": "12/12",
+    "quality": "11/11",
+    "split": "543 checks: 509 ok, 1 fixture/setup assertion failure, 8 ambiguities, 2 not measured, 23 info; exit 1. Refusal case 18 expects a preserved sentinel but its fixture did not seed one; script refused before writing.",
+    "diffWhitespace": "git diff --check passed"
+  },
+  "updatedAt": "2026-10-05T20:22:02.231Z",
+  "exitReason": "SM-FACTS reached three red rounds; implementation is incomplete and has not passed acceptance",
+  "implementationAccepted": false,
+  "remaining": [
+    "Independent syntactic contract reconciliation (stage 5)",
+    "Keyed update execution tests and explicit bounded refill (stage 6)",
+    "K=50/35/25 reading-quality measurement (stage 3б)",
+    "Global summary behavioral probes, dependency/cross-section consistency (stage 4)",
+    "Complete regression on one final revision, absent historical inputs, production verification (stage 8)",
+    "SM-SPLIT refusal case 18 setup must seed the sentinel required by its preservation assertion"
+  ]
+}

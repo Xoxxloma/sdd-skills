@@ -1,0 +1,206 @@
+{
+  "status": "active",
+  "model": "gpt-6-luna",
+  "reasoning": "medium",
+  "scope": "Full PLAN-service-map-2.0.md, with explicit user exclusions: original service-map and other skills remain unchanged",
+  "historicalRun": "../2026-10-05-service-map-implementation",
+  "historicalRedRounds": 3,
+  "currentAuthorization": "User requested continuation as a new goal after the previous stop; a new sequence of up to three confirmed skill-failure rounds begins here. Historical decisions are preserved.",
+  "redRounds": {
+    "sm-facts": 1,
+    "sm-refill-agent": 1,
+    "sm-language-holdout": 2
+  },
+  "completeRegression": false,
+  "implementationAccepted": false,
+  "verification": {
+    "factGrader": "46/46",
+    "factTransferCandidates": "17/17 after cross-section integration",
+    "split": "543 checks: 510 ok, 0 errors, 8 ambiguities, 2 not measured, 23 info; exit 3 due absent inputs",
+    "directed": "19/19 after cross-section integration",
+    "semantic": "13/13 after cross-section integration",
+    "contractsScript": "35/35 (SDL, proto, OpenAPI JSON and bounded YAML profile; CHECK_DECLARATIONS integration)",
+    "refillScript": "Archived experiment; 29/29 previous mechanical checks are not acceptance for current agent-edit mode",
+    "keyedGrader": "26/26; complete fact and trace reviews required",
+    "refillFixture": "Agent-edit first round: 2 accepted+promoted, 1 rejected after dobor for removed metadata/protected tail; 77 source files unchanged per trial; current generalized follow-up instructions not re-tested",
+    "summaryAssembly": "15/15; current conflict TSV resets on clean reassembly and reaches check/quality; not behavioral summary completeness",
+    "languagePortability": "Two holdout rounds source-reviewed: latest Python9/9,8/9,9/9 and Go6/6 all; one false absence of provided function in Python trial2. Independent red rounds2; EOF-only effects excluded as tool confound; full framework/language support not accepted.",
+    "crossSectionReferences": "13/13; optional full-card explicit entity/role reference checks reach reader list and quality warnings; no ownership inference by suffix; no partial-card/global-completeness claim"
+  },
+  "remaining": [
+    "Full semantic audit of model outputs",
+    "K reading-quality experiment",
+    "Independent contract reconciliation behavioral matrix, inactive declaration proof",
+    "Refill and keyed-update behavioral matrix; complete fixture preservation/fact/trace audits",
+    "Global summaries and cross-section consistency",
+    "Final complete regression on one snapshot; historical missing inputs; production verification"
+  ],
+  "updatedAt": "2026-10-06T08:29:09.367Z",
+  "probes": {
+    "sm-facts": {
+      "round": "facts-round-1",
+      "trials": 3,
+      "attemptsPerTrial": 2,
+      "decision": "red-confirmed",
+      "evidence": "facts-round-1/trial-1/red-decision.json",
+      "fullAudits": "not_measured",
+      "currentRound": {
+        "round": "facts-round-2",
+        "status": "running",
+        "trials": 3,
+        "authorCallsPerTrial": [
+          1,
+          1,
+          1
+        ],
+        "agents": [
+          "/root/facts_cont_oct06_round2_trial1",
+          "/root/facts_cont_oct06_round2_trial2",
+          "/root/facts_cont_oct06_round2_trial3"
+        ],
+        "keys": 31,
+        "facts": 53,
+        "oracleSha256": "8a86cf36bc5994c2fc814f56342019edc491518bf982a45acef02bf3db6f4945",
+        "finalRegression": false
+      }
+    },
+    "sm-refill-experiment": {
+      "round": "refill-round-1",
+      "trials": 3,
+      "attempts": [
+        2,
+        1,
+        2
+      ],
+      "decision": "archived-protocol-experiment",
+      "appliedTrials": [
+        2
+      ],
+      "citationRefusals": [
+        1,
+        3
+      ],
+      "countsAsSkillRedRound": false,
+      "fullAudits": "not_measured"
+    },
+    "sm-refill-agent": {
+      "round": "refill-agent-round-1",
+      "trials": 3,
+      "attemptsPerTrial": [
+        2,
+        2,
+        2
+      ],
+      "decision": "red-confirmed-card-preservation",
+      "factCoverage": [
+        "42/43",
+        "43/43",
+        "42/43"
+      ],
+      "inventions": [
+        0,
+        0,
+        0
+      ],
+      "promotedTrials": [
+        1,
+        2
+      ],
+      "rejectedTrials": [
+        3
+      ],
+      "evidence": "refill-agent-round-1/trial-3/work/red-decision.json",
+      "fullAudits": "source-reviewed; fixture scope only",
+      "measurementCorrection": "Trial 3 removed entity rows remain independent red evidence; EOF component excluded as tool confound."
+    },
+    "sm-language-holdout": {
+      "round": "language-holdout-round-1",
+      "trials": 3,
+      "attemptsPerTrial": [
+        2,
+        2,
+        2
+      ],
+      "decision": "red-confirmed",
+      "factCoverage": {
+        "Python": [
+          "8/9",
+          "8/9",
+          "9/9"
+        ],
+        "Go": [
+          "6/6",
+          "6/6",
+          "6/6"
+        ]
+      },
+      "sourceUnchanged": true,
+      "originalCardsUnchanged": true,
+      "evidence": "language-holdout-round-1/red-decision.json",
+      "evidenceSha256": "2d43d31462e669aecfd976d966bf2ccdc96e400bbec769c0949538522045ac7b",
+      "fullAudits": "manual source/fact/unknown/scope reviews completed for selected blocks",
+      "countsAsSkillRedRound": true,
+      "completeLanguageSupport": false,
+      "promoted": false,
+      "currentRound": {
+        "round": "language-holdout-round-2",
+        "status": "red-confirmed",
+        "trials": 3,
+        "authorCallsPerTrial": [
+          2,
+          2,
+          2
+        ],
+        "factCoverage": {
+          "Python": [
+            "9/9",
+            "8/9",
+            "9/9"
+          ],
+          "Go": [
+            "6/6",
+            "6/6",
+            "6/6"
+          ]
+        },
+        "inventions": {
+          "Python": [
+            0,
+            1,
+            0
+          ],
+          "Go": [
+            0,
+            0,
+            0
+          ]
+        },
+        "evidence": "language-holdout-round-2/red-decision.json",
+        "evidenceSha256": "f5231231216f99cb9c0f155f358312ebd98e1674b33e49e38b23712be7cd7bcd",
+        "sourceUnchanged": true,
+        "originalCardsUnchanged": true,
+        "scope": "Selected blocks; no full language/framework acceptance",
+        "excludedFromRed": "Lone EOF effects reproduced in apply_patch control",
+        "exactPreservation": "Trial 2 preserved; other copies unmeasured due tool confound"
+      },
+      "correctedDecision": "Round 1 red counter remains 1, solely because of independent Python sort-direction losses; EOF-only failures cannot count as skill failure.",
+      "history": [
+        {
+          "round": "language-holdout-round-1",
+          "status": "red-confirmed-independent-Python-fact-loss",
+          "evidence": "language-holdout-round-1/red-decision.json",
+          "correction": "measurement-fixes/apply-patch-eof-2026-10-06/correction.json"
+        }
+      ]
+    }
+  },
+  "implementationDecisions": {
+    "refill": "Agent edits prepared copy; dedicated apply/citation script excluded after user discussion",
+    "otherSkills": "User explicitly excluded changes to business-requirements-doc and technical-spec-doc; added paragraphs reverted; git diff verified empty for both",
+    "languageAgnostic": "User explicitly requires language independence; language-specific detectors have declared limits, no tailoring of skill rules to fixture answers",
+    "refillUnknown": "Selected unknown placeholder may be clarified from confirmed source; preserve confirmed links and projection and never delete link row. First holdout prompt had the stronger literal-preservation condition; red evidence relies on lost sort direction and unselected EOF, not placeholder replacement."
+  },
+  "measurementCorrections": [
+    "measurement-fixes/apply-patch-eof-2026-10-06/correction.json"
+  ]
+}
