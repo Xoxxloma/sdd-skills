@@ -46,7 +46,7 @@ CONC="${3:-1}"
 MODEL="${SM_MODEL:-haiku}"
 
 case "$ARM" in
-  scan)  PROMPT="$HERE/stand/prompt-scan.md" ;;
+  scan)  PROMPT="${SM_REAL_PROMPT:-$HERE/stand/prompt-scan.md}" ;;
   rescan) PROMPT="$HERE/stand/prompt-scan.md" ;;   # тот же скан поверх прежних карточек (seed.sh)
   keyed)  PROMPT="$HERE/stand/prompt-keyed.md"
           [ -f "${SM_KEYED_HINT:-}" ] || { echo "плечо keyed: нужен SM_KEYED_HINT — файл подсказки"; exit 1; } ;;

@@ -32,7 +32,7 @@ set -u
 command -v timeout > /dev/null || timeout() { local s="$1"; shift; perl -e 'alarm shift; exec @ARGV' "$s" "$@"; }
 
 SRC="${1:?папка скилла (SKILL.md и reference/)}"; ROUND="${2:?папка раунда}"; FX="${3:?фикстура: NRS-TAIL | SM-MONO-DGS}"; N="${4:-1}"
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; FIXROOT="$HERE/fixtures"; PROMPT="$FIXROOT/SM-MONO-RUN/prompt-scan.md"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; FIXROOT="$HERE/fixtures"; PROMPT="${SM_MONO_PROMPT:-$FIXROOT/SM-MONO-RUN/prompt-scan.md}"
 MODEL="${SM_MODEL:-sonnet}"; CONC="${SM_MONO_CONC:-1}"; TMO="${SM_MONO_TIMEOUT:-7200}"
 case "$FX" in
   NRS-TAIL) SVC=cargonet ;;
@@ -122,7 +122,8 @@ seed() {  # seed <w>
   esac
   [ -d "$w/$SVC" ] && [ -f "$w/AI-SDD/services/manifest.yaml" ]
 }
-fp() { ( cd "$1" && find . -path ./AI-SDD -prune -o -type f -not -path '*/.git/*' -printf '%P\t%s\t%T@\n' | sort ); }
+# отпечаток файлов; где у find нет -printf (macOS) — тот же вид через stat
+fp() { ( cd "$1" && if find . -maxdepth 0 -printf '' 2>/dev/null; then find . -path ./AI-SDD -prune -o -type f -not -path '*/.git/*' -printf '%P\t%s\t%T@\n'; else find . -path ./AI-SDD -prune -o -type f -not -path '*/.git/*' -exec stat -f $'%N\t%z\t%m' {} + | sed 's|^\./||'; fi | sort ); }
 
 run_one() {  # run_one <NN> [попытка]
   local i="$1" attempt="${2:-1}"
