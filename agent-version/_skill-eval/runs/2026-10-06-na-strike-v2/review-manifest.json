@@ -1,0 +1,42 @@
+[
+  {
+    "name": "clean",
+    "work": "C:\\Users\\Konstantin\\projects\\product-skills\\agent-version\\_skill-eval\\runs\\2026-10-06-na-strike-v2\\review\\run-01",
+    "target": "docs/NA-410/technical_specification.md",
+    "source": "docs/NA-410/change_request.md",
+    "checklist": "C:\\Users\\Konstantin\\projects\\product-skills\\agent-version\\_skill-eval\\runs\\2026-10-06-na-strike-v2\\_skills\\spec-review\\reference\\checklist-spec.md",
+    "expected": 0
+  },
+  {
+    "name": "mixed",
+    "work": "C:\\Users\\Konstantin\\projects\\product-skills\\agent-version\\_skill-eval\\runs\\2026-10-06-na-strike-v2\\review\\run-02",
+    "target": "docs/NA-410/technical_specification.md",
+    "source": "docs/NA-410/change_request.md",
+    "checklist": "C:\\Users\\Konstantin\\projects\\product-skills\\agent-version\\_skill-eval\\runs\\2026-10-06-na-strike-v2\\_skills\\spec-review\\reference\\checklist-spec.md",
+    "expected": 0
+  },
+  {
+    "name": "partial-reason",
+    "work": "C:\\Users\\Konstantin\\projects\\product-skills\\agent-version\\_skill-eval\\runs\\2026-10-06-na-strike-v2\\review\\run-03",
+    "target": "docs/NA-410/technical_specification.md",
+    "source": "docs/NA-410/change_request.md",
+    "checklist": "C:\\Users\\Konstantin\\projects\\product-skills\\agent-version\\_skill-eval\\runs\\2026-10-06-na-strike-v2\\_skills\\spec-review\\reference\\checklist-spec.md",
+    "expected": 1
+  },
+  {
+    "name": "applied-heading",
+    "work": "C:\\Users\\Konstantin\\projects\\product-skills\\agent-version\\_skill-eval\\runs\\2026-10-06-na-strike-v2\\review\\run-04",
+    "target": "docs/NA-410/technical_specification.md",
+    "source": "docs/NA-410/change_request.md",
+    "checklist": "C:\\Users\\Konstantin\\projects\\product-skills\\agent-version\\_skill-eval\\runs\\2026-10-06-na-strike-v2\\_skills\\spec-review\\reference\\checklist-spec.md",
+    "expected": 1
+  },
+  {
+    "name": "open-struck",
+    "work": "C:\\Users\\Konstantin\\projects\\product-skills\\agent-version\\_skill-eval\\runs\\2026-10-06-na-strike-v2\\review\\run-05",
+    "target": "docs/NA-410/technical_specification.md",
+    "source": "docs/NA-410/change_request.md",
+    "checklist": "C:\\Users\\Konstantin\\projects\\product-skills\\agent-version\\_skill-eval\\runs\\2026-10-06-na-strike-v2\\_skills\\spec-review\\reference\\checklist-spec.md",
+    "expected": 1
+  }
+]

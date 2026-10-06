@@ -1,0 +1,37 @@
+[
+  {
+    "name": "clean",
+    "expected": 0,
+    "completed": true,
+    "reported": 0,
+    "pass": true
+  },
+  {
+    "name": "mixed",
+    "expected": 0,
+    "completed": true,
+    "reported": 0,
+    "pass": true
+  },
+  {
+    "name": "partial-reason",
+    "expected": 1,
+    "completed": true,
+    "reported": 1,
+    "pass": true
+  },
+  {
+    "name": "applied-heading",
+    "expected": 1,
+    "completed": true,
+    "reported": 1,
+    "pass": true
+  },
+  {
+    "name": "open-struck",
+    "expected": 1,
+    "completed": true,
+    "reported": 1,
+    "pass": true
+  }
+]
