@@ -16,6 +16,7 @@
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { normalizeSpecHeadings } from './spec-markdown.mjs'
 
 const SEED = join(process.cwd(), 'fixtures/TS-FIX/docs/PSS-2210/technical_specification.md')
 const SPEC = 'docs/PSS-2210/technical_specification.md'
@@ -23,7 +24,8 @@ const SPEC = 'docs/PSS-2210/technical_specification.md'
 /** Текст раздела от заголовка до следующего заголовка того же или старшего уровня. */
 export function section (text, head) {
   const lines = text.split(/\r?\n/)
-  const i = lines.findIndex((l) => l.startsWith(head))
+  const normalized = normalizeSpecHeadings(text).split('\n')
+  const i = normalized.findIndex((l) => l.startsWith(head))
   if (i < 0) return ''
   const lvl = (head.match(/^#+/) || ['#'])[0].length
   let j = i + 1

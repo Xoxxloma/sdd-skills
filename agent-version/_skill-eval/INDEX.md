@@ -130,6 +130,7 @@
 | `rv-bug-dirty` | `spec-review` | `RV-BUG` | шесть посаженных нарушений; седьмой пункт намеренно чист — ловушка на проверку, срабатывающую всегда | `grade-rv-bug.mjs --probe=dirty` |
 | `rv-bug-src` | `spec-review` | `RV-BUG` | различающая: репорт несёт `FR-1`, §7 спеки его НЕ трассирует. Источник передан → пункт 3 обязан покраснеть | вручную |
 | `bf-spec` | `technical-spec-doc` | `BF-SPEC` | режим багфикса по баг-репорту: границы правки в §6.2, данные, `FR-1`, чужой `ARS-102` не приписан | `grade-bf.mjs` |
+| `na-strike` | `technical-spec-doc`, `spec-review` | `prepare-na.mjs` | запись и доработка: заголовки/пункты/ячейки неприменимого зачёркнуты, форма шаблона и применимый текст сохранены; чистые и повреждённые примеры приёмки. Только встроенные субагенты `gpt-6-luna`, effort `medium`; `run-ctx.sh` для этой пробы не используется | `grade-na.mjs <раунд> --write --totals`, `--selftest`; снимки и условия — `runs/2026-10-06-na-strike*/STATE.md` |
 | `rt-bug` | `analyst-workspace` | `RT-BUG` | **маршрут, под-скиллы заглушены:** дефект идёт мимо БТ и мимо разреза. Грейдится `_trace.log` | `grade-rt.mjs --probe=bug` |
 | `rt-feature` | `analyst-workspace` | `RT-BUG` | сторож основного пути: обычная задача обязана уйти в `business-requirements-doc` | `grade-rt.mjs --probe=feature` |
 | `rt-menu` | `analyst-workspace` | `RT-BUG` | **порядок на входе:** кнопка нажата, тип не назван — ход обязан встать меню «БТ или баг», ключ задачи НЕ спрашивается | `grade-rt.mjs --probe=menu` |

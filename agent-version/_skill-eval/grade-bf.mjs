@@ -22,6 +22,7 @@
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { normalizeSpecHeadings } from './spec-markdown.mjs'
 
 const RE_API_FAILURE = /API Error|Request not allowed|Please run \/login|Credit balance|rate limit|session limit|usage limit/i
 
@@ -108,11 +109,12 @@ export function gradeRun (dir) {
   r.statusSpec = RE_STATUS_SPEC.test(t)
   r.statusReportVocab = RE_STATUS_REPORT_VOCAB.test(t)
   r.invented = RE_INVENTED_CAUSE.test(t)
-  r.h62 = RE_H_62.test(t)
-  r.h32 = RE_H_32.test(t)
+  const headings = normalizeSpecHeadings(t)
+  r.h62 = RE_H_62.test(headings)
+  r.h32 = RE_H_32.test(headings)
   // Отдельный, более тяжёлый исход: раздела нет вовсе, секция схлопнута. Пункт 11 приёмки
   // краснит и за это — «секции нет вовсе — тоже нарушение».
-  r.no32 = !/^###\s*3\.2\./m.test(t)
+  r.no32 = !/^###\s*3\.2\./m.test(headings)
   r.extraDocs = existsSync(join(dir, 'docs/ARS-312/business_requirements.md'))
 
   r.pass = r.typeBugfix && r.srcReport && !r.blamedARS102 && r.hasFR && r.bounds &&

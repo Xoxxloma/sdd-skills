@@ -1,0 +1,91 @@
+[
+  {
+    "arm": "after",
+    "revision": "current",
+    "templateUnchanged": true,
+    "total": 1,
+    "wrote": 1,
+    "structure": 1,
+    "format": 0,
+    "completed": 1,
+    "pass": 0,
+    "rows": [
+      {
+        "run": "run-01",
+        "scenario": "change",
+        "completed": true,
+        "wrote": true,
+        "structure": true,
+        "missing": [],
+        "order": true,
+        "naSections": 10,
+        "format": false,
+        "defects": [
+          {
+            "type": "heading",
+            "line": 25,
+            "title": "Каталог ошибок (сводно)"
+          },
+          {
+            "type": "heading",
+            "line": 29,
+            "title": "3.1. По сервисам"
+          },
+          {
+            "type": "heading",
+            "line": 35,
+            "title": "3.3. Авторизация/доступ на бэке"
+          },
+          {
+            "type": "heading",
+            "line": 46,
+            "title": "4.3. Состояния (именованные — обязательно, если есть FE)"
+          },
+          {
+            "type": "heading",
+            "line": 49,
+            "title": "4.3.1. Loading и таймауты (обязательно, если есть FE)"
+          },
+          {
+            "type": "heading",
+            "line": 52,
+            "title": "4.4. Доступ по ролям в UI"
+          },
+          {
+            "type": "heading",
+            "line": 56,
+            "title": "5.1. Синхронность, кэш, производительность"
+          },
+          {
+            "type": "heading",
+            "line": 62,
+            "title": "5.3. Безопасность/доступ (сводно)"
+          },
+          {
+            "type": "heading",
+            "line": 74,
+            "title": "6.3. Фиче-флаги"
+          },
+          {
+            "type": "heading",
+            "line": 80,
+            "title": "6.5. Преднастройка до релиза (чек-лист — каждый пункт: заполни или «не применимо: причина»)"
+          },
+          {
+            "type": "body",
+            "line": 92,
+            "text": "**Унаследовано из БТ (бизнес-пробелы):** не применимо: источник — запрос на правку."
+          },
+          {
+            "type": "body",
+            "line": 92,
+            "text": "**Приложения из БТ:** не применимо: источник — запрос на правку."
+          }
+        ],
+        "fr": true,
+        "restoredFlag": true,
+        "pass": false
+      }
+    ]
+  }
+]
