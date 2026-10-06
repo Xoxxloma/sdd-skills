@@ -43,6 +43,47 @@ const sameMap = (a, b) => {
 }
 const fmtMap = (m) => Object.entries(m || {}).filter(([, v]) => v).map(([k, v]) => `${k} ${v}`).join(', ') || '—'
 
+// Файл плана для check.sh (пятый аргумент plan.sh) — тот же план, что в stdout, строками через табуляцию:
+// итог = «к сверке» (а без тестов — «итог по классам») по ключам; сумма пометок по файлам = итог;
+// ожидания частей = ключ-классы строк «часть NN»; хозяин файла — часть, чьи пути его покрывают.
+export function checkPlanTsv (out) {
+  const res = []
+  const add = (check, ok, detail) => res.push({ check: `файл плана: ${check}`, status: ok ? 'ok' : 'ОШИБКА', detail: ok ? '' : detail })
+  if (out.tsv === null) return [{ check: 'файл плана', status: 'не измерено', detail: 'файла нет' }]
+  const rows = out.tsv.split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'))
+  if (out.rc !== 0) { add('при отказе пуст', rows.length === 0, `строк ${rows.length}`); return res }
+  const P = parsePlan(out.stdout)
+  const itog = {}; const parts = {}; const files = []
+  let bad = 0
+  for (const r of rows) {
+    if (r[0] === 'итог' && r.length === 3) itog[r[1]] = (itog[r[1]] ?? 0) + num(r[2])
+    else if (r[0] === 'часть' && r.length === 4) (parts[r[1]] ??= {})[r[2]] = num(r[3])
+    else if (r[0] === 'файл' && r.length === 5) files.push({ path: r[1], cl: r[2], n: num(r[3]), nn: r[4] })
+    else bad++
+  }
+  add('строки по форме', bad === 0, `не по форме: ${bad}`)
+  const want = (P.sverka ?? P.itog)?.ключ ?? {}
+  if (P.outside === null) add('итог = итог плана по ключам', sameMap(itog, want), `файл ${fmtMap(itog)}; stdout ${fmtMap(want)}`)
+  else add('итог без путей вне корней — не больше итога плана', Object.entries(itog).every(([k, v]) => v <= (want[k] ?? 0)), `файл ${fmtMap(itog)}; stdout ${fmtMap(want)}`)
+  const byFile = {}
+  for (const f of files) byFile[f.cl] = (byFile[f.cl] ?? 0) + f.n
+  add('сумма по файлам = итог', sameMap(byFile, itog), `по файлам ${fmtMap(byFile)}; итог ${fmtMap(itog)}`)
+  const fromOut = {}
+  for (const p of P.parts) fromOut[String(p.nn).padStart(2, '0')] = Object.fromEntries(Object.entries(p.cls).filter(([k]) => !k.startsWith('ориентир')))
+  const nns = [...new Set([...Object.keys(fromOut), ...Object.keys(parts)])].sort()
+  const badParts = nns.filter((nn) => !sameMap(parts[nn], fromOut[nn]))
+  add('ожидания частей = классы строк «часть NN»', badParts.length === 0, badParts.slice(0, 3).map((nn) => `часть ${nn}: файл ${fmtMap(parts[nn])}; stdout ${fmtMap(fromOut[nn])}`).join(' | '))
+  const wrong = []
+  for (const f of files) {
+    if (!P.parts.length) { if (f.nn !== '-') wrong.push(`${f.path} → ${f.nn} без частей`); continue }
+    const part = P.parts.find((p) => String(p.nn).padStart(2, '0') === f.nn)
+    const cf = canon(f.path)
+    if (!part || !part.paths.some((q) => { const cq = canon(q); return cf === cq || cf.startsWith(cq + '/') })) wrong.push(`${f.path} → ${f.nn}`)
+  }
+  add('хозяин файла — часть, чьи пути его покрывают', wrong.length === 0, wrong.slice(0, 3).join('; '))
+  return res
+}
+
 // часть → каноническая строка: вид | пути (Ri:rel, сортированы) | вес | ключ-классы
 const partSig = (p, keyClasses) => {
   const cls = Object.entries(p.cls || {}).filter(([k, v]) => v && (!keyClasses || keyClasses.includes(k))).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, v]) => `${k}=${v}`).join(',')

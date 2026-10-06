@@ -36,11 +36,17 @@ export function parseOutput(text) {
   let inTotals = false;
   let lastGuard = null;
   let inCand = false;
+  let inMark = false;
+  let inOut = false;
   let curCand = null;
   for (const line of text.split(/\r?\n/)) {
     if (line.startsWith('== ')) {
       inTotals = false;
       inCand = line.startsWith('== КАНДИДАТЫ');
+      inMark = line.startsWith('== МАРКЕРЫ');
+      inOut = line.startsWith('== ИСХОД');
+      if (inOut) r['исход'] = { 'добор': {} };
+      if (inMark) r['маркеры'] = { 'классы': {}, 'дефицит': [] };
       if (inCand) r['кандидаты'] = {};
       if (line.startsWith('== ГАРД')) r['гард'] = {};
       continue;
@@ -80,6 +86,27 @@ export function parseOutput(text) {
       }
       continue;
     }
+    if (inOut) {
+      const O = r['исход'];
+      let m;
+      if ((m = line.match(/^маркеры: (.*)$/))) O['маркеры'] = m[1].trim();
+      else if ((m = line.match(/^доставка тела: (.*)$/))) O['тело'] = m[1].trim();
+      else if ((m = line.match(/^гард: (.*)$/))) O['гард'] = m[1].trim();
+      else if ((m = line.match(/^ИСХОД: (.*)$/))) O['исход'] = m[1].trim();
+      else if ((m = line.match(/^ДОБОР (.+?): (\d+)/))) O['добор'][m[1]] = +m[2];
+      continue;
+    }
+    if (inMark) {
+      const M = r['маркеры'];
+      let m;
+      if ((m = line.match(/^маркеры (.+?): в карточке (\d+), пометок (\d+) — (пройден|НЕ ПРОЙДЕН)(.*)$/))) M['классы'][m[1]] = `${m[2]}/${m[3]} ${m[4] === 'пройден' ? 'пройден' : 'не пройден'}${/маркер видит/.test(m[5]) ? ', вдвое' : ''}`;
+      else if ((m = line.match(/^маркеры (.+?): (?:в карточке такого класса нет|файла части нет)/))) M['классы'][m[1]] = 'нет класса';
+      else if ((m = line.match(/^МАРКЕРНЫЙ ГЕЙТ: (.*)$/))) M['гейт'] = m[1].trim();
+      else if (/^плана нет или он пуст/.test(line)) M['гейт'] = 'плана нет';
+      else if ((m = line.match(/^по файлам: файлов с пометками (\d+), ключей в описи меньше пометок — (\d+)/))) M['файлов'] = `${m[1]}/${m[2]}`;
+      else if ((m = line.match(/^ {4}(\S.*) \(часть (\S+)\): пометок (\d+), ключей (\d+)$/))) M['дефицит'].push(`${m[1].split('/').pop()}(${m[2]}) ${m[3]}/${m[4]}`);
+      continue;
+    }
     if (inTotals) {
       if (/^\s+⟹/.test(line)) { r['опись']['итоги'].push(line.trim()); continue; }
       inTotals = false;
@@ -113,6 +140,8 @@ export function parseOutput(text) {
       lists.push({ label: 'факт, пустой блок', n: +m[1], items: m[2] });
     } else if ((m = line.match(/^перечень добора: ключ описи с источником без блока (\d+), ключ с блоком без источника (\d+), факт в описи — блок пуст (\d+), один ключ дважды (\d+)/))) {
       r['сверка']['добор'] = `${m[1]}/${m[2]}/${m[3]}/${m[4]}`;
+    } else if ((m = line.match(/^ключи REST без общего префикса \S+: (\d+)/))) {
+      r['черновик']['без префикса'] = +m[1];
     } else if ((m = line.match(/^ключи карточки по классам: контракт (\d+), сущности (\d+), задачи (\d+), топики (\d+), экраны (\d+)/))) {
       r['черновик']['ключи'] = { 'контракт': +m[1], 'сущности': +m[2], 'задачи': +m[3], 'топики': +m[4], 'экраны': +m[5] };
     } else if ((m = line.match(/^опись по классам[^:]*:\s*(.*)$/))) {
@@ -248,6 +277,19 @@ function flatten(r) {
   const out = new Map();
   const D = r['черновик'] ?? {};
   for (const k of ['контракт', 'сущности', 'задачи', 'топики', 'бизнес', 'таблицы']) if (k in D) out.set(`черновик.${k}`, D[k].join('/'));
+  if ('без префикса' in D) out.set('черновик.без префикса', String(D['без префикса']));
+  const MK = r['маркеры'];
+  if (MK) {
+    if ('гейт' in MK) out.set('маркеры.гейт', MK['гейт']);
+    out.set('маркеры.классы', Object.entries(MK['классы'] ?? {}).sort(([a], [b]) => a.localeCompare(b, 'ru')).map(([k, v]) => `${k} ${v}`).join('; ') || '—');
+    if ('файлов' in MK) out.set('маркеры.по файлам', `${MK['файлов']}: ${[...(MK['дефицит'] ?? [])].sort().join(', ') || '—'}`);
+  }
+  const OUT = r['исход'];
+  if (OUT) {
+    for (const k of ['маркеры', 'тело', 'гард']) if (k in OUT) out.set(`исход.${k}`, OUT[k]);
+    if ('исход' in OUT) out.set('исход', OUT['исход']);
+    out.set('исход.добор', Object.entries(OUT['добор'] ?? {}).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, v]) => `${k} ${v}`).join('; ') || 'пусто');
+  }
   if ('ключи' in D) out.set('черновик.ключи', ['контракт', 'сущности', 'задачи', 'топики', 'экраны'].map((c) => `${c} ${D['ключи'][c] ?? 0}`).join(', '));
   const O = r['опись'] ?? {};
   if ('ключей' in O) out.set('опись.ключей', String(O['ключей']));
@@ -332,7 +374,8 @@ const files = (n) => {
   const d = path.join(casesDir, n);
   const prev = path.join(d, 'prev.md');
   const work = path.join(d, '.work', 'draft.md');
-  return [path.join(d, 'opis.md'), fs.existsSync(work) ? work : path.join(d, 'draft.md'), fs.existsSync(prev) ? prev : null];
+  const env = path.join(d, 'env');
+  return [path.join(d, 'opis.md'), fs.existsSync(work) ? work : path.join(d, 'draft.md'), fs.existsSync(prev) ? prev : null, fs.existsSync(env) ? env : null];
 };
 const stats = { 1: [0, 0], 2: [0, 0], 3: [0, 0] }; // [случаев, с расхождением]
 

@@ -3,6 +3,10 @@
 #
 #   bash check.sh <опись> <черновик> [<прежняя карточка>]
 #   CHECK_LISTS=<файл> — туда пишется перечень добора целиком, без обрезки на 40 именах.
+#   CHECK_PLAN=<plan.tsv> — файл плана от plan.sh (пятый аргумент): вердикт маркерного гейта и сверка
+#     «пометки файла ↔ ключи описи».
+#   CHECK_PARTS=<папка частей> — нарезанный сервис: гейт ещё и по каждой части, перечень добора по авторам.
+#   CHECK_PREFIX=<префикс> — общий префикс пути от разведчика: ключи REST без него — в перечень добора.
 #
 # Печатает: состав черновика по секциям и ключи карточки по классам (для маркерного гейта); ключи
 # описи и строки без файла-источника; сверку «опись → черновик» поключево — справку и перечень
@@ -37,6 +41,7 @@ parse_card() {
       if (sec ~ /^## Роли и доступ/) return "роли"
       if (sec ~ /^## Зависит от/) return "зависит"
       if (sec ~ /^## Потребляемые API/) return "потребляет"
+      if (sec ~ /^## Состояние и данные/) return "состояние"   # фронт: что хранится — пара строкам описи
       return ""
     }
     function flush() { if (key != "") print c "\t" key "\t" body; key = ""; body = 0 }
@@ -44,14 +49,14 @@ parse_card() {
     /^## / { flush(); sec = $0; c = cls(sec); hdr = 0; next }
     /^### / {
       flush()
-      if (c == "" || c == "экраны" || c == "роли" || c == "зависит" || c == "потребляет") next
+      if (c == "" || c == "экраны" || c == "роли" || c == "зависит" || c == "потребляет" || c == "состояние") next
       h = substr($0, 5)
       p = index(h, " — "); if (p > 0) h = substr(h, 1, p - 1)
       key = norm(h); body = 0; next
     }
     /^- / { if (key != "") body++; next }
     /^\|/ {
-      if (c != "экраны" && c != "роли" && c != "зависит" && c != "потребляет") next
+      if (c != "экраны" && c != "роли" && c != "зависит" && c != "потребляет" && c != "состояние") next
       if ($0 ~ /^\|[ \t:|-]*$/) { hdr = 1; next }       # строка-разделитель |---|
       if (!hdr) next                                    # строка заголовка таблицы
       n = split($0, cell, "|")
@@ -135,6 +140,17 @@ awk -F'\t' 'BEGIN{OFS="\t"} $1=="бизнес" { k=$2; if (k !~ /^(сообще�
 list() {  # list <файл со строками> — печать до 40 имён через «; »
   awk 'NR<=40{printf "%s%s", (NR>1?"; ":""), $0} END{if (NR>40) printf "; …и ещё %d", NR-40; print ""}' "$1"
 }
+title() {  # title <вид пункта перечня добора> — заголовок раздела перечня
+  case "$1" in
+    ADD) echo 'ключ описи с источником — блока в карточке нет' ;;
+    NOSRC) echo 'блок в карточке есть, у ключа описи нет файла-источника — назвать файл либо убрать ключ из обоих файлов' ;;
+    EMPTY) echo 'факт в описи — блок пуст' ;;
+    DUP) echo 'один ключ двумя блоками' ;;
+    nometh) echo 'ключ контракта без метода' ;;
+    NOPFX) echo 'ключ REST без общего префикса — поправь путь; вне префикса — только с источником, где ручка зарегистрирована' ;;
+    MARKFILE) echo 'в файле пометок больше, чем ключей описи с этим источником — найди недостающие ключи в файле' ;;
+  esac
+}
 
 echo "== ЧЕРНОВИК $(basename "$DRAFT")"
 awk -F'\t' '
@@ -151,17 +167,38 @@ awk -F'\t' '
 # Ключи карточки по классам — число для маркерного гейта, мимо описи. Повтор ключа не считается;
 # ключ контракта вызовом («query task(id)») при том же ключе без скобок — тот же ключ, а перегрузки
 # с разными аргументами без голого ключа — разные.
-awk -F'\t' '
-  function nop(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
-  $1 ~ /^(контракт|сущности|задачи|топики|экраны)$/ { cl[++m] = $1; ky[m] = $2; have[$1 SUBSEP $2] = 1 }
-  END {
-    for (i = 1; i <= m; i++) {
-      k = ky[i]; if (cl[i] == "контракт" && nop(k) != k && ((cl[i] SUBSEP nop(k)) in have)) continue
-      if ((cl[i] SUBSEP k) in seen) continue
-      seen[cl[i] SUBSEP k] = 1; n[cl[i]]++
-    }
-    printf "ключи карточки по классам: контракт %d, сущности %d, задачи %d, топики %d, экраны %d\n", n["контракт"], n["сущности"], n["задачи"], n["топики"], n["экраны"]
-  }' "$TMP/draft.k"
+count_keys() {  # count_keys <разбор карточки> → строки «класс<TAB>число»
+  awk -F'\t' '
+    function nop(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
+    $1 ~ /^(контракт|сущности|задачи|топики|экраны)$/ { cl[++m] = $1; ky[m] = $2; have[$1 SUBSEP $2] = 1 }
+    END {
+      for (i = 1; i <= m; i++) {
+        k = ky[i]; if (cl[i] == "контракт" && nop(k) != k && ((cl[i] SUBSEP nop(k)) in have)) continue
+        if ((cl[i] SUBSEP k) in seen) continue
+        seen[cl[i] SUBSEP k] = 1; n[cl[i]]++
+      }
+      split("контракт сущности задачи топики экраны", L, " ")
+      for (i = 1; i <= 5; i++) print L[i] "\t" n[L[i]] + 0
+    }' "$1"
+}
+count_keys "$TMP/draft.k" > "$TMP/cardn"
+awk -F'\t' '{ printf "%s%s %d", (NR > 1 ? ", " : "ключи карточки по классам: "), $1, $2 } END { print "" }' "$TMP/cardn"
+# Папка частей (нарезанный сервис): ключи карточки каждой части — для её маркерного гейта; кто автор
+# блока и ключа описи — для перечня добора по авторам. Голова — автор своих секций.
+: > "$TMP/partn"; : > "$TMP/own.card"; : > "$TMP/own.opis"
+if [ -n "${CHECK_PARTS:-}" ]; then
+  [ -d "$CHECK_PARTS" ] || { echo "НЕТ ПАПКИ ЧАСТЕЙ: $CHECK_PARTS"; exit 2; }
+  for f in "$CHECK_PARTS"/part-*.md "$CHECK_PARTS"/head.md; do
+    case "$f" in *.opis.md) continue ;; esac
+    [ -f "$f" ] || continue
+    a=$(basename "$f" .md); a=${a#part-}; [ "$a" = head ] && a=голова
+    parse_card "$f" | awk -F'\t' 'BEGIN{OFS="\t"} $1=="бизнес" { k=$2; if (k !~ /^(сообщение|ограничение) /) k="объект " k; $2=k } {print}' > "$TMP/pc"
+    awk -F'\t' -v a="$a" '{ print $2 "\t" a }' "$TMP/pc" >> "$TMP/own.card"
+    [ "$a" = голова ] || count_keys "$TMP/pc" | awk -v a="$a" '{ print a "\t" $0 }' >> "$TMP/partn"
+    o="${f%.md}.opis.md"
+    [ -f "$o" ] && parse_opis "$o" | awk -F'\t' -v a="$a" '{ print $1 "\t" a }' >> "$TMP/own.opis"
+  done
+fi
 # Границы секций — номера строк: проверка внутри секции делается грепом с -n по всему файлу.
 printf 'границы секций: '
 awk 'BEGIN { BINMODE = 3 } { sub(/\r$/, "") } /^## / { if (s != "") printf "%s %d–%d; ", s, a, NR - 1; s = substr($0, 4); a = NR } END { if (s != "") printf "%s %d–%d\n", s, a, NR; else print "нет" }' "$DRAFT"
@@ -169,6 +206,15 @@ awk 'BEGIN { BINMODE = 3 } { sub(/\r$/, "") } /^## / { if (s != "") printf "%s %
 awk -F'\t' '$1 == "контракт" && $2 !~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) / && $2 !~ /^(query|mutation|subscription) / && $2 !~ /^[A-Za-z_][A-Za-z0-9_.]*[.\/][A-Za-z_][A-Za-z0-9_]*$/ { print $2 }' \
   "$TMP/draft.k" > "$TMP/nometh"
 printf 'ключи контракта без метода: %d' "$(wc -l < "$TMP/nometh")"; [ -s "$TMP/nometh" ] && { printf ' — '; list "$TMP/nometh"; } || echo
+# Общий префикс от разведчика стоит в каждом пути ключа REST; ключ без него — форма записи либо ручка
+# вне префикса, и тогда это видно по коду регистрации. Решает читающий по источнику, а не ты.
+: > "$TMP/NOPFX"
+PFX="${CHECK_PREFIX:-}"; PFX="${PFX%/}"; [ -z "$PFX" ] || PFX="/${PFX#/}"   # «api» из кода — тот же префикс, что «/api»
+if [ -n "$PFX" ]; then
+  awk -F'\t' -v p="$PFX" '$1 == "контракт" && $2 ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) / { s = $2; sub(/^[A-Z]+ /, "", s); if (s != p && index(s, p "/") != 1) print $2 }' \
+    "$TMP/draft.k" | sort -u > "$TMP/NOPFX"
+  printf 'ключи REST без общего префикса %s: %d' "$PFX" "$(wc -l < "$TMP/NOPFX")"; [ -s "$TMP/NOPFX" ] && { printf ' — '; list "$TMP/NOPFX"; } || echo
+fi
 
 echo "== ОПИСЬ $(basename "$OPIS")"
 awk -F'\t' '{ n++; if ($3 == 0) ns++; if ($1 ~ /^объект /) o++; else if ($1 ~ /^сообщение /) m++; else if ($1 ~ /^ограничение /) r++ }
@@ -176,6 +222,72 @@ awk -F'\t' '{ n++; if ($3 == 0) ns++; if ($1 ~ /^объект /) o++; else if ($
 awk -F'\t' '$3 == 0 { print $1 }' "$TMP/opis" > "$TMP/nosrc"
 printf 'строк без файла-источника: %d' "$(wc -l < "$TMP/nosrc")"; [ -s "$TMP/nosrc" ] && { printf ' — '; list "$TMP/nosrc"; } || echo
 echo "итоги описи:"; grep -E '^⟹' "$OPIS" | sed 's/\r$//; s/^/  /'
+
+# Маркеры по плану: вердикт гейта — ключи карточки против пометок `ключ` по сервису, а с папкой частей и
+# по каждой части; сверка по файлам — сколько ключей описи ссылается на файл с пометками (путь описи
+# сравнивается с путём плана по хвосту). Ключей в описи меньше пометок файла — добор той части, которой
+# файл отдан; запись это не останавливает. Итог гейта уходит в «ИСХОД».
+: > "$TMP/MARKFILE"; : > "$TMP/markgate"
+if [ -n "${CHECK_PLAN:-}" ]; then
+  echo "== МАРКЕРЫ по $(basename "$CHECK_PLAN")"
+  if [ ! -s "$CHECK_PLAN" ]; then echo "плана нет или он пуст — вердикта маркеров нет"
+  else
+    awk -F'\t' -v cardn="$TMP/cardn" -v partn="$TMP/partn" -v parts="${CHECK_PARTS:+1}" -v deff="$TMP/MARKFILE" -v gatef="$TMP/markgate" '
+      BEGIN {
+        while ((getline l < cardn) > 0) { split(l, a, "\t"); card[a[1]] = a[2] + 0 }
+        while ((getline l < partn) > 0) { split(l, a, "\t"); pcard[a[1], a[2]] = a[3] + 0; haspart[a[1]] = 1 }
+      }
+      function verdict(who, gw, c, g, e) {
+        if (2 * g < e) { printf "маркеры %s%s: в карточке %d, пометок %d — НЕ ПРОЙДЕН: меньше половины\n", who, c, g, e; bad = bad (bad == "" ? "" : "; ") gw c " " g " из " e }
+        else if (g > 2 * e) printf "маркеры %s%s: в карточке %d, пометок %d — пройден; маркер видит %d из %d по карточке — внешней сверки по классу нет\n", who, c, g, e, e, g
+        else printf "маркеры %s%s: в карточке %d, пометок %d — пройден\n", who, c, g, e
+      }
+      FILENAME == ARGV[1] {
+        sub(/\r$/, "")
+        if ($1 == "итог") { if (!($2 in want)) cls[++nc] = $2; want[$2] += $3 }
+        if ($1 == "часть") { if (!(($2, $3) in pwant)) pl[++np] = $2 SUBSEP $3; pwant[$2, $3] += $4 }
+        if ($1 == "файл") { if (!($2 in fn)) { fo[++nf] = $2; own[$2] = $5 }; fn[$2] += $4 }
+        next
+      }
+      { sub(/\r$/, "") }
+      /^[ \t]/ || /^(#|⟹|\(|>|-|```|<!--)/ || /^$/ { next }
+      {
+        p = index($0, " — "); if (p == 0) next
+        rest = substr($0, p + 5); gsub(/[+,;]/, " ", rest); n = split(rest, w, " ")
+        delete seen
+        for (i = 1; i <= n; i++) {
+          t = w[i]; gsub(/[`()]/, "", t); gsub(/\\/, "/", t); sub(/^\.\//, "", t)
+          if (t !~ /\// && t !~ /\.[A-Za-z0-9]+$/) continue
+          if (!(t in seen)) { seen[t] = 1; tok[t]++ }
+        }
+      }
+      END {
+        for (i = 1; i <= nc; i++) {
+          c = cls[i]
+          if (!(c in card)) { printf "маркеры %s: в карточке такого класса нет — сверки нет\n", c; continue }
+          verdict("", "", c, card[c], want[c])
+        }
+        if (parts) for (i = 1; i <= np; i++) {
+          split(pl[i], q, SUBSEP); nn = q[1]; c = q[2]
+          if (!(nn in haspart)) { printf "маркеры части %s, %s: файла части нет — сверки нет\n", nn, c; continue }
+          if (!((nn, c) in pcard)) { printf "маркеры части %s, %s: в карточке такого класса нет — сверки нет\n", nn, c; continue }
+          verdict("части " nn ", ", "часть " nn ", ", c, pcard[nn, c], pwant[nn, c])
+        }
+        gate = (nc == 0 && !(parts && np)) ? "пометок-ключей в плане нет — гейта нет" : (bad == "" ? "пройден" : "НЕ ПРОЙДЕН — " bad)
+        print "МАРКЕРНЫЙ ГЕЙТ: " gate; print gate > gatef
+        nd = 0
+        for (i = 1; i <= nf; i++) {
+          f = fo[i]; m = 0
+          for (t in tok) if (f == t || (length(f) > length(t) && substr(f, length(f) - length(t)) == "/" t)) m += tok[t]
+          if (m < fn[f]) { nd++; line[nd] = f " (часть " own[f] "): пометок " fn[f] ", ключей " m; print line[nd] > deff }
+        }
+        printf "по файлам: файлов с пометками %d, ключей в описи меньше пометок — %d\n", nf, nd
+        for (i = 1; i <= nd && i <= 15; i++) print "    " line[i]
+        if (nd > 15) printf "    …и ещё %d\n", nd - 15
+      }
+' "$CHECK_PLAN" "$OPIS"
+  fi
+fi
 
 # Сверка поключево. Ключ описи найден, если совпал с ключом черновика целиком или своим хвостом после
 # последней точки (роли: «UserRole.OWNER» ↔ «OWNER»). Оставшиеся без пары сводятся ещё раз — без хвоста
@@ -212,10 +324,10 @@ awk -F'\t' '
       if (hit == "") { print "MISS\t" k; if (sc[i] == 1) print "MISSRC\t" k; print "CLS\tбез пары"; continue }
       print "CLS\t" cl[hit]
       if (sc[i] == 0) print "NOSRCPAIR\t" k
-      if (fc[i] > 0 && d[hit] == 0 && cl[hit] != "экраны" && cl[hit] != "роли" && cl[hit] != "зависит" && cl[hit] != "потребляет") print "EMPTY\t" k
+      if (fc[i] > 0 && d[hit] == 0 && cl[hit] != "экраны" && cl[hit] != "роли" && cl[hit] != "зависит" && cl[hit] != "потребляет" && cl[hit] != "состояние") print "EMPTY\t" k
       if (fc[i] == 0 && d[hit] == 0 && (cl[hit] == "контракт" || cl[hit] == "задачи" || cl[hit] == "топики")) print "NOFACT\t" cl[hit] ": " k
     }
-    for (k in d) if (!(k in used) && cl[k] != "зависит" && cl[k] != "потребляет") print "EXTRA\t" cl[k] ": " k
+    for (k in d) if (!(k in used) && cl[k] != "зависит" && cl[k] != "потребляет" && cl[k] != "состояние") print "EXTRA\t" cl[k] ": " k
   }
 ' "$TMP/draft.k" "$TMP/opis" > "$TMP/join"
 for t in MISS MISSRC NOSRCPAIR EXTRA EMPTY DUP NOFACT; do grep "^$t	" "$TMP/join" | cut -f2- | sort > "$TMP/$t"; done
@@ -232,8 +344,8 @@ grep -v -E '^(объект|сообщение|ограничение) ' "$TMP/NO
 printf 'перечень добора: ключ описи с источником без блока %d, ключ с блоком без источника %d, факт в описи — блок пуст %d, один ключ дважды %d\n' \
   "$(wc -l < "$TMP/ADD")" "$(wc -l < "$TMP/NOSRC")" "$(wc -l < "$TMP/EMPTY")" "$(wc -l < "$TMP/DUP")"
 if [ -n "${CHECK_LISTS:-}" ]; then
-  { for t in 'ADD:ключ описи с источником — блока в карточке нет' 'NOSRC:блок в карточке есть, у ключа описи нет файла-источника — назвать файл либо убрать ключ из обоих файлов' 'EMPTY:факт в описи — блок пуст' 'DUP:один ключ двумя блоками' 'nometh:ключ контракта без метода'; do
-      echo "## ${t#*:}"; cat "$TMP/${t%%:*}"; echo; done; } > "$CHECK_LISTS" && echo "перечень добора целиком: $CHECK_LISTS"
+  L="ADD NOSRC EMPTY DUP nometh"; [ -n "$PFX" ] && L="$L NOPFX"; [ -n "${CHECK_PLAN:-}" ] && L="$L MARKFILE"
+  { for t in $L; do echo "## $(title "$t")"; cat "$TMP/$t"; echo; done; } > "$CHECK_LISTS" && echo "перечень добора целиком: $CHECK_LISTS"
 fi
 printf 'опись по классам (класс — по паре в черновике): '
 grep "^CLS	" "$TMP/join" | cut -f2 | sort | uniq -c | awk '{n=$1; $1=""; sub(/^ /,""); printf "%s%s %d", (NR>1?", ":""), $0, n} END{print ""}'
@@ -346,8 +458,8 @@ awk -v names="$TMP/mnames" -v man="$([ -s "$TMP/mnames" ] && echo "$MAN" || echo
   }
 ' "$DRAFT"
 
-[ -n "$PREV" ] || exit 0
-
+ROUTE=""
+if [ -n "$PREV" ]; then
 echo "== ГАРД (прежняя $(basename "$PREV"))"
 parse_card "$PREV" > "$TMP/prev"
 ROUTE=ПОВЕРХ
@@ -369,3 +481,63 @@ for c in контракт сущности задачи топики экран�
   fi
 done
 echo "МАРШРУТ: $ROUTE"
+fi
+
+# Исход — гейты сводит скрипт, а не ведущий: маркеры (по сервису и частям), доставка тела контракта
+# (тело меньше чем у половины блоков — не доехало), гард. «Гейт не пройден» — добор, пока бюджет
+# есть; без бюджета — по SKILL.md. Перечень добора — по авторам: часть, голова; у одиночного — читающий.
+echo "== ИСХОД"
+MG="$(cat "$TMP/markgate" 2>/dev/null)"; [ -n "$MG" ] || MG="плана нет — сверки маркеров нет"
+echo "маркеры: $MG"
+set -- $(awk -F'\t' '$1 == "контракт" { n++; if ($3 > 0) b++ } END { print n + 0, b + 0 }' "$TMP/draft.k")
+NB=$1; BB=$2; BF=""
+if [ "$NB" -eq 0 ]; then echo "доставка тела: блоков контракта нет — сверки нет"
+elif [ $((2 * BB)) -lt "$NB" ]; then BF="тело у $BB из $NB блоков контракта"; echo "доставка тела: НЕ ПРОЙДЕН — $BF, меньше половины"
+else echo "доставка тела: пройден — тело у $BB из $NB блоков контракта"; fi
+echo "гард: ${ROUTE:-прежней карточки нет}"
+FAIL=""
+case "$MG" in "НЕ ПРОЙДЕН"*) FAIL="маркеры: ${MG#НЕ ПРОЙДЕН — }" ;; esac
+[ -n "$BF" ] && FAIL="${FAIL:+$FAIL; }$BF"
+if [ -n "$FAIL" ]; then echo "ИСХОД: гейт не пройден — $FAIL"
+elif [ "$ROUTE" = "В _pending" ]; then echo "ИСХОД: в _pending — гард"
+elif [ -n "$ROUTE" ]; then echo "ИСХОД: записать поверх"
+else echo "ИСХОД: записать"; fi
+{ for t in ADD NOSRC EMPTY DUP nometh NOPFX MARKFILE; do awk -v t="$t" '{ print t "\t" $0 }' "$TMP/$t"; done; } > "$TMP/items"
+awk -F'\t' -v parts="${CHECK_PARTS:+1}" -v oo="$TMP/own.opis" -v oc="$TMP/own.card" '
+  function nop(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
+  function look(arr, k) { if (k in arr) return arr[k]; if (nop(k) in arr) return arr[nop(k)]; return "" }
+  BEGIN {
+    while ((getline l < oo) > 0) { split(l, x, "\t"); if (!((x[1], x[2]) in so)) { so[x[1], x[2]] = 1; op[x[1]] = op[x[1]] (op[x[1]] == "" ? "" : ",") x[2] } }
+    while ((getline l < oc) > 0) { split(l, x, "\t"); if (!((x[1], x[2]) in sc)) { sc[x[1], x[2]] = 1; cp[x[1]] = cp[x[1]] (cp[x[1]] == "" ? "" : ",") x[2] } }
+  }
+  {
+    t = $1; k = $2
+    if (!parts) a = "читающий"
+    else if (t == "MARKFILE") { a = k; sub(/.*\(часть /, "", a); sub(/\).*/, "", a) }
+    else if (t == "DUP") { split(k, d, " ~ "); a = look(cp, d[1]); b = look(cp, d[2]); a = a (a != "" && b != "" ? "," : "") b }
+    else if (t == "ADD" || t == "NOSRC" || t == "EMPTY") { a = look(op, k); if (a == "") a = look(cp, k) }
+    else { a = look(cp, k); if (a == "") a = look(op, k) }
+    if (a == "") a = "без хозяина"
+    n = split(a, as, ","); delete done
+    for (i = 1; i <= n; i++) if (!(as[i] in done)) { done[as[i]] = 1; print as[i] "\t" t "\t" k }
+  }' "$TMP/items" > "$TMP/routed"
+if [ -s "$TMP/routed" ]; then
+  cut -f1 "$TMP/routed" | sort -u > "$TMP/authors"
+  while IFS= read -r a; do
+    n=$(awk -F'\t' -v a="$a" '$1 == a' "$TMP/routed" | wc -l | tr -d ' ')
+    label="$a"; case "$a" in [0-9]*) label="часть $a" ;; esac
+    file=""
+    if [ -n "${CHECK_LISTS:-}" ]; then
+      if [ -z "${CHECK_PARTS:-}" ]; then file="$CHECK_LISTS"
+      else
+        id="$a"; case "$a" in голова) id=head ;; "без хозяина") id=none ;; esac
+        file="${CHECK_LISTS%.md}-$id.md"
+        { for t in ADD NOSRC EMPTY DUP nometh NOPFX MARKFILE; do
+            awk -F'\t' -v a="$a" -v t="$t" '$1 == a && $2 == t { print $3 }' "$TMP/routed" > "$TMP/one"
+            [ -s "$TMP/one" ] && { echo "## $(title "$t")"; cat "$TMP/one"; echo; }
+          done; } > "$file"
+      fi
+    fi
+    echo "ДОБОР $label: $n${file:+ — $file}"
+  done < "$TMP/authors"
+else echo "ДОБОР: пусто"; fi

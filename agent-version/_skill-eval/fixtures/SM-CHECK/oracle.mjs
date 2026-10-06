@@ -67,6 +67,7 @@ const TABLE_SECTIONS = {
   'Роли и доступ': 'роли',
   'Зависит от': 'зависит',
   'Потребляемые API': 'api',
+  'Состояние и данные': 'состояние',   // фронт: что хранится — пара строкам описи, в «нет в описи» не идёт
 };
 
 function cells(line) {
@@ -86,7 +87,7 @@ const roleKey = (c) => headKey(c[0]);
 
 export function parseCard(text) {
   const blocks = { контракт: [], сущности: [], задачи: [], топики: [], бизнес: [] };
-  const rawRows = { экраны: [], роли: [], зависит: [], api: [] };
+  const rawRows = { экраны: [], роли: [], зависит: [], api: [], состояние: [] };
   let sec = null;
   let cur = null;
   for (const line of splitLines(text)) {
@@ -261,6 +262,7 @@ export function analyze(opisText, draftText, prevText) {
   for (const c of d.tables.роли) add('роли', roleKey(c));
   for (const c of d.tables.api) add('потребляет', norm(c[1] ?? ''));
   for (const c of d.tables.зависит) add('зависит', norm(c[0]));
+  for (const c of d.tables.состояние ?? []) add('состояние', norm(c[0]));
 
   // Пара ключу описи: точная; иначе — без хвоста параметров запроса («…/filter?field=x» ↔ «…/filter»),
   // и только среди ключей черновика, оставшихся без точной пары: «?action=list» и «?action=delete»
@@ -290,11 +292,12 @@ export function analyze(opisText, draftText, prevText) {
   const byClass = {};
   let missingInDraft = 0;
   let factEmpty = 0;
+  const emptyList = [];
   for (const [k, v] of o.keys) {
     const e = pair.has(k) ? idx.get(pair.get(k)) : undefined;
     if (!e) { missingInDraft++; byClass['без пары'] = (byClass['без пары'] ?? 0) + 1; continue; }
     byClass[e.cls] = (byClass[e.cls] ?? 0) + 1;
-    if (v.fact && e.blocks.length > 0 && e.blocks.every((b) => !b.body)) factEmpty++;
+    if (v.fact && e.blocks.length > 0 && e.blocks.every((b) => !b.body)) { factEmpty++; emptyList.push(k); }
   }
   let missingInOpis = 0;
   for (const set of Object.values(classKeys)) for (const k of set) if (!taken.has(k)) missingInOpis++;
@@ -321,6 +324,15 @@ export function analyze(opisText, draftText, prevText) {
     cardKeys[c] = [...set].filter((k) => !(c === 'контракт' && nop(k) !== k && set.has(nop(k)))).length;
   }
   draft['ключи'] = cardKeys;
+  // пункты перечня добора списками — для раскладки по авторам (не поле сравнения)
+  const METH = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) |^(query|mutation|subscription) |^[A-Za-z_][A-Za-z0-9_.]*[.\/][A-Za-z_][A-Za-z0-9_]*$/;
+  const items = {
+    ADD: [...o.keys].filter(([k, v]) => !pair.has(k) && v.kind === 'other' && !nofile.has(k)).map(([k]) => [k]),
+    NOSRC: [...o.keys].filter(([k, v]) => pair.has(k) && v.kind === 'other' && nofile.has(k)).map(([k]) => [k]),
+    EMPTY: emptyList.map((k) => [k]),
+    DUP: [...idx].filter(([k, e]) => e.cls === 'контракт' && nop(k) !== k && idx.get(nop(k))?.cls === 'контракт').map(([k]) => [nop(k), k]),
+    nometh: [...classKeys.контракт].filter((k) => !METH.test(k)).map((k) => [k]),
+  };
   const sverka = {
     'добор': `${missSrc}/${pairNoSrc}/${factEmpty}/${dups}`,
     'нет в черновике': missingInDraft,
@@ -349,7 +361,7 @@ export function analyze(opisText, draftText, prevText) {
     }
     route = fired.length ? 'В _pending' : 'ПОВЕРХ';
   }
-  return { 'черновик': draft, 'опись': opis, 'сверка': sverka, 'гард': guard, 'сработал': fired, 'маршрут': route };
+  return { 'черновик': draft, 'опись': opis, 'сверка': sverka, 'гард': guard, 'сработал': fired, 'маршрут': route, _items: items };
 }
 
 // ---------- «== КАНДИДАТЫ ПРОВЕРОК» ----------
@@ -474,11 +486,160 @@ export function candidates(text, names) {
   return r;
 }
 
-export function analyzeFiles(opisPath, draftPath, prevPath) {
+// ---------- маркеры по плану и префикс (SKILL.md 3.0.8, шаг 2) ----------
+// Контракт: файл плана plan.sh — строки «итог/часть/файл» через табуляцию; ожидание класса — «итог» по
+// сервису либо «часть NN»; ключи карточки по классам против пометок: меньше половины — гейт не пройден,
+// больше вдвое — маркер видит не всё. По файлам: ключ описи ссылается на файл, если путь плана кончается
+// путём из хвоста строки-ключа описи (слово с «/» либо с расширением). Ключей меньше пометок — дефицит.
+// Префикс: путь ключа REST равен префиксу либо начинается с «префикс/»; иначе — ключ без префикса.
+
+function readEnv(envPath) {
+  const env = {};
+  if (!envPath) return env;
+  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+    const i = line.indexOf('=');
+    if (i > 0) env[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+  }
+  return env;
+}
+
+function opisSources(opisText) {
+  const tok = new Map();
+  for (const raw of String(opisText).split(/\r?\n/)) {
+    if (!raw || /^[ \t]/.test(raw) || /^(#|⟹|\(|>|-|```|<!--)/.test(raw)) continue;
+    const i = raw.indexOf(SEP);
+    if (i < 0) continue;
+    const seen = new Set();
+    for (let w of raw.slice(i + SEP.length).split(/[\s+,;]+/)) {
+      w = w.replace(/[`()]/g, '').replace(/\\/g, '/').replace(/^\.\//, '');
+      if (!/\//.test(w) && !/\.[A-Za-z0-9]+$/.test(w)) continue;
+      if (!seen.has(w)) { seen.add(w); tok.set(w, (tok.get(w) ?? 0) + 1); }
+    }
+  }
+  return tok;
+}
+
+const nopK = (k) => (/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /.test(k) || !/[^ (]\(.*\)$/.test(k) ? k : k.replace(/\(.*\)$/, ''));
+
+// ключи карточки по классам с тем же правилом, что у сервиса: вызов при голом ключе — один ключ
+function keyCounts(cardText) {
+  const d = parseCard(cardText);
+  const sets = {
+    контракт: new Set(d.blocks.контракт.map((b) => headKey(b.header))),
+    сущности: new Set(d.blocks.сущности.map((b) => headKey(b.header))),
+    задачи: new Set(d.blocks.задачи.map((b) => headKey(b.header))),
+    топики: new Set(d.blocks.топики.map((b) => headKey(b.header))),
+    экраны: new Set(d.tables.экраны.map((c) => norm(c[0])).filter((k) => k && k !== '—')),
+  };
+  const out = {};
+  for (const [c, set] of Object.entries(sets)) out[c] = [...set].filter((k) => !(c === 'контракт' && nopK(k) !== k && set.has(nopK(k)))).length;
+  return out;
+}
+
+// папка частей: ключи карточки каждой части; авторы блоков и ключей описи (часть NN, голова)
+function readParts(dir) {
+  const parts = new Map(); const card = new Map(); const opis = new Map();
+  const add = (m, k, a) => { if (!m.has(k)) m.set(k, new Set()); m.get(k).add(a); };
+  for (const name of fs.readdirSync(dir).sort()) {
+    const m = name.match(/^(?:part-(\d+)|(head))\.md$/);
+    if (!m) continue;
+    const a = m[1] ?? 'голова';
+    const text = fs.readFileSync(path.join(dir, name), 'utf8');
+    const d = parseCard(text);
+    for (const c of ['контракт', 'сущности', 'задачи', 'топики']) for (const b of d.blocks[c]) add(card, headKey(b.header), a);
+    for (const b of d.blocks.бизнес) add(card, bizKey(b.header).key, a);
+    for (const c of d.tables.экраны) add(card, norm(c[0]), a);
+    for (const c of d.tables.роли) add(card, roleKey(c), a);
+    if (m[1]) parts.set(a, keyCounts(text));
+    const op = path.join(dir, name.replace(/\.md$/, '.opis.md'));
+    if (fs.existsSync(op)) for (const k of parseOpis(fs.readFileSync(op, 'utf8')).keys.keys()) add(opis, k, a);
+  }
+  return { parts, card, opis };
+}
+
+function markers(planText, parts, cardKeys, opisText) {
+  const rows = String(planText).split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'));
+  if (!rows.length) return { 'гейт': 'плана нет', 'классы': {}, _gate: '', _owners: [] };
+  const want = new Map(); const pwant = new Map();
+  const files = new Map(); // путь → {n, own}
+  for (const r of rows) {
+    if (r[0] === 'итог') want.set(r[1], (want.get(r[1]) ?? 0) + Number(r[2]));
+    if (r[0] === 'часть') pwant.set(`${r[1]}\t${r[2]}`, (pwant.get(`${r[1]}\t${r[2]}`) ?? 0) + Number(r[3]));
+    if (r[0] === 'файл') { const f = files.get(r[1]) ?? { n: 0, own: r[4] }; f.n += Number(r[3]); files.set(r[1], f); }
+  }
+  const cls = {}; const bad = [];
+  const verdict = (label, gw, g, e) => {
+    if (2 * g < e) { cls[label] = `${g}/${e} не пройден`; bad.push(`${gw}${g} из ${e}`); }
+    else cls[label] = `${g}/${e} пройден${g > 2 * e ? ', вдвое' : ''}`;
+  };
+  for (const [c, e] of want) { if (!(c in cardKeys)) { cls[c] = 'нет класса'; continue; } verdict(c, c + ' ', cardKeys[c], e); }
+  if (parts) for (const [key, e] of pwant) {
+    const [nn, c] = key.split('\t');
+    const label = `части ${nn}, ${c}`;
+    if (!parts.has(nn) || !(c in parts.get(nn))) { cls[label] = 'нет класса'; continue; }
+    verdict(label, `часть ${nn}, ${c} `, parts.get(nn)[c], e);
+  }
+  const gate = want.size === 0 && !(parts && pwant.size) ? 'пометок-ключей в плане нет — гейта нет' : (bad.length ? `НЕ ПРОЙДЕН — ${bad.join('; ')}` : 'пройден');
+  const tok = opisSources(opisText);
+  const deficit = []; const owners = [];
+  for (const [f, { n, own }] of files) {
+    let m = 0;
+    for (const [t, k] of tok) if (f === t || f.endsWith('/' + t)) m += k;
+    if (m < n) { deficit.push(`${f.split('/').pop()}(${own}) ${n}/${m}`); owners.push(own); }
+  }
+  return { 'гейт': gate, 'классы': cls, 'файлов': `${files.size}/${deficit.length}`, 'дефицит': deficit, _gate: gate, _owners: owners };
+}
+
+export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
   const rd = (p) => fs.readFileSync(p, 'utf8');
   const res = analyze(rd(opisPath), rd(draftPath), prevPath ? rd(prevPath) : null);
   const mp = findManifest(draftPath);
   res['кандидаты'] = candidates(rd(draftPath), mp ? manifestNames(rd(mp)) : null);
+  const env = readEnv(envPath);
+  const rel = (v) => path.join(path.dirname(envPath), v);
+  const P = env.CHECK_PARTS ? readParts(rel(env.CHECK_PARTS)) : null;
+  let noPfx = [];
+  if (env.CHECK_PREFIX) {
+    const p = '/' + env.CHECK_PREFIX.replace(/\/$/, '').replace(/^\//, '');
+    const keys = new Set(parseCard(rd(draftPath)).blocks.контракт.map((b) => headKey(b.header)));
+    noPfx = [...keys].filter((k) => { const m = k.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) (\S+)/); return m && m[2] !== p && !m[2].startsWith(p + '/'); });
+    res['черновик']['без префикса'] = noPfx.length;
+  }
+  let mk = null;
+  if (env.CHECK_PLAN) {
+    const planPath = rel(env.CHECK_PLAN);
+    mk = markers(fs.existsSync(planPath) ? rd(planPath) : '', P ? P.parts : null, res['черновик']['ключи'], rd(opisPath));
+    res['маркеры'] = { 'гейт': mk['гейт'], 'классы': mk['классы'], ...('файлов' in mk ? { 'файлов': mk['файлов'], 'дефицит': mk['дефицит'] } : {}) };
+  }
+  // исход: маркеры, доставка тела контракта, гард — и перечень добора по авторам
+  const mg = mk && mk._gate ? mk._gate : 'плана нет — сверки маркеров нет';
+  const [nb, bb] = res['черновик']['контракт'];
+  const bodyFail = nb > 0 && 2 * bb < nb;
+  const fail = [];
+  if (mg.startsWith('НЕ ПРОЙДЕН')) fail.push('маркеры: ' + mg.replace(/^НЕ ПРОЙДЕН — /, ''));
+  if (bodyFail) fail.push(`тело у ${bb} из ${nb} блоков контракта`);
+  const route = res['маршрут'];
+  const it = res._items;
+  const lists = { ...it, NOPFX: noPfx.map((k) => [k]), MARKFILE: (mk?._owners ?? []).map((o) => [o]) };
+  const dobor = {};
+  const look = (m, k) => m.get(k) ?? m.get(nopK(k)) ?? null;
+  for (const [cat, list] of Object.entries(lists)) for (const item of list) {
+    let A;
+    if (!P) A = new Set(['читающий']);
+    else if (cat === 'MARKFILE') A = new Set([item[0]]);
+    else if (cat === 'DUP') A = new Set([...(look(P.card, item[0]) ?? []), ...(look(P.card, item[1]) ?? [])]);
+    else if (['ADD', 'NOSRC', 'EMPTY'].includes(cat)) A = look(P.opis, item[0]) ?? look(P.card, item[0]);
+    else A = look(P.card, item[0]) ?? look(P.opis, item[0]);
+    if (!A || !A.size) A = new Set(['без хозяина']);
+    for (const a of A) { const l = /^\d+$/.test(a) ? `часть ${a}` : a; dobor[l] = (dobor[l] ?? 0) + 1; }
+  }
+  res['исход'] = {
+    'маркеры': mg,
+    'тело': nb === 0 ? 'блоков контракта нет — сверки нет' : (bodyFail ? `НЕ ПРОЙДЕН — тело у ${bb} из ${nb} блоков контракта, меньше половины` : `пройден — тело у ${bb} из ${nb} блоков контракта`),
+    'гард': route ?? 'прежней карточки нет',
+    'исход': fail.length ? `гейт не пройден — ${fail.join('; ')}` : route === 'В _pending' ? 'в _pending — гард' : route ? 'записать поверх' : 'записать',
+    'добор': dobor,
+  };
   return res;
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # plan.sh — план нарезки большого сервиса на части по счёту пометок ключей.
 #
-#   bash plan.sh <counts.txt> <K> <w> <корень>[,<корень>…]
+#   bash plan.sh <counts.txt> <K> <w> <корень>[,<корень>…] [<plan.tsv>]
 #
 # counts.txt — вывод грепов по строкам разведчика, дословно, под заголовками:
 #   ## <класс> :: <ключ|ориентир>
@@ -17,10 +17,16 @@
 # файлам; файл тяжелее K — отдельной частью. Всё остальное — «остаток»: список папок и «файлов прямо в
 # папке» печатается по дереву корней на диске (без скрытых папок, `node_modules`, `__pycache__` и без
 # `target`, `build`, `dist` в корне сервиса); дерева нет или пунктов больше 60 — остаток назван
-# отрицанием. Только читает, печатает план в stdout.
+# отрицанием. Читает и печатает план в stdout. С пятым аргументом ещё пишет тот же план для check.sh,
+# строками через табуляцию (тесты и пути вне корней туда не идут, как и в «к сверке»):
+#   итог  <класс> <пометок ключ>                         — по сервису;
+#   часть <NN> <класс> <пометок ключ>                    — ожидание части;
+#   файл  <путь> <класс> <пометок ключ> <NN части | ->   — каждый файл с пометками `ключ`.
+# При отказе файл плана остаётся пустым.
 set -u
-COUNTS="${1:?counts.txt}"; K="${2:?K}"; W="${3:?w}"; ROOTS="${4:?корни через запятую}"
+COUNTS="${1:?counts.txt}"; K="${2:?K}"; W="${3:?w}"; ROOTS="${4:?корни через запятую}"; TSV="${5:-}"
 [ -f "$COUNTS" ] || { echo "НЕТ ФАЙЛА: $COUNTS"; exit 2; }
+[ -n "$TSV" ] && { : > "$TSV" 2>/dev/null || { echo "файл плана не пишется: $TSV" >&2; TSV=""; }; }
 export LC_ALL=C
 
 # Файлы корней — для списка остатка и проверки путей счёта. Корня на диске нет — ни того, ни другого.
@@ -43,7 +49,7 @@ case ",$ROOTS" in *,[A-Za-z]:[\\/]*|*,\ [A-Za-z]:[\\/]*) WIN=1 ;; esac
 grep -q '^[A-Za-z]:[\\/]' "$COUNTS" 2>/dev/null && WIN=1
 
 # Корни — через окружение: `awk -v` разбирает в значении обратные слеши, и путь `C:\Users\…` портится.
-PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" awk -v K="$K" -v W="$W" -v WIN="$WIN" '
+PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" awk -v K="$K" -v W="$W" -v WIN="$WIN" '
   # Путь к одному виду: прямые слеши, без хвостового слеша, диск `C:` в верхнем регистре; `/c/…` → `C:/…`;
   # двойные слеши схлопнуты, `/./` и `<папка>/../` раскрыты (ведущий собирает корень из `../<сервис>`).
   function np(p,   d) {
@@ -101,14 +107,31 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" awk -v K="$K" -v
     for (c = 1; c <= ncl; c++) { cl = clist[c]; if (arr[cl] > 0) out = out (out == "" ? "" : ", ") pre cl " " arr[cl] }
     return out
   }
-  function emit(kind, items, n, wsum,   i, line) {
+  function emit(kind, items, n, wsum,   i, line, c, cl, s) {
     if (n == 0) return
     np_++
     line = sprintf("часть %02d вес %g", np_, wsum)
     cls = classes(items, n); if (cls != "") line = line " (" cls ")"
     line = line ": " kind " "
-    for (i = 1; i <= n; i++) { cov[items[i]] = 1; line = line (i > 1 ? "; " : "") items[i] }
+    for (i = 1; i <= n; i++) { cov[items[i]] = 1; partof[items[i]] = np_; line = line (i > 1 ? "; " : "") items[i] }
+    for (c = 1; c <= ncl; c++) { cl = clist[c]; s = 0; for (i = 1; i <= n; i++) s += ck[items[i], cl]; if (s > 0) partexp[np_, cl] = s }
     print line
+  }
+  # Номер части, которой принадлежит файл: сам файл либо ближайшая папка части; частей нет — «-».
+  function partfor(p, r,   q) {
+    if (p in partof) return sprintf("%02d", partof[p])
+    for (q = parent(p); ; q = parent(q)) { if (q in partof) return sprintf("%02d", partof[q]); if (q == r || q == "" || q !~ /\//) return "-" }
+  }
+  # План для check.sh — строками через табуляцию; без пятого аргумента ничего не пишет.
+  function dump(   f, c, cl, i, n, fl, p, v) {
+    f = ENVIRON["PLAN_TSV"]; if (f == "") return
+    n = 0; for (p in rt) if (fk[p] > 0) fl[++n] = p
+    sortlist(fl, n)
+    for (i = 1; i <= n; i++) for (c = 1; c <= ncl; c++) { cl = clist[c]; v[cl] += ck[fl[i], cl] }
+    for (c = 1; c <= ncl; c++) { cl = clist[c]; if (v[cl] > 0) print "итог\t" cl "\t" v[cl] > f }
+    for (i = 1; i <= np_; i++) for (c = 1; c <= ncl; c++) { cl = clist[c]; if ((i, cl) in partexp) printf "часть\t%02d\t%s\t%d\n", i, cl, partexp[i, cl] > f }
+    for (i = 1; i <= n; i++) { p = fl[i]; for (c = 1; c <= ncl; c++) { cl = clist[c]; if (ck[p, cl] > 0) print "файл\t" p "\t" cl "\t" ck[p, cl] "\t" partfor(p, rt[p]) > f } }
+    close(f)
   }
   # Делит узел dir: дети-папки с ключами пакуются подряд, тяжёлые — рекурсивно; свои файлы с ключами — подряд.
   function cutdir(dir,   sp, ch, n, i, c, cur, nc, s, fl, nf, curf, ncf, sf) {
@@ -213,8 +236,8 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" awk -v K="$K" -v
       if (o != "") line = line " | ориентир: " o
       print line
     }
-    if (total <= K) { printf "нарезка не нужна: вес %g ≤ K=%g\n", total, K; exit 0 }
-    if (ktotal == 0) { printf "нарезка не нужна: вес 0 ≤ K=%g по ключам (ориентир весит %g)\n", K, total; exit 0 }
+    if (total <= K) { printf "нарезка не нужна: вес %g ≤ K=%g\n", total, K; dump(); exit 0 }
+    if (ktotal == 0) { printf "нарезка не нужна: вес 0 ≤ K=%g по ключам (ориентир весит %g)\n", K, total; dump(); exit 0 }
     printf "вес сервиса %g при K=%g, w=%g\n", total, K, W
     for (i = 1; i <= nr; i++) {
       r = root[i]
@@ -245,12 +268,13 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" awk -v K="$K" -v
       if (top == "") { q = parent(f); if (!(q in loose)) { loose[q] = 1; lo[++nl] = q } }
       else if (!(top in rem)) { rem[top] = 1; rl[++nrem] = top }
     }
-    if (!seen) { printf "частей %d; остаток — всё вне папок и файлов частей (дерева корней на диске нет)\n", np_; exit 0 }
-    if (nrem + nl == 0) { printf "частей %d; остаток — пусто: вне частей файлов нет\n", np_; exit 0 }
-    if (nrem + nl > 60) { printf "частей %d; остаток — всё вне папок и файлов частей (пунктов больше 60 — список не печатается)\n", np_; exit 0 }
+    if (!seen) { printf "частей %d; остаток — всё вне папок и файлов частей (дерева корней на диске нет)\n", np_; dump(); exit 0 }
+    if (nrem + nl == 0) { printf "частей %d; остаток — пусто: вне частей файлов нет\n", np_; dump(); exit 0 }
+    if (nrem + nl > 60) { printf "частей %d; остаток — всё вне папок и файлов частей (пунктов больше 60 — список не печатается)\n", np_; dump(); exit 0 }
     sortlist(rl, nrem); sortlist(lo, nl)
     printf "частей %d; остаток — пунктов %d:\n", np_, nrem + nl
     for (i = 1; i <= nrem; i++) print "  папка " rl[i]
     for (i = 1; i <= nl; i++) print "  файлы прямо в " lo[i]
+    dump()
   }
 ' "$COUNTS"

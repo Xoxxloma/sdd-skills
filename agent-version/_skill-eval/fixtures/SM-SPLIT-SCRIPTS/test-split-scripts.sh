@@ -6,7 +6,7 @@
 # SM_SPLIT_KEEP=1 — не удалять временную папку (путь печатается). Нужны bash и node.
 # Фазы: 0) оракул plan.sh (plan-oracle.mjs) против expect.json — проверка самого стенда; 1) plan.sh на
 # синтетике cases/plan/*; 2) plan.sh на настоящих деревьях (NRS-TAIL, SM-MONO-DGS, repairy-api) против
-# оракула; 3) assemble.sh на cases/assemble/*; 4) круговой: карточка repairy-api из as-base режется на
+# оракула, у обеих — и файл плана (пятый аргумент) против stdout; 3) assemble.sh на cases/assemble/*; 4) круговой: карточка repairy-api из as-base режется на
 # голову и 3 части с дублями и склеивается обратно; 5) promote.sh. Сводка — compare.mjs.
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -42,7 +42,7 @@ for c in "$HERE"/cases/plan/*/; do
   name="$(basename "$c")"; d="$OUT/plan/$name"; mkdir -p "$d"
   nodex "$HEREW/prep.mjs" plan "$(winp "$c")" "$d" "$(winp "$d")" || { echo "prep $name не собрался" >&2; continue; }
   args3 "$d/args.txt"
-  [ -f "$SCR/plan.sh" ] && runs "$d" "$SCR/plan.sh" "$d/counts.txt" "$K" "$W" "$R"
+  [ -f "$SCR/plan.sh" ] && runs "$d" "$SCR/plan.sh" "$d/counts.txt" "$K" "$W" "$R" "$d/plan.tsv"
 done
 mkdir -p "$OUT/real"
 nodex "$HEREW/prep.mjs" real "$(winp "$EVAL")" "$OUT/real" "$(winp "$OUT/real")"
@@ -50,7 +50,7 @@ if [ -f "$SCR/plan.sh" ]; then
   for d in "$OUT"/real/real-*/; do
     [ -d "$d" ] || continue; d="${d%/}"
     args3 "$d/args.txt"
-    runs "$d" "$SCR/plan.sh" "$d/counts.txt" "$K" "$W" "$R"
+    runs "$d" "$SCR/plan.sh" "$d/counts.txt" "$K" "$W" "$R" "$d/plan.tsv"
   done
 fi
 

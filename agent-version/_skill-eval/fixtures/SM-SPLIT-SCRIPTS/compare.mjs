@@ -5,7 +5,7 @@
 // настоящей карточке; 5) promote.sh. Код выхода 1 — есть ОШИБКА (или неисправен сам оракул).
 import fs from 'node:fs'
 import path from 'node:path'
-import { checkPlanCase, checkPlanReal, checkOracle } from './check-plan.mjs'
+import { checkPlanCase, checkPlanReal, checkOracle, checkPlanTsv } from './check-plan.mjs'
 import { checkAsmCase, checkRoundtrip, checkPromote } from './check-assemble.mjs'
 
 const [, , HERE, OUT] = process.argv
@@ -15,7 +15,7 @@ const rows = []
 const push = (phase, name, list) => { for (const r of list) rows.push({ phase, name, ...r }) }
 const loadRun = (d) => {
   const a = read(path.join(d, 'args.txt')).split(/\r?\n/)
-  return { rc: Number(read(path.join(d, 'rc')).trim()), stdout: read(path.join(d, 'stdout')), stderr: read(path.join(d, 'stderr')), counts: read(path.join(d, 'counts.txt')), args: [Number(a[0]), Number(a[1]), a[2]], ms: read(path.join(d, 'ms')).trim() }
+  return { rc: Number(read(path.join(d, 'rc')).trim()), stdout: read(path.join(d, 'stdout')), stderr: read(path.join(d, 'stderr')), counts: read(path.join(d, 'counts.txt')), args: [Number(a[0]), Number(a[1]), a[2]], ms: read(path.join(d, 'ms')).trim(), tsv: fs.existsSync(path.join(d, 'plan.tsv')) ? read(path.join(d, 'plan.tsv')) : null }
 }
 
 // 0–1. plan синтетика
@@ -28,6 +28,7 @@ for (const name of dirs(path.join(HERE, 'cases', 'plan'))) {
   if (ob.length) { oracleBad++; push('0 оракул', name, [{ check: 'оракул = expect.json', status: 'СТЕНД', detail: ob.join('; ') }]) }
   if (!fs.existsSync(path.join(d, 'rc'))) { push('1 plan', name, [{ check: 'прогон', status: 'не измерено', detail: 'нет вывода (скрипта нет?)' }]); continue }
   push('1 plan', name, checkPlanCase(ex, run))
+  push('1 plan', name, checkPlanTsv(run))
 }
 // 2. plan на настоящих деревьях
 for (const name of dirs(path.join(OUT, 'real'))) {
@@ -35,6 +36,7 @@ for (const name of dirs(path.join(OUT, 'real'))) {
   if (!fs.existsSync(path.join(d, 'rc'))) continue
   const run = loadRun(d)
   push('2 plan-real', `${name} (${run.ms} мс)`, checkPlanReal(run))
+  push('2 plan-real', name, checkPlanTsv(run))
 }
 // 3. assemble синтетика
 for (const name of dirs(path.join(HERE, 'cases', 'assemble')).filter((n) => !n.startsWith('_'))) {

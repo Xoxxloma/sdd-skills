@@ -20,12 +20,13 @@ now_ms() {
   case "$t" in *N|'') echo $(( $(date +%s) * 1000 )) ;; *) echo $(( t / 1000000 )) ;; esac
 }
 
-# run <имя> <опись> <черновик> [<прежняя>]
+# run <имя> <опись> <черновик> [<прежняя>]; переменные окружения случая — в RUN_ENV
+RUN_ENV=()
 run() {
   local name="$1"; shift
   local t0 t1
   t0=$(now_ms)
-  bash "$CHECK" "$@" >"$OUT/$name.out" 2>"$OUT/$name.err"
+  env ${RUN_ENV[@]+"${RUN_ENV[@]}"} bash "$CHECK" "$@" >"$OUT/$name.out" 2>"$OUT/$name.err"
   echo $? >"$OUT/$name.rc"
   t1=$(now_ms)
   echo $(( t1 - t0 )) >"$OUT/$name.ms"
@@ -39,9 +40,19 @@ for d in "$HERE"/cases/*/; do
   [ -f "$d/expect.json" ] || continue
   # черновик — draft.md случая или .work/draft.md (манифест ищется в ../ и ./ от папки черновика)
   draft="$d/draft.md"; [ -f "$d/.work/draft.md" ] && draft="$d/.work/draft.md"
+  # env случая — строки ИМЯ=значение; CHECK_PLAN и CHECK_PARTS — пути от папки случая
+  RUN_ENV=()
+  if [ -f "$d/env" ]; then
+    while IFS='=' read -r k v || [ -n "$k" ]; do
+      k="${k%$'\r'}"; v="${v%$'\r'}"; [ -n "$k" ] || continue
+      case "$k" in CHECK_PLAN|CHECK_PARTS) v="$d/$v" ;; esac
+      RUN_ENV+=("$k=$v")
+    done < "$d/env"
+  fi
   if [ -f "$d/prev.md" ]; then run "$name" "$d/opis.md" "$draft" "$d/prev.md"
   else run "$name" "$d/opis.md" "$draft"; fi
 done
+RUN_ENV=()
 
 big_name=''; big_bytes=0; big_args=()
 while IFS='|' read -r name opis draft prev; do
