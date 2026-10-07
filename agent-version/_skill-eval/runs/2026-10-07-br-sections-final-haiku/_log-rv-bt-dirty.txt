@@ -1,0 +1,12 @@
+снимок скилла: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-haiku/_skills/spec-review.SKILL.md
+проба: rv-bt-dirty   фикстура: RV-AUDIT   скилл: spec-review
+effort: умолчание CLI
+плечо: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-haiku/rv-bt-dirty
+скилл: /tmp/skill-eval-rv-bt-dirty/2026-10-07-br-sections-final-haiku-skills/spec-review/SKILL.md
+промпт: /home/user/sdd-skills/agent-version/_skill-eval/fixtures/RV-AUDIT/bt-dirty-prompt.txt
+прогонов: 3, параллельно: 3
+  run-3 — готов
+  run-2 — готов
+  run-1 — готов
+ГОТОВО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-haiku/rv-bt-dirty — песочниц с ответом: 3 из 3
+снимок из /tmp снесён: /tmp/skill-eval-rv-bt-dirty/2026-10-07-br-sections-final-haiku-skills (журнальная копия осталась в /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-haiku/_skills/)
