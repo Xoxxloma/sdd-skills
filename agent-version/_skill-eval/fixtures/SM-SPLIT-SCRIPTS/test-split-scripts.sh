@@ -12,6 +12,7 @@ set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EVAL="$(cd "$HERE/../.." && pwd)"
 SCR="${1:?папка со скриптами plan.sh, assemble.sh, promote.sh}"
+[ "$SCR" != selftest ] || SCR="$HERE/selftest"
 SCR="$(cd "$SCR" && pwd)" || exit 2
 command -v node >/dev/null 2>&1 || { echo "нужен node" >&2; exit 2; }
 CARD="${SM_SPLIT_CARD:-$EVAL/runs/2026-10-04-as-base/sandbox/scan-1/w/AI-SDD/services/repairy-api.md}"
@@ -23,6 +24,8 @@ if [ -n "${SM_SPLIT_KEEP:-}" ]; then echo "временная папка: $OUT";
 # передаётся без конвертации MSYS.
 winp() { cygpath -m "$1" 2>/dev/null || { (cd "$1" 2>/dev/null && pwd -W 2>/dev/null) || echo "$1"; }; }
 HEREW="$(winp "$HERE")"
+export MSYS2_ENV_CONV_EXCL="${MSYS2_ENV_CONV_EXCL:+$MSYS2_ENV_CONV_EXCL;}SM_SPLIT_FS_POSIX"
+export SM_SPLIT_FS_POSIX="$OUT" SM_SPLIT_FS_WIN="$(winp "$OUT")"
 nodex() { MSYS2_ARG_CONV_EXCL='*' MSYS_NO_PATHCONV=1 node "$@"; }
 now_ms() { local t; t=$(date +%s%N 2>/dev/null); case "$t" in *N|'') echo $(( $(date +%s) * 1000 )) ;; *) echo $(( t / 1000000 )) ;; esac; }
 # runs <папка> <скрипт> <аргументы…> → stdout, stderr, rc, ms в папке

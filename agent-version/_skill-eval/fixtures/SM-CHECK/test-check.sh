@@ -49,6 +49,7 @@ for d in "$HERE"/cases/*/; do
       RUN_ENV+=("$k=$v")
     done < "$d/env"
   fi
+  RUN_ENV+=("CHECK_LISTS=$OUT/$name.list.md")
   if [ -f "$d/prev.md" ]; then run "$name" "$d/opis.md" "$draft" "$d/prev.md"
   else run "$name" "$d/opis.md" "$draft"; fi
 done

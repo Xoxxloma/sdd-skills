@@ -53,12 +53,13 @@ export function checkPlanTsv (out) {
   const rows = out.tsv.split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'))
   if (out.rc !== 0) { add('при отказе пуст', rows.length === 0, `строк ${rows.length}`); return res }
   const P = parsePlan(out.stdout)
-  const itog = {}; const parts = {}; const files = []
+  const itog = {}; const parts = {}; const files = []; const paths = []
   let bad = 0
   for (const r of rows) {
     if (r[0] === 'итог' && r.length === 3) itog[r[1]] = (itog[r[1]] ?? 0) + num(r[2])
     else if (r[0] === 'часть' && r.length === 4) (parts[r[1]] ??= {})[r[2]] = num(r[3])
     else if (r[0] === 'файл' && r.length === 5) files.push({ path: r[1], cl: r[2], n: num(r[3]), nn: r[4] })
+    else if (r[0] === 'путь' && r.length === 4 && ['папки', 'файлы'].includes(r[2])) paths.push({ path: canon(r[1]), kind: r[2], nn: r[3] })
     else bad++
   }
   add('строки по форме', bad === 0, `не по форме: ${bad}`)
@@ -81,6 +82,9 @@ export function checkPlanTsv (out) {
     if (!part || !part.paths.some((q) => { const cq = canon(q); return cf === cq || cf.startsWith(cq + '/') })) wrong.push(`${f.path} → ${f.nn}`)
   }
   add('хозяин файла — часть, чьи пути его покрывают', wrong.length === 0, wrong.slice(0, 3).join('; '))
+  const wantPaths = P.parts.flatMap((p) => p.paths.map((q) => `${String(p.nn).padStart(2, '0')}\t${p.kind}\t${canon(q)}`)).sort()
+  const gotPaths = paths.map((p) => `${p.nn}\t${p.kind}\t${p.path}`).sort()
+  add('пути владения = пути частей stdout', JSON.stringify(gotPaths) === JSON.stringify(wantPaths), `файл ${gotPaths.join('; ')}; stdout ${wantPaths.join('; ')}`)
   return res
 }
 

@@ -22,6 +22,7 @@
 #   итог  <класс> <пометок ключ>                         — по сервису;
 #   часть <NN> <класс> <пометок ключ>                    — ожидание части;
 #   файл  <путь> <класс> <пометок ключ> <NN части | ->   — каждый файл с пометками `ключ`.
+#   путь  <путь части> <папки|файлы> <NN части>         — владение, включая файлы без пометок.
 # При отказе файл плана остаётся пустым.
 set -u
 COUNTS="${1:?counts.txt}"; K="${2:?K}"; W="${3:?w}"; ROOTS="${4:?корни через запятую}"; TSV="${5:-}"
@@ -113,7 +114,7 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     line = sprintf("часть %02d вес %g", np_, wsum)
     cls = classes(items, n); if (cls != "") line = line " (" cls ")"
     line = line ": " kind " "
-    for (i = 1; i <= n; i++) { cov[items[i]] = 1; partof[items[i]] = np_; line = line (i > 1 ? "; " : "") items[i] }
+    for (i = 1; i <= n; i++) { cov[items[i]] = 1; partof[items[i]] = np_; partkind[items[i]] = kind; line = line (i > 1 ? "; " : "") items[i] }
     for (c = 1; c <= ncl; c++) { cl = clist[c]; s = 0; for (i = 1; i <= n; i++) s += ck[items[i], cl]; if (s > 0) partexp[np_, cl] = s }
     print line
   }
@@ -123,13 +124,15 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     for (q = parent(p); ; q = parent(q)) { if (q in partof) return sprintf("%02d", partof[q]); if (q == r || q == "" || q !~ /\//) return "-" }
   }
   # План для check.sh — строками через табуляцию; без пятого аргумента ничего не пишет.
-  function dump(   f, c, cl, i, n, fl, p, v) {
+  function dump(   f, c, cl, i, n, fl, p, v, paths, ns) {
     f = ENVIRON["PLAN_TSV"]; if (f == "") return
     n = 0; for (p in rt) if (fk[p] > 0) fl[++n] = p
     sortlist(fl, n)
     for (i = 1; i <= n; i++) for (c = 1; c <= ncl; c++) { cl = clist[c]; v[cl] += ck[fl[i], cl] }
     for (c = 1; c <= ncl; c++) { cl = clist[c]; if (v[cl] > 0) print "итог\t" cl "\t" v[cl] > f }
     for (i = 1; i <= np_; i++) for (c = 1; c <= ncl; c++) { cl = clist[c]; if ((i, cl) in partexp) printf "часть\t%02d\t%s\t%d\n", i, cl, partexp[i, cl] > f }
+    ns = 0; for (p in partof) paths[++ns] = p; sortlist(paths, ns)
+    for (i = 1; i <= ns; i++) { p = paths[i]; printf "путь\t%s\t%s\t%02d\n", p, partkind[p], partof[p] > f }
     for (i = 1; i <= n; i++) { p = fl[i]; for (c = 1; c <= ncl; c++) { cl = clist[c]; if (ck[p, cl] > 0) print "файл\t" p "\t" cl "\t" ck[p, cl] "\t" partfor(p, rt[p]) > f } }
     close(f)
   }

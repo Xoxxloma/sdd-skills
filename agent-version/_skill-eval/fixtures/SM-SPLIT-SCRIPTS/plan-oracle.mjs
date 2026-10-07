@@ -71,6 +71,14 @@ export const isTest = (rel) => {
   if (parts.length >= 3 && ['test', 'spec'].includes(parts[parts.length - 2]) && ['js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs'].includes(parts[parts.length - 1])) return true
   return name.endsWith('_test.go') || name.endsWith('_test.py')
 }
+
+// Windows-node читает временное дерево MSYS по явному отображению из раннера.
+// Сами пути плана сохраняются: их нормализацию продолжает проверять оракул.
+const diskPath = (p) => {
+  const from = process.env.SM_SPLIT_FS_POSIX;
+  const to = process.env.SM_SPLIT_FS_WIN;
+  return from && to && (p === from || p.startsWith(from + '/')) ? to + p.slice(from.length) : p;
+}
 const unbom = (t) => String(t).replace(/^\uFEFF/, '')
 // O13: заголовки — есть ли они и все ли по форме
 export const badHeaders = (text) => {
@@ -142,7 +150,7 @@ export function plan (countsText, K, w, rootsArg, opt = VARIANTS.primary) {
   let outside = 0; const outsideFiles = []
   const itogAll = { ключ: {}, ориентир: {} }; const itogIn = { ключ: {}, ориентир: {} }
   let tests = 0; const testsBy = { ключ: {}, ориентир: {} }; const ghostTests = []
-  const dirOk = (d) => { try { return fs.statSync(d).isDirectory() } catch { return false } }
+  const dirOk = (d) => { try { return fs.statSync(diskPath(d)).isDirectory() } catch { return false } }
   for (const l of lines) {
     const p = resolve(l.path, roots)
     itogAll[l.type][l.cls] = (itogAll[l.type][l.cls] || 0) + l.n
@@ -179,9 +187,9 @@ export function plan (countsText, K, w, rootsArg, opt = VARIANTS.primary) {
   const hb = badHeaders(countsText)
   if (hb) { res.mode = 'отказ'; res.reason = hb; return res }
   const nbad = badLines(countsText)
-  const isDir = (d) => { try { return fs.statSync(d).isDirectory() } catch { return false } }
-  const ghosts = [...files.values()].concat([]).filter((f) => isDir(roots[f.root]) && !fs.existsSync(f.path))
-  if (!nbad && (ghosts.length || ghostTests.some((p) => !fs.existsSync(p)))) { res.mode = 'отказ'; res.reason = 'путей счёта нет на диске'; return res }
+  const isDir = (d) => { try { return fs.statSync(diskPath(d)).isDirectory() } catch { return false } }
+  const ghosts = [...files.values()].concat([]).filter((f) => isDir(roots[f.root]) && !fs.existsSync(diskPath(f.path)))
+  if (!nbad && (ghosts.length || ghostTests.some((p) => !fs.existsSync(diskPath(p))))) { res.mode = 'отказ'; res.reason = 'путей счёта нет на диске'; return res }
   if (nbad) { res.mode = 'отказ'; res.reason = `счёт неполон — строк не по форме <путь>:<число>: ${nbad}`; return res }
   if (outside > 0 && W === 0 && tests === 0) { res.mode = 'отказ'; res.reason = 'все пути счёта вне корней сервиса'; return res }
   if (res.mode === 'не нужна') return res
@@ -268,7 +276,7 @@ export function restList (res) {
   for (const p of cov) { const r = res.roots.filter((x) => p === x || p.startsWith(x + '/')).sort((a, b) => b.length - a.length)[0]; for (let q = p; q !== r && q.includes('/');) { q = q.slice(0, q.lastIndexOf('/')); inner.add(q) } }
   const dirs = new Set(); const loose = new Set(); let seen = false
   const walk = (d, root) => {
-    let list; try { list = fs.readdirSync(d, { withFileTypes: true }) } catch { return }
+    let list; try { list = fs.readdirSync(diskPath(d), { withFileTypes: true }) } catch { return }
     for (const e of list) {
       const p = d + '/' + e.name
       if (e.isDirectory()) { if (!(e.name.length > 1 && e.name.startsWith('.')) && !SKIP.has(e.name) && !(d === root && TOP.has(e.name))) walk(p, root); continue }
@@ -320,10 +328,38 @@ export function fmt (res) {
   return out.join('\n')
 }
 
+// TSV эталона по контракту: классы, пути частей и каждый файл с ключами.
+export function fmtTsv (res, countsText) {
+  if (res.mode === 'отказ') return ''
+  const files = new Map(); const totals = {}
+  for (const l of parseCounts(countsText).filter((x) => x.type === 'ключ' && x.n > 0)) {
+    const f = resolve(l.path, res.roots)
+    const root = res.roots.find((r) => f.startsWith(r + '/'))
+    if (!root || isTest(f.slice(root.length + 1))) continue
+    const cls = files.get(f) ?? {}; cls[l.cls] = (cls[l.cls] ?? 0) + l.n; files.set(f, cls)
+    totals[l.cls] = (totals[l.cls] ?? 0) + l.n
+  }
+  const out = res.keyClasses.filter((c) => totals[c]).map((c) => `итог\t${c}\t${totals[c]}`)
+  res.parts.forEach((p, i) => {
+    const nn = String(i + 1).padStart(2, '0')
+    for (const [c, n] of Object.entries(p.cls)) if (n) out.push(`часть\t${nn}\t${c}\t${n}`)
+    for (const q of p.paths) out.push(`путь\t${q}\t${p.kind}\t${nn}`)
+  })
+  for (const [f, cls] of [...files.entries()].sort(([a], [b]) => cmpBytes(a, b))) {
+    const i = res.parts.findIndex((p) => p.paths.some((q) => f === q || (p.kind === 'папки' && f.startsWith(q + '/'))))
+    const nn = i < 0 ? '-' : String(i + 1).padStart(2, '0')
+    for (const [c, n] of Object.entries(cls)) out.push(`файл\t${f}\t${c}\t${n}\t${nn}`)
+  }
+  return out.length ? out.join('\n') + '\n' : ''
+}
+
 if (process.argv[1] && process.argv[1].endsWith('plan-oracle.mjs') && process.argv.length >= 6) {
-  const [, , counts, K, w, roots, flag, vname] = process.argv
-  const opt = flag === '--variant' ? variant(vname) : VARIANTS.primary
+  const [, , counts, K, w, roots, ...tail] = process.argv
+  const tsv = tail[0] && tail[0] !== '--variant' ? tail.shift() : null
+  const vi = tail.indexOf('--variant')
+  const opt = vi < 0 ? VARIANTS.primary : variant(tail[vi + 1])
   const r = plan(fs.readFileSync(counts, 'utf8'), Number(K), Number(w), roots, opt)
   console.log(fmt(r))
+  if (tsv) fs.writeFileSync(diskPath(tsv), fmtTsv(r, fs.readFileSync(counts, 'utf8')))
   if (r.mode === 'отказ') process.exit(3)
 }

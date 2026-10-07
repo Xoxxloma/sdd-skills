@@ -9,17 +9,20 @@
 #   2. ОБЪЯВЛЕНО, НО НЕ РЕАЛИЗОВАНО. Две операции из 30 (`/api/desk/archive/…`) в коде не реализованы
 #      никем: в карточке их быть не должно.
 #   3. КЛЮЧ В ДВУХ МЕСТАХ. Операция объявлена в `resources/`, а реализована в папке модуля: при
-#      нарезке её вправе взять только часть модуля — в карточке один блок, без дублей.
+#      нарезке её берёт один хозяин по правилам скилла — в карточке один блок, без дублей.
 #   4. ТЕСТОВЫЙ КОНФИГ. `src/test/resources/application.yaml` называет четыре топика
 #      `kontrol.test.*.v1` той же формой, что боевой конфиг: в карточке их быть не должно.
 #
 # Правда: контракт 148 (120 базы + 28 реализованных операций спецификации), сущности 60, задачи 10,
 # топики 12. База собирается генератором SM-MONO-DGS как есть.
 #
-# Вызов:  ./make.sh <куда>      →  <куда>/casedesk/
+# Вызов:  ./make.sh <куда> [--with-client] → <куда>/casedesk/
+# --with-client: рядом лежит спека соседа с тем же operationId и клиентским генератором java.
 # По умолчанию <куда> = ./out (в .gitignore стенда).
 set -eu
 OUT="${1:-./out}"
+VARIANT="${2:-}"
+case "$VARIANT" in ''|--with-client) ;; *) echo "неизвестный вариант: $VARIANT" >&2; exit 2 ;; esac
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE="$HERE/../SM-MONO-DGS/make.sh"
 [ -f "$BASE" ] || { echo "нет генератора базы: $BASE" >&2; exit 1; }
@@ -155,6 +158,64 @@ awk '{ print } /graphql-dgs-codegen-maven-plugin/ {
   print "        <configOptions><interfaceOnly>true</interfaceOnly></configOptions></configuration></plugin>"
 }' "$R/pom.xml" > "$R/pom.xml.tmp" && mv "$R/pom.xml.tmp" "$R/pom.xml"
 
+# Клиентская спека рядом с серверной: расширение, часть имён операций и путей совпадают.
+if [ "$VARIANT" = --with-client ]; then
+  cat > "$RES/neighbour.yaml" <<'EOF'
+openapi: 3.0.3
+info:
+  title: neighbour — удалённый каталог
+  version: 1.0.0
+paths:
+  /api/desk/groups:
+    get:
+      operationId: listGroupsDesk
+      responses:
+        '200': {description: группы соседа}
+    post:
+      operationId: createGroupsDesk
+      responses:
+        '201': {description: группа соседа создана}
+  /api/desk/groups/{id}:
+    get:
+      operationId: getGroupsDesk
+      responses:
+        '200': {description: группа соседа}
+    put:
+      operationId: updateGroupsDesk
+      responses:
+        '200': {description: группа соседа обновлена}
+  /api/neighbour/limits/{id}:
+    get:
+      operationId: getNeighbourLimit
+      responses:
+        '200': {description: лимит соседа}
+    delete:
+      operationId: deleteNeighbourLimit
+      responses:
+        '204': {description: лимит соседа удалён}
+EOF
+  awk '{ print } /graphql-dgs-codegen-maven-plugin/ {
+    print "    <plugin><groupId>org.openapitools</groupId><artifactId>openapi-generator-maven-plugin</artifactId>"
+    print "      <configuration><inputSpec>${project.basedir}/src/main/resources/neighbour.yaml</inputSpec><generatorName>java</generatorName>"
+    print "        <apiPackage>ru.kontrol.neighbour.client.api</apiPackage><library>resttemplate</library></configuration></plugin>"
+  }' "$R/pom.xml" > "$R/pom.xml.tmp" && mv "$R/pom.xml.tmp" "$R/pom.xml"
+  mkdir -p "$J/integration"
+  cat > "$J/integration/NeighbourGateway.java" <<'EOF'
+package ru.kontrol.casedesk.integration;
+
+import org.springframework.stereotype.Service;
+import ru.kontrol.neighbour.client.api.DefaultApi;
+
+@Service
+public class NeighbourGateway {
+  private final DefaultApi client;
+  public NeighbourGateway(DefaultApi client) { this.client = client; }
+  public Object groups() { return client.listGroupsDesk(); }
+  public Object limit(Long id) { return client.getNeighbourLimit(id); }
+}
+EOF
+fi
+
 # --- 4. тесты: конфиг с четырьмя топиками той же формы, что боевой ----------------------------
 TR="$R/src/test/resources"; TJ="$R/src/test/java/ru/kontrol/casedesk"; mkdir -p "$TR" "$TJ"
 printf '%s\n' "spring:" "  datasource:" "    url: jdbc:h2:mem:casedesk" \
@@ -177,5 +238,6 @@ echo "  операций в openapi.yaml:     $ops, из них реализов
 echo "  REST по аннотациям:          $(c '@(Get|Post|Put|Patch|Delete)Mapping\(' "$R/src/main")"
 echo "  DGS корневых операций:       $(( $(c '@Dgs(Query|Mutation|Subscription)\b' "$R/src/main") + $(c '@DgsData\(parentType\s*=\s*"(Query|Mutation|Subscription)"' "$R/src/main") ))"
 echo "  контракт всего:              $(( impl + $(c '@(Get|Post|Put|Patch|Delete)Mapping\(' "$R/src/main") + $(c '@Dgs(Query|Mutation|Subscription)\b' "$R/src/main") + $(c '@DgsData\(parentType\s*=\s*"(Query|Mutation|Subscription)"' "$R/src/main") ))"
+[ "$VARIANT" != --with-client ] || echo "  операций клиентской спеки:   $(grep -cE '^      operationId:' "$RES/neighbour.yaml") (не контракт)"
 echo "  сущности / задачи:           $(c '@Entity\b' "$R/src/main") / $(c '@Scheduled\(' "$R/src/main")"
 echo "  топиков в боевом конфиге:    $(grep -coE 'kontrol\.[a-z]+\.[a-z]+\.v1' "$RES/application.yaml"); в тестовом: $(grep -coE 'kontrol\.[a-z]+\.[a-z]+\.v1' "$TR/application.yaml")"

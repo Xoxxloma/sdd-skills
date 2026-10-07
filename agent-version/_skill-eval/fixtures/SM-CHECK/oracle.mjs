@@ -505,7 +505,13 @@ function readEnv(envPath) {
 
 function opisSources(opisText) {
   const tok = new Map();
-  for (const raw of String(opisText).split(/\r?\n/)) {
+  const declared = new Set();
+  for (let raw of String(opisText).split(/\r?\n/)) {
+    if (raw.startsWith('> объявлено без реализации: ')) {
+      if (declared.has(raw)) continue;
+      declared.add(raw);
+      raw = raw.slice('> объявлено без реализации: '.length);
+    }
     if (!raw || /^[ \t]/.test(raw) || /^(#|⟹|\(|>|-|```|<!--)/.test(raw)) continue;
     const i = raw.indexOf(SEP);
     if (i < 0) continue;
@@ -554,7 +560,41 @@ function readParts(dir) {
     const op = path.join(dir, name.replace(/\.md$/, '.opis.md'));
     if (fs.existsSync(op)) for (const k of parseOpis(fs.readFileSync(op, 'utf8')).keys.keys()) add(opis, k, a);
   }
-  return { parts, card, opis };
+  const notes = fs.readdirSync(dir).filter((n) => /^(part-.*|head)\.opis\.md$/.test(n)).map((n) => fs.readFileSync(path.join(dir, n), 'utf8'));
+  return { parts, card, opis, notes };
+}
+
+// Пометка не становится ключом описи. Владение — по файлу, затем по ближайшей папке плана;
+// неоднозначный относительный хвост и отсутствие владельца дают «без хозяина».
+function missedItems(planText, opisTexts) {
+  const clean = (p) => {
+    let s = path.posix.normalize(p.replace(/`/g, '').trim().replace(/\\/g, '/')).replace(/\/$/, '');
+    if (process.platform === 'win32') s = s.replace(/^\/([a-zA-Z])\//, (_, d) => d.toUpperCase() + ':/');
+    return s.replace(/^([a-zA-Z]):/, (_, d) => d.toUpperCase() + ':');
+  };
+  const absolute = (p) => /^(\/|[A-Za-z]:)/.test(p);
+  const match = (source, owned) => source === owned || (!absolute(source) && owned.endsWith('/' + source));
+  const entries = String(planText).split(/\r?\n/).map((l) => l.split('\t')).flatMap((r) => {
+    if (r[0] === 'файл' && r[4] && r[4] !== '-') return [{ p: clean(r[1]), folder: false, a: r[4] }];
+    if (r[0] === 'путь') return [{ p: clean(r[1]), folder: r[2] === 'папки', a: r[3] }];
+    return [];
+  });
+  const notes = new Set(opisTexts.flatMap(splitLines).filter((l) => l.startsWith('> пропущено частью: ')).map((l) => l.slice('> пропущено частью: '.length)));
+  return [...notes].map((note) => {
+    const at = note.indexOf(SEP);
+    if (at < 0) return [note, 'без хозяина'];
+    const source = clean(note.slice(at + SEP.length));
+    const candidates = [];
+    for (const e of entries) {
+      if (!e.folder) { if (match(source, e.p)) candidates.push({ a: e.a, score: source.length + 1 }); continue; }
+      for (let q = path.posix.dirname(source); q !== '.' && q !== '/'; q = path.posix.dirname(q)) {
+        if (match(q, e.p)) { candidates.push({ a: e.a, score: q.length }); break; }
+      }
+    }
+    const best = Math.max(-1, ...candidates.map((c) => c.score));
+    const owners = new Set(candidates.filter((c) => c.score === best).map((c) => c.a));
+    return [note, owners.size === 1 ? [...owners][0] : 'без хозяина'];
+  });
 }
 
 function markers(planText, parts, cardKeys, opisText) {
@@ -620,12 +660,14 @@ export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
   if (bodyFail) fail.push(`тело у ${bb} из ${nb} блоков контракта`);
   const route = res['маршрут'];
   const it = res._items;
-  const lists = { ...it, NOPFX: noPfx.map((k) => [k]), MARKFILE: (mk?._owners ?? []).map((o) => [o]) };
+  const ownerPlan = env.CHECK_PLAN && fs.existsSync(rel(env.CHECK_PLAN)) ? rd(rel(env.CHECK_PLAN)) : '';
+  const lists = { ...it, NOPFX: noPfx.map((k) => [k]), MARKFILE: (mk?._owners ?? []).map((o) => [o]), MISSED: missedItems(ownerPlan, [rd(opisPath), ...(P?.notes ?? [])]) };
   const dobor = {};
   const look = (m, k) => m.get(k) ?? m.get(nopK(k)) ?? null;
   for (const [cat, list] of Object.entries(lists)) for (const item of list) {
     let A;
-    if (!P) A = new Set(['читающий']);
+    if (cat === 'MISSED') A = new Set([item[1]]);
+    else if (!P) A = new Set(['читающий']);
     else if (cat === 'MARKFILE') A = new Set([item[0]]);
     else if (cat === 'DUP') A = new Set([...(look(P.card, item[0]) ?? []), ...(look(P.card, item[1]) ?? [])]);
     else if (['ADD', 'NOSRC', 'EMPTY'].includes(cat)) A = look(P.opis, item[0]) ?? look(P.card, item[0]);
@@ -640,6 +682,8 @@ export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
     'исход': fail.length ? `гейт не пройден — ${fail.join('; ')}` : route === 'В _pending' ? 'в _pending — гард' : route ? 'записать поверх' : 'записать',
     'добор': dobor,
   };
+  res['пропуски'] = {};
+  for (const [note, owner] of lists.MISSED) (res['пропуски'][owner] ??= []).push(note);
   return res;
 }
 

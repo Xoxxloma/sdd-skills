@@ -275,6 +275,7 @@ const fmtClasses = (bc) => Object.entries(bc ?? {}).filter(([, n]) => n > 0).sor
 
 function flatten(r) {
   const out = new Map();
+  if ('пропуски' in r) for (const [a, notes] of Object.entries(r['пропуски'])) out.set(`пропуски.${a}`, [...notes].sort().join('\n'));
   const D = r['черновик'] ?? {};
   for (const k of ['контракт', 'сущности', 'задачи', 'топики', 'бизнес', 'таблицы']) if (k in D) out.set(`черновик.${k}`, D[k].join('/'));
   if ('без префикса' in D) out.set('черновик.без префикса', String(D['без префикса']));
@@ -395,6 +396,16 @@ for (const n of caseNames) {
   const exp = JSON.parse(fs.readFileSync(path.join(casesDir, n, 'expect.json'), 'utf8'));
   const o = readOut(n);
   const parsed = parseOutput(o.out);
+  if (exp['пропуски']) {
+    parsed.r['пропуски'] = {};
+    for (const a of Object.keys(exp['пропуски'])) {
+      const id = a === 'без хозяина' ? 'none' : a;
+      const file = path.join(OUT, `${n}.list-${id}.md`);
+      const list = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+      const block = list.split('## пропущено частью — проверь ключ по источнику и допиши карточку и опись\n')[1] ?? '';
+      parsed.r['пропуски'][a] = block.split(/\r?\n/).filter((l) => l && !l.startsWith('## '));
+    }
+  }
   const em = flatten(exp);
   em.set('код выхода', '0');
   em.set('stderr', '(пусто)');

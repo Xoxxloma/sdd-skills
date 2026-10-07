@@ -149,6 +149,7 @@ title() {  # title <вид пункта перечня добора> — заг�
     nometh) echo 'ключ контракта без метода' ;;
     NOPFX) echo 'ключ REST без общего префикса — поправь путь; вне префикса — только с источником, где ручка зарегистрирована' ;;
     MARKFILE) echo 'в файле пометок больше, чем ключей описи с этим источником — найди недостающие ключи в файле' ;;
+    MISSED) echo 'пропущено частью — проверь ключ по источнику и допиши карточку и опись' ;;
   esac
 }
 
@@ -250,6 +251,10 @@ if [ -n "${CHECK_PLAN:-}" ]; then
         next
       }
       { sub(/\r$/, "") }
+      /^> объявлено без реализации: / {
+        if (declared[$0]++) next
+        sub(/^> объявлено без реализации: /, "")
+      }
       /^[ \t]/ || /^(#|⟹|\(|>|-|```|<!--)/ || /^$/ { next }
       {
         p = index($0, " — "); if (p == 0) next
@@ -486,6 +491,56 @@ fi
 # Исход — гейты сводит скрипт, а не ведущий: маркеры (по сервису и частям), доставка тела контракта
 # (тело меньше чем у половины блоков — не доехало), гард. «Гейт не пройден» — добор, пока бюджет
 # есть; без бюджета — по SKILL.md. Перечень добора — по авторам: часть, голова; у одиночного — читающий.
+# Пометки остатка — отдельные пункты добора, а не ключи описи или новый гейт.
+# Читаем и сводную опись, и описи частей: одинаковая пометка после склейки — один пункт.
+{ cat "$OPIS"; printf '\n'; if [ -n "${CHECK_PARTS:-}" ]; then
+    for o in "$CHECK_PARTS"/part-*.opis.md "$CHECK_PARTS"/head.opis.md; do [ ! -f "$o" ] || { cat "$o"; printf '\n'; }; done
+  fi; } | sed 's/\r$//' | awk '/^> пропущено частью: / { sub(/^> пропущено частью: /, ""); print }' | sort -u > "$TMP/MISSED"
+CHECK_OWNER_PLAN="${CHECK_PLAN:-}" awk -F'\t' -v os="$(uname -s 2>/dev/null)" '
+  function np(p) {
+    gsub(/`/, "", p); gsub(/\\/, "/", p); gsub(/\/\/+/, "/", p)
+    sub(/^[ \t]+/, "", p); sub(/[ \t]+$/, "", p); sub(/^\.\//, "", p); sub(/\/$/, "", p)
+    if (os ~ /^(MINGW|MSYS|CYGWIN)/ && p ~ /^\/[A-Za-z]\//) p = toupper(substr(p, 2, 1)) ":" substr(p, 3)
+    if (p ~ /^[A-Za-z]:/) p = toupper(substr(p, 1, 1)) substr(p, 2)
+    while (sub(/\/\.(\/|$)/, "/", p)) ;
+    while (match(p, /\/[^\/]+\/\.\.(\/|$)/) && substr(p, RSTART + 1, 3) != "../") p = substr(p, 1, RSTART) substr(p, RSTART + RLENGTH)
+    return p
+  }
+  function abs(p) { return p ~ /^(\/|[A-Za-z]:)/ }
+  function same(p, q) { return p == q || (!abs(p) && length(q) > length(p) && substr(q, length(q) - length(p)) == "/" p) }
+  BEGIN {
+    plan = ENVIRON["CHECK_OWNER_PLAN"]
+    if (plan != "") while ((getline l < plan) > 0) {
+      sub(/\r$/, "", l); split(l, r, "\t")
+      if (r[1] == "файл") { p = np(r[2]); files[p] = r[5] }
+      if (r[1] == "путь") { p = np(r[2]); paths[p] = r[4]; kinds[p] = r[3] }
+    }
+  }
+  {
+    line = $0; j = index(line, " — "); owner = ""; best = 0; conflict = 0
+    if (j > 0) {
+      f = np(substr(line, j + 5))
+      # Точный файл старше папки. Совпадение по относительному хвосту должно быть однозначным.
+      for (p in files) if (same(f, p) && files[p] != "-") {
+        if (owner != "" && owner != files[p]) conflict = 1; owner = files[p]; best = length(f) + 1
+      }
+      for (p in paths) {
+        q = f; depth = length(f) + 1
+        if (kinds[p] == "папки") { sub(/\/[^\/]+$/, "", q); depth = length(q) }
+        while (q != f || kinds[p] == "файлы") {
+          if (same(q, p)) {
+            if (depth > best) { owner = paths[p]; best = depth; conflict = 0 }
+            else if (depth == best && owner != paths[p]) conflict = 1
+            break
+          }
+          if (kinds[p] != "папки" || q !~ /\//) break
+          sub(/\/[^\/]+$/, "", q); depth = length(q)
+        }
+      }
+    }
+    if (owner == "" || conflict) owner = "без хозяина"
+    print line "\t" owner
+  }' "$TMP/MISSED" > "$TMP/missed.owners"
 echo "== ИСХОД"
 MG="$(cat "$TMP/markgate" 2>/dev/null)"; [ -n "$MG" ] || MG="плана нет — сверки маркеров нет"
 echo "маркеры: $MG"
@@ -502,17 +557,19 @@ if [ -n "$FAIL" ]; then echo "ИСХОД: гейт не пройден — $FAIL
 elif [ "$ROUTE" = "В _pending" ]; then echo "ИСХОД: в _pending — гард"
 elif [ -n "$ROUTE" ]; then echo "ИСХОД: записать поверх"
 else echo "ИСХОД: записать"; fi
-{ for t in ADD NOSRC EMPTY DUP nometh NOPFX MARKFILE; do awk -v t="$t" '{ print t "\t" $0 }' "$TMP/$t"; done; } > "$TMP/items"
-awk -F'\t' -v parts="${CHECK_PARTS:+1}" -v oo="$TMP/own.opis" -v oc="$TMP/own.card" '
+{ for t in ADD NOSRC EMPTY DUP nometh NOPFX MARKFILE MISSED; do awk -v t="$t" '{ print t "\t" $0 }' "$TMP/$t"; done; } > "$TMP/items"
+awk -F'\t' -v parts="${CHECK_PARTS:+1}" -v oo="$TMP/own.opis" -v oc="$TMP/own.card" -v om="$TMP/missed.owners" '
   function nop(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
   function look(arr, k) { if (k in arr) return arr[k]; if (nop(k) in arr) return arr[nop(k)]; return "" }
   BEGIN {
+    while ((getline l < om) > 0) { split(l, x, "\t"); missed[x[1]] = x[2] }
     while ((getline l < oo) > 0) { split(l, x, "\t"); if (!((x[1], x[2]) in so)) { so[x[1], x[2]] = 1; op[x[1]] = op[x[1]] (op[x[1]] == "" ? "" : ",") x[2] } }
     while ((getline l < oc) > 0) { split(l, x, "\t"); if (!((x[1], x[2]) in sc)) { sc[x[1], x[2]] = 1; cp[x[1]] = cp[x[1]] (cp[x[1]] == "" ? "" : ",") x[2] } }
   }
   {
     t = $1; k = $2
-    if (!parts) a = "читающий"
+    if (t == "MISSED") a = missed[k]
+    else if (!parts) a = "читающий"
     else if (t == "MARKFILE") { a = k; sub(/.*\(часть /, "", a); sub(/\).*/, "", a) }
     else if (t == "DUP") { split(k, d, " ~ "); a = look(cp, d[1]); b = look(cp, d[2]); a = a (a != "" && b != "" ? "," : "") b }
     else if (t == "ADD" || t == "NOSRC" || t == "EMPTY") { a = look(op, k); if (a == "") a = look(cp, k) }
@@ -532,7 +589,7 @@ if [ -s "$TMP/routed" ]; then
       else
         id="$a"; case "$a" in голова) id=head ;; "без хозяина") id=none ;; esac
         file="${CHECK_LISTS%.md}-$id.md"
-        { for t in ADD NOSRC EMPTY DUP nometh NOPFX MARKFILE; do
+        { for t in ADD NOSRC EMPTY DUP nometh NOPFX MARKFILE MISSED; do
             awk -F'\t' -v a="$a" -v t="$t" '$1 == a && $2 == t { print $3 }' "$TMP/routed" > "$TMP/one"
             [ -s "$TMP/one" ] && { echo "## $(title "$t")"; cat "$TMP/one"; echo; }
           done; } > "$file"
@@ -541,3 +598,6 @@ if [ -s "$TMP/routed" ]; then
     echo "ДОБОР $label: $n${file:+ — $file}"
   done < "$TMP/authors"
 else echo "ДОБОР: пусто"; fi
+if [ -n "${CHECK_LISTS:-}" ] && [ -z "${CHECK_PARTS:-}" ] && [ -s "$TMP/MISSED" ]; then
+  { echo "## $(title MISSED)"; cat "$TMP/MISSED"; echo; } >> "$CHECK_LISTS"
+fi

@@ -18,7 +18,9 @@ for (const f of files) {
   const t = lf(fs.readFileSync(p, 'utf8'))
   const first = t.split('\n')[0]
   const who = f.startsWith('head') ? 'голова' : `часть ${f.slice(5, 7)}`
-  if (!BUG.has('nodate') && first.trim() !== `<!-- service-map: ${who} ${date} -->`) { console.log(`ОТКАЗ: ${f} — первая строка «${first.slice(0, 60)}», ждал свежесть ${who} ${date}`); process.exit(3) }
+  const mark = first.trim().match(/^<!-- service-map: часть (\d+) (\S+) -->$/)
+  const fresh = f.startsWith('head') ? first.trim() === `<!-- service-map: голова ${date} -->` : mark && Number(mark[1]) === Number(f.slice(5, 7)) && mark[2] === date
+  if (!BUG.has('nodate') && !fresh) { console.log(`ОТКАЗ: ${f} — первая строка «${first.slice(0, 60)}», ждал свежесть ${who} ${date}`); process.exit(3) }
   text[f] = t.split('\n').slice(1).join('\n')
 }
 const head = parseCard(text['head.md'])
