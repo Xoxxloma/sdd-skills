@@ -82,3 +82,16 @@ export function questionBlocks (answer) {
 
 /** Заранее объявленный отказ: «если не укажете — будет TBD» (прод 2). Вариант «Пока не знаю, отложить» — законен. */
 export const RE_TBD_PROMISE = /если\s+(?:вы\s+)?не\s+(?:укаж|ответ|назов|уточн|приш)[^\n]{0,120}TBD|TBD[^\n]{0,60}если\s+(?:вы\s+)?не\s+(?:укаж|ответ|назов|уточн)/i
+
+/** Тело раздела «N.M» (заголовок `##`/`###`, с «§» или без) до следующего заголовка уровня ≤ 3. */
+export function section (text, num) {
+  if (!text) return null
+  const lines = text.split('\n')
+  const esc = num.replace('.', '\\.')
+  const re = new RegExp(`^#{2,4}\\s*§?\\s*${esc}\\.?(\\s|$)`)
+  const from = lines.findIndex((l) => re.test(l))
+  if (from < 0) return null
+  const rest = lines.slice(from + 1)
+  const to = rest.findIndex((l) => /^#{1,3}\s/.test(l))
+  return (to < 0 ? rest : rest.slice(0, to)).join('\n').trim()
+}

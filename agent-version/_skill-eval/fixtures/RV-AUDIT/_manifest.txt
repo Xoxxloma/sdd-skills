@@ -1,7 +1,11 @@
 bt-clean-prompt.txt
 bt-dirty-prompt.txt
+bt-empty-prompt.txt
+bt-no43-prompt.txt
 docs/RMS-5101/business_requirements.md
 docs/RMS-5102/business_requirements.md
+docs/RMS-5103/business_requirements.md
+docs/RMS-5104/business_requirements.md
 docs/RMS-5201/business_requirements.md
 docs/RMS-5201/stages/index.md
 docs/RMS-5201/technical_specification.md
