@@ -19,7 +19,7 @@
 
 import { readdirSync, statSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { read, turn, apiFailed, writesBt, section } from './br-lib.mjs'
+import { read, turn, apiFailed, writesBt, section, sectionByTitle, askedBlocks, dropNegated } from './br-lib.mjs'
 
 const CASES = {
   card: { rel: 'docs/REP-304/business_requirements.md' },
@@ -43,7 +43,7 @@ export function overlap (s14, s41) {
 export function gradeT1 (cs, answer, stream) {
   const r = { wrote: writesBt(stream) > 0 }
   if (cs === 'card') r.anchor = RE_ANCHOR.test(answer || '')
-  if (cs === 'new') r.fake = RE_FAKE_SRC.test(answer || '')
+  if (cs === 'new') r.fake = RE_FAKE_SRC.test(dropNegated(askedBlocks(answer)))
   r.ok = !r.wrote && (cs === 'card' ? r.anchor : !r.fake)
   return r
 }
@@ -51,7 +51,8 @@ export function gradeT1 (cs, answer, stream) {
 export function gradeDoc (cs, text) {
   const r = { exists: text !== null }
   if (!r.exists) { r.ok = false; return r }
-  const s14 = section(text, '1.4'); const s41 = section(text, '4.1')
+  const sec = sectionByTitle(text, /как\s+сейчас/i); const s14 = sec ? sec.body : null; r.num = sec ? sec.num : null
+  const s41 = section(text, '4.1') || (sectionByTitle(text, /описание\s+функционал/i) || {}).body || ''
   r.has14 = !!s14
   if (!r.has14) { r.ok = false; return r }
   r.content = cs === 'card' ? /(отозв|отзыв|рассмотр)/i.test(s14) : RE_NONE.test(s14)
@@ -68,6 +69,7 @@ function selftest () {
   ck('T1 card: «отзыв возможен до решения заказчика» — зелёный', gradeT1('card', 'Как сейчас: отзыв акта возможен до решения заказчика, после решения акт не меняется. Верно?', '').ok, true)
   ck('T1 card: без правила карточки — красный', gradeT1('card', 'Как сейчас устроено исправление акта?', '').ok, false)
   ck('T1 new: ссылка «в карточке» без окружения — красный', gradeT1('new', 'В карточке вижу, что вещи сейчас учитываются в журнале — верно?', '').ok, false)
+  ck('T1 new: «окружение (services/, context/) не найдено» — зелёный', gradeT1('new', 'Окружение (services/, context/) не найдено — работаю от брифа.\n\nКак сейчас — понял так: учёта нет. Верно?', '').ok, true)
   ck('T1 new: без ссылок — зелёный', gradeT1('new', 'Как сейчас — понял так: учёта нет, вещи оставляют на ресепшене. Верно?', '').ok, true)
   const doc = (s14, s41) => `# БТ\n\n### 1.3. Заказчик\nX\n\n### 1.4. Как сейчас\n${s14}\n\n## 2. Цели\n\n### 4.1. Описание функционала\n${s41}\n\n### 4.2. Критерии\n…\n`
   const after = '- **FR-1.** Прораб убирает ошибочную работу из отправленного акта до решения заказчика.'
@@ -100,7 +102,7 @@ for (const n of runs) {
   if (ok) green++
   const notes = [
     a.wrote && 'ход 1: ФАЙЛ ЗАПИСАН', a.anchor === false && 'ход 1: нет правила карточки в гипотезе', a.fake && 'ход 1: ссылка на несуществующий источник',
-    !b.exists && 'файла нет', b.exists && !b.has14 && '§1.4 нет', b.content === false && '§1.4: не то содержание',
+    !b.exists && 'файла нет', b.exists && !b.has14 && 'раздела «Как сейчас» нет', b.num && b.num !== '1.4' && `«Как сейчас» под номером ${b.num}`, b.content === false && '§1.4: не то содержание',
     b.dup && `§1.4 повторяет §4.1 (${Math.round(b.overlap * 100)} %)`,
   ].filter(Boolean)
   console.log(`  ${n}: ${ok ? 'зелёный' : 'красный'}${notes.length ? ' · ' + notes.join(' · ') : ''}`)

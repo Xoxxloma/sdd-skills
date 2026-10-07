@@ -1,0 +1,10 @@
+снимок скилла уже есть — прогон читает ЕГО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-pilot/_skills/spec-review.SKILL.md
+проба: rv-bt-no43   фикстура: RV-AUDIT   скилл: spec-review
+effort: умолчание CLI
+плечо: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-pilot/rv-bt-no43
+скилл: /tmp/skill-eval-rv-bt-no43/2026-10-07-br-sections-pilot-skills/spec-review/SKILL.md
+промпт: /home/user/sdd-skills/agent-version/_skill-eval/fixtures/RV-AUDIT/bt-no43-prompt.txt
+прогонов: 1, параллельно: 1
+  run-1 — готов
+ГОТОВО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-pilot/rv-bt-no43 — песочниц с ответом: 1 из 1
+снимок из /tmp снесён: /tmp/skill-eval-rv-bt-no43/2026-10-07-br-sections-pilot-skills (журнальная копия осталась в /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-pilot/_skills/)

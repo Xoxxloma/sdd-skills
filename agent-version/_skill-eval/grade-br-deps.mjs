@@ -17,7 +17,7 @@
 
 import { readdirSync, statSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { read, turn, apiFailed, section } from './br-lib.mjs'
+import { read, turn, apiFailed, section, sectionByTitle } from './br-lib.mjs'
 
 const REL = 'docs/CNT-88/business_requirements.md'
 export const RE_DATE = /\b\d{1,2}\.\d{1,2}(\.\d{2,4})?\b|(?<!\p{L})до\s+\d|(?<!\p{L})к\s+\d{1,2}(?!\d)|\b20\d\d\b|недел|квартал|(?<!\p{L})срок\p{L}*\s*[:—-]\s*(?=\S)(?!(не|нет)(?!\p{L}))/iu
@@ -28,7 +28,8 @@ const RE_WAIT = /(жд[её]м|ожида\p{L}*\s+от|зависим\p{L}*\s+о
 export function gradeDoc (cs, text) {
   const r = { exists: text !== null }
   if (!r.exists) { r.ok = false; return r }
-  const s34 = section(text, '3.4'); const s33 = section(text, '3.3') || ''
+  const sec = sectionByTitle(text, /внешн\S*\s+зависим/i); const s34 = sec ? sec.body : null; r.num = sec ? sec.num : null
+  const s33 = section(text, '3.3') || (sectionByTitle(text, /архитектур|интеграц/i) || {}).body || ''
   r.has34 = !!s34
   if (!r.has34) { r.ok = false; return r }
   r.open = /TBD|⚠/.test(s34)
@@ -61,6 +62,7 @@ function selftest () {
   ck('no: «Внешних зависимостей нет» — зелёный', gradeDoc('no', doc(s33, 'Внешних зависимостей нет.')).ok, true)
   ck('no: «Отсутствуют» — зелёный', gradeDoc('no', doc(s33, 'Отсутствуют.')).ok, true)
   ck('no: «нетривиальная интеграция» без «нет» — красный', gradeDoc('no', doc(s33, 'Нетривиальная интеграция со шлюзом.')).ok, false)
+  ck('no: «§5.5 Интеграции и зависимости» — не раздел зависимостей, красный', gradeDoc('no', `# БТ\n### 3.3. Интеграции\nX\n### 5.5 Интеграции и зависимости\nВнешних зависимостей нет.\n`).ok, false)
   ck('no: TBD — красный', gradeDoc('no', doc(s33, 'TBD')).ok, false)
   console.log(bad === 0 ? '\nсамопроверка: ok' : `\nсамопроверка: ПРОВАЛОВ ${bad}`)
   process.exit(bad === 0 ? 0 : 1)
@@ -81,7 +83,7 @@ for (const n of runs) {
   const b = gradeDoc(cs, read(join(dir, REL)))
   if (b.ok) green++
   const notes = [
-    !b.exists && 'файла нет', b.exists && !b.has34 && '§3.4 нет', b.open && '§3.4: TBD/⚠️',
+    !b.exists && 'файла нет', b.exists && !b.has34 && 'раздела «Внешние зависимости» нет', b.num && b.num !== '3.4' && `«Внешние зависимости» под номером ${b.num}`, b.open && '§3.4: TBD/⚠️',
     b.dep === false && '§3.4: не названо, чего и от кого ждём', b.date && '§3.4: срок, которого не давали', b.mix && 'зависимость переехала в §3.3',
     b.none === false && '§3.4: нет «нет»',
   ].filter(Boolean)

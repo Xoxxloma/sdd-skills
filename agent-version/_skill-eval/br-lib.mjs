@@ -95,3 +95,26 @@ export function section (text, num) {
   const to = rest.findIndex((l) => /^#{1,3}\s/.test(l))
   return (to < 0 ? rest : rest.slice(0, to)).join('\n').trim()
 }
+
+/** Раздел по заголовку, номер любой: { num, body } или null. Номер — не опора: пилот 2026-10-07 —
+ *  Haiku написал свою нумерацию, и «§4.3 Пользовательские сценарии» засчитался бы как «Бизнес-данные». */
+export function sectionByTitle (text, titleRe) {
+  if (!text) return null
+  const lines = text.split('\n')
+  const from = lines.findIndex((l) => /^#{2,4}\s/.test(l) && titleRe.test(l))
+  if (from < 0) return null
+  const num = (lines[from].match(/^#{2,4}\s*§?\s*(\d+(?:\.\d+)*)/) || [])[1] || null
+  const rest = lines.slice(from + 1)
+  const to = rest.findIndex((l) => /^#{1,3}\s/.test(l))
+  return { num, body: (to < 0 ? rest : rest.slice(0, to)).join('\n').trim() }
+}
+
+/** Абзацы ответа с вопросом и список вариантов сразу за таким абзацем — там гипотезы и варианты
+ *  ответа (L189–191: токен не идёт «в варианты ответа и в БТ»); пересказ окружения сюда не входит. */
+export function askedBlocks (answer) {
+  const bs = (answer || '').split(/\n\s*\n/)
+  return bs.filter((b, i) => b.includes('?') || (i > 0 && bs[i - 1].includes('?') && /^\s*([-*•]|\d+[.)]|[а-яa-z]\))\s/i.test(b))).join('\n\n')
+}
+
+/** Строки без отрицания наличия: «окружение (services/, context/) не найдено» — не ссылка на источник. */
+export const dropNegated = (s) => (s || '').split('\n').filter((l) => !/не\s+найден|не\s+нашл|отсутству|нет\s+(ни\s+)?(карточ|окружен|папк|services)|пуст/i.test(l)).join('\n')

@@ -21,7 +21,7 @@
 
 import { readdirSync, statSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { read, turn, apiFailed, writesBt, section } from './br-lib.mjs'
+import { read, turn, apiFailed, writesBt, sectionByTitle, askedBlocks, dropNegated } from './br-lib.mjs'
 
 const CASES = {
   obj: { rel: 'docs/REP-301/business_requirements.md', turns: 2 },
@@ -66,9 +66,11 @@ const norm = (s) => (s || '').toLowerCase().replace(/ё/g, 'е').replace(/[*_`«
 export function gradeT1 (cs, answer, stream) {
   const r = {}
   r.wrote = writesBt(stream) > 0
-  r.code = RE_CODE_OBJ.test(answer || '')
-  r.attr = RE_ATTR.test(answer || '') || RE_ATTR_Q.test(answer || '')
-  r.fake = cs === 'none' && RE_FAKE_SRC.test(answer || '')
+  // Только вопросы и варианты: пересказ прочитанной карточки с токеном — не дефект (L189–191, BR-REAL).
+  const qa = askedBlocks(answer)
+  r.code = RE_CODE_OBJ.test(qa)
+  r.attr = RE_ATTR.test(qa) || RE_ATTR_Q.test(qa)
+  r.fake = cs === 'none' && RE_FAKE_SRC.test(dropNegated(qa))
   r.ok = !r.wrote && !r.code && !r.attr && !r.fake
   return r
 }
@@ -76,7 +78,9 @@ export function gradeT1 (cs, answer, stream) {
 export function gradeDoc (cs, text) {
   const r = { exists: text !== null }
   if (!r.exists) { r.ok = false; return r }
-  const s = section(text, '4.3')
+  const sec = sectionByTitle(text, /бизнес[- ]?данн/i)
+  const s = sec ? sec.body : null
+  r.num = sec ? sec.num : null
   r.has43 = s !== null && s.length > 0
   if (!r.has43) { r.ok = false; return r }
   r.code = RE_CODE_OBJ.test(s) || RE_CODE_STATE.test(s)
@@ -119,6 +123,10 @@ function selftest () {
   ck('T2 obj: §4.3 нет — красный', gradeDoc('obj', '# БТ\n### 4.2. Критерии\n…\n### 4.5. Разбиение\n…').ok, false)
   ck('T2 obj: кодовое имя в ячейке — красный', gradeDoc('obj', doc(obj43.replace('позиция сметы', '`WorkItem`'))).ok, false)
   ck('T2 obj: выдуманное сведение «геолокация» — красный', gradeDoc('obj', doc(obj43 + '\n\nСведения фото: геолокация, дата съёмки.')).ok, false)
+  ck('T2 obj: «§4.3 Пользовательские сценарии» — не «Бизнес-данные», красный', gradeDoc('obj', doc(obj43).replace('### 4.3. Бизнес-данные', '### 4.3 Пользовательские сценарии')).ok, false)
+  ck('T1 obj: токен в пересказе карточки, не в вопросе — зелёный', gradeT1('obj', 'В карточке repairy-api описаны работы сметы (`WorkItem`) и акты.\n\n' + q1, '').ok, true)
+  ck('T1 none: «окружение (services/) не найдено» — зелёный', gradeT1('none', 'Окружение (services/, context/) не найдено — работаю от брифа.\n\n' + q1, '').ok, true)
+  ck('T1 none: «в карточке сервиса вижу …?» — красный', gradeT1('none', 'В карточке сервиса вижу фото у работы — так?', '').ok, false)
   ck('T2 obj: заголовок «## §4.3» — разбирается', gradeDoc('obj', doc(obj43).replace('### 4.3.', '## §4.3')).ok, true)
   ck('T2 dlt0: «не применимо: причина» — зелёный', gradeDoc('dlt0', doc('Не применимо: данные не меняются — причина отклонения в акте уже есть.')).ok, true)
   ck('T2 dlt0: таблица вместо «не применимо» — красный', gradeDoc('dlt0', doc(obj43)).ok, false)
@@ -161,7 +169,7 @@ for (const n of runs) {
   if (ok) green++
   const notes = [
     a.wrote && 'ход 1: ФАЙЛ ЗАПИСАН', a.code && 'ход 1: кодовое имя объекта', a.attr && 'ход 1: вопрос/гипотеза по сведениям', a.fake && 'ход 1: ссылка на несуществующий источник',
-    !b.exists && 'файла нет', b.exists && !b.has43 && '§4.3 нет', b.code && '§4.3: кодовое имя',
+    !b.exists && 'файла нет', b.exists && !b.has43 && 'раздела «Бизнес-данные» нет', b.num && b.num !== '4.3' && `«Бизнес-данные» под номером ${b.num}`, b.code && '§4.3: кодовое имя',
     b.objects === false && '§4.3: не все объекты', b.attr && '§4.3: сведения, которых не давали',
     b.na === false && '§4.3: нет «не применимо»', b.reason === false && '§4.3: нет причины отклонения', b.change === false && '§4.3: не сказано, что новое',
     b.missing && b.missing.length && `§4.3: потеряно ${b.missing.length} из ${FILE_ITEMS.length}: ${b.missing.join('; ')}`, b.fileCode && 'кодовое имя из файла в БТ',
