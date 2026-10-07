@@ -1,0 +1,10 @@
+снимок скилла: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-sonnet/_skills/task-decomposition-doc.SKILL.md
+проба: td-path-w   фикстура: TD-PATH   скилл: task-decomposition-doc
+effort: умолчание CLI
+плечо: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-sonnet/td-path-w
+скилл: /tmp/skill-eval-td-path-w/2026-10-07-br-sections-final-sonnet-skills/task-decomposition-doc/SKILL.md
+промпт: /home/user/sdd-skills/agent-version/_skill-eval/fixtures/TD-PATH/w-prompt.txt
+прогонов: 1, параллельно: 1
+  run-1 — готов
+ГОТОВО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-sonnet/td-path-w — песочниц с ответом: 1 из 1
+снимок из /tmp снесён: /tmp/skill-eval-td-path-w/2026-10-07-br-sections-final-sonnet-skills (журнальная копия осталась в /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-sonnet/_skills/)

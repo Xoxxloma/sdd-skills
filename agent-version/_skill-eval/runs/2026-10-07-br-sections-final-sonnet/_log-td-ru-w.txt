@@ -1,0 +1,10 @@
+снимок скилла уже есть — прогон читает ЕГО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-sonnet/_skills/task-decomposition-doc.SKILL.md
+проба: td-ru-w   фикстура: TD-RU   скилл: task-decomposition-doc
+effort: умолчание CLI
+плечо: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-sonnet/td-ru-w
+скилл: /tmp/skill-eval-td-ru-w/2026-10-07-br-sections-final-sonnet-skills/task-decomposition-doc/SKILL.md
+промпт: /home/user/sdd-skills/agent-version/_skill-eval/fixtures/TD-RU/w-prompt.txt
+прогонов: 1, параллельно: 1
+  run-1 — готов
+ГОТОВО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-sonnet/td-ru-w — песочниц с ответом: 1 из 1
+снимок из /tmp снесён: /tmp/skill-eval-td-ru-w/2026-10-07-br-sections-final-sonnet-skills (журнальная копия осталась в /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-sonnet/_skills/)

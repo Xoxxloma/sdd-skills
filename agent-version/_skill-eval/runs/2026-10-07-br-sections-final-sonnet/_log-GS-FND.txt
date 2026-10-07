@@ -1,0 +1,4 @@
+снимок скилла: 338 строк, рефов: 4
+фикстура: GS-FND   прогонов: 1   скилл: /home/user/sdd-skills/agent-version/analyst-workspace   модель: sonnet
+  run-1 — готов
+ГОТОВО: 1 из 1

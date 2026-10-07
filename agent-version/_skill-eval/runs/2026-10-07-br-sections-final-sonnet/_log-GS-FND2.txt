@@ -1,0 +1,4 @@
+снимок уже есть — прогон читает ЕГО (338 строк)
+фикстура: GS-FND2   прогонов: 1   скилл: /home/user/sdd-skills/agent-version/analyst-workspace   модель: sonnet
+  run-1 — готов
+ГОТОВО: 1 из 1
