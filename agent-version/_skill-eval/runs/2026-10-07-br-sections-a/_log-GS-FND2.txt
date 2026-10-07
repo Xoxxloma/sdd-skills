@@ -1,0 +1,6 @@
+снимок уже есть — прогон читает ЕГО (338 строк)
+фикстура: GS-FND2   прогонов: 3   скилл: /home/user/sdd-skills/agent-version/analyst-workspace   модель: haiku
+  run-3 — готов
+  run-2 — готов
+  run-1 — готов
+ГОТОВО: 3 из 3

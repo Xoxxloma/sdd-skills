@@ -1,0 +1,12 @@
+снимок скилла уже есть — прогон читает ЕГО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a/_skills/spec-review.SKILL.md
+проба: rv-clean   фикстура: RV-CLEAN   скилл: spec-review
+effort: умолчание CLI
+плечо: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a/rv-clean
+скилл: /tmp/skill-eval-rv-clean/2026-10-07-br-sections-a-skills/spec-review/SKILL.md
+промпт: /home/user/sdd-skills/agent-version/_skill-eval/fixtures/RV-CLEAN/rv-prompt.txt
+прогонов: 3, параллельно: 3
+  run-1 — готов
+  run-2 — готов
+  run-3 — готов
+ГОТОВО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a/rv-clean — песочниц с ответом: 3 из 3
+снимок из /tmp снесён: /tmp/skill-eval-rv-clean/2026-10-07-br-sections-a-skills (журнальная копия осталась в /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a/_skills/)

@@ -69,7 +69,9 @@ export function gradeT1 (cs, answer, stream) {
   // Только вопросы и варианты: пересказ прочитанной карточки с токеном — не дефект (L189–191, BR-REAL).
   const qa = askedBlocks(answer)
   r.code = RE_CODE_OBJ.test(qa)
-  r.attr = RE_ATTR.test(qa) || RE_ATTR_Q.test(qa)
+  // Строки гипотезы о рисках (гейт 6) — не о сведениях: «риск — большие размеры файлов» (пилот A, br-data-none).
+  const qaData = qa.split('\n').filter((l) => !/риск/i.test(l)).join('\n')
+  r.attr = RE_ATTR.test(qaData) || RE_ATTR_Q.test(qaData)
   r.fake = cs === 'none' && RE_FAKE_SRC.test(dropNegated(qa))
   r.ok = !r.wrote && !r.code && !r.attr && !r.fake
   return r
@@ -126,6 +128,8 @@ function selftest () {
   ck('T2 obj: «§4.3 Пользовательские сценарии» — не «Бизнес-данные», красный', gradeDoc('obj', doc(obj43).replace('### 4.3. Бизнес-данные', '### 4.3 Пользовательские сценарии')).ok, false)
   ck('T1 obj: токен в пересказе карточки, не в вопросе — зелёный', gradeT1('obj', 'В карточке repairy-api описаны работы сметы (`WorkItem`) и акты.\n\n' + q1, '').ok, true)
   ck('T1 none: «окружение (services/) не найдено» — зелёный', gradeT1('none', 'Окружение (services/, context/) не найдено — работаю от брифа.\n\n' + q1, '').ok, true)
+  ck('T1 none: «риски: большие размеры файлов?» — не вопрос о сведениях, зелёный', gradeT1('none', '- Есть ли риски: потеря фото, конфиденциальность, большие размеры файлов?\n\n' + q1, '').ok, true)
+  ck('T1 obj: «какие поля у фото — дата съёмки?» — красный', gradeT1('obj', 'Какие сведения хранить у фото — дата съёмки, автор?', '').ok, false)
   ck('T1 none: «в карточке сервиса вижу …?» — красный', gradeT1('none', 'В карточке сервиса вижу фото у работы — так?', '').ok, false)
   ck('T2 obj: заголовок «## §4.3» — разбирается', gradeDoc('obj', doc(obj43).replace('### 4.3.', '## §4.3')).ok, true)
   ck('T2 dlt0: «не применимо: причина» — зелёный', gradeDoc('dlt0', doc('Не применимо: данные не меняются — причина отклонения в акте уже есть.')).ok, true)
