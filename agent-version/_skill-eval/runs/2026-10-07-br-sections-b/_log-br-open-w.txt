@@ -1,0 +1,12 @@
+снимок скилла: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-b/_skills/business-requirements-doc.SKILL.md
+проба: br-open-w   фикстура: BR-OPEN   скилл: business-requirements-doc
+effort: умолчание CLI
+плечо: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-b/br-open-w
+скилл: /tmp/skill-eval-br-open-w/2026-10-07-br-sections-b-skills/business-requirements-doc/SKILL.md
+промпт: /home/user/sdd-skills/agent-version/_skill-eval/fixtures/BR-OPEN/w-prompt.txt
+прогонов: 3, параллельно: 3
+  run-2 — готов
+  run-3 — готов
+  run-1 — готов
+ГОТОВО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-b/br-open-w — песочниц с ответом: 3 из 3
+снимок из /tmp снесён: /tmp/skill-eval-br-open-w/2026-10-07-br-sections-b-skills (журнальная копия осталась в /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-b/_skills/)
