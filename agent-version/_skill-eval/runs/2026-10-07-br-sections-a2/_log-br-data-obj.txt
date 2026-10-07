@@ -1,0 +1,16 @@
+снимок скилла: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a2/_skills/business-requirements-doc.SKILL.md
+проба: br-data-obj   фикстура: BR-DATA-CARDS   скилл: business-requirements-doc
+реплика аналитика: obj-turn2.txt   ходов до 2 подряд без движения, потолок 2
+effort: умолчание CLI
+плечо: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a2/br-data-obj
+скилл: /tmp/skill-eval-br-data-obj/2026-10-07-br-sections-a2-skills/business-requirements-doc/SKILL.md
+промпт: /home/user/sdd-skills/agent-version/_skill-eval/fixtures/BR-DATA-CARDS/obj-prompt.txt
+прогонов: 3, параллельно: 3
+  run-1 — ходов: 2, строк в трассе: 0
+  run-1 — готов
+  run-3 — ходов: 2, строк в трассе: 0
+  run-3 — готов
+  run-2 — ходов: 2, строк в трассе: 0
+  run-2 — готов
+ГОТОВО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a2/br-data-obj — песочниц с ответом: 3 из 3
+снимок из /tmp снесён: /tmp/skill-eval-br-data-obj/2026-10-07-br-sections-a2-skills (журнальная копия осталась в /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a2/_skills/)
