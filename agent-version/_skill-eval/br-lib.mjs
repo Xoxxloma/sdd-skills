@@ -57,7 +57,7 @@ export function ledger (answer) {
     if (!m) continue
     let last = null; let at = -1
     for (const [ch, v] of MARKS) { const i = l.lastIndexOf(ch); if (i > at) { at = i; last = v } }
-    if (last && Number(m[1]) <= 14 && !(m[1] in out)) out[m[1]] = last
+    if (last && Number(m[1]) <= 17 && !(m[1] in out)) out[m[1]] = last  // гейты 0–17 (15–17 — с business-requirements-doc 1.2.0)
   }
   return Object.keys(out).length ? out : null
 }
