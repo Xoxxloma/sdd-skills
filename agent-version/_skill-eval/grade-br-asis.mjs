@@ -26,16 +26,18 @@ const CASES = {
   new: { rel: 'docs/OFC-55/business_requirements.md' },
 }
 // Правило из «Бизнес-правил» карточки (`WorkAcceptance`): отзыв до рассмотрения, после — неизменен.
-export const RE_ANCHOR = /(отозв\p{L}*[^\n]{0,120}(пока|до\s+того|не\s+рассмотр|до\s+рассмотр|не\s+вын[её]с)|рассмотр\p{L}*[^\n]{0,100}(неизмен|нельзя\s+(изменить|отозвать|поправить|исправить)))/iu
+export const RE_ANCHOR = /((отозв|отзыв)\p{L}*[^\n]{0,120}(пока|до\s+того|не\s+рассмотр|до\s+(его\s+)?рассмотр|до\s+решени|не\s+вын[её]с)|(рассмотр|решени)\p{L}*[^\n]{0,100}(неизмен|нельзя\s+(изменить|отозвать|поправить|исправить)|не\s+меня))/iu
 export const RE_FAKE_SRC = /(services\/|карточк\p{L}*\s+(сервис|сервера)|в\s+карточке|по\s+коду|из\s+кода)/iu
 const RE_NONE = /(никак|уч[её]т\p{L}*\s+(нет|не\s+вед)|не\s+уч[иі]тыва|не\s+ведётся|не\s+ведется|оставляют\s+на\s+ресепшен|не\s+делает)/iu
 
-const sentences = (s) => (s || '').toLowerCase().replace(/ё/g, 'е').split(/[.;\n]+/).map((x) => x.replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim()).filter((x) => x.split(' ').length >= 5)
-/** Доля предложений §1.4 (≥ 5 слов), которые дословно стоят и в §4.1. */
+const clean = (s) => (s || '').toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L}\p{N} .;\n]/gu, ' ')
+const words = (s) => s.split(/\s+/).filter((w) => w.length >= 4)
+const sentences = (s) => clean(s).split(/[.;\n]+/).map((x) => words(x)).filter((x) => x.length >= 4)
+/** Доля предложений §1.4 (≥ 4 значимых слов), у которых ≥ 80 % слов стоят и в §4.1, — пересказ, а не только дословный повтор. */
 export function overlap (s14, s41) {
-  const a = sentences(s14); const b = (s41 || '').toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ')
+  const a = sentences(s14); const b = new Set(words(clean(s41).replace(/[.;\n]/g, ' ')))
   if (!a.length) return 0
-  return a.filter((x) => b.includes(x)).length / a.length
+  return a.filter((ws) => ws.filter((w) => b.has(w)).length / ws.length >= 0.8).length / a.length
 }
 
 export function gradeT1 (cs, answer, stream) {
@@ -52,7 +54,7 @@ export function gradeDoc (cs, text) {
   const s14 = section(text, '1.4'); const s41 = section(text, '4.1')
   r.has14 = !!s14
   if (!r.has14) { r.ok = false; return r }
-  r.content = cs === 'card' ? /(отозв|рассмотр)/i.test(s14) : RE_NONE.test(s14)
+  r.content = cs === 'card' ? /(отозв|отзыв|рассмотр)/i.test(s14) : RE_NONE.test(s14)
   r.overlap = overlap(s14, s41)
   r.dup = r.overlap > 0.5
   r.ok = r.content && !r.dup
@@ -63,6 +65,7 @@ function selftest () {
   let bad = 0
   const ck = (n, got, want) => { const ok = got === want; if (!ok) bad++; console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${n}: ${got} (ожидалось ${want})`) }
   ck('T1 card: гипотеза из карточки — зелёный', gradeT1('card', 'Как сейчас — понял так по карточке: прораб может отозвать акт, пока заказчик его не рассмотрел; после рассмотрения акт неизменен. Верно?', '').ok, true)
+  ck('T1 card: «отзыв возможен до решения заказчика» — зелёный', gradeT1('card', 'Как сейчас: отзыв акта возможен до решения заказчика, после решения акт не меняется. Верно?', '').ok, true)
   ck('T1 card: без правила карточки — красный', gradeT1('card', 'Как сейчас устроено исправление акта?', '').ok, false)
   ck('T1 new: ссылка «в карточке» без окружения — красный', gradeT1('new', 'В карточке вижу, что вещи сейчас учитываются в журнале — верно?', '').ok, false)
   ck('T1 new: без ссылок — зелёный', gradeT1('new', 'Как сейчас — понял так: учёта нет, вещи оставляют на ресепшене. Верно?', '').ok, true)
