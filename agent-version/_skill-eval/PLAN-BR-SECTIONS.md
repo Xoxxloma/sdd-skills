@@ -185,7 +185,7 @@
 4. Батч A → замер сторожей A.
 5. Батч B → замер сторожей B.
 6. Дым Sonnet: по 1 прогону на пробу.
-7. CHANGELOG 5.37: `business-requirements-doc` 1.1.2 → 1.2.0, `task-decomposition-doc` 1.0.1 → 1.1.0,
+7. CHANGELOG 5.38 (5.37 занят — `analyst-skills-update`): `business-requirements-doc` 1.1.2 → 1.2.0, `task-decomposition-doc` 1.0.1 → 1.1.0,
    `spec-review` 1.0.5 → 1.1.0; незамеренное — форма вариантов шага Б (инструмента вопросов на стенде
    нет). RELEASE-NOTES. В `SKILL.md` чисел стенда нет.
 
