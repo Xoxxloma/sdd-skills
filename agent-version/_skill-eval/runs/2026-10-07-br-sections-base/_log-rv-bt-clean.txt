@@ -1,0 +1,12 @@
+снимок скилла: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-base/_skills/spec-review.SKILL.md
+проба: rv-bt-clean   фикстура: RV-AUDIT   скилл: spec-review
+effort: умолчание CLI
+плечо: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-base/rv-bt-clean
+скилл: /tmp/skill-eval-rv-bt-clean/2026-10-07-br-sections-base-skills/spec-review/SKILL.md
+промпт: /home/user/sdd-skills/agent-version/_skill-eval/fixtures/RV-AUDIT/bt-clean-prompt.txt
+прогонов: 3, параллельно: 3
+  run-3 — готов
+  run-2 — готов
+  run-1 — готов
+ГОТОВО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-base/rv-bt-clean — песочниц с ответом: 3 из 3
+снимок из /tmp снесён: /tmp/skill-eval-rv-bt-clean/2026-10-07-br-sections-base-skills (журнальная копия осталась в /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-base/_skills/)
