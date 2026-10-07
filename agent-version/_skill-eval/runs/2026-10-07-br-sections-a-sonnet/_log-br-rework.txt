@@ -1,0 +1,10 @@
+снимок скилла уже есть — прогон читает ЕГО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a-sonnet/_skills/business-requirements-doc.SKILL.md
+проба: br-rework   фикстура: BR-REWORK   скилл: business-requirements-doc
+effort: умолчание CLI
+плечо: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a-sonnet/br-rework
+скилл: /tmp/skill-eval-br-rework/2026-10-07-br-sections-a-sonnet-skills/business-requirements-doc/SKILL.md
+промпт: /home/user/sdd-skills/agent-version/_skill-eval/fixtures/BR-REWORK/rework-prompt.txt
+прогонов: 1, параллельно: 1
+  run-1 — готов
+ГОТОВО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a-sonnet/br-rework — песочниц с ответом: 1 из 1
+снимок из /tmp снесён: /tmp/skill-eval-br-rework/2026-10-07-br-sections-a-sonnet-skills (журнальная копия осталась в /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a-sonnet/_skills/)
