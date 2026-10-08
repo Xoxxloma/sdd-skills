@@ -1,6 +1,6 @@
 ---
 name: technical-spec-doc
-version: 1.3.3
+version: 1.4.0
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
 description: 'Turns a confirmed business-requirements doc (БТ/BRD/SRS) into ONE Russian Markdown technical spec (technical_specification.md, saved next to the БТ), organized around INTERACTIONS — the new and changed contracts crossing service or FE/BE boundaries — so a frontend agent and a backend agent code against the same contracts and meet without after-the-fact stitching. There is no code to read: NEW things are designed fully (path, schema, JSON example); anything about an EXISTING service is written only as the analyst confirmed it — inventing an endpoint of a service you cannot see is the worst failure of this skill. Requires a ready БТ (or, by orchestrator flag, a bug report, a change request or an epic-БТ for foundation node #0): given only a brief or an idea it refuses and asks for the business requirements. Use when the БТ is ready and a dev spec is needed.'
@@ -639,8 +639,8 @@ a 🟡 assumption, or resolve a ❓ fork):
 - **Never let a refinement invent.** An unanswered gap stays open; do not quietly fill it
   because the document now "looks" nearly complete. The cardinal sin applies on every
   pass.
-- After editing, **re-run Step 3.5 (ledger), Step 5 (self-review), set or bump «Редакция» and
-  recompute «Статус готовности»** — if «Открытые вопросы» is now empty, flip it to «Готово к разработке»;
+- After editing, **re-run Step 3.5 (ledger), Step 5 (self-review), set or bump «Редакция», update
+  «Автор» by the template rule and recompute «Статус готовности»** — if «Открытые вопросы» is now empty, flip it to «Готово к разработке»;
   otherwise keep «Требуются уточнения (N)» with the recomputed N and the shrunken list. Re-show the updated spec and
   its path.
 - При доработке проверь оформление неприменимого **во всей спеке**, включая старые строки без
@@ -713,6 +713,7 @@ Provenance markers (🟢 / 🔵 / 🟡 / ❓, plus ⚠️ for vague) appear inli
 # Техническая спецификация: [название задачи]
 
 > **Задача:** [номер задачи — напр. ARS-123]
+> **Автор:** [логин того, кто пишет спеку, не автора документа-источника: вывод `whoami` (Linux, macOS, Windows); у `ДОМЕН\логин` — часть после `\`; команда не сработала — `—`. Доработка — список сохрани: твоего логина в нём нет (регистр не важен) — допиши через `, `; стоял `—` — замени]
 > **Источник (БТ):** [файл/название бизнес-требований, на которых основана спека]
 > **Редакция:** [N — первая запись 1, доработка +1; дата — только если известна из окружения]
 >

@@ -1,6 +1,6 @@
 ---
 name: task-decomposition-doc
-version: 1.1.0
+version: 1.1.1
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
 description: 'Splits ONE confirmed epic-level business-requirements doc (the output of business-requirements-doc) into several separately-shippable child parts (части), each a coherent GROUP of its FR-*, and writes a self-contained child БТ per part into its OWN Jira/SberTrack sub-task folder (docs/<EPIC-KEY>/<CHILD-KEY>/business_requirements.md) so technical-spec-doc can run on each child unchanged. It PARTITIONS already-confirmed content and INVENTS NOTHING: every child FR and its acceptance criterion is copied verbatim from the parent epic-БТ; it never creates, splits the meaning of, or adds a requirement or scope the parent lacks. It reads only the epic-БТ, proposes a split, and writes files only after the user confirms the parts, the real child task keys, and the build order. Requires a confirmed epic-БТ already written to a file and takes its path — pasted БТ text is not an input, since the child folders are derived from the epic file’s own folder; given a brief, an idea, or pasted text it STOPS and points to business-requirements-doc first. Use whenever someone wants to break down / decompose / split / разбить an epic or large task into sub-tasks, parts, child stories, or shippable increments before writing tech specs.'
@@ -423,6 +423,7 @@ children:
 |--------|--------------------|---------|
 | frontmatter (NEW) | новое | `parent: <EPIC-KEY>`, `source:`, `slice:`, `owned_fr:`, `shared_fr:`. Единственное структурное добавление; для тех-спеки инертно. |
 | шапка `> Задача Jira/SberTrack:` | sliced | `<CHILD-KEY>` этой части, НЕ эпика. |
+| шапка `> Автор:` | copy | из эпика дословно |
 | Статус готовности + Открытые вопросы | computed | Механически: собери в «Открытые вопросы» унаследованные из эпика TBD/⚠️, попавшие в ЭТУ часть, посчитай их — это N. N ≥ 1 → «Требуются уточнения (N)», N = 0 → «Готово к оценке». Оформление то же, что у эпика, но **N считается по ЭТОЙ части — число эпика не копируется**: у эпика их пять, а в часть попал один. Никакого суждения. |
 | §1.0 Тип | copy | из эпика дословно |
 | §1.1 Проблема | copy | из эпика дословно |

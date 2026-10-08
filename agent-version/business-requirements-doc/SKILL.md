@@ -1,6 +1,6 @@
 ---
 name: business-requirements-doc
-version: 1.2.0
+version: 1.3.0
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
 description: 'Gathers business requirements and writes ONE Markdown spec (BRD→SRS) in Russian. It MAY read the repo as evidence, but nothing enters the spec on your own authority: before writing, every gate is either stated by the user themselves or put to the user and answered, and only what the user explicitly leaves open becomes TBD. The mandatory first question is the linked Jira/SberTrack task key (SMSEC-1234); without it the spec is not written. Before writing it also decides the business cut (§4.5) — several separate deliveries (поставки) → it proposes the split into parts (части); one delivery → it says so explicitly («не применимо: причина») — and puts that proposal to the user in the handoff. Use whenever someone wants to write a ТЗ / BRD / SRS, formalize a request, or describe a task, feature, change, or integration for developers.'
@@ -830,6 +830,7 @@ Only confirmed content is filled; gates the user explicitly deferred (⏭️) ar
 # Бизнес-требования: [название задачи]
 
 > **Задача Jira/SberTrack:** [SMSEC-1234] — обязательно, задаётся первым вопросом (Gate 0).
+> **Автор:** [логин из `whoami` (Linux, macOS, Windows); у `ДОМЕН\логин` — часть после `\`; команда не сработала — `—`. Файл уже был — список сохрани: твоего логина в нём нет (регистр не важен) — допиши через `, `; стоял `—` — замени]
 >
 > **Статус готовности:** [Готово к оценке | Требуются уточнения (N)]
 > — **Заполняется последним** (Step 4). В момент записи файла здесь стоит
