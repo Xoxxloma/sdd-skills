@@ -1,0 +1,6 @@
+фикстура: SM-MONO-SPEC, сервис: casedesk
+модель: sonnet; прогонов: 3; параллельность: 2; таймаут: 7200 c
+папка скилла: /c/Users/Konstantin/projects/product-skills/agent-version/service-map-2.0
+снимок: _skills/service-map (1413 строк SKILL.md, 8 файлов reference/); подмена: K=как в тексте w=как в тексте
+копия для прогона: C:/Users/Konstantin/AppData/Local/Temp/sm-mono-skills/2026-10-08-sm311-spec/service-map
+claude: /c/Users/Konstantin/AppData/Roaming/npm/claude

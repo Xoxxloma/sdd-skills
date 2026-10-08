@@ -564,6 +564,18 @@ function readParts(dir) {
   return { parts, card, opis, notes };
 }
 
+// Блок контракта у ключа с пометкой «объявлено без реализации» — пункт добора автору блока.
+// Сравнение без хвоста-вызова у не-HTTP ключей и без имён параметров пути.
+function declItems(opisTexts, contractKeys) {
+  const NOTE = '> объявлено без реализации: ';
+  const same = (k) => nopK(k).replace(/\{[^}]*\}/g, '{}');
+  const declared = new Set(opisTexts.flatMap(splitLines).filter((l) => l.startsWith(NOTE)).map((l) => {
+    const s = l.slice(NOTE.length); const i = s.indexOf(SEP);
+    return same(norm(i < 0 ? s : s.slice(0, i)));
+  }));
+  return [...new Set(contractKeys.filter((k) => declared.has(same(k))))].sort().map((k) => [k]);
+}
+
 // Пометка не становится ключом описи. Владение — по файлу, затем по ближайшей папке плана;
 // неоднозначный относительный хвост и отсутствие владельца дают «без хозяина».
 function missedItems(planText, opisTexts) {
@@ -661,7 +673,8 @@ export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
   const route = res['маршрут'];
   const it = res._items;
   const ownerPlan = env.CHECK_PLAN && fs.existsSync(rel(env.CHECK_PLAN)) ? rd(rel(env.CHECK_PLAN)) : '';
-  const lists = { ...it, NOPFX: noPfx.map((k) => [k]), MARKFILE: (mk?._owners ?? []).map((o) => [o]), MISSED: missedItems(ownerPlan, [rd(opisPath), ...(P?.notes ?? [])]) };
+  const contractKeys = parseCard(rd(draftPath)).blocks.контракт.map((b) => headKey(b.header));
+  const lists = { ...it, NOPFX: noPfx.map((k) => [k]), MARKFILE: (mk?._owners ?? []).map((o) => [o]), MISSED: missedItems(ownerPlan, [rd(opisPath), ...(P?.notes ?? [])]), DECL: declItems([rd(opisPath), ...(P?.notes ?? [])], contractKeys) };
   const dobor = {};
   const look = (m, k) => m.get(k) ?? m.get(nopK(k)) ?? null;
   for (const [cat, list] of Object.entries(lists)) for (const item of list) {
