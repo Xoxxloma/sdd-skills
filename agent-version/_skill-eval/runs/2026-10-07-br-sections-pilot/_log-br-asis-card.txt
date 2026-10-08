@@ -1,0 +1,12 @@
+снимок скилла уже есть — прогон читает ЕГО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-pilot/_skills/business-requirements-doc.SKILL.md
+проба: br-asis-card   фикстура: BR-DATA-CARDS   скилл: business-requirements-doc
+реплика аналитика: asis-turn2.txt   ходов до 2 подряд без движения, потолок 2
+effort: умолчание CLI
+плечо: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-pilot/br-asis-card
+скилл: /tmp/skill-eval-br-asis-card/2026-10-07-br-sections-pilot-skills/business-requirements-doc/SKILL.md
+промпт: /home/user/sdd-skills/agent-version/_skill-eval/fixtures/BR-DATA-CARDS/asis-prompt.txt
+прогонов: 1, параллельно: 1
+  run-1 — ходов: 2, строк в трассе: 0
+  run-1 — готов
+ГОТОВО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-pilot/br-asis-card — песочниц с ответом: 1 из 1
+снимок из /tmp снесён: /tmp/skill-eval-br-asis-card/2026-10-07-br-sections-pilot-skills (журнальная копия осталась в /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-pilot/_skills/)

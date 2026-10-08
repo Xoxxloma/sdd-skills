@@ -1,0 +1,12 @@
+снимок скилла уже есть — прогон читает ЕГО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a-sonnet/_skills/business-requirements-doc.SKILL.md
+проба: br-var   фикстура: BR-VAR   скилл: business-requirements-doc
+реплика аналитика: var-turn2.txt   ходов до 2 подряд без движения, потолок 2
+effort: умолчание CLI
+плечо: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a-sonnet/br-var
+скилл: /tmp/skill-eval-br-var/2026-10-07-br-sections-a-sonnet-skills/business-requirements-doc/SKILL.md
+промпт: /home/user/sdd-skills/agent-version/_skill-eval/fixtures/BR-VAR/brief-prompt.txt
+прогонов: 1, параллельно: 1
+  run-1 — ходов: 2, строк в трассе: 0
+  run-1 — готов
+ГОТОВО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a-sonnet/br-var — песочниц с ответом: 1 из 1
+снимок из /tmp снесён: /tmp/skill-eval-br-var/2026-10-07-br-sections-a-sonnet-skills (журнальная копия осталась в /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a-sonnet/_skills/)

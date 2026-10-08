@@ -1,0 +1,12 @@
+снимок скилла: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-b2/_skills/task-decomposition-doc.SKILL.md
+проба: td-path-w   фикстура: TD-PATH   скилл: task-decomposition-doc
+effort: умолчание CLI
+плечо: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-b2/td-path-w
+скилл: /tmp/skill-eval-td-path-w/2026-10-07-br-sections-b2-skills/task-decomposition-doc/SKILL.md
+промпт: /home/user/sdd-skills/agent-version/_skill-eval/fixtures/TD-PATH/w-prompt.txt
+прогонов: 3, параллельно: 3
+  run-3 — готов
+  run-1 — готов
+  run-2 — готов
+ГОТОВО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-b2/td-path-w — песочниц с ответом: 3 из 3
+снимок из /tmp снесён: /tmp/skill-eval-td-path-w/2026-10-07-br-sections-b2-skills (журнальная копия осталась в /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-b2/_skills/)

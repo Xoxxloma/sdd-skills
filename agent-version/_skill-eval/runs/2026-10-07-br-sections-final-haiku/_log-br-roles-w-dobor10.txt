@@ -1,0 +1,19 @@
+снимок скилла уже есть — прогон читает ЕГО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-haiku/_skills/business-requirements-doc.SKILL.md
+проба: br-roles-w   фикстура: BR-ROLES   скилл: business-requirements-doc
+effort: умолчание CLI
+плечо: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-haiku/br-roles-w
+скилл: /tmp/skill-eval-br-roles-w-final/2026-10-07-br-sections-final-haiku-skills/business-requirements-doc/SKILL.md
+промпт: /home/user/sdd-skills/agent-version/_skill-eval/fixtures/BR-ROLES/w-prompt.txt
+прогонов: 10, параллельно: 4
+  run-01 — готов
+  run-04 — готов
+  run-03 — готов
+  run-02 — готов
+  run-05 — готов
+  run-08 — готов
+  run-07 — готов
+  run-06 — готов
+  run-09 — готов
+  run-10 — готов
+ГОТОВО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-haiku/br-roles-w — песочниц с ответом: 13 из 10
+снимок из /tmp снесён: /tmp/skill-eval-br-roles-w-final/2026-10-07-br-sections-final-haiku-skills (журнальная копия осталась в /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-final-haiku/_skills/)

@@ -1,0 +1,24 @@
+снимок скилла уже есть — прогон читает ЕГО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-base/_skills/business-requirements-doc.SKILL.md
+проба: br-half   фикстура: BR-HALF   скилл: business-requirements-doc
+реплика аналитика: half-turn2.txt   ходов до 2 подряд без движения, потолок 3
+реплика хода 3: half-t3-turn2.txt
+effort: умолчание CLI
+плечо: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-base/br-half
+скилл: /tmp/skill-eval-br-half/2026-10-07-br-sections-base-skills/business-requirements-doc/SKILL.md
+промпт: /home/user/sdd-skills/agent-version/_skill-eval/fixtures/BR-HALF/brief-prompt.txt
+прогонов: 8, параллельно: 3
+  run-1 — уже есть, пропуск
+  run-2 — уже есть, пропуск
+  run-3 — уже есть, пропуск
+  run-5 — ходов: 3, строк в трассе: 0
+  run-5 — готов
+  run-4 — ходов: 3, строк в трассе: 0
+  run-4 — готов
+  run-6 — ходов: 3, строк в трассе: 0
+  run-6 — готов
+  run-7 — ходов: 3, строк в трассе: 0
+  run-7 — готов
+  run-8 — ходов: 3, строк в трассе: 0
+  run-8 — готов
+ГОТОВО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-base/br-half — песочниц с ответом: 8 из 8
+снимок из /tmp снесён: /tmp/skill-eval-br-half/2026-10-07-br-sections-base-skills (журнальная копия осталась в /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-base/_skills/)

@@ -1,0 +1,12 @@
+снимок скилла уже есть — прогон читает ЕГО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a2/_skills/business-requirements-doc.SKILL.md
+проба: br-data-file   фикстура: BR-DATA-FILE   скилл: business-requirements-doc
+effort: умолчание CLI
+плечо: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a2/br-data-file
+скилл: /tmp/skill-eval-br-data-file/2026-10-07-br-sections-a2-skills/business-requirements-doc/SKILL.md
+промпт: /home/user/sdd-skills/agent-version/_skill-eval/fixtures/BR-DATA-FILE/file-prompt.txt
+прогонов: 3, параллельно: 3
+  run-1 — готов
+  run-2 — готов
+  run-3 — готов
+ГОТОВО: /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a2/br-data-file — песочниц с ответом: 3 из 3
+снимок из /tmp снесён: /tmp/skill-eval-br-data-file/2026-10-07-br-sections-a2-skills (журнальная копия осталась в /home/user/sdd-skills/agent-version/_skill-eval/runs/2026-10-07-br-sections-a2/_skills/)

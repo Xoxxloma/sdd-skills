@@ -202,6 +202,9 @@ case "$PROBE" in
   rv-tpl-dirty) FIXTURE=RV-AUDIT; PROMPT_FILE=tpl-dirty-prompt.txt; SKILL=spec-review ;;
   rv-tpl-count) FIXTURE=RV-AUDIT; PROMPT_FILE=tpl-count-prompt.txt; SKILL=spec-review ;;
   rv-stage-na)  FIXTURE=RV-AUDIT; PROMPT_FILE=stage-na-prompt.txt;  SKILL=spec-review ;;
+  # П.9 `spec-review` 1.1.0 (PLAN-BR-SECTIONS D11): законные пустые ответы новых разделов БТ → 0; БТ без §4.3 → нарушение.
+  rv-bt-empty)  FIXTURE=RV-AUDIT; PROMPT_FILE=bt-empty-prompt.txt;  SKILL=spec-review ;;
+  rv-bt-no43)   FIXTURE=RV-AUDIT; PROMPT_FILE=bt-no43-prompt.txt;   SKILL=spec-review ;;
   sb-ctx2)   FIXTURE=SB-CTX2;   PROMPT_FILE=stage-prompt.txt; SKILL=stage-breakdown-doc ;;
   # ── `spec-readiness`: достаточно ли спеки, чтобы писать код ────────────────────────────────
   # Как и приёмка, ничего не пишет на диск: артефакт — `answer.md` из stdout. Парное плечо без
@@ -259,6 +262,20 @@ case "$PROBE" in
   br-nclib)   FIXTURE=BR-NC-LIB; PROMPT_FILE=brief-prompt.txt; SKILL=business-requirements-doc; TURN2_FILE=lib-turn2.txt; TURNS_CAP=2 ;;
   br-nccan)   FIXTURE=BR-NC-CANTEEN; PROMPT_FILE=brief-prompt.txt; SKILL=business-requirements-doc; TURN2_FILE=canteen-turn2.txt; TURNS_CAP=2 ;;
   br-nclap)   FIXTURE=BR-NC-LAPTOP; PROMPT_FILE=brief-prompt.txt; SKILL=business-requirements-doc; TURN2_FILE=laptop-turn2.txt; TURNS_CAP=2 ;;
+  # Новые разделы БТ 1.2.0 (PLAN-BR-SECTIONS, 2026-10-07): §4.3 «Бизнес-данные» (гейт 15), §1.4 «Как сейчас» (16),
+  # §3.4 «Внешние зависимости» (17). `br-data-*` — гейт 15: объекты гипотезой, сведения ни вопросом, ни гипотезой;
+  # `obj`/`dlt*`/`asis-card` — поверх карточек BR-REAL (`SEED_SUB=seed`), `none`/`asis-new` — без окружения.
+  # `br-data-file` — регресс прода: состав данных в файле пользователя, один ход «ПРОДОЛЖЕНИЕ». `br-deps-*` — гейт 17,
+  # один ход. Грейдеры — `grade-br-data.mjs`, `grade-br-asis.mjs`, `grade-br-deps.mjs` (`--case=` — хвост имени пробы).
+  br-data-obj)  FIXTURE=BR-DATA-CARDS; PROMPT_FILE=obj-prompt.txt;  SKILL=business-requirements-doc; SEED_SUB=seed; TURN2_FILE=obj-turn2.txt;  TURNS_CAP=2 ;;
+  br-data-dlt0) FIXTURE=BR-DATA-CARDS; PROMPT_FILE=dlt-prompt.txt;  SKILL=business-requirements-doc; SEED_SUB=seed; TURN2_FILE=dlt0-turn2.txt; TURNS_CAP=2 ;;
+  br-data-dlt1) FIXTURE=BR-DATA-CARDS; PROMPT_FILE=dlt-prompt.txt;  SKILL=business-requirements-doc; SEED_SUB=seed; TURN2_FILE=dlt1-turn2.txt; TURNS_CAP=2 ;;
+  br-asis-card) FIXTURE=BR-DATA-CARDS; PROMPT_FILE=asis-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed; TURN2_FILE=asis-turn2.txt; TURNS_CAP=2 ;;
+  br-data-none) FIXTURE=BR-DATA-NONE;  PROMPT_FILE=none-prompt.txt;    SKILL=business-requirements-doc; TURN2_FILE=none-turn2.txt;    TURNS_CAP=2 ;;
+  br-asis-new)  FIXTURE=BR-DATA-NONE;  PROMPT_FILE=asisnew-prompt.txt; SKILL=business-requirements-doc; TURN2_FILE=asisnew-turn2.txt; TURNS_CAP=2 ;;
+  br-data-file) FIXTURE=BR-DATA-FILE;  PROMPT_FILE=file-prompt.txt;     SKILL=business-requirements-doc; SEED_SUB=seed ;;
+  br-deps-yes)  FIXTURE=BR-DEPS;       PROMPT_FILE=deps-yes-prompt.txt; SKILL=business-requirements-doc ;;
+  br-deps-no)   FIXTURE=BR-DEPS;       PROMPT_FILE=deps-no-prompt.txt;  SKILL=business-requirements-doc ;;
   # Эпик лежит НЕ в `docs/<KEY>/`, а в спек-репе `AI-SDD/docs/PSS-40/`; в корне песочницы при этом
   # есть настоящая `docs/` с документацией продукта. Меряется якорь пути: дети обязаны лечь ВНУТРЬ
   # папки эпика. Второе плечо — тот же эпик ВСТАВЛЕН ТЕКСТОМ и на диске отсутствует: гейт обязан
@@ -444,7 +461,7 @@ case "$PROBE" in
   artype)    FIXTURE=AR-TYPE;   PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
 esac
 
 # Потолок пробы сильнее внешнего значения: пул — дочерний процесс и читает переменную из окружения.

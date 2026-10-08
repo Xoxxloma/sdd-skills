@@ -1,0 +1,6 @@
+снимок скилла: 338 строк, рефов: 4
+фикстура: GS-FND2   прогонов: 3   скилл: /home/user/sdd-skills/agent-version/analyst-workspace   модель: haiku
+  run-1 — готов
+  run-2 — готов
+  run-3 — готов
+ГОТОВО: 3 из 3
