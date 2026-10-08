@@ -1,6 +1,6 @@
 ---
 name: analyst-skills-update
-version: 1.1.0
+version: 1.1.1
 user-invocable: true
 argument-hint: "[папка назначения]"
 allowed-tools: Bash
@@ -27,14 +27,15 @@ description: 'Обновляет или устанавливает скиллы 
    Windows:
 
    ```
-   powershell -NoProfile -ExecutionPolicy Bypass -File .gigacode\skills\analyst-skills-update\reference\skills.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File .gigacode/skills/analyst-skills-update/reference/skills.ps1
    ```
 
    Если скиллы установлены в другую папку, путь до `reference/` начинается с неё.
 
    Именно через `bash …`, не `./…` и не `sh …`: в корпоративных образах запуск файлов из домашней
    папки бывает запрещён, а bash читает скрипт как текст. На Windows — только `powershell … -File`,
-   не `bash`: там `bash` часто оказывается WSL, а не Git Bash.
+   не `bash`: там `bash` часто оказывается WSL, а не Git Bash. Слэши в пути прямые: если агент
+   выполняет команды через bash, обратные он съест.
 
 2. Покажи пользователю вывод скрипта как есть: строку с адресом репозитория, список
    `имя скилла — версия` и итог «установлено в …: N скиллов». Ничего не пересчитывай и не сокращай.
@@ -47,7 +48,7 @@ description: 'Обновляет или устанавливает скиллы 
 | `bash: command not found`, `'bash' is not recognized` | В системе нет bash. На macOS и Linux он есть из коробки — значит, агент запускает команды другой оболочкой; на Windows нужна команда для Windows из шага 1. |
 | `нужен git` | В системе нет git. Поставить штатным способом для своей ОС (на Windows — Git for Windows). |
 | `No such file or directory: …/reference/skills.sh`, `-File parameter does not exist` | Команда запущена не из корня репозитория, либо папка скилла скопирована без `reference/`. Скопировать папку `analyst-skills-update` целиком заново. |
-| `running scripts is disabled`, `is not digitally signed`, `выполнение сценариев отключено`, `не имеет цифровой подписи` | Запуск `.ps1` запрещён политикой Windows. Запустить тот же скрипт как текст: `powershell -NoProfile -Command "Invoke-Expression (Get-Content -Raw -Encoding UTF8 .gigacode\skills\analyst-skills-update\reference\skills.ps1)"`. |
+| `running scripts is disabled`, `is not digitally signed`, `выполнение сценариев отключено`, `не имеет цифровой подписи` | Запуск `.ps1` запрещён политикой Windows. Запустить тот же скрипт как текст — самому, в терминале из корня репозитория: `powershell -NoProfile -Command "Invoke-Expression (Get-Content -Raw -Encoding UTF8 .gigacode/skills/analyst-skills-update/reference/skills.ps1)"`. |
 | `Permission denied`, `Authentication failed`, `could not resolve host` | Нет доступа к репозиторию со скиллами. Проверить, работает ли `git clone` этого репозитория вообще; доступ выдаёт команда скиллов. |
 | `в репозитории со скиллами нет папки skills/` | Репозиторий скиллов переехал или адрес в скрипте устарел — сообщить команде скиллов. |
 
