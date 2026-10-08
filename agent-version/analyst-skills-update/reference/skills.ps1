@@ -1,13 +1,15 @@
 ﻿# skills.ps1 — то же, что skills.sh, для Windows: установить или обновить скиллы в репозитории со спеками.
 #
-#   powershell -NoProfile -ExecutionPolicy Bypass -File .gigacode\skills\analyst-skills-update\reference\skills.ps1                 # → .\.gigacode\skills
-#   powershell -NoProfile -ExecutionPolicy Bypass -File .gigacode\skills\analyst-skills-update\reference\skills.ps1 .claude\skills  # → другая папка
+#   powershell -NoProfile -ExecutionPolicy Bypass -File .gigacode/skills/analyst-skills-update/reference/skills.ps1                 # → .\.gigacode\skills
+#   powershell -NoProfile -ExecutionPolicy Bypass -File .gigacode/skills/analyst-skills-update/reference/skills.ps1 .claude/skills  # → другая папка
 #
-# Если запуск .ps1 запрещён групповой политикой, тот же скрипт читается как текст (другая папка — в SDD_SKILLS_DEST):
+# Слэши прямые: если агент выполняет команды через bash, обратные он съест.
 #
-#   powershell -NoProfile -Command "Invoke-Expression (Get-Content -Raw -Encoding UTF8 .gigacode\skills\analyst-skills-update\reference\skills.ps1)"
+# Если запуск .ps1 запрещён групповой политикой, тот же скрипт читается как текст (другая папка — в SDD_SKILLS_DEST).
+# Запускает сам пользователь в терминале: агенту GigaCode `powershell -Command` закрыт корпоративным режимом.
+# Обёртка `powershell -Command` нужна: `exit` при ошибке закрыл бы окно пользователя вместе с текстом ошибки.
 #
-# Именно в скобках, не через `|`: в конвейере Get-Content держит файл открытым, и скрипт не может удалить свою папку.
+#   powershell -NoProfile -Command "Invoke-Expression (Get-Content -Raw -Encoding UTF8 .gigacode/skills/analyst-skills-update/reference/skills.ps1)"
 #
 # Что копируется и что печатается — как в skills.sh; правятся оба файла вместе. Нужен только git.
 # Пишется под Windows PowerShell 5.1 и ограниченный режим языка: только командлеты, без вызовов .NET.
@@ -47,8 +49,10 @@ try {
     $skillMd = Join-Path $dir.FullName 'SKILL.md'
     if (-not (Test-Path -LiteralPath $skillMd -PathType Leaf)) { continue }
     $target = Join-Path $Dest $name
-    if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
-    Copy-Item -LiteralPath $dir.FullName -Destination $target -Recurse -Force
+    # Поверх на месте, а не «удалить и скопировать»: Remove-Item в 5.1 падает на папке, которую кто-то
+    # держит открытой, и скилл остаётся пустым. robocopy /MIR перезаписывает файлы и убирает лишние.
+    $out = & robocopy $dir.FullName $target /MIR /R:3 /W:1 /NJH /NJS /NFL /NDL /NP
+    if ($LASTEXITCODE -ge 8) { $out; Write-Output "не удалось обновить $name"; exit 1 }
     $version = '—'
     $found = Select-String -LiteralPath $skillMd -Pattern '^version:\s*(.*)$' -CaseSensitive | Select-Object -First 1
     if ($found -and $found.Matches[0].Groups[1].Value.Trim()) { $version = $found.Matches[0].Groups[1].Value.Trim() }
