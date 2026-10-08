@@ -1,0 +1,2 @@
+Вариант фикстуры: SM-MONO-SPEC, дерево собрано `make.sh out --big-spec` (100 операций спеки, 98 реализованы, контракт 218; ключ — fixtures/SM-MONO-SPEC/big-spec-key.tsv).
+Раннер run-sm-mono.sh варианта не знает: дерево fixtures/SM-MONO-SPEC/out подменено на время засева песочниц.

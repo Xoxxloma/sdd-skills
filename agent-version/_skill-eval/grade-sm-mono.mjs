@@ -3,7 +3,7 @@
 // Критерии Б-5 и Б-6 плана PLAN-AUTOSPLIT.md §5.
 //
 //   node grade-sm-mono.mjs <папка-раунда> [--json]     отчёт и <раунд>/GRADE-MONO.txt
-//   node grade-sm-mono.mjs --truth <NRS-TAIL|SM-MONO-DGS>  правда по дереву фикстуры, числа по классам
+//   node grade-sm-mono.mjs --truth <NRS-TAIL|SM-MONO-DGS|SM-MONO-SPEC|SM-MONO-SPEC-BIG>  правда по дереву фикстуры, числа по классам
 //   node grade-sm-mono.mjs --selftest                   мини-песочницы fixtures/SM-MONO-RUN/grader-selftest/
 //
 // ПРАВДА — множества ключей, извлечённые из сгенерированного дерева (`fixtures/<фикстура>/out/<сервис>`;
@@ -21,6 +21,12 @@
 //              `src/test` — «призраки»: в правду не идут, в карточке считаются отдельно (критерий Б-7).
 // КАРТОЧКА — `w/AI-SDD/services/<сервис>.md`; ключи — заголовки `###` в секциях «Публичный контракт»,
 // «Владеет данными», «Фоновые задачи», «События». Грейдится файл, не формулировка отчёта.
+// БЛОКИ КОНТРАКТА (справочно, без критерия) — блок от `### ` до следующего `### `/`## `; пустой — ни одной
+//   строки, начинающейся с «- ». Считается по карточке и по каждой `.work/<сервис>/part-NN.md`.
+//   «GraphQL без типа» — заголовок блока не с HTTP-глагола и не с `query `/`mutation `/`subscription `.
+// SM-MONO-SPEC --big-spec (вариант SM-MONO-SPEC-BIG: дерево песочницы со всеми operationId ключа или
+//   `_variant.txt` с `--big-spec`) — факты операций спеки по `fixtures/SM-MONO-SPEC/big-spec-key.tsv`:
+//   засчитан, если в блоке своей операции есть и анкер (целым словом, без учёта регистра), и код.
 // ТРАССА — `_stream.jsonl` (не `_trace.jsonl` и не ответ): ведущий — события без parent_tool_use_id.
 // Не измерено — `_api-failure.txt`, нет answer.md (брошено в фоне без удачного повтора, обрыв).
 import { readFileSync, existsSync, readdirSync, statSync, writeFileSync, mkdtempSync, cpSync, rmSync, mkdirSync } from 'node:fs'
@@ -34,7 +40,10 @@ const FIXT = {
   'SM-MONO-DGS': { svc: 'casedesk', expect: { contract: 120, entities: 60, jobs: 10, topics: 12 } },
   // casedesk плюс REST из openapi.yaml без аннотаций (28 реализовано, 2 только объявлены) и тестовый конфиг с 4 топиками
   'SM-MONO-SPEC': { svc: 'casedesk', expect: { contract: 148, entities: 60, jobs: 10, topics: 12 } },
+  // make.sh --big-spec: 100 операций спеки, 98 реализованы, у каждой факт-анкер из ключа; дерево — своё out/big-spec
+  'SM-MONO-SPEC-BIG': { svc: 'casedesk', dir: 'SM-MONO-SPEC', out: join('out', 'big-spec'), variant: '--big-spec', key: 'big-spec-key.tsv', expect: { contract: 218, entities: 60, jobs: 10, topics: 12 } },
 }
+const fxDir = (fx) => FIXT[fx].dir || fx
 const CLASSES = ['contract', 'entities', 'jobs', 'topics']
 const RU = { contract: 'контракт', entities: 'сущности', jobs: 'задачи', topics: 'топики' }
 const SECTION = { contract: 'Публичный контракт', entities: 'Владеет данными', jobs: 'Фоновые задачи', topics: 'События' }
@@ -169,37 +178,65 @@ export function extractTruth (tree) {
   return T
 }
 
+// ключ ответов большой спеки: глагол, путь, operationId, код, вид, анкер — строками через табуляцию
+export function loadKey (fx) {
+  const f = join(HERE, 'fixtures', fxDir(fx), FIXT[fx].key)
+  if (!existsSync(f)) throw new Error(`нет ключа ответов ${f}`)
+  const rows = []
+  for (const l of read(f).split('\n')) {
+    if (!l.trim() || l.startsWith('#')) continue
+    const c = l.split('\t')
+    if (c.length !== 9 || !/^\d{3}$/.test(c[5])) throw new Error(`строка ключа не по форме: ${l}`)
+    rows.push({ mod: c[0], verb: c[2], path: c[3], opid: c[4], code: c[5], kind: c[6], anchor: c[7], key: restKey(c[2], c[3]) })
+  }
+  return rows
+}
+// дерево большой спеки — в его openapi.yaml есть все operationId ключа (у базы их 28 из 98)
+const BIG = 'SM-MONO-SPEC-BIG'
+function isBigTree (tree) {
+  const ids = new Set([...read(join(tree, 'src', 'main', 'resources', 'openapi.yaml')).matchAll(/^\s+operationId:\s*(\w+)/gm)].map((m) => m[1]))
+  return loadKey(BIG).every((r) => ids.has(r.opid))
+}
+
 function truthTree (fx, round) {
   const svc = FIXT[fx].svc
-  const out = join(HERE, 'fixtures', fx, 'out', svc)
-  if (existsSync(join(out, 'src'))) return out
+  const own = [join(HERE, 'fixtures', fxDir(fx), 'out', svc)]
+  if (FIXT[fx].out) own.push(join(HERE, 'fixtures', fxDir(fx), FIXT[fx].out, svc))
+  const sbx = []
   if (round) {
     const sb = join(round, 'sandbox')
-    if (existsSync(sb)) for (const d of readdirSync(sb).sort()) { const t = join(sb, d, 'w', svc); if (existsSync(join(t, 'src'))) return t }
+    if (existsSync(sb)) for (const d of readdirSync(sb).sort()) sbx.push(join(sb, d, 'w', svc))
   }
-  return null
+  // вариант SM-MONO-SPEC — по дереву: базе не годится дерево большой спеки, и наоборот; большой спеке
+  // сначала песочница — out/ на её раунд подменяют и возвращают обычным
+  const fits = (t) => existsSync(join(t, 'src')) && (fx === BIG ? isBigTree(t) : fx === 'SM-MONO-SPEC' ? !isBigTree(t) : true)
+  return (fx === BIG ? [...sbx, ...own] : [...own, ...sbx]).find(fits) || null
 }
 
 export function loadTruth (fx, round, { build = false } = {}) {
   if (!FIXT[fx]) throw new Error(`неизвестная фикстура ${fx}`)
+  const outRel = FIXT[fx].out || 'out'
+  const make = `bash fixtures/${fxDir(fx)}/make.sh fixtures/${fxDir(fx)}/${outRel.split(sep).join('/')}${FIXT[fx].variant ? ' ' + FIXT[fx].variant : ''}`
   let tree = truthTree(fx, round)
   if (!tree && build) {
-    const r = spawnSync('bash', [join(HERE, 'fixtures', fx, 'make.sh'), join(HERE, 'fixtures', fx, 'out')], { encoding: 'utf8' })
+    const r = spawnSync('bash', [join(HERE, 'fixtures', fxDir(fx), 'make.sh'), join(HERE, 'fixtures', fxDir(fx), outRel), ...(FIXT[fx].variant ? [FIXT[fx].variant] : [])], { encoding: 'utf8' })
     if (r.status !== 0) throw new Error(`make.sh ${fx} упал: ${r.stderr}`)
     tree = truthTree(fx, round)
   }
-  if (!tree) throw new Error(`нет дерева ${fx}: соберите bash fixtures/${fx}/make.sh fixtures/${fx}/out`)
+  if (!tree) throw new Error(`нет дерева ${fx}: соберите ${make}`)
   const T = extractTruth(tree)
   const exp = FIXT[fx].expect
   // числа expected.md — тот же источник, что в шапке; файл проверяется на месте, чтобы правка правды не прошла молча
-  const md = read(join(HERE, 'fixtures', fx, 'expected.md'))
+  const md = read(join(HERE, 'fixtures', fxDir(fx), 'expected.md'))
   const bad = []
   for (const c of CLASSES) {
     if (T[c].size !== exp[c]) bad.push(`${RU[c]}: извлечено ${T[c].size}, в expected.md ${exp[c]}`)
     if (md && !md.includes(`**${exp[c]}**`)) bad.push(`в expected.md нет «**${exp[c]}**» (${RU[c]}) — правда фикстуры изменилась, поправьте грейдер`)
   }
+  const key = FIXT[fx].key ? loadKey(fx) : null
+  if (key) for (const r of key) if (!T.contract.has(r.key)) bad.push(`строка ключа ${r.opid} (${r.key}) не в правде контракта`)
   if (bad.length) throw new Error(`правда ${fx} не сходится с expected.md:\n  ${bad.join('\n  ')}`)
-  return { fx, svc: FIXT[fx].svc, tree, T }
+  return { fx, svc: FIXT[fx].svc, tree, T, key }
 }
 
 // ─── карточка ───────────────────────────────────────────────────────────────────────────
@@ -262,13 +299,66 @@ export function gradeCard (text, truth) {
   }
   // призраки среди лишних: операция спецификации без реализации и топик тестового конфига
   const g = truth.T.ghost || { contract: new Map(), topics: new Map() }
-  const restOf = (h) => { const r = h.replace(/`/g, ' ').match(/\b(GET|POST|PUT|PATCH|DELETE)\b\s+(\/\S*)/i); return r ? restKey(r[1], r[2].replace(/[),.;:]+$/, '')) : null }
   res.ghost = {
     contract: res.contract.extras.filter((h) => g.contract.has(restOf(h))),
     topics: res.topics.extras.filter((h) => [...g.topics.keys()].some((n) => h.toLowerCase().includes(n.toLowerCase()))),
     has: g.contract.size + g.topics.size > 0,
   }
   return res
+}
+function restOf (h) { const r = h.replace(/`/g, ' ').match(/\b(GET|POST|PUT|PATCH|DELETE)\b\s+(\/\S*)/i); return r ? restKey(r[1], r[2].replace(/[),.;:]+$/, '')) : null }
+
+// ─── блоки контракта: пустота, тип GraphQL, факты большой спеки ──────────────────────────
+// блок — заголовок `### ` секции «Публичный контракт» и строки до следующего `### `/`## `/`# `
+export function contractBlocks (text) {
+  const blocks = []; let inSec = false; let cur = null
+  for (const l of text.split('\n')) {
+    if (/^#{1,3} /.test(l)) {
+      cur = null
+      if (/^## /.test(l)) inSec = l.slice(3).trim() === SECTION.contract
+      else if (/^# /.test(l)) inSec = false
+      else if (inSec) { cur = { head: l.slice(4).trim(), lines: [] }; blocks.push(cur) }
+      continue
+    }
+    if (cur) cur.lines.push(l)
+  }
+  return blocks
+}
+const typedHead = (h) => { const s = h.replace(/`/g, '').trim(); return /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s/.test(s) || /^(query|mutation|subscription)\s/.test(s) }
+export function blockStats (text) {
+  const b = contractBlocks(text)
+  const untyped = b.filter((x) => !typedHead(x.head)).map((x) => x.head)
+  return { blocks: b.length, empty: b.filter((x) => !x.lines.some((l) => l.startsWith('- '))).length, untyped: untyped.length, untypedHeads: untyped }
+}
+// слово целиком без учёта регистра; граница — не [A-Za-z0-9_] (кириллица рядом — граница). Без RegExp из строки.
+const WORDCH = /[A-Za-z0-9_]/
+export function hasWord (text, w) {
+  const t = text.toLowerCase(); const k = String(w).toLowerCase()
+  for (let i = t.indexOf(k); i >= 0; i = t.indexOf(k, i + 1)) {
+    const a = i > 0 ? t[i - 1] : ''; const z = t[i + k.length] || ''
+    if (!(a && WORDCH.test(a)) && !(z && WORDCH.test(z))) return true
+  }
+  return false
+}
+// факт засчитан, если в блоке своей операции (по глаголу и пути заголовка) есть и анкер, и код
+export function gradeFacts (text, key) {
+  const blocks = contractBlocks(text).map((b) => ({ rk: restOf(b.head), body: [b.head, ...b.lines].join('\n') }))
+  const r = { hit: 0, anchorNoCode: 0, elsewhere: 0, absent: 0, noBlock: 0, total: key.length, miss: [] }
+  for (const k of key) {
+    const own = blocks.filter((b) => b.rk === k.key)
+    if (!own.length) { r.noBlock++; r.miss.push(`${k.opid} (блока нет)`); continue }
+    if (own.some((b) => hasWord(b.body, k.anchor) && hasWord(b.body, k.code))) { r.hit++; continue }
+    if (own.some((b) => hasWord(b.body, k.anchor))) { r.anchorNoCode++; r.miss.push(`${k.opid} (${k.anchor} без ${k.code})`); continue }
+    // в своих блоках анкера нет — значит, найденный в карточке лежит вне их
+    if (hasWord(text, k.anchor)) { r.elsewhere++; r.miss.push(`${k.opid} (${k.anchor} вне блока)`) } else { r.absent++; r.miss.push(`${k.opid} (${k.anchor} нет)`) }
+  }
+  return r
+}
+// части: `.work/<сервис>/part-NN.md` песочницы, по возрастанию номера
+function partStats (dir, svc) {
+  const d = join(dir, 'w', 'AI-SDD', 'services', '.work', svc)
+  if (!existsSync(d)) return []
+  return readdirSync(d).filter((f) => /^part-\d+\.md$/.test(f)).sort().map((f) => ({ part: f.slice(5, -3), ...blockStats(read(join(d, f))) }))
 }
 
 // ─── трасса и пики ──────────────────────────────────────────────────────────────────────
@@ -324,10 +414,23 @@ export function gradeRun (dir, truth) {
   const b6 = st.events > 0 && st.lead.peak > 0 && st.lead.peak <= PEAK_LEAD_MAX && st.lead.readWork === 0
   // Б-7: в карточке нет призраков и ни один ключ контракта не описан дважды; null — у фикстуры призраков нет
   const b7 = (truth.T.ghost.contract.size + truth.T.ghost.topics.size) === 0 ? null : cardOk && keys.ghost.contract.length === 0 && keys.ghost.topics.length === 0 && keys.contract.dups.length === 0
-  return { name, measured: true, card: cardOk, keys, st, cost, dirt, bg, b5, b6, b7 }
+  // справочно, без критерия: пустые блоки контракта (карточка и части), GraphQL без типа, факты большой спеки
+  const blocks = cardOk ? blockStats(card) : null
+  const parts = partStats(dir, truth.svc)
+  const facts = cardOk && truth.key ? gradeFacts(card, truth.key) : null
+  return { name, measured: true, card: cardOk, keys, st, cost, dirt, bg, b5, b6, b7, blocks, parts, facts }
 }
 
 function detectFixture (round) {
+  const fx = detectBase(round)
+  if (fx !== 'SM-MONO-SPEC') return fx
+  // раннер вариантов не знает: большая спека — по дереву первой песочницы, без дерева — по _variant.txt
+  const sb = join(round, 'sandbox')
+  const tree = existsSync(sb) ? readdirSync(sb).sort().map((d) => join(sb, d, 'w', FIXT[fx].svc)).find((t) => existsSync(join(t, 'src'))) : null
+  if (tree) return isBigTree(tree) ? BIG : fx
+  return read(join(round, '_variant.txt')).includes(FIXT[BIG].variant) ? BIG : fx
+}
+function detectBase (round) {
   const j = join(round, '_mono.json')
   if (existsSync(j)) { try { return JSON.parse(read(j)).fixture } catch {} }
   const sb = join(round, 'sandbox')
@@ -353,6 +456,7 @@ export function gradeRound (round, { build = false } = {}) {
     b7: truth.T.ghost.contract.size + truth.T.ghost.topics.size === 0 ? null : { ok: m.filter((r) => r.b7).length, n: m.length, verdict: verdict(m.filter((r) => r.b7).length, m.length) },
     ghostCounts: { contract: truth.T.ghost.contract.size, topics: truth.T.ghost.topics.size },
     cost: runs.reduce((a, r) => a + (r.cost || 0), 0),
+    factsTotal: truth.key ? truth.key.length : null,
   }
 }
 
@@ -376,6 +480,13 @@ function report (R) {
     L.push(`  трасса: субагентов ${s.lead.agents}; ${SCRIPTS.map((x) => `${x} ${s.scripts[x].lead}+${s.scripts[x].sub}`).join(', ')} (ведущий+субагенты); Read .work ведущим ${s.lead.readWork} (субагентами ${s.sub.readWork})`)
     L.push(`  пик ведущего ${s.lead.peak}${s.lead.peak > PEAK_LEAD_MAX ? ' > 150k' : ''}; субагенты: ${s.subs.map((x) => `«${String(x.desc).slice(0, 40)}» ${x.peak}`).join(', ') || '—'}`)
     if (r.card && r.keys.ghost.has) L.push(`  призраки в карточке: операций без реализации ${r.keys.ghost.contract.length}${r.keys.ghost.contract.length ? ' (' + r.keys.ghost.contract.join(' | ') + ')' : ''}, тестовых топиков ${r.keys.ghost.topics.length}${r.keys.ghost.topics.length ? ' (' + r.keys.ghost.topics.join(' | ') + ')' : ''}`)
+    if (r.card) L.push(`  блоки контракта без фактов: пустых ${r.blocks.empty} из ${r.blocks.blocks} (${pct(share(r.blocks))})`)
+    if (r.parts.length) L.push(`  …по частям: ${r.parts.map((p) => `${p.part} — ${p.blocks ? `${p.empty} из ${p.blocks}` : 'контракта нет'}`).join(', ')}`)
+    if (r.card) L.push(`  GraphQL без типа (заголовок контракта не с HTTP-глагола и не с query/mutation/subscription): ${r.blocks.untyped}${r.blocks.untyped ? `  · ${r.blocks.untypedHeads.slice(0, 5).join(' | ')}${r.blocks.untyped > 5 ? ` …и ещё ${r.blocks.untyped - 5}` : ''}` : ''}`)
+    if (r.facts) {
+      const f = r.facts
+      L.push(`  факты спеки в блоках своих операций (анкер и код): ${f.hit} из ${f.total}; анкер без кода ${f.anchorNoCode}, анкер вне своего блока ${f.elsewhere}, анкера нет ${f.absent}, блока операции нет ${f.noBlock}${f.miss.length ? `  · ${f.miss.slice(0, 6).join('; ')}${f.miss.length > 6 ? ` …и ещё ${f.miss.length - 6}` : ''}` : ''}`)
+    }
     L.push(`  Б-5 ${r.b5 ? 'да' : 'НЕТ'} · Б-6 ${r.b6 ? 'да' : 'НЕТ'}${r.b7 == null ? '' : ` · Б-7 ${r.b7 ? 'да' : 'НЕТ'}`} · цена $${r.cost.toFixed(2)}`)
   }
   L.push('')
@@ -383,8 +494,21 @@ function report (R) {
   L.push(`Б-5 (карточка записана; ключей по каждому классу ≥ 95 % правды; топиков ${R.truthCounts.topics}/${R.truthCounts.topics}): ${R.b5.verdict}`)
   L.push(`Б-6 (пик ведущего ≤ 200 000; Read ведущего по .work/ = 0): ${R.b6.verdict}`)
   if (R.b7) L.push(`Б-7 (в карточке нет операций без реализации (в дереве их ${R.ghostCounts.contract}) и тестовых топиков (${R.ghostCounts.topics}); повторов в контракте 0): ${R.b7.verdict}`)
+  // справочно, без критерия — по измеренным прогонам с карточкой
+  const withCard = R.runs.filter((r) => r.measured && r.card)
+  const each = (fn, sep = ', ') => withCard.map((r) => `${r.name} ${fn(r)}`).join(sep) || '—'
+  L.push(`блоки контракта без фактов, по карточке: ${each((r) => `${r.blocks.empty} из ${r.blocks.blocks} (${pct(share(r.blocks))})`)}`)
+  L.push(`  …по частям (всего; худшая часть): ${each((r) => {
+    const ps = r.parts.filter((p) => p.blocks)
+    if (!ps.length) return r.parts.length ? 'частей с контрактом нет' : 'частей нет'
+    const worst = ps.reduce((a, p) => (share(p) > share(a) ? p : a))
+    return `${ps.reduce((a, p) => a + p.empty, 0)} из ${ps.reduce((a, p) => a + p.blocks, 0)}, худшая ${worst.part} — ${worst.empty} из ${worst.blocks} (${pct(share(worst))})`
+  }, '; ')}`)
+  L.push(`GraphQL без типа: ${each((r) => r.blocks.untyped)}`)
+  if (R.factsTotal != null) L.push(`факты спеки в блоках своих операций (анкер и код): ${each((r) => `${r.facts.hit}/${r.facts.total}`)}`)
   return L.join('\n')
 }
+const share = (b) => (b.blocks ? b.empty / b.blocks : 0)
 
 // ─── самопроверка ───────────────────────────────────────────────────────────────────────
 function selftest () {

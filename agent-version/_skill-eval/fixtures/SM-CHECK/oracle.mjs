@@ -288,6 +288,15 @@ export function analyze(opisText, draftText, prevText) {
     const dk = freeP.get(nop(k));
     if (dk !== undefined && !taken.has(dk)) { pair.set(k, dk); taken.add(dk); }
   }
+  // четвёртый проход — операция GraphQL с типом и без него («mutation saveTask» ↔ «saveTask»)
+  const bop = (k) => nop(k).replace(/^(query|mutation|subscription) /, '');
+  const freeO = new Map();
+  for (const [k, e] of idx) if (!taken.has(k) && e.cls === 'контракт' && !freeO.has(bop(k))) freeO.set(bop(k), k);
+  for (const k of o.keys.keys()) {
+    if (pair.has(k)) continue;
+    const dk = freeO.get(bop(k));
+    if (dk !== undefined && !taken.has(dk)) { pair.set(k, dk); taken.add(dk); }
+  }
   const dups = [...idx].filter(([k, e]) => e.cls === 'контракт' && nop(k) !== k && idx.get(nop(k))?.cls === 'контракт').length;
   const byClass = {};
   let missingInDraft = 0;
@@ -544,7 +553,7 @@ function keyCounts(cardText) {
 
 // папка частей: ключи карточки каждой части; авторы блоков и ключей описи (часть NN, голова)
 function readParts(dir) {
-  const parts = new Map(); const card = new Map(); const opis = new Map();
+  const parts = new Map(); const card = new Map(); const opis = new Map(); const pbody = [];
   const add = (m, k, a) => { if (!m.has(k)) m.set(k, new Set()); m.get(k).add(a); };
   for (const name of fs.readdirSync(dir).sort()) {
     const m = name.match(/^(?:part-(\d+)|(head))\.md$/);
@@ -557,11 +566,27 @@ function readParts(dir) {
     for (const c of d.tables.экраны) add(card, norm(c[0]), a);
     for (const c of d.tables.роли) add(card, roleKey(c), a);
     if (m[1]) parts.set(a, keyCounts(text));
+    if (m[1]) for (const b of d.blocks.контракт) pbody.push({ a, key: headKey(b.header), body: b.body });
     const op = path.join(dir, name.replace(/\.md$/, '.opis.md'));
     if (fs.existsSync(op)) for (const k of parseOpis(fs.readFileSync(op, 'utf8')).keys.keys()) add(opis, k, a);
   }
   const notes = fs.readdirSync(dir).filter((n) => /^(part-.*|head)\.opis\.md$/.test(n)).map((n) => fs.readFileSync(path.join(dir, n), 'utf8'));
-  return { parts, card, opis, notes };
+  return { parts, card, opis, notes, pbody };
+}
+
+// Пустота по частям: у части больше половины блоков контракта без фактов — её ключи, пустые и в
+// склеенной карточке, идут ей в добор.
+function partEmptyItems(pbody, draftText) {
+  const draftBody = new Map();
+  for (const b of parseCard(draftText).blocks.контракт) { const k = headKey(b.header); draftBody.set(k, (draftBody.get(k) ?? false) || b.body); }
+  const byPart = new Map();
+  for (const r of pbody) { if (!byPart.has(r.a)) byPart.set(r.a, []); byPart.get(r.a).push(r); }
+  const keys = new Set();
+  for (const rows of byPart.values()) {
+    if (2 * rows.filter((r) => r.body).length >= rows.length) continue;
+    for (const r of rows) if (!r.body && draftBody.get(r.key) === false) keys.add(r.key);
+  }
+  return [...keys].sort().map((k) => [k]);
 }
 
 // Блок контракта у ключа с пометкой «объявлено без реализации» — пункт добора автору блока.
@@ -674,7 +699,7 @@ export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
   const it = res._items;
   const ownerPlan = env.CHECK_PLAN && fs.existsSync(rel(env.CHECK_PLAN)) ? rd(rel(env.CHECK_PLAN)) : '';
   const contractKeys = parseCard(rd(draftPath)).blocks.контракт.map((b) => headKey(b.header));
-  const lists = { ...it, NOPFX: noPfx.map((k) => [k]), MARKFILE: (mk?._owners ?? []).map((o) => [o]), MISSED: missedItems(ownerPlan, [rd(opisPath), ...(P?.notes ?? [])]), DECL: declItems([rd(opisPath), ...(P?.notes ?? [])], contractKeys) };
+  const lists = { ...it, NOPFX: noPfx.map((k) => [k]), MARKFILE: (mk?._owners ?? []).map((o) => [o]), MISSED: missedItems(ownerPlan, [rd(opisPath), ...(P?.notes ?? [])]), DECL: declItems([rd(opisPath), ...(P?.notes ?? [])], contractKeys), PARTEMPTY: P ? partEmptyItems(P.pbody, rd(draftPath)) : [] };
   const dobor = {};
   const look = (m, k) => m.get(k) ?? m.get(nopK(k)) ?? null;
   for (const [cat, list] of Object.entries(lists)) for (const item of list) {
