@@ -59,6 +59,8 @@ REAL_SUBS=""
 # Жёсткий потолок ходов пробы (пусто → как было: внешний RT_MAX_TURNS или 8 в пуле). Нужен двухходовым пробам
 # без трассы: пул считает движение по `_trace.log`, без него ход «пустой», и реплика уходит второй раз.
 TURNS_CAP=""
+# Папка скилла (пусто → `agent-version/<скилл>`, как было). Задаётся пробой скилла, который лежит вне набора.
+SKILL_DIR=""
 case "$PROBE" in
   ts-live)   FIXTURE=TS-LIVE;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-conv)   FIXTURE=TS-CONV;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
@@ -460,9 +462,16 @@ case "$PROBE" in
   arnocard)  FIXTURE=AR-NOCARD; PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
   artype)    FIXTURE=AR-TYPE;   PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
+  # ── `sdd-quality-audit`: баллы БТ и спек по папке docs/ из восьми фич ────────────────────────
+  # Хорошая, та же в старом шаблоне, частичная, «протыканная», багфикс, эпик с фундаментом. Отчёт —
+  # файл `sdd-quality-report.md` в корне песочницы; грейдер `grade-sq.mjs`, эталон — `fixtures/SQ-AUDIT/README.md`.
+  # Скилл живёт вне набора аналитика — в корне репозитория, поэтому путь к нему задан явно.
+  sq-audit)  FIXTURE=SQ-AUDIT;  PROMPT_FILE=audit-prompt.txt; SKILL=sdd-quality-audit; SKILL_DIR="$HERE/../../sdd-quality-audit" ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q sq-audit"; exit 1 ;;
 esac
+
+SKILL_DIR="${SKILL_DIR:-$HERE/../$SKILL}"
 
 # Потолок пробы сильнее внешнего значения: пул — дочерний процесс и читает переменную из окружения.
 [ -n "$TURNS_CAP" ] && export RT_MAX_TURNS="$TURNS_CAP"
@@ -479,7 +488,7 @@ SNAP_KEEP="$ROUND/_skills/$SKILL.SKILL.md"
 if [ -f "$SNAP_KEEP" ]; then
   echo "снимок скилла уже есть — прогон читает ЕГО: $SNAP_KEEP"
 else
-  cp "$HERE/../$SKILL/SKILL.md" "$SNAP_KEEP"
+  cp "$SKILL_DIR/SKILL.md" "$SNAP_KEEP"
   echo "снимок скилла: $SNAP_KEEP"
 fi
 # ПРОГОН ЧИТАЕТ КОПИЮ СНИМКА ВНЕ РЕПОЗИТОРИЯ. Единственный путь, который прогон получает внутрь
@@ -507,9 +516,9 @@ cp "$SNAP_KEEP" "$SNAP"
 # круги «до правки» и «после» мерились бы на одном и том же тексте, и разница вышла бы нулевой
 # по построению. Кладётся рядом со снимком, поэтому относительный путь `reference/…` из скилла
 # ведёт в снимок, а не в репозиторий.
-if [ -d "$HERE/../$SKILL/reference" ]; then
+if [ -d "$SKILL_DIR/reference" ]; then
   if [ ! -d "$ROUND/_skills/$SKILL.reference" ]; then
-    cp -r "$HERE/../$SKILL/reference" "$ROUND/_skills/$SKILL.reference"
+    cp -r "$SKILL_DIR/reference" "$ROUND/_skills/$SKILL.reference"
   fi
   rm -rf "$SNAP_ROOT/$SKILL/reference"
   cp -r "$ROUND/_skills/$SKILL.reference" "$SNAP_ROOT/$SKILL/reference"
