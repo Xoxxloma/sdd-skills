@@ -27,8 +27,10 @@ run_case() {
   cp -R "$src/." "$OUT/$name/"
   man="$OUT/$name/services/manifest.yaml"
   [ -f "$OUT/$name/manifest.yaml" ] && man="$OUT/$name/manifest.yaml"
+  local extra=()
+  [ -f "$src/args.txt" ] && read -r -a extra < "$src/args.txt"   # например «--only web»
   t0=$(now_ms)
-  bash "$EDGES" "$OUT/$name/services" "$man" >"$OUT/$name.out" 2>"$OUT/$name.err"
+  bash "$EDGES" "$OUT/$name/services" "$man" ${extra[@]+"${extra[@]}"} >"$OUT/$name.out" 2>"$OUT/$name.err"
   echo $? >"$OUT/$name.rc"
   t1=$(now_ms)
   echo $(( t1 - t0 )) >"$OUT/$name.ms"

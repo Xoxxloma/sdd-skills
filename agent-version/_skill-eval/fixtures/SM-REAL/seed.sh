@@ -97,6 +97,12 @@ if [ "$ARM" = rescan ] || [ "$ARM" = keyed ]; then
   done
 fi
 
+# Лишние карточки слепка (SM_EXTRA_CARDS — папка с *.md): сторож Шага 5 — карточки, с прогоном не
+# связанные; их файлы обязаны остаться байт в байт.
+if [ -n "${SM_EXTRA_CARDS:-}" ] && [ "$ARM" != first ]; then
+  cp "$SM_EXTRA_CARDS"/*.md "$DEST/AI-SDD/services/" || { echo "нет лишних карточек: $SM_EXTRA_CARDS"; exit 1; }
+fi
+
 echo "песочница собрана: $DEST   плечо: $ARM"
 for s in repairy-api repairy-web resonance-api resonance-web; do
   printf '  %-14s %4s файлов  .git: %s\n' "$s" \

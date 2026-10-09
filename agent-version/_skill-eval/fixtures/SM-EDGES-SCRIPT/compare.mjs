@@ -102,6 +102,14 @@ const stats = { 1: [0, 0], 2: [0, 0], 3: [0, 0] };
 const casesDir = path.join(HERE, 'cases');
 const caseNames = fs.readdirSync(casesDir).filter((n) => fs.existsSync(path.join(casesDir, n, 'expect.json'))).sort();
 const manifestOf = (dir) => (fs.existsSync(path.join(dir, 'manifest.yaml')) ? path.join(dir, 'manifest.yaml') : path.join(dir, 'services', 'manifest.yaml'));
+// args.txt случая: «--only a,b» — тот же список оракулу
+const onlyOf = (dir) => {
+  const f = path.join(dir, 'args.txt');
+  if (!fs.existsSync(f)) return null;
+  const a = fs.readFileSync(f, 'utf8').trim().split(/\s+/);
+  const i = a.indexOf('--only');
+  return i < 0 ? null : (a[i + 1] ?? '').split(',').map((s) => s.replace(/`/g, '').trim()).filter(Boolean);
+};
 const readRun = (name) => {
   const f = (s) => path.join(OUT, `${name}.${s}`);
   return {
@@ -117,7 +125,7 @@ header('ФАЗА 1. ОРАКУЛ против expect.json (синтетика, �
 for (const n of caseNames) {
   const dir = path.join(casesDir, n);
   const exp = JSON.parse(fs.readFileSync(path.join(dir, 'expect.json'), 'utf8'));
-  const o = edges(path.join(dir, 'services'), manifestOf(dir));
+  const o = edges(path.join(dir, 'services'), manifestOf(dir), onlyOf(dir));
   const pairs = [];
   const ep = flatPrint(exp['печать']);
   const op = flatPrint(o);
