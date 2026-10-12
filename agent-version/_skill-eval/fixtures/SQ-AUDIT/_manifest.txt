@@ -13,4 +13,6 @@ docs/PSS-2212/business_requirements.md
 docs/PSS-2212/technical_specification.md
 docs/PSS-2213/business_requirements.md
 docs/PSS-2213/technical_specification.md
+docs/PSS-2214/business_requirements.md
+docs/PSS-2214/technical_specification.md
 README.md
