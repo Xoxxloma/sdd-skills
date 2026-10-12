@@ -1,6 +1,6 @@
 ---
 name: technical-spec-doc
-version: 1.4.0
+version: 1.4.1
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
 description: 'Turns a confirmed business-requirements doc (БТ/BRD/SRS) into ONE Russian Markdown technical spec (technical_specification.md, saved next to the БТ), organized around INTERACTIONS — the new and changed contracts crossing service or FE/BE boundaries — so a frontend agent and a backend agent code against the same contracts and meet without after-the-fact stitching. There is no code to read: NEW things are designed fully (path, schema, JSON example); anything about an EXISTING service is written only as the analyst confirmed it — inventing an endpoint of a service you cannot see is the worst failure of this skill. Requires a ready БТ (or, by orchestrator flag, a bug report, a change request or an epic-БТ for foundation node #0): given only a brief or an idea it refuses and asks for the business requirements. Use when the БТ is ready and a dev spec is needed.'
@@ -877,7 +877,7 @@ Provenance markers (🟢 / 🔵 / 🟡 / ❓, plus ⚠️ for vague) appear inli
 - **❓ Открытые решения:** [незакрытые архитектурные развилки].
 - **⚠️ Требует уточнения:** [подтверждено, но расплывчато].
 - **Технические риски:** [риск нашего 🟢-дизайна → принятая мера, без пометок; про чужой сервис или без меры — не сюда; вопроса не задаётся; нет — «—»].
-- **Унаследовано из БТ (бизнес-пробелы):** [TBD/⚠️ из БТ, в багфиксе — из баг-репорта, в мелкой правке — из запроса на правку; закрываются на стороне этого документа; перечисляются здесь, но сами по себе НЕ переводят тех-спеку в «Требуются уточнения», если все технические решения приняты. Подтверждено отсутствие — обычное «Унаследованных бизнес-пробелов нет», без зачёркивания].
+- **Унаследовано из БТ (бизнес-пробелы):** [TBD/⚠️ из БТ, в багфиксе — из баг-репорта, в мелкой правке — из запроса на правку; закрываются на стороне документа-источника; перечисляются здесь, но сами по себе НЕ переводят тех-спеку в «Требуются уточнения», если все технические решения приняты. Подтверждено отсутствие — обычное «Унаследованных бизнес-пробелов нет», без зачёркивания].
 - **Приложения из БТ:** [UX-пожелания, схемы, файлы из БТ, баг-репорта или запроса на правку. Подтверждено отсутствие — обычное «Приложений нет», без зачёркивания. Нет сведений не означает «нет». Отсутствие вопросов/рисков не закрывает весь §8 неприменимостью].
 ````
 

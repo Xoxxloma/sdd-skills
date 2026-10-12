@@ -71,6 +71,13 @@ case "$PROBE" in
   # Грейдер grade-gaps.mjs (`--q` для вопросной). Состав и ловушки — fixtures/TS-GAPS/README.md.
   ts-gaps)   FIXTURE=TS-GAPS;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-gaps-q) FIXTURE=TS-GAPS;   PROMPT_FILE=q-prompt.txt;     SKILL=technical-spec-doc ;;
+  # Полные задачи обычного режима (2026-10-12): все 10 тех-гейтов содержательны, БТ по текущему шаблону,
+  # условия по статусу только словами процесса. TS-VAC — отпуск, всё наше, окружения нет; TS-ACC — доступ
+  # к системе, чужая система учёток, services/ и context/. Состав и ловушки — README фикстур.
+  ts-vac)    FIXTURE=TS-VAC;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
+  ts-vac-q)  FIXTURE=TS-VAC;    PROMPT_FILE=q-prompt.txt;     SKILL=technical-spec-doc ;;
+  ts-acc)    FIXTURE=TS-ACC;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
+  ts-acc-q)  FIXTURE=TS-ACC;    PROMPT_FILE=q-prompt.txt;     SKILL=technical-spec-doc ;;
   # interaction-diagram: схема по готовой спеке DSP-330; формат назван (mmd/puml) или нет (ask).
   # Состав и ловушки — `fixtures/ID-DIAG/README.md`.
   id-mmd)    FIXTURE=ID-DIAG;   PROMPT_FILE=mmd-prompt.txt;   SKILL=interaction-diagram ;;
@@ -468,7 +475,7 @@ case "$PROBE" in
   # Скилл живёт вне набора аналитика — в корне репозитория, поэтому путь к нему задан явно.
   sq-audit)  FIXTURE=SQ-AUDIT;  PROMPT_FILE=audit-prompt.txt; SKILL=sdd-quality-audit; SKILL_DIR="$HERE/../../sdd-quality-audit" ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q sq-audit"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q sq-audit"; exit 1 ;;
 esac
 
 SKILL_DIR="${SKILL_DIR:-$HERE/../$SKILL}"
