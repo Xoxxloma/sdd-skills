@@ -468,6 +468,8 @@ case "$PROBE" in
   arlate)    FIXTURE=AR-LATE;   PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
   arnocard)  FIXTURE=AR-NOCARD; PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
   artype)    FIXTURE=AR-TYPE;   PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
+  # Пачка релиза — основной путь архивации: несколько ключей, один скан, история карточек.
+  arbatch)   FIXTURE=AR-BATCH;  PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
   # ── `sdd-quality-audit`: баллы БТ и спек по папке docs/ из восьми фич ────────────────────────
   # Хорошая, та же в старом шаблоне, частичная, «протыканная», багфикс, эпик с фундаментом. Отчёт —

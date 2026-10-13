@@ -35,7 +35,7 @@ for (const d of dirs) {
   const facts = FACTS.filter(([, re]) => re.test(t)).map(([n]) => n);
   const updated = /^updated:\s*2026-09-18/m.test(t);
   const scannedOld = /^scanned:\s*2026-06-01/m.test(t);
-  const wrote = j.split('\n').filter((l) => /Write/.test(l) && /repairy-api\.md/.test(l) && !/не Write|not Write/.test(l)).length;
+  const wrote = j.split('\n').filter((l) => /Write/.test(l) && /(?<!_history\/)repairy-api\.md/.test(l) && !/не Write|not Write/.test(l)).length;
   const fullPath = updated && wrote === 0 ? 'нет (быстрое обновление)' : 'да';
   let verbatim = '—';
   if (existsSync(prev)) {
