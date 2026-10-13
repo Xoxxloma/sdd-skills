@@ -1,0 +1,11 @@
+etalon/meeting-2026-10-09.razbor.md
+etalon/meeting-2026-10-09-spec.md
+expected.md
+seed/context/conventions.md
+seed/docs/ACS-208/business_requirements.md
+seed/meeting-2026-10-09.txt
+seed/services/idm.md
+seed/services/manifest.yaml
+seed/services/request-portal.md
+w-prompt.txt
+w-turn2.txt

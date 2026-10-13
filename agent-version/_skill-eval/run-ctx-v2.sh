@@ -59,6 +59,15 @@ REAL_SUBS=""
 # Жёсткий потолок ходов пробы (пусто → как было: внешний RT_MAX_TURNS или 8 в пуле). Нужен двухходовым пробам
 # без трассы: пул считает движение по `_trace.log`, без него ход «пустой», и реплика уходит второй раз.
 TURNS_CAP=""
+# Конец диалога по файлу и порог пустых ходов (пусто → как было: конец по трассе, два пустых хода подряд).
+# Нужны многоходовым пробам без заглушек, у которых скилл задаёт вопросы по одному за ход: трассы нет,
+# каждый ход «пустой», и пул гасил диалог на втором вопросе. `DONE_RE` — регулярка по путям файлов
+# песочницы: нашёлся — диалог кончен. `IDLE_MAX` — сколько пустых ходов подряд терпеть.
+DONE_RE=""
+IDLE_MAX=""
+# Ход 1 у `meeting-intake` — три субагента подряд по расшифровке: 900 с не хватает, а потолок ожидания
+# фоновых задач (600 с) рвёт ход посреди субагента. Модель по умолчанию — прод-уровень.
+MEET_ENV=""
 # Папка скилла (пусто → `agent-version/<скилл>`, как было). Задаётся пробой скилла, который лежит вне набора.
 SKILL_DIR=""
 case "$PROBE" in
@@ -74,6 +83,15 @@ case "$PROBE" in
   # Полные задачи обычного режима (2026-10-12): все 10 тех-гейтов содержательны, БТ по текущему шаблону,
   # условия по статусу только словами процесса. TS-VAC — отпуск, всё наше, окружения нет; TS-ACC — доступ
   # к системе, чужая система учёток, services/ и context/. Состав и ловушки — README фикстур.
+  # ── `meeting-intake`: расшифровка встречи → вход для БТ или спеки (2026-10-13) ──────────────
+  # Засев — `seed/`: в фикстуре рядом лежат эталоны (`etalon/`), им в песочнице не место. Реплика одна
+  # на все ходы и нейтральная («согласен с рекомендацией»): цель, условные пункты и сводка — каждый вопрос
+  # скилла с рекомендацией первой. Диалог кончается, когда во вход записан файл. Грейдер —
+  # `grade-meet.mjs --fx VAC|ACC`, ожидания — `fixtures/MEET-*/expected.md`.
+  meet-vac)  FIXTURE=MEET-VAC;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  meet-acc)  FIXTURE=MEET-ACC;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  # Длинная встреча (660 строк, 52 минуты): карта в три окна, тема > 400 строк — разбор кусками.
+  meet-long) FIXTURE=MEET-LONG; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
   ts-vac)    FIXTURE=TS-VAC;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-vac-q)  FIXTURE=TS-VAC;    PROMPT_FILE=q-prompt.txt;     SKILL=technical-spec-doc ;;
   ts-acc)    FIXTURE=TS-ACC;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
@@ -477,13 +495,18 @@ case "$PROBE" in
   # Скилл живёт вне набора аналитика — в корне репозитория, поэтому путь к нему задан явно.
   sq-audit)  FIXTURE=SQ-AUDIT;  PROMPT_FILE=audit-prompt.txt; SKILL=sdd-quality-audit; SKILL_DIR="$HERE/../../sdd-quality-audit" ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q sq-audit"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q sq-audit meet-vac meet-acc meet-long"; exit 1 ;;
 esac
 
 SKILL_DIR="${SKILL_DIR:-$HERE/../$SKILL}"
 
 # Потолок пробы сильнее внешнего значения: пул — дочерний процесс и читает переменную из окружения.
 [ -n "$TURNS_CAP" ] && export RT_MAX_TURNS="$TURNS_CAP"
+[ -n "$DONE_RE" ] && export RT_DONE_RE="$DONE_RE"
+[ -n "$IDLE_MAX" ] && export RT_IDLE_MAX="$IDLE_MAX"
+if [ -n "$MEET_ENV" ]; then
+  export RUN_TIMEOUT="${RUN_TIMEOUT:-3600}" SM_MODEL="${SM_MODEL:-sonnet}" CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0
+fi
 
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
 [ -f "$POOL" ]  || { echo "нет раннера: $POOL"; exit 1; }
@@ -646,6 +669,8 @@ mkdir -p "$ROUND/$PROBE"
   [ -n "$NODE2_FILE" ] && echo "реплика на второй узел: $NODE2_FILE"
   [ -n "$REAL_SUBS" ] && echo "живые под-скиллы: $REAL_SUBS"
   echo "потолок ходов: ${RT_MAX_TURNS:-8}"
+  [ -n "$DONE_RE" ] && echo "конец диалога по файлу: $DONE_RE"
+  [ -n "$IDLE_MAX" ] && echo "пустых ходов подряд: $IDLE_MAX"
   echo "прогонов: $N, параллельность: $CONC"
 } > "$ROUND/$PROBE/_settings.txt"
 echo "effort: ${EFFORT:-умолчание CLI}"

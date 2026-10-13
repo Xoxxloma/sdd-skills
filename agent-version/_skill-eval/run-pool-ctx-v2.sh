@@ -97,6 +97,13 @@ EFFORT="${EFFORT:-}"
 # файл реплики (восьмой аргумент), то есть на пробах маршрута. Остальной набор одноходовой и
 # цикла не видит.
 MAX_TURNS="${RT_MAX_TURNS:-8}"
+# `RT_IDLE_MAX` — сколько ходов подряд без роста трассы терпеть (пусто → 2, как было). `RT_DONE_RE` —
+# регулярка по путям файлов песочницы: нашёлся файл — диалог кончен (пусто → не проверяется). Обе — для
+# многоходовых проб без заглушек (`meet-*`): трассы там нет, каждый ход «пустой», и при пороге 2 диалог
+# гас на втором вопросе скилла; конец задаёт записанный файл, потолок — `RT_MAX_TURNS`.
+IDLE_MAX="${RT_IDLE_MAX:-2}"
+DONE_RE="${RT_DONE_RE:-}"
+is_done() { [ -n "$DONE_RE" ] && find "$1" -type f 2>/dev/null | grep -qE "$DONE_RE"; }
 # `RT_NODE_REPLY` — файл реплики на узел «Что дальше?» (`analyst-workspace` 2.0.0). Пусто → цикл
 # побайтно прежний. Узел опознаётся в ответе прошлого хода по двум подписям, которых нет больше нигде
 # в маршруте. Нейтральное «да, годится» вариант из четырёх не выбирает, поэтому в узле реплика — выбор;
@@ -278,7 +285,7 @@ $(cat "$PROMPT")
   if [ -n "$TURN2" ] && [ $rc -eq 0 ] && [ -s "$sb/answer.md" ] && ! is_api_failure "$sb/answer.md"; then
     cp "$sb/answer.md" "$sb/answer-01.md"
     local reply node_used=0 prev done_sent=0
-    while [ "$turn" -lt "$MAX_TURNS" ] && [ "$idle" -lt 2 ] && [ "$done_sent" = "0" ]; do
+    while [ "$turn" -lt "$MAX_TURNS" ] && [ "$idle" -lt "$IDLE_MAX" ] && [ "$done_sent" = "0" ] && ! is_done "$sb"; do
       local before; before="$(trace_len "$sb")"
       prev="$sb/answer-$(printf '%02d' "$turn").md"
       turn=$((turn + 1))
