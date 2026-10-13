@@ -4,13 +4,13 @@
 //   node grade-sq.mjs <каталог с песочницами run-NN>
 //   node grade-sq.mjs --selftest
 //
-// ЧТО МЕРЯЕТСЯ. Скилл обходит `docs/` из девяти фич и пишет `sdd-quality-report.md` в корень песочницы.
+// ЧТО МЕРЯЕТСЯ. Скилл обходит `docs/` из одиннадцати фич и пишет `sdd-quality-report.md` в корень песочницы.
 // Грейдится ФАЙЛ на диске, а не пересказ в чате. Эталон и смысл каждой фичи — `fixtures/SQ-AUDIT/README.md`.
 //
 // Проверки:
 //   отчёт      — файл `sdd-quality-report*.md` в корне песочницы
 //   docs       — в `docs/` ничего не создано и не изменено
-//   строки     — у каждой из девяти папок своя строка сводной таблицы
+//   строки     — у каждой из одиннадцати папок своя строка сводной таблицы
 //   н/п        — колонки «н/п: баг-репорт», «н/п: узел-фундамент», «спеки нет» там, где должны
 //   счёт       — сумма частей = итог, максимум = веса применимых критериев, процент = округление
 //   хорошая    — PSS-2210: БТ ≥ 4.0, спека ≥ 4.5
@@ -20,13 +20,18 @@
 //   протыкано  — PSS-2213: БТ и спека < 50% и «шаблонно» у обоих
 //   багфикс    — ARS-312: спека ≥ 80%, н/п не меньше двух из крит. 2, 3, 5
 //   фундамент  — ARS-100/_foundation: крит. 1 спеки — н/п
-//   внимание   — в «Требуют внимания» есть PSS-2213 и PSS-2214 и нет PSS-2210/2211/2212, ARS-312
+//   внимание   — в «Требуют внимания» есть PSS-2213, PSS-2214, PSS-2215, PSS-2216 и нет PSS-2210/2211/2212, ARS-312
 //   флаг       — «шаблонно» только у PSS-2213 (заглушки эпика не проверяются)
 //   форма      — «не по форме» у БТ PSS-2214 (свободная форма) и не у его спеки (нет 4 из 23, 17%);
 //                у PSS-2210 (старый шаблон), PSS-2211, PSS-2212, PSS-2213, ARS-312 — «нет»
+//                спеки PSS-2215 (по коду) и PSS-2216 (правлена руками) — «не по форме»
 //   свободная  — PSS-2214: БТ ≥ 4.0 — тот же текст, что у PSS-2211; форма баллы не снижает
+//   по коду    — происхождение «по коду» у PSS-2215 и ни у одной другой спеки
+//   правлена   — PSS-2216 «скилл, правлена руками»; PSS-2210/2212/2213/2214, ARS-312 — «скилл»
+//   без источника — PSS-2215 (рядом нет документа сверху): БТ «нет», крит. 1 спеки = 0, а не н/п
 //   детали     — в «Деталях» только подсвеченные: PSS-2213 и PSS-2214 есть, у PSS-2214 — только ответ по
-//                БТ (его спека по форме); PSS-2210/2211/2212, ARS-312 нет; эхо-строк «рубрика прочитана» нет
+//                БТ (его спека по форме), у PSS-2216 — только по спеке; PSS-2210/2211/2212, ARS-312 нет;
+//                эхо-строк «рубрика прочитана» нет
 //
 // Правила репы: песочница без ответа или с отказом API — «НЕ ИЗМЕРЕНО»; регулярки литеральные,
 // `\b`/`\w` рядом с кириллицей не применяются.
@@ -39,6 +44,8 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const FIXTURE_DOCS = join(HERE, 'fixtures', 'SQ-AUDIT', 'docs')
 // Документы, у которых форма шаблона цела: в колонке «не по форме» у них «нет».
 const IN_FORM = ['PSS-2210', 'PSS-2211', 'PSS-2212', 'PSS-2213', 'ARS-312']
+// Спеки, написанные скиллом и не тронутые руками: происхождение у них «скилл».
+const BY_SKILL = ['PSS-2210', 'PSS-2212', 'PSS-2213', 'PSS-2214', 'ARS-312']
 const RE_API_FAILURE = /API Error|Request not allowed|Please run \/login|Credit balance|rate limit|session limit|usage limit/i
 const W_BT = [0.5, 1, 1, 1, 1]
 const W_SPEC = [1, 1, 1, 1, 1]
@@ -53,6 +60,8 @@ const ROW_KEYS = [
   ['PSS-2212', 'PSS-2212'],
   ['PSS-2213', 'PSS-2213'],
   ['PSS-2214', 'PSS-2214'],
+  ['PSS-2215', 'PSS-2215'],
+  ['PSS-2216', 'PSS-2216'],
   ['EPIC', 'ARS-100']
 ]
 
@@ -98,7 +107,8 @@ export function parseTable (text) {
     spec: head.findIndex((h) => h === 'спека'),
     specScore: col(/^спек[аи]? оценка/),
     flag: col(/шаблонно/),
-    form: col(/не по форме/)
+    form: col(/не по форме/),
+    origin: col(/происхождение/)
   }
   const rows = {}
   for (let i = hi + 2; i < lines.length && lines[i].trim().startsWith('|'); i++) {
@@ -108,7 +118,8 @@ export function parseTable (text) {
     if (!key || rows[key[0]]) continue
     rows[key[0]] = {
       bt: c[idx.bt] ?? '', btScore: c[idx.btScore] ?? '', spec: c[idx.spec] ?? '',
-      specScore: c[idx.specScore] ?? '', flag: c[idx.flag] ?? '', form: idx.form < 0 ? '' : (c[idx.form] ?? '')
+      specScore: c[idx.specScore] ?? '', flag: c[idx.flag] ?? '', form: idx.form < 0 ? '' : (c[idx.form] ?? ''),
+      origin: idx.origin < 0 ? '' : (c[idx.origin] ?? '')
     }
   }
   return rows
@@ -127,7 +138,7 @@ export function gradeReport (text) {
   const rows = parseTable(text) || {}
   const need = ROW_KEYS.map(([k]) => k)
   ck['строки'] = need.every((k) => rows[k])
-  const r = (k) => rows[k] || { bt: '', btScore: '', spec: '', specScore: '', flag: '', form: '' }
+  const r = (k) => rows[k] || { bt: '', btScore: '', spec: '', specScore: '', flag: '', form: '', origin: '' }
   ck['н/п'] = /спеки нет/i.test(r('PSS-2211').specScore + r('PSS-2211').spec) &&
     /н\/п[^|]*баг/i.test(r('ARS-312').btScore + r('ARS-312').bt) &&
     /н\/п[^|]*фундамент/i.test(r('FND').btScore + r('FND').bt) &&
@@ -164,20 +175,28 @@ export function gradeReport (text) {
   ck['багфикс'] = !!bug && bug.pct >= 80 && [1, 2, 4].filter((i) => bug.parts[i] === null).length >= 2
   ck['фундамент'] = !!sc.FND.spec && sc.FND.spec.parts[0] === null
   const att = section(text, 'Требуют внимания') || ''
-  ck['внимание'] = att.includes('PSS-2213') && att.includes('PSS-2214') &&
+  ck['внимание'] = ['PSS-2213', 'PSS-2214', 'PSS-2215', 'PSS-2216'].every((k) => att.includes(k)) &&
     !['PSS-2210', 'PSS-2211', 'PSS-2212', 'ARS-312'].some((k) => att.includes(k))
-  ck['флаг'] = ['PSS-2210', 'PSS-2211', 'PSS-2212', 'ARS-312', 'PSS-2214'].every((k) => /нет/i.test(r(k).flag))
-  const f14 = r('PSS-2214').form
-  ck['форма'] = /БТ/.test(f14) && !/спек/i.test(f14) && IN_FORM.every((k) => /^нет\.?$/i.test(r(k).form.trim()))
+  ck['флаг'] = ['PSS-2210', 'PSS-2211', 'PSS-2212', 'ARS-312', 'PSS-2214', 'PSS-2215', 'PSS-2216'].every((k) => /нет/i.test(r(k).flag))
+  const f14 = r('PSS-2214').form; const f16 = r('PSS-2216').form
+  ck['форма'] = /БТ/.test(f14) && !/спек/i.test(f14) && IN_FORM.every((k) => /^нет\.?$/i.test(r(k).form.trim())) &&
+    /спек/i.test(r('PSS-2215').form) && /спек/i.test(f16) && !/БТ/.test(f16)
+  const org = (k) => r(k).origin.trim().toLowerCase()
+  ck['по коду'] = /по коду/.test(org('PSS-2215')) && ![...BY_SKILL, 'PSS-2216'].some((k) => /по коду/.test(org(k)))
+  ck['правлена'] = /правлен/.test(org('PSS-2216')) && BY_SKILL.every((k) => /^скилл\.?$/.test(org(k)))
+  const s15 = sc['PSS-2215'].spec
+  ck['без источника'] = !!s15 && s15.parts[0] === 0 && /^нет/i.test((r('PSS-2215').bt || r('PSS-2215').btScore).trim())
   ck['свободная'] = btS('PSS-2214') >= 4.0
   const det = section(text, 'Детали') || ''
   // Подраздел на строку или по подразделу на документ («PSS-2213 (БТ)», «PSS-2213 (спека)») — склеиваем по ключу.
   const sub = (key) => det.split(/\n(?=### )/).filter((s) => s.split('\n')[0].includes(key)).join('\n')
   ck['детали'] = /Цель *—/.test(sub('PSS-2213')) && /Функционал из источника *—/.test(sub('PSS-2213')) &&
     /Цель *—/.test(sub('PSS-2214')) && !/Функционал из источника *—/.test(sub('PSS-2214')) &&
+    /Функционал из источника *—/.test(sub('PSS-2216')) && !/Цель *—/.test(sub('PSS-2216')) &&
     !['PSS-2210', 'PSS-2211', 'PSS-2212', 'ARS-312'].some((k) => det.includes(k)) && !/рубрика прочитана/i.test(text)
   const p12 = p12s ? `данные ${p12s.parts[1]} роли ${p12s.parts[2]} контракты ${p12s.parts[4]}` : '-'
-  const forms = ['PSS-2214', ...IN_FORM].map((k) => `${k}: ${r(k).form || '-'}`).join('; ')
+  const forms = ['PSS-2214', 'PSS-2215', 'PSS-2216', ...IN_FORM].map((k) => `${k}: ${r(k).form || '-'}`).join('; ') +
+    '  происхождение: ' + ['PSS-2215', 'PSS-2216', ...BY_SKILL].map((k) => `${k}: ${r(k).origin || '-'}`).join('; ')
   return { ck, sc, p12, forms }
 }
 
@@ -211,21 +230,27 @@ function selftest () {
   ck('не оценка', parseScore('н/п: баг-репорт'), null)
   const good = [
     '## Требуют внимания', '- PSS-2213 · БТ 0.5 из 4.5 (11%) · шаблонно: да',
-    '- PSS-2214 · БТ 4.5 из 4.5 (100%) · не по форме: нет 10 из 16 разделов (63%)', '',
+    '- PSS-2214 · БТ 4.5 из 4.5 (100%) · не по форме: нет 10 из 16 разделов (63%)',
+    '- PSS-2215 · спека 2.0 из 5.0 (40%) · не по форме: нет 19 из 23 разделов (83%) · по коду',
+    '- PSS-2216 · спека 4.5 из 5.0 (90%) · не по форме: нет 10 из 23 разделов (43%)', '',
     '## Сводная таблица',
-    '| команда | ai-sdd repo | аналитик | фича | jira | БТ | БТ оценка | Спека | Спек оценка | шаблонно | не по форме |',
-    '|---|---|---|---|---|---|---|---|---|---|---|',
-    '| А | | | ф | PSS-2210 | docs/PSS-2210/business_requirements.md | 0.5+1+1+1+1 = 4.5 из 4.5 (100%) | docs/PSS-2210/technical_specification.md | 1+1+1+1+1 = 5.0 из 5.0 (100%) | нет | нет |',
-    '| А | | | ф | PSS-2211 | docs/PSS-2211/business_requirements.md | 0.5+1+1+1+1 = 4.5 из 4.5 (100%) | спеки нет | спеки нет | нет | нет |',
-    '| А | | | ф | PSS-2212 | docs/PSS-2212/business_requirements.md | 0.5+1+0.5+0.5+0.5 = 3.0 из 4.5 (67%) | docs/PSS-2212/technical_specification.md | 1+0.5+0.5+1+0.5 = 3.5 из 5.0 (70%) | нет | нет |',
-    '| А | | | ф | PSS-2213 | docs/PSS-2213/business_requirements.md | 0+0.5+0+0+0 = 0.5 из 4.5 (11%) | docs/PSS-2213/technical_specification.md | 0+0+0+0.5+0 = 0.5 из 5.0 (10%) | БТ, спека | нет |',
-    '| А | | | ф | PSS-2214 | docs/PSS-2214/business_requirements.md | 0.5+1+1+1+1 = 4.5 из 4.5 (100%) | docs/PSS-2214/technical_specification.md | 1+1+1+1+1 = 5.0 из 5.0 (100%) | нет | БТ 63% |',
-    '| А | | | ф | ARS-312 | н/п: баг-репорт | н/п: баг-репорт | docs/ARS-312/technical_specification.md | 1+н/п+н/п+1+н/п = 2.0 из 2.0 (100%) | нет | нет |',
-    '| А | | | ф | ARS-100 | docs/ARS-100/business_requirements.md | 0+0+0.5+0+0 = 0.5 из 4.5 (11%) | спеки нет | спеки нет | БТ | БТ 81% |',
-    '| А | | | ф | ARS-100 | н/п: узел-фундамент | н/п: узел-фундамент | docs/ARS-100/_foundation/technical_specification.md | н/п+0+0+0+0 = 0.0 из 4.0 (0%) | спека | спека 96% |',
-    '| А | | | ф | ARS-101 | docs/ARS-100/ARS-101/business_requirements.md | 0+0+0+0+0 = 0.0 из 4.5 (0%) | docs/ARS-100/ARS-101/technical_specification.md | 0+0+0+0+0 = 0.0 из 5.0 (0%) | БТ, спека | БТ 94%, спека 96% |',
+    '| команда | ai-sdd repo | аналитик | фича | jira | БТ | БТ оценка | Спека | Спек оценка | шаблонно | не по форме | происхождение |',
+    '|---|---|---|---|---|---|---|---|---|---|---|---|',
+    '| А | | | ф | PSS-2210 | docs/PSS-2210/business_requirements.md | 0.5+1+1+1+1 = 4.5 из 4.5 (100%) | docs/PSS-2210/technical_specification.md | 1+1+1+1+1 = 5.0 из 5.0 (100%) | нет | нет | скилл |',
+    '| А | | | ф | PSS-2211 | docs/PSS-2211/business_requirements.md | 0.5+1+1+1+1 = 4.5 из 4.5 (100%) | спеки нет | спеки нет | нет | нет | — |',
+    '| А | | | ф | PSS-2212 | docs/PSS-2212/business_requirements.md | 0.5+1+0.5+0.5+0.5 = 3.0 из 4.5 (67%) | docs/PSS-2212/technical_specification.md | 1+0.5+0.5+1+0.5 = 3.5 из 5.0 (70%) | нет | нет | скилл |',
+    '| А | | | ф | PSS-2213 | docs/PSS-2213/business_requirements.md | 0+0.5+0+0+0 = 0.5 из 4.5 (11%) | docs/PSS-2213/technical_specification.md | 0+0+0+0.5+0 = 0.5 из 5.0 (10%) | БТ, спека | нет | скилл |',
+    '| А | | | ф | PSS-2214 | docs/PSS-2214/business_requirements.md | 0.5+1+1+1+1 = 4.5 из 4.5 (100%) | docs/PSS-2214/technical_specification.md | 1+1+1+1+1 = 5.0 из 5.0 (100%) | нет | БТ 63% | скилл |',
+    '| А | | | ф | PSS-2215 | нет | нет | docs/PSS-2215/technical_specification.md | 0+0.5+0+1+0.5 = 2.0 из 5.0 (40%) | нет | спека 83% | по коду |',
+    '| А | | | ф | PSS-2216 | docs/PSS-2216/business_requirements.md | 0.5+1+1+1+1 = 4.5 из 4.5 (100%) | docs/PSS-2216/technical_specification.md | 1+1+0.5+1+1 = 4.5 из 5.0 (90%) | нет | спека 43% | скилл, правлена руками |',
+    '| А | | | ф | ARS-312 | н/п: баг-репорт | н/п: баг-репорт | docs/ARS-312/technical_specification.md | 1+н/п+н/п+1+н/п = 2.0 из 2.0 (100%) | нет | нет | скилл |',
+    '| А | | | ф | ARS-100 | docs/ARS-100/business_requirements.md | 0+0+0.5+0+0 = 0.5 из 4.5 (11%) | спеки нет | спеки нет | БТ | БТ 81% | — |',
+    '| А | | | ф | ARS-100 | н/п: узел-фундамент | н/п: узел-фундамент | docs/ARS-100/_foundation/technical_specification.md | н/п+0+0+0+0 = 0.0 из 4.0 (0%) | спека | спека 96% | мимо фреймворка |',
+    '| А | | | ф | ARS-101 | docs/ARS-100/ARS-101/business_requirements.md | 0+0+0+0+0 = 0.0 из 4.5 (0%) | docs/ARS-100/ARS-101/technical_specification.md | 0+0+0+0+0 = 0.0 из 5.0 (0%) | БТ, спека | БТ 94%, спека 96% | мимо фреймворка |',
     '', '## Детали', '',
     '### PSS-2213 — ф', '', '1. Цель — 0 из 0.5', '1. Функционал из источника — 0 из 1', '',
+    '### PSS-2215 — ф', '', '1. Функционал из источника — 0 из 1', '',
+    '### PSS-2216 — ф', '', '1. Функционал из источника — 1 из 1', '',
     '### PSS-2214 — ф', '', 'файл: docs/PSS-2214/business_requirements.md', '1. Цель — 0.5 из 0.5', 'форма: нет 12 из 16 — …'
   ].join('\n')
   const g = gradeReport(good)
@@ -239,6 +264,11 @@ function selftest () {
   ck('в «Деталях» хороший документ — красный', gradeReport(good + '\n\n### PSS-2210 — ф\n\n1. Цель — 0.5 из 0.5').ck['детали'], false)
   ck('в «Деталях» спека PSS-2214 (по форме) — красный', gradeReport(good + '\n1. Функционал из источника — 1 из 1').ck['детали'], false)
   ck('нет «Деталей» — красный', gradeReport(good.split('\n## Детали')[0]).ck['детали'], false)
+  ck('багфикс «по коду» — красный', gradeReport(good.replace('(100%) | нет | нет | скилл |\n| А | | | ф | ARS-100', '(100%) | нет | нет | по коду |\n| А | | | ф | ARS-100')).ck['по коду'], false)
+  ck('правленная «по коду» — красный', gradeReport(good.replace('скилл, правлена руками', 'по коду')).ck['по коду'], false)
+  ck('PSS-2215 не «по коду» — красный', gradeReport(good.replace('| спека 83% | по коду |', '| спека 83% | мимо фреймворка |')).ck['по коду'], false)
+  ck('PSS-2215 крит. 1 н/п — красный', gradeReport(good.replace('0+0.5+0+1+0.5 = 2.0 из 5.0 (40%)', 'н/п+0.5+0+1+0.5 = 2.0 из 4.0 (50%)')).ck['без источника'], false)
+  ck('PSS-2216 «скилл» — красный', gradeReport(good.replace('скилл, правлена руками', 'скилл')).ck['правлена'], false)
   ck('подраздел на документ — зелёный', gradeReport(good.replace('1. Цель — 0 из 0.5\n', '1. Цель — 0 из 0.5\n\n### PSS-2213 — ф (спека)\n')).ck['детали'], true)
   console.log(bad === 0 ? '\nсамопроверка: ok' : `\nсамопроверка: ПРОВАЛОВ ${bad}`)
   process.exit(bad === 0 ? 0 : 1)
