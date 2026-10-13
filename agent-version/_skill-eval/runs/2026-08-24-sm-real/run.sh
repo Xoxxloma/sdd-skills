@@ -48,8 +48,11 @@ MODEL="${SM_MODEL:-haiku}"
 case "$ARM" in
   scan)  PROMPT="$HERE/stand/prompt-scan.md" ;;
   rescan) PROMPT="$HERE/stand/prompt-scan.md" ;;   # тот же скан поверх прежних карточек (seed.sh)
-  keyed)  PROMPT="$HERE/stand/prompt-keyed.md"
-          [ -f "${SM_KEYED_HINT:-}" ] || { echo "плечо keyed: нужен SM_KEYED_HINT — файл подсказки"; exit 1; } ;;
+  # SM_PROMPT — другая обёртка поверх того же засева; подсказка нужна, только если в ней есть HINTBLOCK.
+  keyed)  PROMPT="${SM_PROMPT:-$HERE/stand/prompt-keyed.md}"
+          if grep -q HINTBLOCK "$PROMPT" 2>/dev/null; then
+            [ -f "${SM_KEYED_HINT:-}" ] || { echo "плечо keyed: нужен SM_KEYED_HINT — файл подсказки"; exit 1; }
+          fi ;;
   first) PROMPT="$HERE/stand/prompt-first.md" ;;
   *) echo "неизвестное плечо: $ARM"; exit 1 ;;
 esac
@@ -103,7 +106,9 @@ run_one() {
   # от «так и было»: запрет в промпте изоляцией не является, а правило 2 скилла («ты только
   # читаешь чужие репозитории») ни одной синтетической фикстурой не проверялось — писать в них
   # было незачем.
-  ( cd "$sb/w" && find repairy-api repairy-web resonance-api resonance-web -type f \
+  local repos="repairy-api repairy-web resonance-api resonance-web"
+  [ -d "$sb/w/hello-api" ] && repos="$repos hello-api"
+  ( cd "$sb/w" && find $repos -type f \
       -not -path '*/.git/*' -not -name .git | sort ) > "$sb/_seeded.txt"
 
   local wd="$sb/w/AI-SDD"
@@ -112,7 +117,7 @@ run_one() {
   task="$(sed -e "s|WORKDIR|$abs_wd|g" -e "s|SKILLDIR|$SNAP_WIN|g" -e "s|модель \`haiku\`|модель \`$MODEL\`|g" "$PROMPT")"
   if [ "$ARM" = keyed ]; then
     task="${task/KEYEDARGS/${SM_KEYED_ARGS:-repairy-api repairy-web}}"
-    task="${task/HINTBLOCK/$(cat "$SM_KEYED_HINT")}"
+    [ -f "${SM_KEYED_HINT:-}" ] && task="${task/HINTBLOCK/$(cat "$SM_KEYED_HINT")}"
   fi
 
   # stream-json: в `_stream.jsonl` лежит трасса ведущего (каждый tool_use с аргументами) и полные
@@ -149,7 +154,7 @@ run_one() {
   fi
 
   # ─── Караул чужих реп ──────────────────────────────────────────────────────────────────
-  ( cd "$sb/w" && find repairy-api repairy-web resonance-api resonance-web -type f \
+  ( cd "$sb/w" && find $repos -type f \
       -not -path '*/.git/*' -not -name .git | sort ) > "$sb/_after.txt"
   if ! diff -q "$sb/_seeded.txt" "$sb/_after.txt" > /dev/null; then
     echo "  !!! $ARM-$i — ПРОГОН ТРОГАЛ ПАПКИ СЕРВИСОВ (правило 2 скилла):"
@@ -170,7 +175,8 @@ run_one() {
   echo "прогонов: $N, параллельность: $CONC"
   echo "текст скилла: $SKILL_SRC"
   echo "источники: ${SM_REAL_SRC:-/c/Users/Konstantin/projects}/{repairy,resonance}"
-  [ "$ARM" = keyed ] && echo "подсказка: $SM_KEYED_HINT; аргументы: ${SM_KEYED_ARGS:-repairy-api repairy-web}; патч: ${SM_REAL_PATCH:-нет}"
+  [ "$ARM" = keyed ] && echo "подсказка: ${SM_KEYED_HINT:-нет}; аргументы: ${SM_KEYED_ARGS:-repairy-api repairy-web}; патч: ${SM_REAL_PATCH:-нет}"
+  [ "$ARM" = keyed ] && echo "обёртка: $(basename "$PROMPT"); сосед-заглушка: ${SM_REAL_HELLO:+hello-api}"
   echo "снимок скилла: _skills/service-map.SKILL.md ($(wc -l < "$ROUND/_skills/service-map.SKILL.md") строк)"
 } > "$ROUND/_settings-$ARM.txt"
 cat "$ROUND/_settings-$ARM.txt"
