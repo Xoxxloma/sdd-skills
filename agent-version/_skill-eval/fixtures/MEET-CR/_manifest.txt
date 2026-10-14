@@ -1,0 +1,6 @@
+etalon/meeting-2026-10-16.razbor.md
+etalon/meeting-2026-10-16-bt.md
+expected.md
+seed/support-sync-2026-10-16.vtt
+w-prompt.txt
+w-turn2.txt
