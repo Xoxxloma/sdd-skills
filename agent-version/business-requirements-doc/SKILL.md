@@ -1,6 +1,6 @@
 ---
 name: business-requirements-doc
-version: 1.3.0
+version: 1.3.1
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
 description: 'Gathers business requirements and writes ONE Markdown spec (BRD→SRS) in Russian. It MAY read the repo as evidence, but nothing enters the spec on your own authority: before writing, every gate is either stated by the user themselves or put to the user and answered, and only what the user explicitly leaves open becomes TBD. The mandatory first question is the linked Jira/SberTrack task key (SMSEC-1234); without it the spec is not written. Before writing it also decides the business cut (§4.5) — several separate deliveries (поставки) → it proposes the split into parts (части); one delivery → it says so explicitly («не применимо: причина») — and puts that proposal to the user in the handoff. Use whenever someone wants to write a ТЗ / BRD / SRS, formalize a request, or describe a task, feature, change, or integration for developers.'
@@ -113,6 +113,8 @@ description: 'Gathers business requirements and writes ONE Markdown spec (BRD→
 это уже его ответ (`user-stated`).** Правило
 «улика ≠ ответ» защищает от репозитория, а не от собственных слов пользователя;
 применять его к его же тексту — значит заставлять вводить одно и то же дважды.
+Открытый вопрос во входе — это вопрос, а не ответ: он уходит в «Открытые вопросы» и не
+отменяет того, что уже написано в документе.
 
 Сверка понимания при этом **нужна** — но в форме, где пользователю остаётся только
 кивнуть: одна строка «понял так: <его мысль твоими словами> — верно?» внутри общего

@@ -1,0 +1,1 @@
+Доработай спеку docs/ACS-208/technical_specification.md по итогам встречи. Что на встрече решили — в docs/ACS-208/meeting-2026-10-14-spec.md.

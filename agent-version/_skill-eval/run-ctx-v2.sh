@@ -90,8 +90,26 @@ case "$PROBE" in
   # `grade-meet.mjs --fx VAC|ACC`, ожидания — `fixtures/MEET-*/expected.md`.
   meet-vac)  FIXTURE=MEET-VAC;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
   meet-acc)  FIXTURE=MEET-ACC;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  # Стык встреча → петля (2026-10-14): скилл петли получает документ задачи и эталонный вход
+  # meeting-intake и сообщение «по итогам встречи». Меряется, как он разбирает вход и что спрашивает.
+  jm-br-vac)  FIXTURE=JM-BR-VAC;  PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; MEET_ENV=1 ;;
+  jm-br-long) FIXTURE=JM-BR-LONG; PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; MEET_ENV=1 ;;
+  jm-ts-acc)  FIXTURE=JM-TS-ACC;  PROMPT_FILE=w-prompt.txt; SKILL=technical-spec-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=4; IDLE_MAX=4; DONE_RE='/docs/.*/technical_specification\.md$'; MEET_ENV=1 ;;
   # Длинная встреча (660 строк, 52 минуты): карта в три окна, тема > 400 строк — разбор кусками.
   meet-long) FIXTURE=MEET-LONG; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  # Фичу обсуждают с нуля: документов задачи нет, ключ только в чате (MEET-NEW, цель — новый БТ).
+  # Вторая встреча по готовой спеке (MEET-REW, цель — правки спеки): в папке уже лежит вход прошлой
+  # встречи, поэтому конец диалога — по дате этой встречи, а не по любому входу.
+  meet-new)  FIXTURE=MEET-NEW;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  # Правки поверх записанного БТ + последнее слово после итогов внутри чужой темы (MEET-CHG); правка работающего,
+  # расшифровка VTT, дата из имени файла (MEET-CR). Ключ у обеих — в строке вызова.
+  meet-chg)  FIXTURE=MEET-CHG;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  meet-cr)   FIXTURE=MEET-CR;   PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  meet-rew)  FIXTURE=MEET-REW;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-2026-10-14[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  # Стык для этих двух: новый БТ только по входу встречи; доработка готовой спеки по входу второй встречи
+  # (спека уже лежит — конец диалога по файлу не ловится, только потолок).
+  jm-br-new)  FIXTURE=JM-BR-NEW;  PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=4; IDLE_MAX=4; DONE_RE='/docs/.*/business_requirements\.md$'; MEET_ENV=1 ;;
+  jm-ts-rew)  FIXTURE=JM-TS-REW;  PROMPT_FILE=w-prompt.txt; SKILL=technical-spec-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; MEET_ENV=1 ;;
   ts-vac)    FIXTURE=TS-VAC;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-vac-q)  FIXTURE=TS-VAC;    PROMPT_FILE=q-prompt.txt;     SKILL=technical-spec-doc ;;
   ts-acc)    FIXTURE=TS-ACC;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
@@ -495,7 +513,7 @@ case "$PROBE" in
   # Скилл живёт вне набора аналитика — в корне репозитория, поэтому путь к нему задан явно.
   sq-audit)  FIXTURE=SQ-AUDIT;  PROMPT_FILE=audit-prompt.txt; SKILL=sdd-quality-audit; SKILL_DIR="$HERE/../../sdd-quality-audit" ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q sq-audit meet-vac meet-acc meet-long"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q sq-audit meet-vac meet-acc meet-long meet-new meet-rew meet-chg meet-cr jm-br-vac jm-br-long jm-br-new jm-ts-acc jm-ts-rew"; exit 1 ;;
 esac
 
 SKILL_DIR="${SKILL_DIR:-$HERE/../$SKILL}"
