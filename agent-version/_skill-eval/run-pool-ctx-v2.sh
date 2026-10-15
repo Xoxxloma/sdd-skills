@@ -103,7 +103,47 @@ MAX_TURNS="${RT_MAX_TURNS:-8}"
 # гас на втором вопросе скилла; конец задаёт записанный файл, потолок — `RT_MAX_TURNS`.
 IDLE_MAX="${RT_IDLE_MAX:-2}"
 DONE_RE="${RT_DONE_RE:-}"
-is_done() { [ -n "$DONE_RE" ] && find "$1" -type f 2>/dev/null | grep -qE "$DONE_RE"; }
+# `RT_DONE_GREP` — регулярка по СОДЕРЖИМОМУ файлов `docs/` и `notes/` песочницы: нашлась строка — диалог кончен (пусто →
+# не проверяется). Для проб, у которых файл результата создаётся в начале диалога и дописывается по ходу
+# (`rec-*`): по пути конец не опознать.
+DONE_GREP="${RT_DONE_GREP:-}"
+is_done() { { [ -n "$DONE_RE" ] && find "$1" -type f 2>/dev/null | grep -qE "$DONE_RE"; } || { [ -n "$DONE_GREP" ] && grep -rqE "$DONE_GREP" "$1/docs" "$1/notes" 2>/dev/null; }; }
+# `RT_TWIN` — карточка памяти двойника аналитика, `RT_TWIN_PROMPT` — общий промпт двойника (пусто → цикл
+# побайтно прежний). Задана — реплику хода пишет не файл, а двойник: отдельный `claude -p` без инструментов,
+# вне песочницы, получает промпт, карточку и весь диалог и отвечает за аналитика. Для опросов, где ответ
+# зависит от вопроса (`rec-*`): готовая реплика на такой вопрос не отвечает. Диалог и реплики — `<песочница>/_twin/`.
+TWIN="${RT_TWIN:-}"
+TWIN_PROMPT="${RT_TWIN_PROMPT:-}"
+if [ -n "$TWIN" ]; then
+  [ -f "$TWIN" ] && [ -f "$TWIN_PROMPT" ] || { echo "нет карточки или промпта двойника: $TWIN / $TWIN_PROMPT"; exit 1; }
+fi
+twin_reply() {
+  local sb="$1" last="$2" n="$3" td="$1/_twin" wd
+  mkdir -p "$td"
+  [ -s "$td/dialog.md" ] || printf 'Аналитик:\n%s\n\n' "$(cat "$PROMPT")" > "$td/dialog.md"
+  printf 'Агент:\n%s\n\n' "$(cat "$last")" >> "$td/dialog.md"
+  # Промпт собирается ДО перехода во временную папку: путь песочницы относительный, и подстановка внутри
+  # `( cd … )` читала бы диалог уже не оттуда — двойник получал пустой диалог и отвечал «вопросов не было».
+  local tp
+  tp="$(cat "$TWIN_PROMPT")
+
+<карточка>
+$(cat "$TWIN")
+</карточка>
+
+<диалог>
+$(cat "$td/dialog.md")
+</диалог>
+
+Напиши только свой ответ на последнее сообщение агента."
+  wd="$(mktemp -d)"
+  ( cd "$wd" && timeout 300 claude -p "$tp" --model "${RT_TWIN_MODEL:-sonnet}" --tools "" --output-format json < /dev/null ) \
+      > "$td/twin-$n.json" 2>> "$sb/_stderr.log"
+  rm -rf "$wd"
+  node -e 'const j = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); process.stdout.write(String(j.result || ""))' \
+      "$td/twin-$n.json" > "$td/reply-$n.txt" 2>> "$sb/_stderr.log" || cp /dev/null "$td/reply-$n.txt"
+  printf 'Аналитик:\n%s\n\n' "$(cat "$td/reply-$n.txt")" >> "$td/dialog.md"
+}
 # `RT_NODE_REPLY` — файл реплики на узел «Что дальше?» (`analyst-workspace` 2.0.0). Пусто → цикл
 # побайтно прежний. Узел опознаётся в ответе прошлого хода по двум подписям, которых нет больше нигде
 # в маршруте. Нейтральное «да, годится» вариант из четырёх не выбирает, поэтому в узле реплика — выбор;
@@ -292,6 +332,12 @@ $(cat "$PROMPT")
       local tf="$TURN2"
       [ "$turn" -ge 3 ] && [ -n "${TURN_FILES[$((turn - 3))]:-}" ] && tf="${TURN_FILES[$((turn - 3))]}"
       reply="$(cat "$tf")"
+      if [ -n "$TWIN" ]; then
+        twin_reply "$sb" "$prev" "$(printf '%02d' "$turn")"
+        reply="$(cat "$sb/_twin/reply-$(printf '%02d' "$turn").txt")"
+        # Двойник не ответил — это отказ стенда, а не ход аналитика: прогон в счёт не идёт.
+        [ -n "$reply" ] || { apifail=1; break; }
+      fi
       if [ -n "$NODE_REPLY" ] && is_node "$prev"; then
         if [ "$node_used" = "0" ]; then reply="$(cat "$NODE_REPLY")"; node_used=1
         elif [ "$node_used" = "1" ] && [ -n "$NODE_REPLY2" ]; then reply="$(cat "$NODE_REPLY2")"; node_used=2
