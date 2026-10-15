@@ -290,6 +290,17 @@ function parseAnswer(text) {
   return { markers, bad, notes: [...notes] }
 }
 
+// Контроль разведчика (3.3.0): «контроль :: <класс> :: <файл> :: <число>» — файл, где разведчик сам
+// насчитал ключи класса; ведущий сверяет с маркером. Строкой маркера не является и формат не портит.
+function parseControls(text) {
+  const out = []
+  for (const raw of text.split(/\r?\n/)) {
+    const m = raw.trim().replace(/^`+|`+$/g, '').match(/^контроль\s*::\s*(контракт|сущности|задачи|топики)[^:]*::\s*(.+?)\s*::\s*(\d+)\s*$/)
+    if (m) out.push({ cls: m[1], file: m[2].replace(/^`+|`+$/g, ''), n: Number(m[3]) })
+  }
+  return out
+}
+
 // ─── стрим ───────────────────────────────────────────────────────────────────────────────
 const FULL_GLOB = /^(\*\*\/)*\*\*(\/\*\*)*(\/\*(\.\*)?)?$/
 const norm = p => resolve(p).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
@@ -399,6 +410,19 @@ function gradeRun(fx, runDir, sandbox) {
     const cnt = tl.reduce((s, m) => s + (m.n || 0), 0)
     res.topicMask = { ok: cnt >= 1 && cnt <= 2 * tn, why: `на коде (${tl.map(m => m.glob).join(', ')}), совпадений ${cnt}` + (cnt > 2 * tn ? ` — шире двойной правды ${2 * tn}` : cnt === 0 ? ' — ноль' : '') }
   }
+  // Контроль: у каждого класса со строкой «ключ» не по спеке — строка контроля; маркер класса в её
+  // файле против числа разведчика (меньше половины — «узкий», как у plan.sh). На вердикт А-1 не влияет.
+  const ctl = parseControls(answer)
+  const needCtl = CLASSES.filter(cls => markers.some(x => x.cls === cls && x.kind === 'ключ' && x.raw.split(/\s*::\s*/).length < 5))
+  const missCtl = needCtl.filter(cls => !ctl.some(c => c.cls === cls))
+  const ctlInfo = ctl.map(c => {
+    const f = resolve(c.file)
+    if (!existsSync(f)) return `${c.cls}: файла нет (${c.file})`
+    let m = 0
+    for (const x of markers.filter(y => y.cls === c.cls && y.kind === 'ключ')) { const r = countLines(x.regex, x.glob, f); if (!r.error) m += r.n }
+    return `${c.cls} ${m}/${c.n}${m * 2 < c.n ? ' УЗКИЙ' : ''}`
+  })
+  res.control = { ok: missCtl.length === 0, narrow: ctlInfo.some(t => / УЗКИЙ$/.test(t)), why: (missCtl.length ? `нет у ${missCtl.join(', ')}` : `есть у всех классов с ключом (${needCtl.join(', ') || '—'})`) + (ctlInfo.length ? `; маркер/разведчик: ${ctlInfo.join(', ')}` : '') }
   for (const k of Object.keys(TRAP_NAMES)) res.trapWhere[k] = [...res.trapWhere[k]].slice(0, 3)
   const trapHit = Object.values(res.traps).some(v => v > 0)
   const common = !trapHit && !res.invalid.length && !res.bad.length && st.peak <= PEAK_MAX && st.globRoot.length === 0
@@ -424,6 +448,7 @@ function printRun(r, out) {
     out.push(`      ${cls.padEnd(9)} ${String(c.sum).padStart(4)} / ${String(c.n).padEnd(4)} ${ok.padEnd(9)} ${c.why}${c.orient ? `; ориентир ${c.orient}` : ''}`)
   }
   out.push(`      пометка топиков: ${r.topicMask.ok ? 'ок' : 'КРАСНЫЙ'} — ${r.topicMask.why}`)
+  out.push(`      контроль: ${r.control.ok ? 'ок' : 'КРАСНЫЙ'} — ${r.control.why}`)
   const tr = Object.entries(r.traps).map(([k, v]) => `${TRAP_NAMES[k]} ${v}`).join(' · ')
   out.push(`      ловушки: ${tr}`)
   for (const [k, list] of Object.entries(r.trapWhere)) for (const w of list) out.push(`        [${k}] ${w}`)
@@ -456,6 +481,8 @@ function gradeRound(roundDir, sandbox, { quiet = false } = {}) {
     if (!pass) allPass = false
     if (!passL) allPassLax = false
     out.push(`  ПОМЕТКА ТОПИКОВ ${fx}: ок ${meas.filter(r => r.topicMask.ok).length} из ${M}`)
+    out.push(`  КОНТРОЛЬ ${fx}: у всех классов с ключом ${meas.filter(r => r.control.ok).length} из ${M}; узкий маркер по контролю ${meas.filter(r => r.control.narrow).length} из ${M}`)
+    out.push(`  КОНТРАКТ ${fx}: в окне ${meas.filter(r => r.classes['контракт'].okStrict).length} из ${M}`)
     out.push(`  ИТОГ ${fx}: строго зелёных ${g} из ${M} (нужно ≥ ${need}) — ${pass ? 'ПРОЙДЕН' : 'НЕ ПРОЙДЕН'}; мягко ${gl} из ${M} — ${passL ? 'ПРОЙДЕН' : 'НЕ ПРОЙДЕН'}; не измерено ${rs.length - M}${M && M < 5 ? '  (измерено меньше 5 — критерий 4/5 не применим буквально)' : ''}`)
     out.push('')
     results.push(...rs)

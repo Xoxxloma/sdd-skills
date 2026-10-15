@@ -82,7 +82,7 @@ const diskPath = (p) => {
 const unbom = (t) => String(t).replace(/^\uFEFF/, '')
 // O13: заголовки — есть ли они и все ли по форме
 export const badHeaders = (text) => {
-  const hs = unbom(text).split(/\r?\n/).filter((l) => /^## /.test(l))
+  const hs = unbom(text).split(/\r?\n/).filter((l) => /^## /.test(l) && !/^## контроль\s*::/.test(l))
   if (!hs.length) return 'нет заголовков'
   const bad = hs.filter((l) => { const f = l.slice(3).split(' :: '); return f.length < 2 || !f[0].trim() || !['ключ', 'ориентир'].includes(f[f.length - 1].replace(/\s*\(.*$/, '').trim()) })
   return bad.length ? `заголовков не по форме: ${bad.length}` : ''
@@ -108,6 +108,7 @@ export function parseCounts (text) {
   const lines = []
   let cur = null
   for (const raw of unbom(text).split(/\r?\n/)) {
+    if (/^##\s+контроль\s*::/.test(raw)) { cur = null; continue }   // контроль разведчика — не класс счёта
     if (/^##\s/.test(raw)) {
       const h = raw.match(/^##\s+(.+?)\s*::.*::\s*(ключ|ориентир)(?:\s*\([^)]*\))?\s*$/) || raw.match(/^##\s+(.+?)\s*::\s*(ключ|ориентир)(?:\s*\([^)]*\))?\s*$/)
       if (h) cur = { cls: h[1].trim(), type: h[2] }

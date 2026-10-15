@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # run-sm-scout.sh <SKILL.md> <папка-раунда> [N] — проба разведчика Шага 3.0 (критерий А-1, PLAN-AUTOSPLIT.md §5).
 #
-# Из УКАЗАННОГО SKILL.md вырезается бриф разведчика — первый блок, огороженный четырьмя обратными
-# кавычками, после заголовка `#### 3.0 Разведчик` (до следующего заголовка раздела; не нашёлся — отказ).
+# Бриф разведчика: рядом с УКАЗАННЫМ SKILL.md лежит `reference/brief-scout.md` — он целиком (3.3.0+);
+# иначе из SKILL.md вырезается первый блок, огороженный четырьмя обратными кавычками, после заголовка
+# `#### 3.0 Разведчик` (до следующего заголовка раздела; не нашёлся — отказ).
 # В нём подставляются `<пути>` — абсолютный Windows-путь дерева сервиса (`pwd -W`, как в
 # runs/2026-08-24-sm-real/run.sh) — и `<type>` = backend. Промпт прогона — бриф целиком, как его отдал бы
 # ведущий субагенту. Прогон: `claude -p` с моделью ${SM_MODEL:-haiku}, ТОЛЬКО Read/Grep/Glob
 # (`--tools` ограничивает встроенный набор, `--strict-mcp-config` и ENABLE_CLAUDEAI_MCP_SERVERS=false
 # убирают MCP и коннекторы claude.ai, `--disallowedTools` — страховка), stream-json.
 #
-# Фикстуры: NRS-TAIL, SM-MONO-DGS, repairy-api, resonance-api (fixtures/SM-SCOUT/truth.json).
+# Фикстуры: NRS-TAIL, SM-MONO-DGS, SM-MONO-DGS-MIX, repairy-api, resonance-api (fixtures/SM-SCOUT/truth.json).
 # Песочница — ОДНА на раунд, <раунд>/sandbox-scout/ (fixtures/SM-SCOUT/sandbox.sh): писать разведчику
 # нечем, а грейдер обязан грепать то же дерево, что видел прогон. Отпечаток песочницы снимается до и
 # после пула; до пула эталонные маркеры сверяются с правдой (`grade-sm-scout.mjs --truth-check`).
@@ -32,9 +33,11 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; FIX="$HERE/fixtures/SM-SCO
 mkdir -p "$ROUND"; ROUND="$(cd "$ROUND" && pwd)"
 OUT="$ROUND/${SM_OUT:-sm-scout}"; SB="$ROUND/sandbox-scout"
 MODEL="${SM_MODEL:-haiku}"
-FIXTURES="NRS-TAIL SM-MONO-DGS repairy-api resonance-api"
+FIXTURES="NRS-TAIL SM-MONO-DGS SM-MONO-DGS-MIX repairy-api resonance-api"
 
 # ─── бриф ────────────────────────────────────────────────────────────────────────────────
+BRIEF_FILE="$(dirname "$SKILL")/reference/brief-scout.md"
+if [ -f "$BRIEF_FILE" ]; then BRIEF="$(cat "$BRIEF_FILE")"; else
 BRIEF="$(awk '
   st == 0 && /^#### 3\.0 Разведчик/ { st = 1; next }
   st == 1 && /^````/                 { st = 2; next }
@@ -43,10 +46,12 @@ BRIEF="$(awk '
   st == 2                            { print }
   END { if (st != 3) exit 1 }' "$SKILL")" \
   || { echo "не нашёл бриф разведчика: блок в четырёх обратных кавычках после «#### 3.0 Разведчик» в $SKILL" >&2; exit 1; }
+fi
 [ -n "$BRIEF" ] || { echo "бриф разведчика пуст в $SKILL" >&2; exit 1; }
 case "$BRIEF" in *'<пути>'*) ;; *) echo "в брифе нет плейсхолдера <пути> — разведчику некуда смотреть" >&2; exit 1 ;; esac
 mkdir -p "$OUT"
 cp "$SKILL" "$OUT/_skill-snapshot.md"
+[ -f "$BRIEF_FILE" ] && cp "$BRIEF_FILE" "$OUT/_brief-scout-snapshot.md"
 printf '%s\n' "$BRIEF" > "$OUT/_brief-template.md"
 LEFT="$(printf '%s\n' "$BRIEF" | grep -o '<[^<> `|]\{1,24\}>' | grep -v -x -e '<пути>' -e '<type>' -e '<класс>' -e '<регэксп>' -e '<glob>' | sort -u | tr '\n' ' ')"
 [ -n "$LEFT" ] && echo "ВНИМАНИЕ: в брифе есть плейсхолдеры, которых раннер не подставляет: $LEFT"

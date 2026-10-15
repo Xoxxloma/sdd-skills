@@ -23,6 +23,9 @@
 #   9. Схемы `*.graphqls` — 17 файлов: поля корневых типов совпадают с кодом, но сами по себе
 #      ключами не считаются (ключ — объявление резолвера в коде).
 #
+# DGS_MIX=1 — смешанный вариант: первая операция `@DgsQuery`/`@DgsMutation` в каждом классе записана
+# со скобками (`@DgsQuery(field = "…")`), остальные без. Число ключей то же; маркер со скобкой
+# (`@DgsQuery\(`) ловит только их — так выглядит недосчёт GraphQL на проде.
 # Вызов:  ./make.sh <куда>   →  <куда>/casedesk/   (по умолчанию ./out, он в .gitignore стенда)
 # Детерминированно, без random. В конце — числа, посчитанные grep'ом по собранному дереву.
 set -eu
@@ -246,12 +249,14 @@ emit_dgs() {
       } > "$f"
     fi
     case "$op" in
-      q)  meth "  @DgsQuery" \
+      q)  if [ "${DGS_MIX:-}" = 1 ] && [ "$inclass" = 0 ]; then ann="  @DgsQuery(field = \"find${D}$k\")"; else ann="  @DgsQuery"; fi
+          meth "$ann" \
             "  public List<Object> find${D}$k(@InputArgument String filter) {" \
             "    return service.find(filter);" \
             "  }" >> "$f"
           SQ="$SQ  find${D}$k(filter: String): [${D}Item]"$'\n' ;;
-      m)  meth "  @DgsMutation" \
+      m)  if [ "${DGS_MIX:-}" = 1 ] && [ "$inclass" = 0 ]; then ann="  @DgsMutation(field = \"save${D}$k\")"; else ann="  @DgsMutation"; fi
+          meth "$ann" \
             "  public Object save${D}$k(@InputArgument Map<String, Object> input) {" \
             "    return service.save(input);" \
             "  }" >> "$f"

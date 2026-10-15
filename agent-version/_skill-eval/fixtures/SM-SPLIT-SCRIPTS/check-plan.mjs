@@ -223,6 +223,21 @@ export function checkPlanCase (ex, out) {
   }
   const inv = invariants(P, out.counts, K, w, rootsArg)
   add('инварианты (файл с ключами ровно в одной части, остальные не больше чем в одной, веса, ≤ K, сумма)', inv.bad.length === 0, inv.bad.slice(0, 4).join('; '))
+  if (ex.controls) {
+    // «УЗКИЙ МАРКЕР: <класс> — маркер дал M в <файл>, разведчик видел N» | «контроль <класс>: маркер дал M в <файл>, разведчик видел N — сходится»
+    const got = []
+    for (const l of out.stdout.split(/\r?\n/)) {
+      let m = l.match(/^УЗКИЙ МАРКЕР: (\S+) — маркер дал (\d+) в .+, разведчик видел (\d+)$/)
+      if (m) { got.push(`${m[1]} ${m[2]}/${m[3]} узкий`); continue }
+      m = l.match(/^контроль (\S+): маркер дал (\d+) в .+, разведчик видел (\d+) — сходится$/)
+      if (m) got.push(`${m[1]} ${m[2]}/${m[3]} сходится`)
+    }
+    const want = ex.controls.map((c) => `${c.cls} ${c.m}/${c.n} ${c.narrow ? 'узкий' : 'сходится'}`)
+    got.sort(); want.sort()
+    add('строки контроля разведчика', got.length === want.length && got.every((x, i) => x === want[i]), `получено [${got.join(' ¦ ') || '—'}], ждали [${want.join(' ¦ ')}]`)
+    const badLine = out.stdout.match(/^контроль не по форме .*?: (\d+);/m)
+    add('строка «контроль не по форме»', (badLine ? Number(badLine[1]) : 0) === (ex.controls_bad || 0), `получено ${badLine ? badLine[1] : 'нет строки'}, ждали ${ex.controls_bad || 0}`)
+  }
   return res
 }
 
