@@ -388,6 +388,17 @@ function gradeRun(fx, runDir, sandbox) {
     }
     res.classes[cls] = c
   }
+  // Куда показывает пометка топиков (раунд 2026-10-15): на конфиг или её нет — нарезка отдаёт
+  // топики остатку, и тела событий пишутся из конфига. На строгий/мягкий вердикт А-1 не влияет.
+  const tn = (T.classes['топики'] || { n: 0 }).n, tl = markers.filter(x => x.cls === 'топики')
+  const isConf = g => /(ya?ml|properties|json|toml|env|conf|ini|xml)\W*$/i.test(g)
+  if (tn === 0) res.topicMask = tl.length ? { ok: false, why: `правда 0, а строка есть: ${tl.map(m => m.glob).join(', ')}` } : { ok: true, why: 'правда 0, строки нет' }
+  else if (!tl.length) res.topicMask = { ok: false, why: 'строки нет — топики уйдут остатку' }
+  else if (tl.some(m => isConf(m.glob))) res.topicMask = { ok: false, why: `на конфиге: ${tl.filter(m => isConf(m.glob)).map(m => m.glob).join(', ')}` }
+  else {
+    const cnt = tl.reduce((s, m) => s + (m.n || 0), 0)
+    res.topicMask = { ok: cnt >= 1 && cnt <= 2 * tn, why: `на коде (${tl.map(m => m.glob).join(', ')}), совпадений ${cnt}` + (cnt > 2 * tn ? ` — шире двойной правды ${2 * tn}` : cnt === 0 ? ' — ноль' : '') }
+  }
   for (const k of Object.keys(TRAP_NAMES)) res.trapWhere[k] = [...res.trapWhere[k]].slice(0, 3)
   const trapHit = Object.values(res.traps).some(v => v > 0)
   const common = !trapHit && !res.invalid.length && !res.bad.length && st.peak <= PEAK_MAX && st.globRoot.length === 0
@@ -412,6 +423,7 @@ function printRun(r, out) {
     const ok = c.okStrict ? 'ок' : (c.okLax ? 'мягко ок' : 'КРАСНЫЙ')
     out.push(`      ${cls.padEnd(9)} ${String(c.sum).padStart(4)} / ${String(c.n).padEnd(4)} ${ok.padEnd(9)} ${c.why}${c.orient ? `; ориентир ${c.orient}` : ''}`)
   }
+  out.push(`      пометка топиков: ${r.topicMask.ok ? 'ок' : 'КРАСНЫЙ'} — ${r.topicMask.why}`)
   const tr = Object.entries(r.traps).map(([k, v]) => `${TRAP_NAMES[k]} ${v}`).join(' · ')
   out.push(`      ловушки: ${tr}`)
   for (const [k, list] of Object.entries(r.trapWhere)) for (const w of list) out.push(`        [${k}] ${w}`)
@@ -443,6 +455,7 @@ function gradeRound(roundDir, sandbox, { quiet = false } = {}) {
     const pass = M > 0 && g >= need, passL = M > 0 && gl >= need
     if (!pass) allPass = false
     if (!passL) allPassLax = false
+    out.push(`  ПОМЕТКА ТОПИКОВ ${fx}: ок ${meas.filter(r => r.topicMask.ok).length} из ${M}`)
     out.push(`  ИТОГ ${fx}: строго зелёных ${g} из ${M} (нужно ≥ ${need}) — ${pass ? 'ПРОЙДЕН' : 'НЕ ПРОЙДЕН'}; мягко ${gl} из ${M} — ${passL ? 'ПРОЙДЕН' : 'НЕ ПРОЙДЕН'}; не измерено ${rs.length - M}${M && M < 5 ? '  (измерено меньше 5 — критерий 4/5 не применим буквально)' : ''}`)
     out.push('')
     results.push(...rs)
