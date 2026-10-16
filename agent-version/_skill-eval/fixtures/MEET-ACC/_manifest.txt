@@ -1,5 +1,7 @@
 etalon/meeting-2026-10-09.razbor.md
 etalon/meeting-2026-10-09-spec.md
+etalon-2/meeting-2026-10-09.points.md
+etalon-2/meeting-2026-10-09.razbor.md
 expected.md
 seed/context/conventions.md
 seed/docs/ACS-208/business_requirements.md

@@ -12,6 +12,7 @@
 // прогона (`answer-*.md`) и потоки (`stream*.jsonl`) читаются только для критериев о ходах: выбор темы, ключ задачи,
 // спор со старым пунктом (SAME), стоп на «решений нет» — других следов у них нет.
 
+import { resolve as pathResolve } from 'node:path'
 import { readdirSync, readFileSync, existsSync, statSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -74,7 +75,7 @@ export const disputeAsked = (dialog) => RE_DISPUTE_TEMPLATE.test(dialog) || ques
 const RE_STOP_TAIL = /решени\S*[^.!?\n]{0,30}?\s(нет|не\s+было)([^а-яё]|$)/i
 const RE_ASKS = /\?|вариант\S*\s*:|ответьте|выберите/i
 
-const FX = {
+export const FX = {
   IN: {
     kind: 'input',
     seed: { [NB]: `fixtures/MI-NB-IN/seed/${NB}` },
@@ -1116,25 +1117,29 @@ function selftest () {
 
 // ---------- прогон ----------
 
-const arg = process.argv[2]
-if (arg === '--selftest') selftest()
-const fxName = process.argv[process.argv.indexOf('--fx') + 1]
-const fx = FX[fxName]
-if (!arg || !existsSync(arg) || !fx) { console.error('usage: node grade-minb.mjs <каталог проб> --fx IN|OUT|REC|ANS|SAME | --selftest'); process.exit(1) }
-const runs = readdirSync(arg).filter((n) => /^run-\d+$/.test(n) && statSync(join(arg, n)).isDirectory()).sort()
-console.log(`\nпроба mi-nb-${fxName.toLowerCase()}, ${arg}`)
-let measured = 0; let green = 0
-for (const n of runs) {
-  const dir = join(arg, n)
-  const ans = existsSync(join(dir, 'answer.md')) ? readFileSync(join(dir, 'answer.md'), 'utf8') : ''
-  // Отказ API — прогон не в счёт (пул пишет `_api-failure*.txt`).
-  if (existsSync(join(dir, '_api-failure.txt')) || existsSync(join(dir, '_api-failure-turn.txt')) || !ans.trim() || RE_API_FAILURE.test(ans.slice(0, 300))) { console.log(`  ${n}: НЕ ИЗМЕРЕНО`); continue }
-  measured++
-  const r = gradeRun(dir, fx)
-  if (r.pass) green++
-  const turns = readdirSync(dir).filter((f) => /^answer-\d+\.md$/.test(f)).length || 1
-  console.log(`  ${n}: ${r.pass ? 'ЗЕЛЁНЫЙ' : 'КРАСНЫЙ — ' + r.red.join('; ')}`)
-  console.log(`         ходов: ${turns}${r.razbor ? `, цитат: ${r.razbor.quotes}` : ''}${r.info.length ? ' · ' + r.info.join(' · ') : ''}`)
-  if (r.warn.length) console.log(`         предупреждения: ${r.warn.join(' · ')}`)
+// Импорт из другого оценщика (grade-ni.mjs) не должен запускать прогон.
+const IS_MAIN = !!process.argv[1] && fileURLToPath(import.meta.url) === pathResolve(process.argv[1])
+if (IS_MAIN) {
+  const arg = process.argv[2]
+  if (arg === '--selftest') selftest()
+  const fxName = process.argv[process.argv.indexOf('--fx') + 1]
+  const fx = FX[fxName]
+  if (!arg || !existsSync(arg) || !fx) { console.error('usage: node grade-minb.mjs <каталог проб> --fx IN|OUT|REC|ANS|SAME | --selftest'); process.exit(1) }
+  const runs = readdirSync(arg).filter((n) => /^run-\d+$/.test(n) && statSync(join(arg, n)).isDirectory()).sort()
+  console.log(`\nпроба mi-nb-${fxName.toLowerCase()}, ${arg}`)
+  let measured = 0; let green = 0
+  for (const n of runs) {
+    const dir = join(arg, n)
+    const ans = existsSync(join(dir, 'answer.md')) ? readFileSync(join(dir, 'answer.md'), 'utf8') : ''
+    // Отказ API — прогон не в счёт (пул пишет `_api-failure*.txt`).
+    if (existsSync(join(dir, '_api-failure.txt')) || existsSync(join(dir, '_api-failure-turn.txt')) || !ans.trim() || RE_API_FAILURE.test(ans.slice(0, 300))) { console.log(`  ${n}: НЕ ИЗМЕРЕНО`); continue }
+    measured++
+    const r = gradeRun(dir, fx)
+    if (r.pass) green++
+    const turns = readdirSync(dir).filter((f) => /^answer-\d+\.md$/.test(f)).length || 1
+    console.log(`  ${n}: ${r.pass ? 'ЗЕЛЁНЫЙ' : 'КРАСНЫЙ — ' + r.red.join('; ')}`)
+    console.log(`         ходов: ${turns}${r.razbor ? `, цитат: ${r.razbor.quotes}` : ''}${r.info.length ? ' · ' + r.info.join(' · ') : ''}`)
+    if (r.warn.length) console.log(`         предупреждения: ${r.warn.join(' · ')}`)
+  }
+  console.log(`\nИТОГ ${fxName}: ${green}/${measured}`)
 }
-console.log(`\nИТОГ ${fxName}: ${green}/${measured}`)
