@@ -1,0 +1,6 @@
+etalon/notebook-2026-10-15-bt.md
+README.md
+seed/docs/.keep
+seed/notes/возврат-товара-без-чека/notebook-2026-10-15.points.md
+w-prompt.txt
+w-turn2.txt

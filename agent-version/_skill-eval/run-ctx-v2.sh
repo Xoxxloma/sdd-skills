@@ -74,6 +74,8 @@ SKILL_DIR=""
 # из файлов, как было). Пробам `meeting-recall`: протокол создаётся на первом ходу, а ответ зависит от вопроса.
 DONE_GREP=""
 TWIN_CARD=""
+# Вызов скилла словами (пусто → как было): снимок — в `.claude/skills/` песочницы, обёртка не называет ни скилл, ни путь.
+AUTO_SKILL=""
 case "$PROBE" in
   ts-live)   FIXTURE=TS-LIVE;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-conv)   FIXTURE=TS-CONV;   PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
@@ -92,24 +94,26 @@ case "$PROBE" in
   # на все ходы и нейтральная («согласен с рекомендацией»): цель, условные пункты и сводка — каждый вопрос
   # скилла с рекомендацией первой. Диалог кончается, когда во вход записан файл. Грейдер —
   # `grade-meet.mjs --fx VAC|ACC`, ожидания — `fixtures/MEET-*/expected.md`.
-  meet-vac)  FIXTURE=MEET-VAC;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
-  meet-acc)  FIXTURE=MEET-ACC;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  meet-vac)  FIXTURE=MEET-VAC;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-acc)  FIXTURE=MEET-ACC;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
   # Стык встреча → петля (2026-10-14): скилл петли получает документ задачи и эталонный вход
   # meeting-intake и сообщение «по итогам встречи». Меряется, как он разбирает вход и что спрашивает.
   jm-br-vac)  FIXTURE=JM-BR-VAC;  PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; MEET_ENV=1 ;;
   jm-br-long) FIXTURE=JM-BR-LONG; PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; MEET_ENV=1 ;;
   jm-ts-acc)  FIXTURE=JM-TS-ACC;  PROMPT_FILE=w-prompt.txt; SKILL=technical-spec-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=4; IDLE_MAX=4; DONE_RE='/docs/.*/technical_specification\.md$'; MEET_ENV=1 ;;
   # Длинная встреча (660 строк, 52 минуты): карта в три окна, тема > 400 строк — разбор кусками.
-  meet-long) FIXTURE=MEET-LONG; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  meet-long) FIXTURE=MEET-LONG; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
   # Фичу обсуждают с нуля: документов задачи нет, ключ только в чате (MEET-NEW, цель — новый БТ).
   # Вторая встреча по готовой спеке (MEET-REW, цель — правки спеки): в папке уже лежит вход прошлой
   # встречи, поэтому конец диалога — по дате этой встречи, а не по любому входу.
-  meet-new)  FIXTURE=MEET-NEW;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  meet-new)  FIXTURE=MEET-NEW;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
   # Правки поверх записанного БТ + последнее слово после итогов внутри чужой темы (MEET-CHG); правка работающего,
   # расшифровка VTT, дата из имени файла (MEET-CR). Ключ у обеих — в строке вызова.
-  meet-chg)  FIXTURE=MEET-CHG;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
-  meet-cr)   FIXTURE=MEET-CR;   PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
-  meet-rew)  FIXTURE=MEET-REW;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-2026-10-14[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  meet-chg)  FIXTURE=MEET-CHG;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-cr)   FIXTURE=MEET-CR;   PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-rew)  FIXTURE=MEET-REW;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-2026-10-14[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  # Созвон-расспрос без решений (перенос MI-NB-OUT): ключа нет — список в docs/_inbox/; ждём сведения и открытые вопросы.
+  meet-out)  FIXTURE=MEET-OUT;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
   # Стык для этих двух: новый БТ только по входу встречи; доработка готовой спеки по входу второй встречи
   # (спека уже лежит — конец диалога по файлу не ловится, только потолок).
   jm-br-new)  FIXTURE=JM-BR-NEW;  PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=4; IDLE_MAX=4; DONE_RE='/docs/.*/business_requirements\.md$'; MEET_ENV=1 ;;
@@ -117,13 +121,11 @@ case "$PROBE" in
   # ── `meeting-recall`: встреча по памяти → протокол (2026-10-14) ───────────────────────────────
   # За аналитика отвечает двойник: `twin-analyst.md` + `twin-card.md` фикстуры. Конец — в протоколе
   # появился раздел «Уточнить у участников». Грейдер `grade-recall.mjs --fx NEW|CHG`.
-  rec-new) FIXTURE=RECALL-NEW; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_GREP='^## Уточнить у участников'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
-  rec-chg) FIXTURE=RECALL-CHG; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_GREP='^## Уточнить у участников'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  rec-new) FIXTURE=RECALL-NEW; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  rec-chg) FIXTURE=RECALL-CHG; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
   # Стык «протокол по памяти → meeting-intake»: засев — зелёный протокол `meeting-recall` (r2-new run-3, r2-chg run-2).
-  mr-new) FIXTURE=MR-NEW; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
-  mr-chg) FIXTURE=MR-CHG; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
   # Пересказ в строке вызова, ключа нет (протокол — в docs/_inbox/), аналитик просит закончить посреди раундов.
-  rec-inline) FIXTURE=RECALL-INLINE; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_GREP='^## Уточнить у участников'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  rec-inline) FIXTURE=RECALL-INLINE; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
   # analyst-notebook 1.0.0 и meeting-intake 1.1.0 (план product/plans/notebook.md): запись в ноут, сборка выкладки,
   # ноут на входе и цель «в ноут». Ноут лежит в `notes/` — конец по содержимому смотрит и туда (`RT_DONE_GREP`).
   nb-new)     FIXTURE=NB-NEW;     PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/notebook\.md$'; MEET_ENV=1 ;;
@@ -133,9 +135,6 @@ case "$PROBE" in
   nb-file)    FIXTURE=NB-FILE;    PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='reglament\.pdf'; MEET_ENV=1 ;;
   nb-view-api)  FIXTURE=NB-VIEW;  PROMPT_FILE=w-prompt-api.txt;  SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2-api.txt;  TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/[^/]*-20[0-9][0-9]-[0-9][0-9]-[0-9][0-9](-2)?\.md$'; MEET_ENV=1 ;;
   nb-view-chat) FIXTURE=NB-VIEW;  PROMPT_FILE=w-prompt-chat.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2-chat.txt; TURNS_CAP=3; IDLE_MAX=3; MEET_ENV=1 ;;
-  mi-nb-in)   FIXTURE=MI-NB-IN;   PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/notebook-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
-  mi-nb-out)  FIXTURE=MI-NB-OUT;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_GREP='— /meeting-intake'; MEET_ENV=1 ;;
-  mi-nb-rec)  FIXTURE=MI-NB-REC;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_GREP='— /meeting-intake'; MEET_ENV=1 ;;
   # analyst-notebook 1.1.0: спор людей, ответ закрывает открытый вопрос, режим «спроси», длинная вставка в sources/,
   # выкладка из части ноута другой формой; meeting-intake 1.1.0: ответ на открытый вопрос в ноуте на входе.
   nb-dispute) FIXTURE=NB-DISPUTE; PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='[Чч]то верно'; MEET_ENV=1 ;;
@@ -143,8 +142,6 @@ case "$PROBE" in
   nb-ask)     FIXTURE=NB-ASK;     PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=2; IDLE_MAX=2; MEET_ENV=1 ;;
   nb-long)    FIXTURE=NB-LONG;    PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='^> исходник:'; MEET_ENV=1 ;;
   nb-view-part) FIXTURE=NB-VIEW-PART; PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/[^/]*-20[0-9][0-9]-[0-9][0-9]-[0-9][0-9](-2)?\.md$'; MEET_ENV=1 ;;
-  mi-nb-ans)  FIXTURE=MI-NB-ANS;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/notebook-[^/]*-(bt|spec)\.md$'; MEET_ENV=1 ;;
-  mi-nb-same) FIXTURE=MI-NB-SAME; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_GREP='— /meeting-intake'; MEET_ENV=1 ;;
   ts-vac)    FIXTURE=TS-VAC;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-vac-q)  FIXTURE=TS-VAC;    PROMPT_FILE=q-prompt.txt;     SKILL=technical-spec-doc ;;
   ts-acc)    FIXTURE=TS-ACC;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
@@ -548,7 +545,30 @@ case "$PROBE" in
   # Скилл живёт вне набора аналитика — в корне репозитория, поэтому путь к нему задан явно.
   sq-audit)  FIXTURE=SQ-AUDIT;  PROMPT_FILE=audit-prompt.txt; SKILL=sdd-quality-audit; SKILL_DIR="$HERE/../../sdd-quality-audit" ;;
 
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q sq-audit meet-vac meet-acc meet-long meet-new meet-rew meet-chg meet-cr jm-br-vac jm-br-long jm-br-new jm-ts-acc jm-ts-rew rec-new rec-chg rec-inline mr-new mr-chg nb-new nb-thought nb-contra nb-noauth nb-file nb-view-api nb-view-chat mi-nb-in mi-nb-out mi-nb-rec nb-dispute nb-answer nb-ask nb-long nb-view-part mi-nb-ans mi-nb-same"; exit 1 ;;
+  # ── `notes-to-intent` 1.0.0: готовый список пунктов → вход для БТ или спеки (2026-10-15). Засев — документы задачи
+  # и список `*.points.md`; реплика одна на все ходы. Грейдер — `grade-ni.mjs --fx <FX>`, ожидания — fixtures/NI-*/README.md.
+  ni-vac)     FIXTURE=NI-VAC;     PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-07-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-acc)     FIXTURE=NI-ACC;     PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-09-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-new)     FIXTURE=NI-NEW;     PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-08-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-chg)     FIXTURE=NI-CHG;     PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-15-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-cr)      FIXTURE=NI-CR;      PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-16-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-rew)     FIXTURE=NI-REW;     PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-14-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-mr-new)  FIXTURE=NI-MR-NEW;  PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-14-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-mr-chg)  FIXTURE=NI-MR-CHG;  PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-14-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-nb-in)   FIXTURE=NI-NB-IN;   PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/notebook-2026-10-15-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-nb-ans)  FIXTURE=NI-NB-ANS;  PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/notebook-2026-10-15-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-nb-pick) FIXTURE=NI-NB-PICK; PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/notebook-2026-10-15-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  # analyst-notebook 1.2.0: список пунктов в ноут, выгрузка `собери пункты`, расшифровка по ссылке — строка. Грейдер grade-nb.mjs.
+  nb-pts-in)  FIXTURE=NB-PTS-IN;  PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='points\.md|^### [0-9]+ .{0,4}(В|в)стреча'; MEET_ENV=1 ;;
+  nb-pts-new) FIXTURE=NB-PTS-NEW; PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/notebook\.md$'; MEET_ENV=1 ;;
+  nb-pts-rec) FIXTURE=NB-PTS-REC; PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='points\.md|^### [0-9]+ .{0,4}(В|в)стреча'; MEET_ENV=1 ;;
+  nb-export)  FIXTURE=NB-EXPORT;  PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; IDLE_MAX=3; DONE_RE='/notes/[^/]+/notebook-20[0-9][0-9]-[0-9][0-9]-[0-9][0-9](-2)?\.points\.md$'; MEET_ENV=1 ;;
+  nb-export-since) FIXTURE=NB-EXPORT-SINCE; PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; IDLE_MAX=3; DONE_RE='/notes/[^/]+/notebook-20[0-9][0-9]-[0-9][0-9]-[0-9][0-9](-2)?\.points\.md$'; MEET_ENV=1 ;;
+  nb-route)   FIXTURE=NB-ROUTE;   PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=2; IDLE_MAX=2; MEET_ENV=1 ;;
+  nb-desc-one) FIXTURE=NB-DESC-ONE; PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='Кисел'; MEET_ENV=1 ;;
+  nb-desc-two) FIXTURE=NB-DESC-TWO; PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='Кисел'; MEET_ENV=1 ;;
+  nb-auto)    FIXTURE=NB-AUTO;    PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='Кисел'; AUTO_SKILL=1; MEET_ENV=1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q sq-audit meet-vac meet-acc meet-long meet-new meet-rew meet-chg meet-cr jm-br-vac jm-br-long jm-br-new jm-ts-acc jm-ts-rew rec-new rec-chg rec-inline nb-new nb-thought nb-contra nb-noauth nb-file nb-view-api nb-view-chat nb-dispute nb-answer nb-ask nb-long nb-view-part meet-out ni-vac ni-acc ni-new ni-chg ni-cr ni-rew ni-mr-new ni-mr-chg ni-nb-in ni-nb-ans ni-nb-pick nb-pts-in nb-pts-new nb-pts-rec nb-export nb-export-since nb-route nb-desc-one nb-desc-two nb-auto"; exit 1 ;;
 esac
 
 SKILL_DIR="${SKILL_DIR:-$HERE/../$SKILL}"
@@ -690,6 +710,15 @@ if [ -n "${REAL_SUBS:-}" ] && [ -n "$STUBS_DIR" ]; then
   STUBS_DIR="$(cd "$MIX" && pwd)"
   echo "живые под-скиллы поверх заглушек: $REAL_SUBS → $MIX"
 fi
+# Вызов скилла словами (`nb-auto`): снимок с reference/ — набором `.claude/skills/<скилл>/` песочницы, обёртка пула
+# не называет ни скилл, ни путь к нему. Набор — в папке раунда: тот же текст, что `_skills/`, и журнал прогона.
+if [ -n "$AUTO_SKILL" ]; then
+  AUTO="$ROUND/_auto-$PROBE"
+  [ -d "$AUTO/$SKILL" ] || { mkdir -p "$AUTO" && cp -r "$SNAP_ROOT/$SKILL" "$AUTO/"; }
+  STUBS_DIR="$(cd "$AUTO" && pwd)"
+  export RT_NO_SKILL_PATH=1
+  echo "вызов словами: снимок скилла → .claude/skills/$SKILL песочницы, путь в обёртке не называется"
+fi
 
 TURN2=""
 if [ -n "$TURN2_FILE" ]; then
@@ -725,6 +754,7 @@ mkdir -p "$ROUND/$PROBE"
   [ -n "$NODE_FILE" ] && echo "реплика на узел: $NODE_FILE"
   [ -n "$NODE2_FILE" ] && echo "реплика на второй узел: $NODE2_FILE"
   [ -n "$REAL_SUBS" ] && echo "живые под-скиллы: $REAL_SUBS"
+  [ -n "$AUTO_SKILL" ] && echo "вызов словами: скилл в .claude/skills/, путь не назван"
   echo "потолок ходов: ${RT_MAX_TURNS:-8}"
   [ -n "$DONE_RE" ] && echo "конец диалога по файлу: $DONE_RE"
   [ -n "$IDLE_MAX" ] && echo "пустых ходов подряд: $IDLE_MAX"
