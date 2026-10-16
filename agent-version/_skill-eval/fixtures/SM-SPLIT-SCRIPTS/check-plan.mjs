@@ -235,6 +235,8 @@ export function checkPlanCase (ex, out) {
     const want = ex.controls.map((c) => `${c.cls} ${c.m}/${c.n} ${c.narrow ? 'узкий' : 'сходится'}`)
     got.sort(); want.sort()
     add('строки контроля разведчика', got.length === want.length && got.every((x, i) => x === want[i]), `получено [${got.join(' ¦ ') || '—'}], ждали [${want.join(' ¦ ')}]`)
+    const unres = out.stdout.split(/\r?\n/).filter((l) => /^контроль \S+ не сверен:/.test(l)).length
+    add('строки «контроль … не сверен»', unres === (ex.controls_unresolved || 0), `получено ${unres}, ждали ${ex.controls_unresolved || 0}`)
     const badLine = out.stdout.match(/^контроль не по форме .*?: (\d+);/m)
     add('строка «контроль не по форме»', (badLine ? Number(badLine[1]) : 0) === (ex.controls_bad || 0), `получено ${badLine ? badLine[1] : 'нет строки'}, ждали ${ex.controls_bad || 0}`)
   }

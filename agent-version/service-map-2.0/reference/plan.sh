@@ -8,7 +8,10 @@
 #   <путь>:<число>
 # и заголовки контроля разведчика, без строк под ними:
 #   ## контроль :: <класс> :: <файл> :: <сколько ключей класса разведчик видел в этом файле>
-# Класс — первое слово поля: «контракт HTTP» и «контракт GraphQL» — оба контракт.
+# Класс — первое слово поля: «контракт HTTP» и «контракт GraphQL» — оба контракт. Путь — как угодно
+# записанный: бэктики и кавычки снимаются; точного пути нет ни в счёте, ни в дереве корней — берётся
+# единственный файл с тем же хвостом пути (вплоть до имени файла). Не нашёлся или таких несколько —
+# «контроль … не сверен», без тревоги.
 # По каждому контролю печатается строка: маркер класса дал в этом файле меньше половины —
 # «УЗКИЙ МАРКЕР: …», иначе «контроль …: сходится». На план контроль не влияет.
 # Путь без корня (`./src/…`, `src/…`) при одном корне считается от него. ОТКАЗ, код 3 — файл счёта
@@ -222,11 +225,27 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
   }
   NR == 1 { sub(/^\357\273\277/, "") }
   { sub(/\r$/, "") }
+  # Путь контроля, которого нет как есть: единственный файл счёта или дерева с тем же хвостом пути —
+  # от полного хвоста к имени файла; на уровне, где совпадений больше одного, — не найден.
+  function ctlfind(raw,   t, n, seg, k, j, tail, f, hit, cnt) {
+    t = raw; gsub(/\\/, "/", t); sub(/^(\.\/)+/, "", t); sub(/\/+$/, "", t)
+    n = split(t, seg, "/")
+    for (k = n; k >= 1; k--) {
+      tail = seg[n - k + 1]; for (j = n - k + 2; j <= n; j++) tail = tail "/" seg[j]
+      if (tail == "") continue
+      cnt = 0; hit = ""
+      for (f in fw) if (f == tail || substr(f, length(f) - length(tail)) == "/" tail) { if (f != hit) { cnt++; hit = f } }
+      for (f in allf) if (!(f in fw) && (f == tail || substr(f, length(f) - length(tail)) == "/" tail)) { cnt++; hit = f }
+      if (cnt == 1) return hit
+      if (cnt > 1) return ""
+    }
+    return ""
+  }
   # Контроль разведчика: «## контроль :: <класс> :: <файл> :: <число>» — не класс счёта.
   /^## контроль[ \t]*::/ {
     h = substr($0, 4); n = split(h, hp, " :: "); cl = ""
-    for (i = 1; i <= n; i++) gsub(/^[ \t]+|[ \t]+$/, "", hp[i])
-    if (n == 4 && hp[2] != "" && hp[4] ~ /^[0-9]+$/) { sub(/[ 	].*$/, "", hp[2]); ctlc[++nctl] = hp[2]; ctlf[nctl] = full(hp[3]); ctln[nctl] = hp[4] + 0 }
+    for (i = 1; i <= n; i++) { gsub(/^[ \t]+|[ \t]+$/, "", hp[i]); gsub(/[`"]/, "", hp[i]) }
+    if (n == 4 && hp[2] != "" && hp[4] ~ /^[0-9]+$/) { sub(/[ 	].*$/, "", hp[2]); ctlc[++nctl] = hp[2]; ctlr[nctl] = hp[3]; ctlf[nctl] = full(hp[3]); ctln[nctl] = hp[4] + 0 }
     else { ctlbad++; if (ctlbad1 == "") ctlbad1 = substr($0, 1, 160) }
     next
   }
@@ -302,10 +321,14 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
       print line
     }
     # Контроль разведчика: маркер класса в его файле против числа, которое разведчик видел глазами.
+    if (nctl) { while ((getline f < ENVIRON["PLAN_LIST"]) > 0) { sub(/\r$/, "", f); if (f != "") allf[np(f)] = 1 }; close(ENVIRON["PLAN_LIST"]) }
     for (i = 1; i <= nctl; i++) {
-      m = ((ctlf[i], ctlc[i]) in ck) ? ck[ctlf[i], ctlc[i]] : 0
-      if (m * 2 < ctln[i]) printf "УЗКИЙ МАРКЕР: %s — маркер дал %d в %s, разведчик видел %d\n", ctlc[i], m, ctlf[i], ctln[i]
-      else printf "контроль %s: маркер дал %d в %s, разведчик видел %d — сходится\n", ctlc[i], m, ctlf[i], ctln[i]
+      p = ctlf[i]
+      if (!(p in fw) && !(p in allf)) p = ctlfind(ctlr[i])
+      if (p == "") { printf "контроль %s не сверен: файла «%s» нет ни в счёте, ни в дереве сервиса\n", ctlc[i], ctlr[i]; continue }
+      m = ((p, ctlc[i]) in ck) ? ck[p, ctlc[i]] : 0
+      if (m * 2 < ctln[i]) printf "УЗКИЙ МАРКЕР: %s — маркер дал %d в %s, разведчик видел %d\n", ctlc[i], m, p, ctln[i]
+      else printf "контроль %s: маркер дал %d в %s, разведчик видел %d — сходится\n", ctlc[i], m, p, ctln[i]
     }
     if (ctlbad > 0) printf "контроль не по форме «## контроль :: <класс> :: <файл> :: <число>»: %d; первый: %s\n", ctlbad, ctlbad1
     if (total <= K) { printf "нарезка не нужна: вес %g ≤ K=%g\n", total, K; dump(); exit 0 }

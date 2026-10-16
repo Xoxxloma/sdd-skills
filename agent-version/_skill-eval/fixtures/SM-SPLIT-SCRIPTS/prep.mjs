@@ -54,8 +54,8 @@ if (mode === 'plan') {
   }
   const disk = (key, rest) => path.join(baseWin, 'w', rootDir(key), rest)
   const out = tpl.split(/\r?\n/).map((l) => {
-    const c = l.match(/^## контроль :: (.+?) :: \{(R\d|X)\}\/(.*?) :: (\d+)\s*$/)
-    if (c) return `## контроль :: ${c[1]} :: ${form(c[2], c[3], ex.counts_form)} :: ${c[4]}`
+    const c = l.match(/^## контроль :: (.+?) :: (`?)\{(R\d|X)\}\/(.*?)(`?) :: (\d+)\s*$/)
+    if (c) return `## контроль :: ${c[1]} :: ${c[2]}${form(c[3], c[4], ex.counts_form)}${c[5]} :: ${c[6]}`
     const m = l.match(/^\{(R\d|X)\}\/(.*?):(\d+)\s*$/)
     if (!m) return l
     touch(disk(m[1], m[2]))
