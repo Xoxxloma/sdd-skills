@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // grade-ni.mjs — пробы notes-to-intent: готовый список пунктов → вход для БТ или спеки (fixtures/NI-*).
 //
-//   node grade-ni.mjs <каталог проб> --fx VAC|ACC|NEW|CHG|CR|REW|MR-NEW|MR-CHG|NB-IN|NB-ANS|NB-PICK [--verbose]
+//   node grade-ni.mjs <каталог проб> --fx VAC|ACC|NEW|CHG|CR|REW|MR-NEW|MR-CHG|NB-IN|NB-ANS|NB-PICK|SPEC-BT|NB-REPEAT|TWIN [--verbose]
 //   node grade-ni.mjs --selftest
 //
 // Грейдится ФАЙЛ в песочнице: вход `<папка>/<основа списка>-(bt|spec).md` (notes-to-intent/reference/intent.md).
-// Три слоя проверок:
+// Четыре слоя проверок:
 // 1. Ожидания исходной пробы на том же материале, импортом: MEET → gradeInput (grade-meet.mjs), MR → gradeNEW /
 //    gradeCHG (grade-mr.mjs), NB → gradeInputIN / gradeInputANS (grade-minb.mjs). Адаптации — у `gradeContent`.
 // 2. Место КАЖДОГО пункта списка (`PTS`, после круга 2): карта «строка пункта → допустимые места», выведенная из
@@ -15,19 +15,31 @@
 //    старше; место не установлено — пропуск `[сведение]` и `[решено]`/`[открыто]`, у которых есть место во входе, —
 //    красный.
 // 3. Дословность (Шаг 7): «со слов <кто>» у сведения, пометки «по памяти» («не помню», «не уверен»), числа пункта
-//    (в том числе «вместо 24»), роли в «решали:» / «решает:» только из шапки списка — красный; потерянные «решил:»,
-//    «ждёт:», «(на встрече: …)» — предупреждение.
-// Общие: вход ровно один и там, где велит intent.md; документы задачи и список байт в байт; лишних файлов нет; ссылок
-// на источник (`L<n>`, `<дата> №<n>`) нет; в шапке `> Задача: <KEY> · цель: <цель>`; services/ и context/ не
-// читались. Отказ API — «НЕ ИЗМЕРЕНО».
+//    цифрой и словом (в том числе «вместо 24»), ФИО в «решил:» / «ждёт:» / «со слов» — из этого же пункта списка,
+//    `[открыто]` с `варианты:` — с «?» или обоими вариантами; потерянные «решил:», «ждёт:», «(на встрече: …)» —
+//    предупреждение.
+// 4. Опора (TL;DR 2, Шаг 7): КАЖДАЯ строка входа — все разделы, шапка, не только узнанные пункты — сверяется
+//    `groundCheck` (ground-check.mjs) с текстом списка и репликами аналитика (w-prompt/w-turn* фикстуры, `_twin/reply-*`
+//    прогона): число цифрой и словом, ФИО и роли в `решил:` / `ждёт:` / `со слов`, латиница. Не нашлось — красный.
+//    «решали:» в шапке — парами «роль — ФИО» из строки `> Встреча:` списка; «решает:» — по фамилии. Мысль и набросок
+//    списка узнаются и пересказом (основы слов пункта), не только словами классификатора grade-minb.mjs.
+// Общие: вход ровно один и там, где велит intent.md; документы задачи и список не тронуты (хеши `_seeded.sha256`
+// прогона, нет — LF-текст фикстуры); лишних файлов нет; ссылок на источник (`L<n>`, `<дата> №<n>`) нет; в шапке
+// `> Задача: <KEY> · цель: <цель>`; services/ и context/ не читались. «НЕ ИЗМЕРЕНО» — только отказ API; прогон без
+// ответа и без входа — красный «файл не записан».
+// По правке (баги 1, 2, 4, 5, 8, 9; черновик `runs/2026-10-16-harden-edits.md`): то, что законно по тексту 1.0.0 и неверно
+// после правки, — не красный, а отдельная строка «по правке» (`fix`): базовый замер на текущей версии её показывает, с
+// ложью не смешивает. Новые пробы (SPEC-BT, NB-REPEAT, TWIN) — свои ожидания и ловушки, `ownChecks`.
 
 import { resolve as pathResolve, join, relative, basename } from 'node:path'
 import { readdirSync, readFileSync, existsSync, statSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
 import { gradeInput, FX as MEET } from './grade-meet.mjs'
 import { gradeNEW, gradeCHG } from './grade-mr.mjs'
 import { gradeInputIN, gradeInputANS } from './grade-minb.mjs'
+import { groundCheck, fmtMissing, numbersOf, stemOf, norm as gnorm } from './ground-check.mjs'
 
 const HERE = fileURLToPath(new URL('.', import.meta.url))
 const lf = (s) => s.replace(/\r\n/g, '\n')
@@ -59,12 +71,16 @@ const isSec = (p) => SEC.includes(p)
 // - прямая пометка «(на встрече: …)» старше признаков (layout.md).
 // `s` — ключ для сводки, если суть там короче, чем пункт во входе (иначе — `k`).
 const P = (at, k, why, s) => ({ at, k, why, s })
+// Доп. поля пункта: `fix: { places, edit }` — места, законные по тексту 1.0.0 и неверные по правке (пункт там — строка
+// «по правке», не красный); `m` — регулярки, которые обязана нести каждая строка входа с этим пунктом (суть, которую
+// ключ не держит: «раз в две недели», а не «раз в 2 дня»).
+const PX = (p, extra) => ({ ...p, ...extra })
 export const PTS = {
   VAC: {
     6: P([DONE, S], [w('бумажн')], 'БТ §5.2: бумажные заявления с февраля, срок 31 января', [any(w('бумажн'), /31\s+январ/i)]),
     7: P([O], [any(w('груз'), w('загруж'), w('залива'))]),
     8: P([S], [any(/(^|\D)40(\D|$)/, w('сорок'))]),
-    9: P([R, O], [w('директор'), w('генеральн')], 'Шаг 5: решил не заказчик — «Оставляем?» (в «Решено») или «В открытые вопросы»'),
+    9: P([R, O], [w('директор'), w('генеральн')], '«Решено» по виду; «Открыто» — если Шаг 5 спросил «Оставляем?» (заказчика в шапке списка после правки засева нет — вопроса быть не должно, место оставлено)'),
     10: P([S], [any(/20\s*октябр/i, w('табельн'))]),
     11: P([DONE, S], [w('москов')], 'БТ §1.2: по московскому времени'),
     12: P([O], [w('ежегодн')]),
@@ -74,19 +90,20 @@ export const PTS = {
     16: P([OTHER], [any(w('сервер'), /в\s+заявк/i)]),
     17: P([DONE, S], [w('праздник')], 'БТ FR-1, §3.2: календарные дни, праздники вне проекта'),
     18: P([DONE, S], [any(/задним\s+числом/i, /после\s+даты\s+начала/i)], 'БТ FR-8'),
-    19: P([DONE, N], [w('начавш')], 'БТ §3.2: отзыв из начавшегося отпуска вне проекта'),
+    // `[решено] не входит: …` — решение: и в «Не входит», и в «Решено» (у всех таких пунктов, ревью 2026-10-16).
+    19: P([DONE, N, R], [w('начавш')], 'БТ §3.2: отзыв из начавшегося отпуска вне проекта'),
     20: P([R], [any(/FR-10/i, /в\s+день\s+(его\s+)?начала/i)]),
     21: P([S], [any(w('администратор'), /роль\s+кадровик/i)]),
     22: P([DONE, S], [any(/отдельн\S*\s+рол/i, /роли\s+руководител/i)], 'БТ §5.3, FR-7'),
     23: P([OTHER, OUT], [any(w('серы'), w('бейдж'))], 'пометка «не в требования» не называет документ', [any(w('серы'), w('бейдж'), w('цвет'), w('отозван'))]),
-    24: P([DONE, N], [w('черновик')], 'БТ §3.2: удаление черновиков вне проекта'),
+    24: P([DONE, N, R], [w('черновик')], 'БТ §3.2: удаление черновиков вне проекта'),
     25: P([DONE, R], [/только\s+согласованн/i], 'БТ FR-9'),
   },
   ACC: {
     6: P([S], [any(w('понедельник'), /8\s*[–-]\s*10/)]),
     7: P([S], [any(/429/, /20\s+запрос/i)]),
     8: P([R], [w('фонов')]),
-    9: P([O, OTHER], [any(w('промежуточн'), /которого\s+в\s+БТ\s+нет/i, /«Согласована»/)], 'пометка встречи «в спецификацию» против слоя БТ — в обе стороны (решение пользователя 2026-10-15)'),
+    9: P([O, OTHER, X], [any(w('промежуточн'), /которого\s+в\s+БТ\s+нет/i, /«Согласована»/)], 'пометка встречи «в спецификацию — как отклонение от БТ» против слоя БТ — в обе стороны (решение пользователя 2026-10-15); отклонение от БТ во входе спеки — «Расходится с БТ» (intent.md)'),
     10: P([R], [any(w('нараста'), w('дежурн'))]),
     11: P([R], [any(w('идентификатор'), /повторн\S*\s+заведени/i)]),
     12: P([S], [any(w('администратор'), w('админ'))]),
@@ -100,7 +117,7 @@ export const PTS = {
     20: P([R], [w('признак')]),
     21: P([S, OTHER, X], [w('выгрузк')], 'чужая система (её коды) или зависимость от данных — слой БТ; меняет порядок ведения справочника из БТ — «Расходится с БТ» (intent.md)'),
     22: P([S], [w('токен')]),
-    23: P([N], [w('подписк')], 'обмен с другими системами — спека (после круга 2)'),
+    23: P([N, R], [w('подписк')], 'обмен с другими системами — спека (после круга 2)'),
     24: P([S, OUT], [w('стенд')], 'поведение чужой системы или инструмент команды'),
     25: P([R], [any(w('заглушк'), /для\s+тестов/i, w('мок'))]),
     26: P([DONE, OTHER], [any(/владел\S*[^.;]{0,40}смен/i, /смен\S*[^.;]{0,40}владел/i, /видит\s+новый/i)], 'БТ: заявки видит новый владелец'),
@@ -131,7 +148,7 @@ export const PTS = {
     7: P([DONE, S], [w('праздник')], 'пометка «не меняется, так и в БТ»; БТ FR-1, §3.2'),
     8: P([R], [any(/FR-9/i, w('отмен[её]нн'))]),
     9: P([DONE, R], [any(w('ближайш'), w('сортир'))], 'пометка «остаётся, как в БТ»; БТ FR-7'),
-    10: P([DONE, N], [w('черновик')], 'БТ §3.2'),
+    10: P([DONE, N, R], [w('черновик')], 'БТ §3.2'),
     11: P([OTHER], [any(w('бэк'), /раз\s+в\s+сутки/i, w('джоб'))]),
     12: P([R], [/(3|тр[её]х|три)\s+(год|лет)/i]),
   },
@@ -168,20 +185,25 @@ export const PTS = {
     12: P([S], [any(/15\s*%/, w('пятнадцат'))]),
     13: P([O, OUT], [any(/к\s+которому/i, w('уточнит'), /к\s+какому\s+сроку/i)], 'срок поручения: процесс команды или ожидание ответа'),
     14: P([O], [any(w('закры'), /(2|два|двух)\s*час/i)]),
-    15: P([OUT], [any(/начал\S*\s+встреч/i, w('экран'))]),
+    // Бывший P15 «кто начал встречу и что показывали на экране» снят из засева: «Уточнить» не о предмете — не пункт
+    // (meeting-recall/SKILL.md, таблица Шага 5).
   },
   'MR-CHG': {
     6: P([THOUGHT], [any(w('предупрежд'), /осталась\s+одна/i, w('оставш'))]),
     7: P([R], [any(/12\s*час/i, w('двенадцат'))]),
-    8: P([R], [w('лимит'), any(w('поменял'), w('измен'), /меня(ет|ем|ется|ют)/i)]),
+    // P8 — решение «лимит поменяли», P12 — вопрос «какое новое значение»: пересказ P12 («на сколько изменён лимит —
+    // ждёт: …») ключом P8 не берётся (ревью 2026-10-16).
+    8: P([R], [w('лимит'), any(w('поменял'), w('измен'), /меня(ет|ем|ется|ют)/i), { test: (s) => !/жд[её]т|на\s+сколько|\?/i.test(s) }]),
     9: P([O], [/ДМС/]),
     10: P([O], [any(w('пуш'), /push/i)]),
     11: P([DONE, O, N], [w('колл')], 'БТ §2: колл-центр вне объёма'),
-    12: P([O], [w('значени'), any(/жд[её]т/i, /жд[её]м/i)]),
+    12: P([O], [any(w('значени'), /на\s+сколько/i, w('числ')), any(/жд[её]т/i, /жд[её]м/i)]),
     13: P([OUT, O, OTHER], [any(w('гусев'), w('сч[её]тчик'))], 'срок поручения; где хранится счётчик — спека'),
   },
   'NB-IN': {
-    6: P([S], [any(w('возврат'), /не\s+принима/i)]),
+    // Два слова сути: «сейчас только выдача и возвраты» и «частных не принимают» — одно «не принимают» берёт пересказ
+    // P13 («в пунктах без весов не принимают», ревью 2026-10-16).
+    6: P([S], [any(w('возврат'), /выда\S*\s+(\S+\s+)?заказ/i), any(/не\s+принима/i, /частн\S*\s+лиц/i)]),
     7: P([R], [any(w('оплат'), /плат[ия]т/i, w('денег'))]),
     8: P([THOUGHT], [any(/трек\S*[^.;]{0,40}чек/i, /чек[^.;]{0,40}трек/i)]),
     9: P([S], [/180/]),
@@ -204,6 +226,55 @@ export const PTS = {
 }
 PTS['NB-PICK'] = { ...PTS['NB-IN'], 12: P([O], PTS['NB-IN'][12].k) }
 
+// NI-SPEC-BT (Н8, fixtures/NI-SPEC-BT/expected.md). Места — каждое законное при любой метке раскладки (`новое` /
+// `меняет` / `противоречит`); баги 1, 8, 9 — строкой «по правке».
+const E1 = 'E1 (баг 1): решение слоя БТ с «меняет»/«противоречит» во входе спеки — «Расходится с БТ», не «для БТ»'
+const E4 = 'E4 (баг 8): запрос и повтор пользователя — не признак спеки; пункт слоя БТ во входе спеки не «Решено»'
+PTS['SPEC-BT'] = {
+  6: P([THOUGHT], [w('таймер')]),
+  7: PX(P([X, OTHER], [any(/(3|тр[её]х|три)\s+дн/i, /срок\S*\s+ожидани/i), any(w('сообщени'), /заказ\s+собран/i, /с\s+момента/i)], 'слой БТ, меняет FR-3'), { fix: { places: [OTHER], edit: E1 } }),
+  8: PX(P([X, OTHER], [any(w('распределит'), /нет\s+в\s+(выбранной\s+)?аптек/i, /не\s+из\s+наличи/i, /нет\s+в\s+наличии/i)], 'слой БТ, противоречит 3.2: «Меняем?» → «Расходится с БТ»'), { fix: { places: [OTHER], edit: E1 } }),
+  9: PX(P([OTHER, X, R], [any(/повторн\S*\s+запрос/i, /тот\s+же\s+препарат/i, /уже\s+есть\s+заказ/i)], 'слой БТ: новое — для БТ, меняет/противоречит FR-1 — «Расходится с БТ»'), { fix: { places: [R], edit: E4 } }),
+  10: PX(P([OTHER, X, R], [any(w('лимит'), w('шест'), /(5|пят\S*)\s+заказ/i)], 'то же, что P9'), { fix: { places: [R], edit: E4 } }),
+  11: P([R], [any(/без\s+к[эе]ш/i, /запросом/i)]),
+  12: P([R], [any(/(3|тр[её]х)\s+раз/i, w('пауз'), w('не\\s+ответил'))]),
+  13: P([R], [any(w('шин'), w('сервис\\S*\\s+уведомлени'))]),
+  14: P([R], [any(w('просроч'), /фонов\S*\s+задач/i)]),
+  15: P([O], [any(w('списыв'), w('синхронн'))]),
+  16: P([S], [any(/(5|пят\S*)\s+секунд/i, /вечерн\S*\s+пик/i, /с\s+18/i)]),
+}
+// NI-NB-REPEAT (Н9): по правке E3 (баг 4) цель — «новая спека»: вход БТ из этого списка уже лежит в docs/CBK-208/.
+// По тексту 1.0.0 — второй вход БТ (`NB-REPEAT/bt`, строка «по правке»), его места — по слою для входа БТ.
+PTS['NB-REPEAT'] = {
+  6: P([OTHER], [any(/(8|восьм\S*)\s+(кофе|из)/i, /тысяч/i, w('девят'))]),
+  7: P([OTHER], [any(/31\s+декабр/i, w('отметк'), /20\s*₽/)]),
+  8: P([OTHER], [/(6|шест\S*)\s+месяц/i]),
+  9: P([OTHER], [any(/оплатил\S*\s+кешб/i, /оплачен\S*\s+кешб/i, /на\s+(ту\s+)?часть/i)]),
+  10: P([OTHER, X], [any(w('работник'), w('бариста'), /свои\S*\s+номер/i)], 'граница начисления: новое — для БТ; меняет/противоречит FR-1 — «Расходится с БТ» (E1)'),
+  11: P([OTHER], [any(w('переда'), /500\s*₽/)]),
+  12: P([S], [any(/без\s+состав/i, /только\s+сумм/i)]),
+  13: P([R], [any(w('шин'), /покупка\s+закрыта/i)]),
+  14: P([THOUGHT], [any(/сразу\s+после\s+оплат/i, /не\s+дожида/i)]),
+  15: P([R], [any(/раз\s+в\s+сутки/i, /03[:.]00/, w('фонов'))]),
+  16: P([O], [w('истори')]),
+}
+{
+  const at = { 6: [S], 7: [R], 8: [R], 9: [O], 10: [R], 11: [R], 12: [S], 13: [OTHER], 14: [THOUGHT], 15: [OTHER], 16: [OTHER] }
+  PTS['NB-REPEAT/bt'] = Object.fromEntries(Object.entries(at).map(([n, a]) => [n, P(a, PTS['NB-REPEAT'][n].k)]))
+}
+// NI-TWIN (Н10): аналитик-двойник по twin-card.md — «Не вносим» на P8, «В открытые вопросы» на P9, «Поправить» на сводке.
+PTS.TWIN = {
+  6: P([S], [any(/перв\S*\s+пят\S*\s+чисел/i, w('машин'))]),
+  7: PX(P([R], [any(/(две|2)\s+недел/i, /на\s+выбор/i)]), { m: [/недел/i] }),
+  8: P([OUT], [any(/с\s+10\s+до\s+22/i, w('тр[её]хчасов'), w('интервал'), /с\s+9\s+до\s+21/i)], 'аналитик: «Не вносим»'),
+  9: P([O], [any(/199/, /2\s?000/, w('бесплатн'))], 'аналитик: «В открытые вопросы»'),
+  10: PX(P([R], [w('отмен'), any(/(2|два|двух)\s+дн/i, /за\s+сутки/i, /не\s+позже/i)]), { m: [/(2|два|двух)\s+дн/i] }),
+  11: P([S], [any(/1\s?400/, /тысяч\S*\s+четырест/i)]),
+  12: P([OTHER], [any(w('пересчит'), w('фонов'))]),
+  13: P([O], [any(w('перевод'), /нов\S*\s+график/i)]),
+  14: P([N, R], [/в\s+день\s+оформлени/i]),
+}
+
 // ---------- фикстуры ----------
 
 export const FX = {
@@ -221,9 +292,18 @@ export const FX = {
   'NB-ANS': { src: 'nb', key: 'RET-214', kind: 'bt', folder: 'docs/RET-214', list: 'notes/возврат-товара-без-чека/notebook-2026-10-15.points.md', goal: /^(новый\s+БТ|правк\S*\s+работающ)/i, goalName: 'новый БТ или правка работающего', wrongGoal: 'правки спеки', etalon: 'fixtures/NI-NB-ANS/etalon/notebook-2026-10-15-bt.md' },
   // Тот же список, что NB-IN; аналитик берёт один набросок (fixtures/NI-NB-PICK/w-turn2.txt).
   'NB-PICK': { src: 'nb', key: 'PVZ-318', kind: 'bt', folder: 'docs/PVZ-318', list: 'notes/посылки-от-частных-лиц/notebook-2026-10-15.points.md', goal: /^новый\s+БТ/i, goalName: 'новый БТ', wrongGoal: 'правки спеки', etalon: 'fixtures/NI-NB-PICK/etalon/notebook-2026-10-15-bt.md', thought: 'Печатать трек-номер прямо на чеке приёмки', pick: true },
+  // Пробы фазы 1.5 (fixtures/NI-*/expected.md): импортированных ожиданий нет (`imp: false`) — свои, `ownChecks`.
+  'SPEC-BT': { src: 'mr', imp: false, key: 'FRM-614', kind: 'spec', folder: 'docs/FRM-614', list: 'docs/FRM-614/meeting-2026-10-13.points.md', goal: /^правки\s+спеки/i, goalName: 'правки спеки', wrongGoal: 'правки БТ', thought: 'Снимать заказ своим таймером ровно в момент, когда истёк срок' },
+  'NB-REPEAT': { src: 'nb', imp: false, key: 'CBK-208', kind: 'spec', folder: 'docs/CBK-208', list: 'notes/кешбэк-в-кофейнях/notebook-2026-10-14.points.md', goal: /^нов\S*\s+спек/i, goalName: 'новая спека', wrongGoal: 'новый БТ', thought: 'Показывать новый баланс сразу после оплаты', alt: 'NB-REPEAT/bt' },
+  // Второй вход БТ из того же списка — законен по тексту 1.0.0 (баг 4), по правке E3 его нет. Не ветка `--fx`: его выбирает
+  // `gradeRun` пробы NB-REPEAT по записанному файлу.
+  'NB-REPEAT/bt': { src: 'nb', imp: false, hidden: true, fixture: 'NB-REPEAT', key: 'CBK-208', kind: 'bt', folder: 'docs/CBK-208', list: 'notes/кешбэк-в-кофейнях/notebook-2026-10-14.points.md', goal: /^правки\s+БТ/i, goalName: 'правки БТ', wrongGoal: 'новый БТ', thought: 'Показывать новый баланс сразу после оплаты', fixGoal: 'E3 (баг 4): вход БТ из этого списка уже лежит в docs/CBK-208/ — по правке цель «новая спека», вход notebook-2026-10-14-spec.md, а записан второй вход БТ' },
+  TWIN: { src: 'meet', imp: false, twin: true, key: 'ZKM-905', kind: 'bt', folder: 'docs/ZKM-905', list: 'docs/ZKM-905/meeting-2026-10-12.points.md', goal: /^(правки\s+БТ|правк\S*\s+работающ)/i, goalName: 'правки БТ или правка работающего', wrongGoal: 'новая спека' },
 }
+for (const [n, fx] of Object.entries(FX)) fx.name = n
 
-const seedDirOf = (name) => join(HERE, 'fixtures', 'NI-' + name, 'seed')
+const fixtureOf = (name) => FX[name].fixture || name
+const seedDirOf = (name) => join(HERE, 'fixtures', 'NI-' + fixtureOf(name), 'seed')
 
 // Пункты списка: номер строки файла, вид, текст без ссылки ` · …` в конце.
 export function listPoints (name) {
@@ -233,7 +313,24 @@ export function listPoints (name) {
     return m && { n: i + 1, kind: m[1], text: m[2] }
   }).filter(Boolean)
 }
-const listHead = (name) => read(join(seedDirOf(name), FX[name].list)).split('\n').filter((l) => /^> /.test(l)).join('\n')
+const listText = (name) => read(join(seedDirOf(name), FX[name].list))
+const listHead = (name) => listText(name).split('\n').filter((l) => /^> /.test(l)).join('\n')
+
+// Реплики аналитика — второй законный источник входа (TL;DR 2): строка вызова и реплики фикстуры (`w-*.txt`), у
+// прогона — ещё реплики двойника (`_twin/reply-*.txt`).
+export function analystReplies (name, dir) {
+  const fxDir = join(HERE, 'fixtures', 'NI-' + fixtureOf(name))
+  const out = existsSync(fxDir) ? readdirSync(fxDir).filter((f) => /^w-.*\.txt$/.test(f)).sort().map((f) => read(join(fxDir, f))) : []
+  const tw = dir && join(dir, '_twin')
+  if (tw && existsSync(tw)) out.push(...readdirSync(tw).filter((f) => /^reply-.*\.txt$/.test(f)).sort().map((f) => read(join(tw, f))))
+  return out
+}
+// Реплики двойника аналитика по порядку (`_twin/reply-*.txt`); двойника не было — undefined.
+export function twinReplies (dir) {
+  const tw = dir && join(dir, '_twin')
+  if (!tw || !existsSync(tw)) return undefined
+  return readdirSync(tw).filter((f) => /^reply-.*\.txt$/.test(f)).sort().map((f) => read(join(tw, f)))
+}
 
 // ---------- разбор входа ----------
 
@@ -318,16 +415,25 @@ const docRefs = (t) => new Set([...(t || '').matchAll(/FR-\d+|(?:§\s*)?(?<![\d.
 // — из потоков прогона; последняя старше. Нет — пустая карта.
 export function layoutOf (dir) {
   const out = new Map()
+  const checks = []
   if (!existsSync(dir)) return out
   for (const f of readdirSync(dir).filter((n) => /^stream(-\d+)?\.jsonl$/.test(n)).sort()) {
     for (const line of read(join(dir, f)).split('\n')) {
       let e; try { e = JSON.parse(line) } catch { continue }
       const content = e && e.message && Array.isArray(e.message.content) ? e.message.content : []
       for (const c of content) {
-        if (!c || c.type !== 'text' || !/^\s*рубрика прочитана: раскладка/.test(c.text || '')) continue
-        for (const m of c.text.matchAll(/^P(\d+)\s+(БТ|спека|чужая система|вне документов)\s*·\s*(.+)$/gm)) out.set(Number(m[1]), { layer: m[2], doc: m[3].trim() })
+        if (!c || c.type !== 'text') continue
+        if (/^\s*рубрика прочитана: раскладка/.test(c.text || '')) {
+          for (const m of c.text.matchAll(/^P(\d+)\s+(БТ|спека|чужая система|вне документов)\s*·\s*(.+)$/gm)) out.set(Number(m[1]), { layer: m[2], doc: m[3].trim() })
+        }
+        // Вердикт проверки «P<n> слой: <другой>» меняет слой пункта (SKILL.md, Шаг 3) — после раскладки.
+        if (/^\s*рубрика прочитана: проверка/.test(c.text || '')) checks.push(c.text)
       }
     }
+  }
+  for (const t of checks) for (const m of t.matchAll(/^P(\d+)\s+слой:\s*(БТ|спека|чужая система|вне документов)/gm)) {
+    const l = out.get(Number(m[1]))
+    if (l) l.layer = m[2]
   }
   return out
 }
@@ -396,12 +502,50 @@ export function summaryPlaces (turns, name, opts = {}) {
 // ---------- дословность (Шаг 7) ----------
 
 const NUM_WORD = { 1: 'од(ин|на|ну|ного|ной|ним)', 2: 'дв(а|е|ух)', 3: 'тр(и|[её]х)', 4: 'четыр', 5: 'пят', 6: 'шест', 7: 'сем', 8: 'восем', 10: 'десят', 12: 'двенадцат', 15: 'пятнадцат', 20: 'двадцат', 24: 'двадцат\\S*\\s+четыр', 30: 'тридцат', 40: 'сорок' }
-const hasNum = (t, n) => new RegExp('(^|[^\\d])' + esc(n) + '([^\\d]|$)').test(t) || (NUM_WORD[n] && w(NUM_WORD[n]).test(t))
+// «1 200» и «1200» — одно число: пробел между разрядами снимается (ревью 2026-10-16).
+const joinDigits = (t) => t.replace(/(\d)[\s  ](?=\d{3}(?!\d))/g, '$1')
+const hasNum = (t, n) => new RegExp('(^|[^\\d])' + esc(n) + '([^\\d]|$)').test(joinDigits(t)) || (NUM_WORD[n] && w(NUM_WORD[n]).test(t))
 // Основной текст пункта: без хвоста «— решил: / — со слов / — ждёт:» и без пометок «(на встрече: …)».
 const mainText = (t) => t.split(/\s+—\s+(решил|ждёт|со\s+слов)/)[0].replace(/\(на встрече:[^)]*\)/g, '')
 const stem = (word) => yo(word).slice(0, Math.max(4, word.length - 2)).toLowerCase()
+// Сколько раз встречается каждое число (цифрой и словом, ground-check.mjs `numbersOf`).
+const numCount = (t) => numbersOf(t).reduce((m, v) => m.set(v, (m.get(v) || 0) + 1), new Map())
 
-export function literalChecks (p, found) {
+// Пункты списка, чей ключ узнаёт строку входа (строка может нести два пункта).
+const pointsOf = (t, name) => listPoints(name).filter((p) => PTS[name][p.n] && PTS[name][p.n].k.every((re) => re.test(t)))
+// Основа слова есть в тексте (как в ground-check.mjs: граница слова, начало основы).
+const hasStemIn = (text, word) => new RegExp('(^|[^а-яa-z])' + esc(stemOf(word))).test(gnorm(text))
+// ФИО в полях людей: «решил: Литвинов И. П.», «ждёт: Ким Сергей», «со слов Зуева Т. Р.» — слова с заглавной и строчными
+// (не «ИБ», не инициалы). Роли и «решает:» сюда не идут: роли меряет опора, «решает:» — roleChecks.
+const RE_PERSON_FIELD = /(решил[аи]?|принял[аи]?|жд[её]т|со\s+слов)\s*:?\s*([^·;\n]+)/gi
+function fioOf (t) {
+  const out = []
+  for (const m of String(t).matchAll(RE_PERSON_FIELD)) {
+    const val = m[2].split(/[)→]/)[0].replace(/\s[—–-]\s.*$/, '').replace(/\(.*?\)/g, ' ').split(/\s+/).slice(0, 6).join(' ')
+    for (const x of val.match(/[А-ЯЁ][а-яё]{2,}(-[А-ЯЁ][а-яё]+)?/g) || []) out.push({ field: m[1].replace(/\s+/g, ' '), who: x })
+  }
+  return out
+}
+// Варианты `[открыто]`: «варианты: A или B» / «варианты: A; B» до «; до ответа:».
+function variantsOf (text) {
+  const m = text.match(/варианты:\s*(.*?)(?:;\s*до\s+ответа:|$)/)
+  if (!m) return []
+  return (m[1].includes(';') ? m[1].split(';') : m[1].split(/\s+или\s+/)).map((s) => s.trim()).filter(Boolean)
+}
+const vStems = (s) => (yo(s).toLowerCase().match(/[а-яa-z]{4,}/g) || []).map((x) => x.slice(0, Math.max(4, x.length - 2)))
+// Вариант есть в строке: больше половины его отличительных основ (которых нет у других вариантов) — начала слов строки.
+// Больше половины, а не все: пересказ теряет слово («в очередь «Управления доступом»» без «команды»).
+function variantIn (v, others, t) {
+  const words = yo(t).toLowerCase().match(/[а-яa-z]+/g) || []
+  const near = (a, b) => a.startsWith(b) || b.startsWith(a)
+  const own = vStems(v)
+  const rest = others.flatMap(vStems)
+  const dist = own.filter((s) => !rest.some((r) => near(r, s)))
+  const need = dist.length ? dist : own
+  return need.filter((s) => words.some((x) => x.startsWith(s))).length * 2 > need.length
+}
+
+export function literalChecks (p, found, name, replies = []) {
   const red = []
   const warn = []
   const all = found.map((x) => x.t).join(' \n ')
@@ -410,9 +554,35 @@ export function literalChecks (p, found) {
   const sl = p.text.match(/со\s+слов\s+([А-ЯЁ][а-яё-]+)/)
   if (p.kind === 'сведение' && sl && inS.length && !inS.some((x) => /со\s+слов/i.test(x.t) && yo(x.t).toLowerCase().includes(stem(sl[1])))) red.push(`${tag}: потеряно «со слов ${sl[1]}»`)
   for (const mark of ['не помню', 'не уверен']) if (p.text.includes(mark) && !all.includes(mark)) red.push(`${tag}: потеряна пометка «${mark}»`)
-  const nums = [...new Set((mainText(p.text).match(/\d+/g) || []))]
-  const lost = nums.filter((n) => !hasNum(all, n))
+  const nums = [...new Set((joinDigits(mainText(p.text)).match(/\d+/g) || []))]
+  // Цифра пункта во входе цифрой или словом («около 300» = «около трёхсот»).
+  const allVals = new Set(numbersOf(all, true))
+  const lost = nums.filter((n) => !hasNum(all, n) && !allVals.has(Number(n)))
   if (lost.length) red.push(`${tag}: потеряно число ${lost.join(', ')}`)
+  // Числа словами («три дня», «четыре человека»): сколько раз в основном тексте пункта — столько и в основном тексте
+  // строк входа; «один/одна» не меряется («за рабочий день» = «за один рабочий день»). Сравнивается основной текст:
+  // «FR-3» в хвосте «до ответа» не прикрывает «три дня» → «четыре дня».
+  const have = numCount(found.map((x) => mainText(x.t)).join(' \n '))
+  const lostW = [...numCount(mainText(p.text))].filter(([v, c]) => v !== 1 && !lost.includes(String(v)) && (have.get(v) || 0) < c).map(([v]) => v)
+  if (lostW.length) red.push(`${tag}: потеряно число ${lostW.join(', ')} (словами)`)
+  // ФИО в «решил:» / «ждёт:» / «со слов» строки входа — из пунктов, которые эта строка несёт, или из реплик аналитика.
+  for (const x of found) {
+    const pq = pointsOf(x.t, name)
+    const own = pq.map((q) => q.text).concat(replies).join('\n')
+    // «В открытые вопросы» (SKILL.md:142): решение уходит в «Открыто» «с тем, кого ждём» — кто, не сказано; любой участник.
+    const anyone = x.sec === O && pq.some((q) => q.kind === 'решено') ? listHead(name) : ''
+    for (const f of fioOf(x.t)) if (!hasStemIn(own, f.who) && !(/жд/.test(f.field) && hasStemIn(anyone, f.who))) red.push(`${tag}: «${f.field}: ${f.who}» — в пункте списка другой человек`)
+  }
+  // Суть, которую ключ не держит (`m`): «раз в две недели» — не «раз в 2 дня».
+  for (const re of PTS[name][p.n].m || []) for (const x of found) if (!re.test(x.t)) red.push(`${tag}: суть пункта искажена — нет «${re.source}»: «${x.t.slice(0, 60)}»`)
+  // `[открыто]` с вариантами — вопросом («?») или обоими вариантами; один вариант утверждением — решённое (ревью).
+  const vs = p.kind === 'открыто' ? variantsOf(p.text) : []
+  if (vs.length > 1) {
+    for (const x of found) {
+      if (/\?/.test(x.t) || vs.every((v, i) => variantIn(v, vs.filter((_, j) => j !== i), x.t))) continue
+      red.push(`${tag}: открытый вопрос с вариантами во входе утверждением — ни «?», ни обоих вариантов: «${x.t.slice(0, 60)}»`)
+    }
+  }
   const vm = mainText(p.text).match(/вместо\s+(\S+)(\s+\S+)?/)
   if (vm) {
     const word = [vm[1], vm[2] || ''].map((s) => s.trim().replace(/[^\dА-Яа-яЁё]/g, '')).sort((a, b) => b.length - a.length)[0]
@@ -427,34 +597,88 @@ export function literalChecks (p, found) {
 }
 
 // Роли: «решали: <роль — имя>» в шапке входа и «решает: <кто>» в пунктах — только то, что есть в шапке списка (Шаг 4).
+// Участники из строки `> Встреча:` списка: «роль — Фамилия И. О.[, Фамилия И. О.]» или «Фамилия И. О.» (ролей нет).
+export function participants (name) {
+  const line = listHead(name).split('\n').find((l) => /^> Встреча:/.test(l)) || ''
+  const m = line.match(/участники:\s*(.*?)(?:\s·\s|$)/)
+  return (m ? m[1].split(/;\s*/) : []).map((e) => {
+    const parts = e.split(/\s+—\s+/)
+    const role = parts.length > 1 ? parts[0] : ''
+    const surnames = parts[parts.length - 1].split(/,\s*/).map(surnameOf).filter(Boolean)
+    return { role, surnames }
+  })
+}
+// Фамилия — первое слово с заглавной не короче трёх букв.
+const surnameOf = (s) => (String(s).match(/[А-ЯЁ][а-яё]{2,}(-[А-ЯЁ][а-яё]+)?/) || [''])[0]
+const sameStem = (a, b) => { const x = stemOf(a); const y = stemOf(b); return x.startsWith(y) || y.startsWith(x) }
+const roleWords = (role) => (yo(role).toLowerCase().match(/[а-яa-z]{4,}/g) || []).map((x) => x.slice(0, 5))
+const roleHas = (entryRole, role) => { const r = yo(entryRole).toLowerCase(); return roleWords(role).every((x) => r.includes(x)) }
+
+// Документы задачи из засева (БТ, спека, запрос на правку) — одним текстом.
+const docText = (name) => listFiles(seedDirOf(name), seedDirOf(name), true).filter((f) => /(business_requirements|technical_specification|change_request)\.md$/.test(f)).map((f) => read(join(seedDirOf(name), f))).join('\n')
+// Роль есть в строке документа рядом с фамилией (`sn`, если дана).
+const docRole = (doc, role, sn) => doc.split('\n').some((l) => { const n = yo(l).toLowerCase(); return roleWords(role).every((x) => n.includes(x)) && (!sn || hasStemIn(l, sn)) })
+
+// Пара «роль — ФИО» (или одно ФИО, или одна роль) против участников встречи → { red } | { warn } | {}.
+// Роль у человека не из шапки, но так в документе задачи («автор БТ — Ярцева» при «Автор: Ярцева О.» в БТ) — факт верен,
+// предупреждение (expected NI-SPEC-BT, «Стык»). Роль без имени из документа: у встречи с участниками — ложь (его не было
+// на встрече, NI-SPEC-BT ловушка 3), у ноута участников нет — предупреждение (NI-NB-REPEAT ловушка 3).
+function pairError (part, ents, lt, what, doc = '') {
+  const p = part.replace(/[*_]/g, '').replace(/\(.*?\)/g, ' ').trim()
+  if (!p || /^[—–-]$/.test(p)) return {}
+  const dash = p.split(/\s+—\s+/)
+  if (dash.length >= 2) {
+    const role = dash[0].trim()
+    for (const nm of dash.slice(1).join(' — ').split(/,\s*/)) {
+      const sn = surnameOf(nm)
+      if (!sn) continue
+      const e = ents.find((x) => x.surnames.some((y) => sameStem(y, sn)))
+      if (e && roleHas(e.role, role)) continue
+      if (docRole(doc, role, sn) && (e || hasStemIn(lt, sn))) return { warn: `роль «${role}» у ${nm.trim()} в «${what}» — из документа задачи, не из шапки списка (Шаг 4)` }
+      if (!ents.length) return { red: `роль «${role}» в «${what}» — в шапке списка ролей нет` }
+      if (!e) return { red: `роль «${role}» в «${what}» — «${nm.trim()}» нет среди участников в шапке списка` }
+      return { red: `роль «${role}» в «${what}» — у ${nm.trim()} в шапке списка ${e.role ? `роль «${e.role}»` : 'роли нет'}` }
+    }
+    return {}
+  }
+  // ФИО без ролей, через запятую («решали: Цыганкова М., Евсеев Д.») — каждая фамилия есть в списке.
+  const sns = p.split(/,\s*/).map(surnameOf).filter(Boolean)
+  if (sns.length) { const miss = sns.filter((x) => !hasStemIn(lt, x)); return miss.length ? { red: `«${what} ${miss.join(', ')}» — такого человека нет в списке` } : {} }
+  // Роль без ФИО («заказчик», «ИБ», «владелец БТ») — каждое её слово есть в списке.
+  const words = yo(p).toLowerCase().match(/[а-яa-z]+/g) || []
+  if (words.filter((x) => x.length >= 2).every((x) => (x.length < 3 ? new RegExp('(^|[^а-яa-z])' + esc(x) + '([^а-яa-z]|$)').test(gnorm(lt)) : hasStemIn(lt, x)))) return {}
+  if (docRole(doc, p) && !ents.length) return { warn: `роль «${p}» в «${what}» — из документа задачи, не из списка (Шаг 4)` }
+  return { red: `роль «${p}» в «${what}» — её нет в списке${docRole(doc, p) ? ' (она из документа задачи, на встрече её не было)' : ''}` }
+}
+
+// Роли (Шаг 4, ревью 2026-10-16): «решали:» в шапке входа — пары «роль — ФИО» из строки `> Встреча:` списка целиком
+// (роль у того же человека, не просто где-то в шапке); «решает:» в пунктах — фамилия есть в списке, роль без ФИО —
+// каждое её слово есть в списке.
 export function roleChecks (text, name) {
   const red = []
-  const lh = yo(listHead(name)).toLowerCase()
-  const lt = yo(read(join(seedDirOf(name), FX[name].list))).toLowerCase()
+  const warn = []
+  const lt = listText(name)
+  const ents = participants(name)
+  const doc = docText(name)
   const head = text.split(/^## /m)[0]
   const rm = head.match(/решали\**\s*:\s*([^\n]+)/i)
-  const meet = /^> Встреча:/m.test(listHead(name))
-  for (const part of rm ? rm[1].split(/;\s*/) : []) {
-    const dash = part.split(/\s+—\s+/)
-    if (dash.length < 2) continue
-    const role = dash[0].replace(/[*_]/g, '').trim()
-    const words = yo(role).toLowerCase().split(/[^а-яa-z]+/).filter((x) => x.length >= 4)
-    if (!meet || !words.every((x) => lh.includes(x.slice(0, 5)))) red.push(`роль «${role}» в «решали:» — её нет в шапке списка`)
-  }
+  const take = (e) => { if (e.red) red.push(e.red); if (e.warn) warn.push(e.warn) }
+  // Пары «роль — ФИО» через «;» или через запятую перед следующей парой (SKILL.md:122 «заказчик — …, автор БТ — …»).
+  for (const part of rm ? rm[1].split(/;\s*|,\s*(?=[^,;—]+\s—\s)/) : []) take(pairError(part, ents, lt, 'решали:', doc))
   for (const { t } of allItems(text)) {
-    const m = t.match(/реша(ет|ют)\**\s*:\s*([^;.\n]+)/i)
+    const m = t.match(/реша(ет|ют)\**\s*:\s*([^;\n·]+)/i)
     if (!m) continue
-    const words = yo(m[2]).toLowerCase().split(/[^а-яa-z]+/).filter((x) => x.length >= 2)
-    if (!words.some((x) => lt.includes(x.slice(0, 5)))) red.push(`«решает: ${m[2].trim()}» — такого нет в списке`)
+    for (const part of m[2].split(/\s+и\s+/)) take(pairError(part.replace(/\.\s*$/, ''), ents, lt, 'решает:', doc))
   }
-  return red
+  return { red: [...new Set(red)], warn: [...new Set(warn)] }
 }
 
 // ---------- место каждого пункта ----------
 
-export function placeChecks (text, name, turns = [], layout = new Map()) {
+export function placeChecks (text, name, turns = [], layout = new Map(), replies = analystReplies(name)) {
   const red = []
   const warn = []
+  const fix = []
   const rows = []
   const its = allItems(text)
   const foundOf = (n) => its.filter((x) => PTS[name][n].k.every((re) => re.test(x.t)))
@@ -465,27 +689,38 @@ export function placeChecks (text, name, turns = [], layout = new Map()) {
     const spec = PTS[name][p.n]
     const tag = `P${p.n} «${p.text.slice(0, 40)}»`
     const found = foundOf(p.n)
-    // Мысли и наброски во входе ноута меряет классификатор grade-minb.mjs (ниже), здесь — только у MR и в сводке.
-    const skipThought = fx.src === 'nb' && (p.kind === 'мысль' || p.kind === 'набросок')
+    // Мысль или набросок во входе ноута, узнанные `thoughtPoint`, меряет `thoughtChecks`; не узнанные им строки (ключ
+    // пункта их взял, классификатор — нет) — по месту, как любой пункт (ревью 2026-10-16).
+    const skipThought = fx.src === 'nb' && (p.kind === 'мысль' || p.kind === 'набросок') && found.every((x) => thoughtPoint(x.t, name))
     let where
     if (found.length) {
       const secs = [...new Set(found.map((x) => x.sec))]
       where = secs.join(' + ')
       const bad = secs.filter((s) => !spec.at.includes(s))
       if (bad.length && !skipThought) red.push(`${tag} — во входе в «${bad.join('», «')}», место: ${spec.at.join(' | ')}`)
-      const lc = literalChecks(p, found)
+      const fixBad = secs.filter((s) => spec.fix && spec.fix.places.includes(s))
+      if (fixBad.length) fix.push(`${tag} — во входе в «${fixBad.join('», «')}»; по правке ${spec.fix.edit}`)
+      const lc = literalChecks(p, found, name, replies)
       red.push(...lc.red)
       warn.push(...lc.warn)
     } else {
       const c = place.get(p.n)
       where = c ? `сводка: ${c}` : 'не найден'
-      if (c && !spec.at.includes(c)) red.push(`${tag} — не во входе, по сводке «${c}», место: ${spec.at.join(' | ')}`)
+      if (c && spec.fix && spec.fix.places.includes(c)) fix.push(`${tag} — по сводке «${c}»; по правке ${spec.fix.edit}`)
+      // Пункт и не должен быть во входе (ни одно его место — не раздел входа): метка сводки не та — предупреждение.
+      if (c && !spec.at.includes(c) && !spec.at.some(isSec)) warn.push(`${tag} — не во входе (верно), но сводка называет «${c}», место: ${spec.at.join(' | ')}`)
+      else if (c && !spec.at.includes(c)) red.push(`${tag} — не во входе, по сводке «${c}», место: ${spec.at.join(' | ')}`)
       else if (!c && spec.at.some(isSec) && ['решено', 'открыто', 'сведение'].includes(p.kind)) red.push(`${tag} — нет во входе, место в сводке не названо (место: ${spec.at.join(' | ')})`)
     }
     rows.push({ n: p.n, kind: p.kind, where, at: spec.at })
   }
-  red.push(...roleChecks(text, name))
-  return { red, warn, rows }
+  // Строка входа, которую не узнал ни ключ, ни основы слов пункта, — предупреждение: факты в ней меряет опора.
+  const pts = listPoints(name)
+  for (const x of its) if (!pointsOf(x.t, name).length && !bestPoint(x.t, pts) && !thoughtPoint(x.t, name)) warn.push(`строка входа не узнана ни как один пункт списка: «${x.t.slice(0, 60)}»`)
+  const rc = roleChecks(text, name)
+  red.push(...rc.red)
+  warn.push(...rc.warn)
+  return { red, warn, fix, rows }
 }
 
 // ---------- содержание входа ----------
@@ -508,6 +743,7 @@ export function importedChecks (text, name) {
   const fx = FX[name]
   const red = []
   const warn = []
+  if (fx.imp === false) return { red, warn }
   if (fx.src === 'meet') {
     const mfx = MEET[name]
     const r = gradeInput(text, mfx)
@@ -526,27 +762,200 @@ export function importedChecks (text, name) {
     const g = (name === 'NB-ANS' ? gradeInputANS : gradeInputIN)(text, '')
     red.push(...g.red.filter((m) => !DROP_NB_RED.some((re) => re.test(m))))
     warn.push(...g.warn.filter((m) => !DROP_NB_WARN.some((re) => re.test(m))))
-    // Новое правило (TL;DR 3, Шаг 5): мысли и наброски по умолчанию во вход не идут; взятые — только в «Открыто» с
-    // «(предложение аналитика)».
-    const found = allItems(text).map((x) => ({ ...x, k: thoughtKind(x.t) })).filter((x) => x.k)
-    for (const x of found) {
-      if (!(x.k === 'набросок' && fx.pick)) { red.push(`${x.k} во входе (по умолчанию не берётся): «${x.t.slice(0, 60)}»`); continue }
-      if (x.sec !== O) red.push(`выбранный набросок в «${x.sec}», а не в «Открыто»`)
-      else if (!/предложени\S*\s+аналитик/i.test(x.t)) red.push(`выбранный набросок без пометки «(предложение аналитика)»: «${x.t.slice(0, 60)}»`)
-    }
-    if (fx.pick && !found.some((x) => x.k === 'набросок')) red.push('выбранного аналитиком наброска нет во входе')
   }
   return { red, warn }
 }
 
-export function gradeContent (text, name, turns = [], layout = new Map()) {
+// Мысль или набросок списка в строке входа: классификатор grade-minb.mjs; иначе основы слов — строка ближе всего к
+// пункту-мысли (`bestPoint`) или несёт не меньше двух его отличительных основ (которых нет у пунктов других видов).
+// Пересказ без слова «трек» классификатор не узнаёт (ревью 2026-10-16).
+const THOUGHT_STOP = new Set(['может', 'чтобы', 'прямо', 'тоже', 'также', 'нужно', 'будет', 'хорошо'])
+const tStems = (s) => new Set((yo(s).toLowerCase().match(/[а-яa-z]{4,}/g) || []).filter((x) => !THOUGHT_STOP.has(x)).map((x) => x.slice(0, Math.min(5, Math.max(3, x.length - 2)))))
+export function thoughtPoint (t, name) {
+  const pts = listPoints(name)
+  const th = pts.filter((p) => p.kind === 'мысль' || p.kind === 'набросок')
+  if (!th.length) return null
+  const k = thoughtKind(t)
+  if (k) return th.find((p) => p.kind === k) || null
+  const bp = bestPoint(t, pts)
+  if (bp) return th.includes(bp) ? bp : null
+  const other = new Set(pts.filter((p) => !th.includes(p)).flatMap((p) => [...tStems(mainText(p.text))]))
+  const near = (a, b) => a.startsWith(b) || b.startsWith(a)
+  const mine = [...tStems(t)]
+  let best = null; let bc = 0
+  for (const p of th) {
+    const own = [...tStems(mainText(p.text))].filter((s) => ![...other].some((o) => near(o, s)))
+    const c = own.filter((s) => mine.some((x) => near(x, s))).length
+    if (c > bc) { bc = c; best = p }
+  }
+  return bc >= 2 ? best : null
+}
+
+// Пометка взятого наброска называет аналитика: «(предложение аналитика)», «(со слов аналитика)», «(мысль аналитика)» —
+// по смыслу, как RE_BY_ANALYST в grade-minb.mjs (ревью 2026-10-16).
+const RE_BY_ANALYST = /со\s+слов\s+аналитика|\([^()\n]*аналитик[^()\n]*\)/i
+
+// TL;DR 3, Шаг 5: мысли и наброски по умолчанию во вход не идут; взятые аналитиком (место пункта — «Открыто») — только в
+// «Открыто» с пометкой, что это аналитик.
+export function thoughtChecks (text, name) {
+  const red = []
+  const th = listPoints(name).filter((p) => p.kind === 'мысль' || p.kind === 'набросок')
+  if (!th.length) return red
+  const found = allItems(text).map((x) => ({ ...x, p: thoughtPoint(x.t, name) })).filter((x) => x.p)
+  const chosen = (p) => PTS[name][p.n].at.includes(O)
+  for (const x of found) {
+    if (!chosen(x.p)) { red.push(`${x.p.kind} P${x.p.n} во входе — аналитик её не выбрал: «${x.t.slice(0, 60)}»`); continue }
+    if (x.sec !== O) red.push(`выбранный ${x.p.kind} P${x.p.n} в «${x.sec}», а не в «Открыто»`)
+    else if (!RE_BY_ANALYST.test(x.t)) red.push(`выбранный ${x.p.kind} P${x.p.n} без пометки «(предложение аналитика)»: «${x.t.slice(0, 60)}»`)
+  }
+  for (const p of th.filter(chosen)) if (!found.some((x) => x.p.n === p.n)) red.push(`выбранного аналитиком ${p.kind === 'мысль' ? 'мысли' : 'наброска'} P${p.n} нет во входе`)
+  return red
+}
+
+// `replies` — реплики аналитика (`analystReplies`): второй законный источник фактов входа. `ctx.twin` — реплики двойника
+// (`twinReplies`). `fix` — строки «по правке»: на `pass` не влияют.
+export function gradeContent (text, name, turns = [], layout = new Map(), replies = analystReplies(name), ctx = {}) {
   const fx = FX[name]
   const imp = importedChecks(text, name)
-  const pl = placeChecks(text, name, turns, layout)
+  const pl = placeChecks(text, name, turns, layout, replies)
   const h = headerChecks(text, fx)
-  const red = [...imp.red, ...pl.red, ...h.red, ...refChecks(text)]
-  const warn = [...imp.warn, ...pl.warn, ...h.warn]
-  return { red, warn, rows: pl.rows, pass: !red.length }
+  const gr = groundChecks(text, name, replies)
+  const own = ownChecks(text, name, { turns, layout, ...ctx })
+  const xb = fx.kind === 'bt' ? allItems(text).filter((x) => x.sec === X) : []
+  const red = [...new Set([...imp.red, ...pl.red, ...thoughtChecks(text, name), ...h.red, ...refChecks(text), ...gr.red, ...own.red,
+    ...xb.map((x) => `«Расходится с БТ» во входе БТ (intent.md:60): «${x.t.slice(0, 60)}»`)])]
+  const warn = [...new Set([...imp.warn, ...pl.warn, ...h.warn, ...gr.warn, ...own.warn])]
+  const fix = [...new Set([...pl.fix, ...own.fix, ...changeQuestion(name, turns, layout)])]
+  // Неизмеренная ветка (TWIN: вопроса «Оставляем?» по P8/P9 не было): место её пункта — предупреждение, не красный —
+  // решение было на встрече, во входе оно не ложь (критерий раунда, 2026-10-16).
+  const um = own.unmeasured || []
+  const loose = (m) => um.some((u) => m.startsWith(`P${u.n} `) && /— во входе в/.test(m))
+  return { red: red.filter((m) => !loose(m)), warn: [...warn, ...red.filter(loose).map((m) => m + ' (ветка не измерена)')], fix, unmeasured: um.map((u) => u.text), rows: pl.rows, pass: !red.some((m) => !loose(m)) }
+}
+
+// Баг 9, по правке E2 (`SKILL.md:136`: «`[решено]` с `противоречит: <где>` в раскладке» → «Меняем?»): у каждого `[решено]` с
+// меткой «противоречит» в раскладке прогона (`layoutOf`) — абзац ответа с «Меняем» об этом пункте (ключ, `P<n>` или основы
+// слов). Раскладки в потоке нет — не меряется.
+export function changeQuestion (name, turns = [], layout = new Map()) {
+  const out = []
+  if (!layout || !layout.size) return out
+  const pts = listPoints(name)
+  const paras = turns.flatMap((t) => t.split(/\n\s*\n/)).filter((p) => /Меняем/.test(p))
+  for (const p of pts) {
+    const l = layout.get(p.n)
+    // E2 как внесена (`SKILL.md:136`): слой цели, во входе спеки — ещё слой «БТ»; слой — после вердикта проверки.
+    const layers = FX[name].kind === 'spec' ? ['спека', 'БТ'] : ['БТ']
+    if (p.kind !== 'решено' || !l || !/^противоречит/i.test(l.doc) || !layers.includes(l.layer)) continue
+    const asked = paras.some((para) => new RegExp('(^|[^A-Za-z])P' + p.n + '([^0-9]|$)').test(para) || PTS[name][p.n].k.every((re) => re.test(para)) || para.split('\n').some((ln) => (bestPoint(ln, pts) || {}).n === p.n))
+    if (!asked) out.push(`P${p.n} «${p.text.slice(0, 40)}» — в раскладке «${l.doc}», вопроса «Меняем?» нет; по правке E2 (баг 9)`)
+  }
+  return out
+}
+
+// Свои ожидания новых проб (fixtures/NI-SPEC-BT|NB-REPEAT|TWIN/expected.md): ловушки на ложь — красный, ожидания по правке
+// — `fix`, стыки — предупреждение.
+export function ownChecks (text, name, ctx = {}) {
+  const red = []
+  const warn = []
+  const fix = []
+  const unmeasured = []
+  const fx = FX[name]
+  const its = allItems(text)
+  const find = (re, secs) => its.find((x) => re.test(x.t) && (!secs || secs.includes(x.sec)))
+  const cut = (x) => `«${x.t.slice(0, 60)}»`
+  if (fx.fixGoal) fix.push(fx.fixGoal)
+  const base = fixtureOf(name)
+  if (base === 'SPEC-BT') {
+    let x = find(/раз\s+в\s+час(?![а-яё])/i)
+    if (x) red.push(`«раз в час» — слово спеки, не пункта (ловушка 2): ${cut(x)}`)
+    x = find(/таймер/i)
+    if (x) red.push(`мысль P6 (свой таймер) во входе (ловушка 1): ${cut(x)}`)
+    // Название раздела БТ в кавычках («3.2 «Не входит»») — ссылка, не сторона пункта.
+    x = its.find((y) => PTS[name][8].k.every((re) => re.test(y.t)) && /не\s+входит|нельзя|не\s+(можно|заказыва|принима)/i.test(y.t.replace(/«[^»]*»/g, ' ')))
+    if (x) red.push(`P8 стороной документа — «не из наличия не заказываем» вместо решения встречи (ловушка 4): ${cut(x)}`)
+  }
+  if (base === 'NB-REPEAT') {
+    const x = find(/сразу\s+после\s+оплат/i)
+    if (x) red.push(`мысль P14 (баланс сразу после оплаты) во входе (ловушка 1): ${cut(x)}`)
+  }
+  if (base === 'TWIN') {
+    const goal = ((text.split(/^## /m)[0].match(/цель\**\s*:\s*\**\s*([^\n·;|]+)/i) || [])[1] || '').replace(/\*/g, '').trim()
+    const tw = ctx.twin
+    // Ветка исправления измерена, только если двойник ответил на её вопрос (критерий раунда, 2026-10-16): нет ответа —
+    // предупреждение и строка «не измерено», не красный; прогон в счёт этой ветки не идёт.
+    const all = (tw || []).join('\n')
+    if (!tw) warn.push('реплик двойника нет (`_twin/reply-*.txt`) — ветки исправления не проверены')
+    if (!/не\s+вносим/i.test(all)) { unmeasured.push({ n: 8, text: 'ветка «Не вносим» (P8) не измерена' }); if (tw) warn.push('вопроса «Оставляем?» по P8 не было: решил не заказчик (SKILL.md:137)') }
+    if (!/в\s+открытые\s+вопросы/i.test(all)) { unmeasured.push({ n: 9, text: 'ветка «В открытые вопросы» (P9) не измерена' }); if (tw) warn.push('вопроса «Оставляем?» по P9 не было: решила не заказчик (SKILL.md:137)') }
+    if (tw) {
+      const gm = all.match(/правк[аи]\s+БТ|правка\s+работающ\S*/i)
+      if (gm && !(/работающ/i.test(gm[0]) ? /^правк\S*\s+работающ/i : /^правки\s+БТ/i).test(goal)) red.push(`цель в шапке «${goal}», аналитик выбрал «${gm[0]}» (Шаг 4)`)
+      if (!gm) warn.push('в репликах двойника нет выбора цели')
+      if (/поправить/i.test(all)) {
+        const cor = its.filter((y) => /отмен/i.test(y.t) && /деньг|списыв/i.test(y.t))
+        if (!cor.length) red.push('поправка аналитика на сводке («за отменённый привоз деньги с карты не списываем») — не во входе')
+        for (const y of cor) {
+          if (!RE_BY_ANALYST.test(y.t)) red.push(`поправка аналитика без «(со слов аналитика)» (intent.md:68, ловушка 3): ${cut(y)}`)
+          if (!PTS[name][10].k.every((re) => re.test(y.t)) && /решил/i.test(y.t)) red.push(`поправка аналитика отдельной строкой с «решил:» участника (ловушка 3): ${cut(y)}`)
+        }
+      }
+    }
+    // Правка работающего — «как сейчас → как должно стать» у P7 и P10 (intent.md:71–73); форма, не ложь.
+    if (/работающ/i.test(goal)) for (const n of [7, 10]) for (const y of its.filter((z) => PTS[name][n].k.every((re) => re.test(z.t)))) if (!/как\s+сейчас|→/i.test(y.t)) warn.push(`P${n} без «как сейчас → как должно стать» (intent.md:71): ${cut(y)}`)
+    // «В открытые вопросы» — «с тем, кого ждём» (SKILL.md:142): «ждёт: —» или без «ждёт:» — стык, предупреждение.
+    for (const y of its.filter((z) => z.sec === O && PTS[name][9].k.every((re) => re.test(z.t)))) if (!/жд[её]т\s*:\s*[А-ЯЁа-яё]/i.test(y.t)) warn.push(`P9 в «Открыто» без «ждёт: <кто>» (SKILL.md:142): ${cut(y)}`)
+  }
+  return { red, warn, fix, unmeasured }
+}
+
+// Опора КАЖДОЙ строки входа (TL;DR 2, Шаг 7; ревью 2026-10-16): не только узнанные пункты — шапка, все разделы,
+// строки вне пунктов. Источник — текст списка и реплики аналитика. Заголовок и строка `> Встреча:` / `> Ноут:` — без
+// чисел (дата и время встречи в любой записи), «решали:» — отдельно (`roleChecks`). `> Документ:` — путь из засева.
+// `> Список:` и `> Источник:` — пути, их меряет `headerChecks`. Слова-заполнители в `ждёт:` («не назван», «ответа») —
+// не люди.
+// Глаголы при человеке, местоимения и служебные слова — сверх стоп-слов ground-check.mjs (там уже «что», «это», «уточняет»…).
+const GROUND_SKIP = ['назван', 'названо', 'названа', 'названы', 'известно', 'указан', 'указано', 'определен', 'определено', 'ответа', 'решения', 'подтверждения', 'уточнения',
+  'уточняют', 'пишет', 'напишет', 'спросит', 'спрашивает', 'подтвердит', 'подтверждает', 'него', 'нее', 'них', 'ему',
+  'чтобы', 'каким', 'сколько', 'когда', 'где', 'как', 'если', 'будет', 'будут', 'есть', 'был', 'была', 'было', 'были',
+  'еще', 'уже', 'также', 'только', 'тут', 'так', 'потом', 'ней', 'ним', 'оно', 'нам', 'нас', 'вам', 'вас']
+export function groundChecks (text, name, replies = []) {
+  const red = []
+  const warn = []
+  const src = [listText(name), ...replies]
+  const srcAll = src.join('\n')
+  const seedFiles = listFiles(seedDirOf(name), seedDirOf(name), true)
+  const doc = docText(name)
+  let sec = ''
+  for (const raw of text.split('\n')) {
+    const l = raw.trim()
+    const hm = l.match(/^#{2,}\s+(.+?)\s*$/)
+    if (hm) { sec = normSec(hm[1]); continue }
+    if (!l) continue
+    if (/^>\s*\**\s*(Список|Источник)\**\s*:/i.test(l)) continue
+    if (/^>\s*\**\s*решали\**\s*:/i.test(l)) continue
+    if (/^>\s*\**\s*Документ\**\s*:/i.test(l)) {
+      for (const tok of l.match(/[\w./\\:-]*[\w-]+\.(md|docx?|pdf|txt)/gi) || []) {
+        const t = tok.split('\\').join('/')
+        if (!seedFiles.some((sf) => t.endsWith(sf) || sf.endsWith(t))) red.push(`«> Документ:» — файла «${tok}» в засеве нет`)
+      }
+      continue
+    }
+    let line = l.replace(/^(-|\*|\d+[.)])\s+/, '')
+    // «Расходится с БТ»: номер раздела документа («FR-3», «3.2») — ссылка, не факт пункта (expected NI-SPEC-BT, «Стык»):
+    // предупреждение, если он есть в документе задачи.
+    if (sec === X) {
+      const refs = (line.match(/FR-\d+|§\s*\d+(?:\.\d+)*|(?<![\d.])\d+\.\d+(?![\d.])/g) || []).filter((r) => doc.includes(r.replace(/^§\s*/, '')) && !srcAll.includes(r))
+      if (refs.length) { warn.push(`ссылка на раздел документа в «Расходится с БТ»: ${refs.join(', ')} — «${line.slice(0, 60)}»`); for (const r of refs) line = line.split(r).join(' ') }
+    }
+    const opts = { skip: GROUND_SKIP }
+    if (/^>\s*\**\s*(Встреча|Ноут)\**\s*:/i.test(l)) { line = l.split(/\s·\s*\**\s*решали\**\s*:/i)[0].replace(/\d/g, ' '); opts.header = true }
+    if (/^#\s/.test(l)) line = l.replace(/\d/g, ' ')
+    const r = groundCheck(line, src, opts)
+    // ФИО после «решил» / «ждёт» без двоеточия («решила Орлова Е.»): модуль такие поля не берёт (там это глагол).
+    if (!opts.header) for (const f of fioOf(line)) if (!hasStemIn(srcAll, f.who) && !r.missing.some((m) => m.tok === f.who)) r.missing.push({ kind: 'человек', tok: f.who })
+    if (r.missing.length) red.push(`нет опоры в списке и репликах аналитика: ${fmtMissing(r)} — «${line.slice(0, 70)}»`)
+  }
+  return { red, warn }
 }
 
 function headerChecks (text, fx) {
@@ -620,12 +1029,41 @@ function dialogTurns (dir) {
 }
 
 const listBase = (fx) => basename(fx.list).replace(/\.points\.md$/, '')
-export const inputRel = (fx) => `${fx.folder}/${listBase(fx)}-${fx.kind}.md`
+// Вход с этим именем уже лежит в засеве — `-2` перед расширением, по правке E5: `<основа>-bt-2.md` (intent.md:6 в 1.0.0
+// место `-2` не задаёт: `<основа>-2-bt.md` законен, строка «по правке»).
+export const inputRel = (fx) => {
+  const b = `${fx.folder}/${listBase(fx)}-${fx.kind}`
+  return existsSync(join(seedDirOf(fx.name), b + '.md')) ? `${b}-2.md` : `${b}.md`
+}
+const e5alt = (rel) => (/-(bt|spec)-2\.md$/.test(rel) ? rel.replace(/-(bt|spec)-2\.md$/, '-2-$1.md') : null)
 
-// Прогон в счёт: есть ответ, нет пометки отказа API от пула, ответ не начинается с сообщения об отказе.
+// Прогон не в счёт («НЕ ИЗМЕРЕНО») — только отказ API: пометка пула или ответ, который начинается с сообщения об отказе.
+// Прогон без ответа и без входа — в счёт и красный «файл не записан» (ревью 2026-10-16: молча кончившийся прогон
+// выпадал из знаменателя).
 export function measured (dir) {
   const ans = existsSync(join(dir, 'answer.md')) ? readFileSync(join(dir, 'answer.md'), 'utf8') : ''
-  return !(existsSync(join(dir, '_api-failure.txt')) || existsSync(join(dir, '_api-failure-turn.txt')) || !ans.trim() || RE_API_FAILURE.test(ans.slice(0, 300)))
+  return !(existsSync(join(dir, '_api-failure.txt')) || existsSync(join(dir, '_api-failure-turn.txt')) || RE_API_FAILURE.test(ans.slice(0, 300)))
+}
+
+// Засев не тронут. Раннер пишет хеши засева в `_seeded.sha256` (формат sha256sum: `<sha256>  <путь>` или `<sha256> *<путь>`,
+// хеш — от байтов файла, как он лёг в песочницу) — сверка с ними, а не с текущей фикстурой: фикстура могла измениться
+// после прогона. Хешей нет — LF-текст файла песочницы против LF-текста фикстуры. `_seeded.txt` — список путей, как раньше.
+const sha256 = (p) => createHash('sha256').update(readFileSync(p)).digest('hex')
+export function seededHashes (dir) {
+  const p = join(dir, '_seeded.sha256')
+  if (!existsSync(p)) return null
+  const out = new Map()
+  for (const l of readFileSync(p, 'utf8').split(/\r?\n/)) {
+    const m = l.match(/^\\?([0-9a-f]{64}) [ *](.+)$/)
+    if (m) out.set(m[2].replace(/^\.\//, ''), m[1])
+  }
+  return out
+}
+export function seedTouched (dir, name) {
+  const seedDir = seedDirOf(name)
+  const hashes = seededHashes(dir)
+  if (hashes) return [...hashes].filter(([rel, h]) => !existsSync(join(dir, rel)) || sha256(join(dir, rel)) !== h).map(([rel]) => rel)
+  return listFiles(seedDir, seedDir, true).filter((rel) => !existsSync(join(dir, rel)) || read(join(dir, rel)) !== read(join(seedDir, rel)))
 }
 
 export function gradeRun (dir, name) {
@@ -636,22 +1074,34 @@ export function gradeRun (dir, name) {
   const seedFiles = listFiles(seedDir, seedDir, true)
   const seeded = new Set(seedFiles)
   if (existsSync(join(dir, '_seeded.txt'))) for (const l of read(join(dir, '_seeded.txt')).split('\n')) if (l.trim()) seeded.add(l.trim())
-  const touched = seedFiles.filter((rel) => !existsSync(join(dir, rel)) || read(join(dir, rel)) !== read(join(seedDir, rel)))
+  for (const rel of (seededHashes(dir) || new Map()).keys()) seeded.add(rel)
+  const touched = seedTouched(dir, name)
   if (touched.length) red.push('засев тронут (документ задачи или список): ' + touched.join(', '))
+  const fix = []
+  const unmeasured = []
   const files = listFiles(dir)
   const want = inputRel(fx)
-  const RE_IN = new RegExp('(^|/)' + esc(listBase(fx)) + '[.-]?(points-)?(bt|spec)(-\\d+)?\\.md$')
+  const RE_IN = new RegExp('(^|/)' + esc(listBase(fx)) + '(-\\d+)?[.-]?(points-)?(bt|spec)(-\\d+)?\\.md$')
   const inputs = files.filter((f) => RE_IN.test(f) && !seeded.has(f))
-  if (!inputs.includes(want)) red.push(`нет входа ${want}`)
-  const stray = inputs.filter((f) => f !== want)
+  // Законные имена входа: по правке, `-2` в другом месте (E5) и, у NB-REPEAT, второй вход БТ (законен по 1.0.0, баг 4).
+  const altName = fx.alt
+  const cands = [[want, name], [e5alt(want), name, 'E5'], ...(altName ? [[inputRel(FX[altName]), altName], [e5alt(inputRel(FX[altName])), altName, 'E5']] : [])].filter(([p]) => p)
+  const pick = cands.find(([p]) => inputs.includes(p))
+  if (!inputs.length) red.push(`файл не записан: нет входа ${want}`)
+  else if (!pick) red.push(`нет входа ${want}`)
+  const stray = inputs.filter((f) => !pick || f !== pick[0])
   if (stray.length) red.push('вход не там или не той цели: ' + stray.join(', '))
   const extra = files.filter((f) => !seeded.has(f) && !isStand(f) && !inputs.includes(f))
   if (extra.length) red.push('лишние файлы: ' + extra.join(', '))
   let rows = []
-  if (inputs.includes(want)) {
-    const c = gradeContent(read(join(dir, want)), name, dialogTurns(dir), layoutOf(dir))
+  if (pick) {
+    const [rel, gname, e5] = pick
+    if (e5) fix.push(`имя ${basename(rel)} — по правке E5 (баг 5) «-2» перед расширением: ${basename(inputRel(FX[gname]))}`)
+    const c = gradeContent(read(join(dir, rel)), gname, dialogTurns(dir), layoutOf(dir), analystReplies(gname, dir), { twin: twinReplies(dir) })
     red.push(...c.red)
     warn.push(...c.warn)
+    fix.push(...c.fix)
+    unmeasured.push(...(c.unmeasured || []))
     rows = c.rows
   }
   const uses = toolUses(dir)
@@ -659,7 +1109,7 @@ export function gradeRun (dir, name) {
   if (forbidden.length) red.push('читал services/ или context/: ' + forbidden.map((u) => `${u.sub ? 'субагент' : 'ведущий'} ${u.name} ${JSON.stringify(u.input).slice(0, 80)}`).join('; '))
   const turns = existsSync(dir) ? readdirSync(dir).filter((f) => /^answer-\d+\.md$/.test(f)).length || 1 : 0
   const agents = uses.filter((u) => !u.sub && (u.name === 'Agent' || u.name === 'Task')).length
-  return { red, warn, rows, pass: !red.length, hasInput: inputs.includes(want), turns, agents }
+  return { red, warn, fix, unmeasured, rows, pass: !red.length, hasInput: !!pick, turns, agents }
 }
 
 // ---------- самопроверка ----------
@@ -677,7 +1127,9 @@ export function fromList (name) {
     if (p.kind === 'мысль' || p.kind === 'набросок') { secs[O].push(`${t} (предложение аналитика) — ждёт: —`); continue }
     let sec = p.kind === 'открыто' ? O : p.kind === 'сведение' ? S : R
     if (p.kind === 'решено' && /^не входит:\s*/i.test(t)) { sec = N; t = t.replace(/^не входит:\s*/i, '') }
-    secs[at === X ? X : sec].push(t)
+    // Основное место — раздел, отличный от вида («Расходится с БТ»; решение, которое аналитик отправил «В открытые
+    // вопросы», — «Открыто»), — пункт идёт туда.
+    secs[at === X || (at === O && sec === R) ? at : sec].push(t)
   }
   const head = listHead(name).split('\n')
   const subject = read(join(seedDirOf(name), fx.list)).split('\n')[0].replace(/^# Пункты:\s*/, '')
@@ -705,26 +1157,8 @@ const dropLine = (text, re) => text.split('\n').filter((l) => !re.test(l)).join(
 // Строка входа, в которой лежит пункт `n` (по ключу из PTS).
 const lineOf = (text, name, n) => text.split('\n').find((l) => /^(\d+\.|-)\s/.test(l) && PTS[name][n].k.every((re) => re.test(l)))
 
-// Прогоны круга 2 (если лежат на диске): аудит глазами решил, какие из них обязаны быть красными и какие — зелёными.
-const R2 = 'runs/2026-10-15-loop-r2-ni-'
-const R2_MUST = [
-  ['NB-IN', 'nb-in', 'run-1', false, /P6 .*вне документов|P9 .*вне документов|P10 .*вне документов/],
-  ['CR', 'cr', 'run-1', false, /P6 .*вне документов/],
-  ['ACC', 'acc', 'run-1', false, /P23 .*(другой слой|место)/],
-  ['MR-CHG', 'mr-chg', 'run-1', false, /потеряно число 24|не помню/],
-  ['REW', 'rew', 'run-1', true, null],
-  ['VAC', 'vac', 'run-1', true, null],
-]
-// Круг 3: ложные красные разбора сводки — зелёные, а пункт — на месте, названном в сводке.
-const R3 = 'runs/2026-10-15-loop-r3-ni-'
-const R3_MUST = [
-  ['CHG', 'chg', 'run-2', 9, 'сводка: ' + DONE],
-  ['VAC', 'vac', 'run-3', 17, 'сводка: ' + DONE],
-  ['NB-PICK', 'nb-pick', 'run-1', 8, 'сводка: ' + THOUGHT],
-]
-// Круг 4: суть пункта в сводке узнаётся только по месту в документе и по счёту.
-const R4 = 'runs/2026-10-15-loop-r4-ni-'
-const R4_MUST = [['CHG', 'chg', 'run-1', 9, 'сводка: ' + DONE]]
+// Прогоны кругов 2–4 (`runs/2026-10-15-loop-r{2,3,4}-ni-*`) удалены — самопроверка на них не опирается: случаи аудита
+// и разбора сводки — синтетикой, строки ответов дословно (ниже по фикстурам и в «общих»).
 
 function selftest () {
   let bad = 0
@@ -736,17 +1170,23 @@ function selftest () {
   }
   // По умолчанию — со сводкой правильного прогона: без неё пропуск пункта «уже записано» законно красный.
   let SUM = []
-  const G = (text, name, turns = SUM) => gradeContent(text, name, turns)
+  // Двойник по карточке (TWIN): ответы на все ветки — иначе ветки не измерены и место P8/P9 не красит.
+  const TWIN_FULL = ['Правки БТ.', '1. Не вносим. 2. В открытые вопросы.']
+  const G = (text, name, turns = SUM) => gradeContent(text, name, turns, new Map(), analystReplies(name), FX[name].twin ? { twin: TWIN_FULL } : {})
+  const G2 = (text, name) => gradeContent(text, name, [summaryOf(name)])
   for (const [name, fx] of Object.entries(FX)) {
+    if (fx.hidden) continue
     SUM = [summaryOf(name)]
     console.log(`\n${name}`)
     const pts = listPoints(name)
     ck('карта мест покрывает каждый пункт списка', pts.filter((p) => !PTS[name][p.n]).map((p) => 'P' + p.n).join(','), '')
     const own = pts.filter((p) => pts.filter((q) => PTS[name][q.n].k.every((re) => re.test(p.text))).length !== 1 || !PTS[name][p.n].k.every((re) => re.test(p.text)))
     ck('ключ каждого пункта узнаёт ровно его в списке', own.map((p) => 'P' + p.n).join(','), '')
-    const et = read(join(HERE, fx.etalon))
-    const g0 = importedChecks(et, name)
-    ck('эталон исходной пробы — импортированные ожидания зелёные', !g0.red.length, true, g0.red.join(' | '))
+    if (fx.etalon) {
+      const et = read(join(HERE, fx.etalon))
+      const g0 = importedChecks(et, name)
+      ck('эталон исходной пробы — импортированные ожидания зелёные', !g0.red.length, true, g0.red.join(' | '))
+    }
     const ok = fromList(name)
     const g1 = G(ok, name)
     ck('вход по правилам скилла (основное место каждого пункта) со сводкой — зелёный', g1.pass, true, g1.red.join(' | '))
@@ -812,9 +1252,12 @@ function selftest () {
       rmSync(join(sb, fx.folder, 'notes.md'))
       const otherKind = fx.kind === 'bt' ? 'spec' : 'bt'
       const wrong = want.replace(new RegExp('-' + fx.kind + '\\.md$'), `-${otherKind}.md`)
-      rmSync(join(sb, want)); writeFileSync(join(sb, wrong), ok)
-      ck(`вход -${otherKind} вместо -${fx.kind} — красный`, g().pass, false)
-      rmSync(join(sb, wrong))
+      // У NB-REPEAT вход другой цели (второй вход БТ) законен по 1.0.0 — его меряют проверки новых проб ниже.
+      if (!fx.alt && !existsSync(join(seedDir, wrong))) {
+        rmSync(join(sb, want)); writeFileSync(join(sb, wrong), ok)
+        ck(`вход -${otherKind} вместо -${fx.kind} — красный`, g().pass, false)
+        rmSync(join(sb, wrong))
+      }
       writeFileSync(join(sb, want.replace(/-(bt|spec)\.md$/, '.points-$1.md')), ok)
       ck('вход «<основа>.points-bt.md» (круг 2, ni-vac run-2) — красный и назван', g().red.some((m) => /вход не там/.test(m)), true)
       rmSync(join(sb, want.replace(/-(bt|spec)\.md$/, '.points-$1.md')))
@@ -852,7 +1295,8 @@ function selftest () {
       const t = ok.replace(lineOf(ok, name, 23) + '\n', '')
       const r = G(t, name, ['- для БТ — 1 (подписка на увольнение не входит)\n- уже записано — 1 (сменился владелец системы — FR-3)']).red
       ck('«подписка на событие увольнения» «для БТ» (acc run-1) — красный', r.some((m) => m.startsWith('P23 ')), true, r.join(' | '))
-      for (const n of [9, 13, 17]) ck(`P${n} (слой БТ) во входе спеки ${n === 9 ? 'в «Расходится с БТ»' : ''} — красный`, G(addItem(ok, n === 17 ? R : X, listPoints(name).find((p) => p.n === n).text), name).red.some((m) => m.startsWith(`P${n} `)), true)
+      for (const n of [13, 17]) ck(`P${n} (слой БТ) во входе спеки — красный`, G(addItem(ok, n === 17 ? R : X, listPoints(name).find((p) => p.n === n).text), name).red.some((m) => m.startsWith(`P${n} `)), true)
+      ck('P9 в «Расходится с БТ» входа спеки — зелёный (intent.md: отклонение от БТ)', G(addItem(ok.replace(lineOf(ok, name, 9) + '\n', ''), X, listPoints(name).find((p) => p.n === 9).text), name).pass, true)
       // P9 — в обе стороны (решение пользователя 2026-10-15): в «Открыто» входа спеки и «для БТ» по сводке — зелёный.
       const l9 = lineOf(ok, name, 9)
       ck('P9 в «Открыто» входа спеки — зелёный', l9 !== undefined && G(ok, name).pass, true)
@@ -915,23 +1359,125 @@ function selftest () {
   ck('счёт «уже записано — 2» при трёх кандидатах — не покрытие', summaryPlaces([r4b.replace('— 3', '— 2').replace(', порядок списка у руководителя', '')], 'CHG', { inInput: in4, layout: lay4 }).get(9), undefined)
   ck('счёт не перекрывает место, названное сводкой', summaryPlaces([r4b, '- для спеки — 1 (P9)'], 'CHG', { inInput: in4, layout: lay4 }).get(9), OTHER)
 
-  // Прогоны круга 2 на диске — вердикты аудита.
-  const have = R2_MUST.filter(([, p]) => existsSync(join(HERE, `${R2}${p}`)))
-  if (!have.length) console.log('\nпрогоны круга 2 не найдены — проверка на них пропущена')
-  else console.log('\nпрогоны круга 2 (вердикты аудита)')
-  for (const [name, p, run, want, re] of have) {
-    const r = gradeRun(join(HERE, `${R2}${p}/ni-${p}/${run}`), name)
-    ck(`ni-${p} ${run} — ${want ? 'зелёный' : 'красный'}${re ? ' и с названной ошибкой' : ''}`, r.pass === want && (!re || r.red.some((m) => re.test(m))), true, r.red.join(' | '))
+  // Опора, роли, варианты, мысли пересказом (ревью 2026-10-16) — на одной фикстуре каждого вида.
+  {
+    const vac = fromList('VAC')
+    const l12 = lineOf(vac, 'VAC', 12)
+    ck('опора: «три дня» → «пять дней» (число словами) — красный', G2(vac.replace(l12, l12.replace('три дня', 'пять дней')), 'VAC').red.some((m) => /нет опоры.*число «5»/.test(m)), true)
+    ck('опора: «три дня» → «четыре дня» (4 есть у другого пункта) — красный: потеряно 3', G2(vac.replace(l12, l12.replace('три дня', 'четыре дня')), 'VAC').red.some((m) => /^P12 .*потеряно число 3/.test(m)), true)
+    ck('опора: лишняя строка с числом и ФИО — красный', G2(addItem(vac, R, 'Запуск переносится на 15 марта, бюджет 2 млн — решил: Петров И. И.'), 'VAC').red.some((m) => /нет опоры.*Петров/.test(m)), true)
+    ck('опора: «ждёт: не назван» вместо «ждёт: —» — зелёный', G2(vac.replace(lineOf(vac, 'VAC', 7), lineOf(vac, 'VAC', 7).replace('ждёт: —', 'ждёт: не назван')), 'VAC').pass, true)
+    ck('опора: число из реплики аналитика — зелёный', gradeContent(addItem(vac, O, 'Срок ответа — 5 дней (со слов аналитика) — ждёт: —'), 'VAC', [summaryOf('VAC')], new Map(), ['Срок ответа отдела кадров — пять дней.']).pass, true)
+    ck('опора: «> Документ:» не из засева — красный', G2(vac.replace('> Документ: —', '> Документ: docs/EMP-1207/technical_specification.md'), 'VAC').red.some((m) => /Документ/.test(m)), true)
+    ck('опора: «> Документ:» из засева — зелёный', G2(vac.replace('> Документ: —', '> Документ: docs/EMP-1207/business_requirements.md'), 'VAC').pass, true)
+    ck('ФИО: «ждёт: Литвинов» у пункта «ждёт: —» — красный', G2(vac.replace(lineOf(vac, 'VAC', 7), lineOf(vac, 'VAC', 7).replace('ждёт: —', 'ждёт: Литвинов И. П.')), 'VAC').red.some((m) => /^P7 .*ждёт: Литвинов/.test(m)), true)
+    ck('варианты: открытый вопрос утверждением — красный', G2(vac.replace(l12, '- Минимальный срок подачи ежегодного оплачиваемого отпуска — три календарных дня до начала — ждёт: Литвинов И. П. (уточняет у Елены Сергеевны)'), 'VAC').red.some((m) => /^P12 .*вариантами/.test(m)), true)
+    ck('варианты: оба варианта без «?» — зелёный', G2(vac.replace(l12, '- Минимальный срок подачи ежегодного оплачиваемого отпуска: три дня до начала, календарных или рабочих — не решено — ждёт: Литвинов И. П. (уточняет у Елены Сергеевны); до ответа: в FR-3 остаётся «не раньше следующего дня»'), 'VAC').pass, true)
+    const chg = fromList('CHG')
+    const l6 = lineOf(chg, 'CHG', 6)
+    ck('ФИО: «решил: Соколова» у пункта Литвинова — красный', G2(chg.replace(l6, l6.replace('решил: Литвинов И. П.', 'решил: Соколова Е. В.')), 'CHG').red.some((m) => /^P6 .*решил: Соколова/.test(m)), true)
+    const meet = (t, x) => t.replace(/^(> Встреча:[^\n]*)$/m, `$1 · решали: ${x}`)
+    ck('роли: «автор БТ — Литвинов» (ролей на встрече не называли) — красный', G2(meet(chg, 'автор БТ — Литвинов И. П.'), 'CHG').red.some((m) => /роль «автор БТ»/.test(m)), true)
+    ck('роли: «отдел кадров — Литвинов И. П.» (так в шапке VAC) — зелёный', G2(meet(vac, 'отдел кадров — Литвинов И. П.'), 'VAC').pass, true)
+    ck('роли: «отдел кадров — Соколова Е. В.» (у Соколовой роли нет) — красный', G2(meet(vac, 'отдел кадров — Соколова Е. В.'), 'VAC').red.some((m) => /роль «отдел кадров»/.test(m)), true)
+    ck('роли: «заказчик — Литвинов» (заказчика на встрече не называли) — красный', G2(meet(chg, 'заказчик — Литвинов И. П.'), 'CHG').red.some((m) => /роль «заказчик»/.test(m)), true)
+    ck('роли: ФИО без роли из шапки — зелёный', G2(meet(chg, 'Литвинов И. П.; Соколова Е. В.'), 'CHG').pass, true)
+    ck('«решает:» — фамилии нет в списке — красный', G2(addItem(chg, X, 'FR-3 меняется — решает: Петров И.'), 'CHG').red.some((m) => /решает: Петров/.test(m)), true)
+    const acc = fromList('ACC')
+    ck('«решает: ИБ» — зелёный (место P9 в «Расходится с БТ» законно)', G2(acc.replace(lineOf(acc, 'ACC', 9), '- Между согласованием и выдачей доступа нужен статус, которого в БТ нет; до ответа в спеке статус называется «Согласована» — решает: ИБ'), 'ACC').pass, true)
+    const nb = fromList('NB-IN')
+    ck('мысль пересказом без «трек» — красный', G2(addItem(nb, O, 'Печатать номер отправления прямо на чеке приёмки, чтобы отправитель не искал его в приложении (предложение аналитика) — ждёт: —'), 'NB-IN').red.some((m) => /^мысль P8 во входе/.test(m)), true)
+    ck('«1 200» = «1200» — зелёный', G2(nb.replace('из 1200', 'из 1 200'), 'NB-IN').pass, true)
+    const pk = fromList('NB-PICK')
+    ck('выбранный набросок «(со слов аналитика)» — зелёный', G2(pk.replace('(предложение аналитика)', '(со слов аналитика)'), 'NB-PICK').pass, true)
+    ck('пустышка — красный', G2('', 'VAC').pass, false)
   }
-  for (const [round, base, list] of [[3, R3, R3_MUST], [4, R4, R4_MUST]]) {
-    const have = list.filter(([, p]) => existsSync(join(HERE, `${base}${p}`)))
-    if (!have.length) { console.log(`\nпрогоны круга ${round} не найдены — проверка на них пропущена`); continue }
-    console.log(`\nпрогоны круга ${round} (ложные красные разбора сводки)`)
-    for (const [name, p, run, n, where] of have) {
-      const r = gradeRun(join(HERE, `${base}${p}/ni-${p}/${run}`), name)
-      const row = r.rows.find((x) => x.n === n)
-      ck(`ni-${p} ${run} — зелёный, P${n} → «${where}»`, `${r.pass}/${row && row.where}`, `true/${where}`, r.red.join(' | '))
-    }
+  // Новые пробы фазы 1.5: хороший прогон, «по правке» на версии 1.0.0, ловушки (полный набор — selftest/loop/ni-mut.mjs).
+  {
+    const GC = (t, n, ctx = {}, turns, layout = new Map()) => gradeContent(t, n, turns || [summaryOf(n)], layout, analystReplies(n), ctx)
+    const sp = fromList('SPEC-BT')
+    const g1 = GC(sp, 'SPEC-BT')
+    ck('SPEC-BT: вход по правке (P7, P8 — «Расходится с БТ») — зелёный, «по правке» пусто', `${g1.pass}/${g1.fix.length}`, 'true/0', g1.red.concat(g1.fix).join(' | '))
+    const cur = ['P7', 'P8'].reduce((t, p) => t.replace(lineOf(t, 'SPEC-BT', Number(p.slice(1))) + '\n', ''), sp)
+    const g2 = GC(cur, 'SPEC-BT', {}, ['Не идёт во вход: для БТ — 4 (P7, P8, P9, P10), мысли и наброски не взяты — 1 (P6).'])
+    ck('SPEC-BT: P7, P8 «для БТ» (версия 1.0.0) — не красный, две строки «по правке» E1', `${g2.pass}/${g2.fix.filter((m) => /E1/.test(m)).length}`, 'true/2', g2.red.concat(g2.fix).join(' | '))
+    const g3 = GC(addItem(sp, R, 'Повторный запрос клиента на тот же препарат в той же аптеке в тот же день отклоняем — решил: Гладких Таисия'), 'SPEC-BT')
+    ck('SPEC-BT: P9 в «Решено» входа спеки (баг 8) — не красный, «по правке» E4', `${g3.pass}/${g3.fix.some((m) => /E4/.test(m))}`, 'true/true', g3.red.join(' | '))
+    const lay = new Map([[8, { layer: 'БТ', doc: 'противоречит: 3.2 Не входит' }]])
+    ck('SPEC-BT: P8 «противоречит» в раскладке без «Меняем?» — «по правке» E2', GC(sp, 'SPEC-BT', {}, undefined, lay).fix.some((m) => /^P8 .*E2/.test(m)), true)
+    ck('SPEC-BT: тот же P8 с «Меняем?» в ответе — «по правке» пусто', GC(sp, 'SPEC-BT', {}, [summaryOf('SPEC-BT'), 'В БТ, 3.2, сейчас «не входит: заказ препарата, которого нет в наличии». В списке: препарат не из наличия тоже заказываем (Гладких Таисия). Меняем?'], lay).fix.length, 0)
+    ck('SPEC-BT: «раз в час» во входе — красный', GC(sp.replace('раз в 10 минут', 'раз в час'), 'SPEC-BT').red.some((m) => /раз в час/.test(m)), true)
+    const nb = fromList('NB-REPEAT')
+    const g4 = GC(nb, 'NB-REPEAT')
+    ck('NB-REPEAT: вход спеки (правка E3) — зелёный, «по правке» пусто', `${g4.pass}/${g4.fix.length}`, 'true/0', g4.red.concat(g4.fix).join(' | '))
+    const g5 = GC(fromList('NB-REPEAT/bt'), 'NB-REPEAT/bt')
+    ck('NB-REPEAT: второй вход БТ (1.0.0) — не красный, «по правке» E3', `${g5.pass}/${g5.fix.some((m) => /E3/.test(m))}`, 'true/true', g5.red.join(' | '))
+    const tw = fromList('TWIN').replace(/(Отменить один привоз[^\n]*?) — решил:/, '$1; за отменённый привоз деньги с карты не списываем (со слов аналитика) — решил:')
+    const twin = ['Правки БТ.', '1. Не вносим. 2. В открытые вопросы. 3. Так.', 'Поправить: к пункту про отмену привоза добавьте — за отменённый привоз деньги с карты не списываем.', 'Записать 7 пунктов.']
+    const g6 = GC(tw, 'TWIN', { twin })
+    ck('TWIN: вход по ответам двойника — зелёный', g6.pass, true, g6.red.join(' | '))
+    ck('TWIN: поправка без «(со слов аналитика)» — красный', GC(tw.replace(' (со слов аналитика)', ''), 'TWIN', { twin }).red.some((m) => /поправка/.test(m)), true)
+    ck('TWIN: цель не та, что выбрал двойник — красный', GC(setGoal(tw, 'правка работающего'), 'TWIN', { twin }).red.some((m) => /аналитик выбрал/.test(m)), true)
+    const g7 = GC(tw, 'TWIN', { twin: twin.map((r) => r.replace('Не вносим', 'Оставляем')) })
+    ck('TWIN: вопроса по P8 не было — не красный, «ветка «Не вносим» не измерена» (критерий раунда)', `${g7.pass}/${g7.unmeasured.some((m) => /Не вносим/.test(m))}`, 'true/true', g7.red.join(' | '))
+    const g8 = GC(addItem(tw, R, 'Привоз автозаказа — с 10 до 22, в трёхчасовой интервал, который выбирает клиент; сейчас — с 9 до 21 без интервала — решил: Мамедов Т. Р.'), 'TWIN', { twin: twin.map((r) => r.replace('Не вносим', 'Оставляем')) })
+    ck('TWIN: без вопроса P8 во входе — не красный, предупреждение', `${g8.pass}/${g8.warn.some((m) => /^P8 .*ветка не измерена/.test(m))}`, 'true/true', g8.red.join(' | '))
+    ck('TWIN: «Не вносим» ответил, а P8 во входе — красный', GC(addItem(tw, R, 'Привоз автозаказа — с 10 до 22, в трёхчасовой интервал, который выбирает клиент; сейчас — с 9 до 21 без интервала — решил: Мамедов Т. Р.'), 'TWIN', { twin }).red.some((m) => /^P8 /.test(m)), true)
+    for (const n of ['SPEC-BT', 'NB-REPEAT', 'TWIN']) ck(`${n}: пустышка — красный`, GC('', n, { twin }).pass, false)
+  }
+  // «Не входит» у пункта — значит, и «Решено» (ревью 2026-10-16).
+  ck('карта: у каждого «[решено] не входит:» с местом «Не входит» есть и «Решено»', Object.keys(FX).flatMap((n) => listPoints(n).filter((p) => /^не входит:/i.test(p.text) && PTS[n][p.n].at.includes(N) && !PTS[n][p.n].at.includes(R)).map((p) => `${n} P${p.n}`)).join(','), '')
+
+  // NB-REPEAT в песочнице: вход спеки — без «по правке»; второй вход БТ `-bt-2.md` — E3; `-2-bt.md` — E3 и E5; первый вход тронут — красный.
+  {
+    const sb = mkdtempSync(join(tmpdir(), 'grade-ni-'))
+    try {
+      const seedDir = seedDirOf('NB-REPEAT')
+      const seedFiles = listFiles(seedDir, seedDir, true)
+      for (const rel of seedFiles) { mkdirSync(join(sb, rel, '..'), { recursive: true }); writeFileSync(join(sb, rel), readFileSync(join(seedDir, rel))) }
+      writeFileSync(join(sb, '_seeded.txt'), seedFiles.join('\n') + '\n')
+      writeFileSync(join(sb, 'answer.md'), summaryOf('NB-REPEAT'))
+      const spec = 'docs/CBK-208/notebook-2026-10-14-spec.md'
+      writeFileSync(join(sb, spec), fromList('NB-REPEAT'))
+      let r = gradeRun(sb, 'NB-REPEAT')
+      ck('NB-REPEAT песочница: вход спеки — зелёный, «по правке» пусто', `${r.pass}/${r.fix.length}`, 'true/0', r.red.concat(r.fix).join(' | '))
+      rmSync(join(sb, spec))
+      writeFileSync(join(sb, 'answer.md'), summaryOf('NB-REPEAT/bt'))
+      writeFileSync(join(sb, 'docs/CBK-208/notebook-2026-10-14-bt-2.md'), fromList('NB-REPEAT/bt'))
+      r = gradeRun(sb, 'NB-REPEAT')
+      ck('NB-REPEAT песочница: второй вход БТ -bt-2.md — не красный, «по правке» E3', `${r.pass}/${r.fix.some((m) => /E3/.test(m))}/${r.fix.some((m) => /E5/.test(m))}`, 'true/true/false', r.red.join(' | '))
+      rmSync(join(sb, 'docs/CBK-208/notebook-2026-10-14-bt-2.md'))
+      writeFileSync(join(sb, 'docs/CBK-208/notebook-2026-10-14-2-bt.md'), fromList('NB-REPEAT/bt'))
+      r = gradeRun(sb, 'NB-REPEAT')
+      ck('NB-REPEAT песочница: -2-bt.md — не красный, «по правке» E3 и E5', `${r.pass}/${r.fix.some((m) => /E3/.test(m))}/${r.fix.some((m) => /E5/.test(m))}`, 'true/true/true', r.red.join(' | '))
+      writeFileSync(join(sb, 'docs/CBK-208/notebook-2026-10-14-bt.md'), fromList('NB-REPEAT/bt'))
+      ck('NB-REPEAT песочница: первый вход переписан — красный', gradeRun(sb, 'NB-REPEAT').red.some((m) => /засев тронут/.test(m)), true)
+    } finally { rmSync(sb, { recursive: true, force: true }) }
+  }
+
+  // Засев: хеши `_seeded.sha256` (обе формы sha256sum) и прогон без ответа и входа.
+  {
+    const sb = mkdtempSync(join(tmpdir(), 'grade-ni-'))
+    try {
+      const seedDir = seedDirOf('CR')
+      const rel = FX.CR.list
+      mkdirSync(join(sb, rel, '..'), { recursive: true })
+      const bytes = readFileSync(join(seedDir, rel))
+      writeFileSync(join(sb, rel), bytes)
+      const h = createHash('sha256').update(bytes).digest('hex')
+      writeFileSync(join(sb, '_seeded.txt'), rel + '\n')
+      ck('нет ни ответа, ни входа, отказа API нет — в счёт (не «НЕ ИЗМЕРЕНО»)', measured(sb), true)
+      ck('нет ни ответа, ни входа — красный «файл не записан»', gradeRun(sb, 'CR').red.some((m) => /^файл не записан/.test(m)), true)
+      writeFileSync(join(sb, '_seeded.sha256'), `${h}  ${rel}\n`)
+      ck('_seeded.sha256 «<хеш>  <путь>», файл цел — засев не тронут', seedTouched(sb, 'CR').length, 0)
+      writeFileSync(join(sb, '_seeded.sha256'), `${h} *${rel}\r\n`)
+      ck('_seeded.sha256 «<хеш> *<путь>» (Windows), CRLF — засев не тронут', seedTouched(sb, 'CR').length, 0)
+      writeFileSync(join(sb, '_seeded.sha256'), `${'0'.repeat(64)}  ${rel}\n`)
+      ck('_seeded.sha256: хеш не тот — засев тронут (с фикстурой не сверяется)', seedTouched(sb, 'CR').join(','), rel)
+      rmSync(join(sb, '_seeded.sha256'))
+      writeFileSync(join(sb, rel), bytes.toString('utf8').replace(/\r?\n/g, '\r\n'))
+      ck('без хешей: тот же текст в CRLF — засев не тронут (LF-текст)', seedTouched(sb, 'CR').length, 0)
+    } finally { rmSync(sb, { recursive: true, force: true }) }
   }
   console.log(bad === 0 ? '\nсамопроверка: ok' : `\nсамопроверка: ПРОВАЛОВ ${bad}`)
   process.exit(bad === 0 ? 0 : 1)
@@ -946,23 +1492,29 @@ if (IS_MAIN) {
   const fxName = process.argv[process.argv.indexOf('--fx') + 1]
   const fx = FX[fxName]
   const verbose = process.argv.includes('--verbose')
-  if (!arg || !existsSync(arg) || !fx) { console.error(`usage: node grade-ni.mjs <каталог проб> --fx ${Object.keys(FX).join('|')} [--verbose] | --selftest`); process.exit(1) }
+  if (!arg || !existsSync(arg) || !fx || fx.hidden) { console.error(`usage: node grade-ni.mjs <каталог проб> --fx ${Object.keys(FX).filter((n) => !FX[n].hidden).join('|')} [--verbose] | --selftest`); process.exit(1) }
   const runs = readdirSync(arg).filter((n) => /^run-\d+$/.test(n) && statSync(join(arg, n)).isDirectory()).sort()
   console.log(`\nпроба ni-${fxName.toLowerCase()}, ${arg}`)
   const SETTINGS = join(arg, '_settings.txt')
   const CAP = existsSync(SETTINGS) ? Number((read(SETTINGS).match(/потолок ходов: (\d+)/) || [])[1] || 0) : 0
-  let n = 0; let green = 0
+  let n = 0; let green = 0; let fixOk = 0; const unm = {}
   for (const run of runs) {
     const dir = join(arg, run)
     if (!measured(dir)) { console.log(`  ${run}: НЕ ИЗМЕРЕНО`); continue }
     n++
     const r = gradeRun(dir, fxName)
     if (r.pass) green++
+    if (!r.fix.length) fixOk++
     const capHit = !r.hasInput && CAP > 0 && r.turns >= CAP
     console.log(`  ${run}: ${r.pass ? 'ЗЕЛЁНЫЙ' : 'КРАСНЫЙ — ' + r.red.join('; ')}`)
+    if (r.fix.length) console.log(`         по правке: ${r.fix.join(' · ')}`)
+    if (r.unmeasured.length) console.log(`         не измерено (в счёт ветки не идёт): ${r.unmeasured.join(' · ')}`)
+    for (const u of r.unmeasured) unm[u] = (unm[u] || 0) + 1
     console.log(`         ходов: ${r.turns}, субагентов: ${r.agents}${capHit ? ` · УПЁРСЯ В ПОТОЛОК ${CAP} ХОДОВ — читать answer-*.md` : ''}`)
     if (r.warn.length) console.log(`         предупреждения: ${r.warn.join(' · ')}`)
     if (verbose) for (const row of r.rows) console.log(`         P${row.n} [${row.kind}] → ${row.where}   (место: ${row.at.join(' | ')})`)
   }
-  console.log(`\nИТОГ ${fxName}: ${green}/${n}  ← место каждого пункта, дословность, ожидания исходной пробы, засев не тронут`)
+  console.log(`\nИТОГ ${fxName}: ${green}/${n}  ← ложь и поломка: место каждого пункта, опора, дословность, ожидания пробы, засев не тронут`)
+  console.log(`по правке без замечаний: ${fixOk}/${n}  ← ожидания черновика правок (баги 1, 4, 5, 8, 9); на версии до правок — справочно`)
+  for (const [u, k] of Object.entries(unm)) console.log(`${u}: в ${k} из ${n} прогонов — эта ветка измерена в ${n - k}`)
 }

@@ -18,6 +18,8 @@ for p in "${probes[@]}"; do
     ni-*)    fx="$(echo "${p#ni-}" | tr a-z A-Z)"; cmd=(node grade-ni.mjs "$dir" --fx "$fx") ;;
     rec-*)   fx="$(echo "${p#rec-}" | tr a-z A-Z)"; cmd=(node grade-recall.mjs "$dir" --fx "$fx") ;;
     nb-*)    fx="$(echo "${p#nb-}" | tr a-z A-Z)"; cmd=(node grade-nb.mjs "$dir" --fx "$fx") ;;
+    # Цепочки (`run-chain.sh`): раскладка `runs/<префикс>-<проба>/<проба>/run-<i>/stage-<k>/`.
+    loop-*)  fx="$(echo "${p#loop-}" | tr a-z A-Z)"; cmd=(node grade-chain.mjs "$dir" --fx "$fx") ;;
     *) echo "== $p: нет оценщика"; continue ;;
   esac
   echo "================ $p (${cmd[*]})"
