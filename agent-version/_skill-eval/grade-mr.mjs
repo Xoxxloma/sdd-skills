@@ -8,6 +8,10 @@
 // переведены в проверки, номер проверки = номер критерия). Грейдится ФАЙЛ: вход
 // `docs/<KEY>/meeting-2026-10-14-bt.md` и разбор рядом; документ задачи из засева — байт в байт.
 // Вне критериев, предупреждениями: протокол тронут, цитаты разбора не сходятся с протоколом (±2), лишние файлы.
+//
+// ОДИНОЧНЫЙ РЕЖИМ — АРХИВ, ПУТЬ 1.x. `node grade-mr.mjs <каталог> --fx …` грейдил вход meeting-intake 1.x из протокола
+// (`*-bt.md` + `*.razbor.md`); в 2.0 meeting-intake пишет список пунктов, вход пишет notes-to-intent. Запуск печатает это
+// и выходит. Живые части — `gradeNEW` / `gradeCHG` (их импортирует grade-ni.mjs) и `--selftest`.
 
 import { resolve as pathResolve } from 'node:path'
 import { readdirSync, readFileSync, existsSync, statSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
@@ -450,23 +454,7 @@ const IS_MAIN = !!process.argv[1] && fileURLToPath(import.meta.url) === pathReso
 if (IS_MAIN) {
   const arg = process.argv[2]
   if (arg === '--selftest') selftest()
-  const fxName = process.argv[process.argv.indexOf('--fx') + 1]
-  const fx = FX[fxName]
-  if (!arg || !existsSync(arg) || !fx) { console.error('usage: node grade-mr.mjs <каталог проб> --fx NEW|CHG | --selftest'); process.exit(1) }
-  const runs = readdirSync(arg).filter((n) => /^run-\d+$/.test(n) && statSync(join(arg, n)).isDirectory()).sort()
-  console.log(`\nпроба mr-${fxName.toLowerCase()}, ${arg}`)
-  let measured = 0; let green = 0
-  for (const n of runs) {
-    const dir = join(arg, n)
-    const ans = existsSync(join(dir, 'answer.md')) ? readFileSync(join(dir, 'answer.md'), 'utf8') : ''
-    if (existsSync(join(dir, '_api-failure.txt')) || existsSync(join(dir, '_api-failure-turn.txt')) || !ans.trim() || RE_API_FAILURE.test(ans.slice(0, 300))) { console.log(`  ${n}: НЕ ИЗМЕРЕНО`); continue }
-    measured++
-    const r = gradeRun(dir, fx, fxName)
-    if (r.pass) green++
-    const turns = readdirSync(dir).filter((f) => /^answer-\d+\.md$/.test(f)).length || 1
-    console.log(`  ${n}: ${r.pass ? 'ЗЕЛЁНЫЙ' : 'КРАСНЫЙ — ' + r.red.join('; ')}`)
-    console.log(`         ходов: ${turns}${r.quotes ? `, цитат: ${r.quotes.n}` : ''}`)
-    if (r.warn.length) console.log(`         предупреждения: ${r.warn.join(' · ')}`)
-  }
-  console.log(`\nИТОГ ${fxName}: ${green}/${measured}`)
+  // Одиночный режим — архив (шапка файла): прогон meeting-intake 1.x из протокола больше не грейдится.
+  console.log('grade-mr.mjs: одиночный режим — архив, путь meeting-intake 1.x (вход и разбор из протокола). Протокол по памяти в 2.0 — meeting-recall → список пунктов → notes-to-intent: грейдер `node grade-ni.mjs <каталог> --fx MR-NEW|MR-CHG`. Здесь живы только `gradeNEW` / `gradeCHG` для grade-ni.mjs и `--selftest`.')
+  process.exit(2)
 }

@@ -74,6 +74,9 @@ SKILL_DIR=""
 # из файлов, как было). Пробам `meeting-recall`: протокол создаётся на первом ходу, а ответ зависит от вопроса.
 DONE_GREP=""
 TWIN_CARD=""
+# Промпт двойника (пусто → `twin-analyst.md`, как было). Пробам, где двойник не вспоминает встречу, а отвечает на
+# вопросы скилла по карточке и возражает там, где карточка велит: `twin-objector.md`.
+TWIN_PROMPT=""
 # Вызов скилла словами (пусто → как было): снимок — в `.claude/skills/` песочницы, обёртка не называет ни скилл, ни путь.
 AUTO_SKILL=""
 case "$PROBE" in
@@ -568,6 +571,22 @@ case "$PROBE" in
   nb-desc-one) FIXTURE=NB-DESC-ONE; PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='Кисел'; MEET_ENV=1 ;;
   nb-desc-two) FIXTURE=NB-DESC-TWO; PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='Кисел'; MEET_ENV=1 ;;
   nb-auto)    FIXTURE=NB-AUTO;    PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='Кисел'; AUTO_SKILL=1; MEET_ENV=1 ;;
+  # ── Срез 1.1 петли (PLAN-LOOP-HARDEN, 2026-10-16): пробы на стыки, ветки исправления, живые входы ───────────────────
+  # `twin-objector.md` — двойник, который отвечает по карточке и возражает там, где она велит; `w-turn2.txt` при нём —
+  # заглушка: без файла реплики пул не крутит ходы.
+  meet-workshop) FIXTURE=MEET-WORKSHOP; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-nonames) FIXTURE=MEET-NONAMES; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-notes) FIXTURE=MEET-NOTES; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-sameday) FIXTURE=MEET-SAMEDAY; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-2026-10-19-2\.points\.md$'; DONE_GREP='^> Встреча:.*14:[0-5][0-9]'; MEET_ENV=1 ;;
+  meet-twin)  FIXTURE=MEET-TWIN;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-objector.md; MEET_ENV=1 ;;
+  rec-finish) FIXTURE=REC-FINISH; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  rec-cont)   FIXTURE=REC-CONT;   PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=12; IDLE_MAX=12; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  ni-spec-bt) FIXTURE=NI-SPEC-BT; PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-13-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-nb-repeat) FIXTURE=NI-NB-REPEAT; PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/notebook-2026-10-14-(spec|2-bt|bt-2|2-spec)\.md$'; MEET_ENV=1 ;;
+  ni-twin)    FIXTURE=NI-TWIN;    PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=12; IDLE_MAX=12; DONE_RE='/docs/.*/meeting-2026-10-12-(bt|spec)\.md$'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-objector.md; MEET_ENV=1 ;;
+  nb-big-export) FIXTURE=NB-BIG; PROMPT_FILE=w-prompt-export.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2-export.txt; TURNS_CAP=3; IDLE_MAX=3; DONE_RE='/notes/[^/]+/notebook-20[0-9][0-9]-[0-9][0-9]-[0-9][0-9](-2)?\.points\.md$'; MEET_ENV=1 ;;
+  nb-big-view)   FIXTURE=NB-BIG; PROMPT_FILE=w-prompt-view.txt;   SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2-view.txt;   TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/[^/]*-20[0-9][0-9]-[0-9][0-9]-[0-9][0-9](-2)?\.md$'; MEET_ENV=1 ;;
+  nb-twin)    FIXTURE=NB-TWIN;    PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=6; IDLE_MAX=6; DONE_GREP='получател'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-objector.md; MEET_ENV=1 ;;
   *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q sq-audit meet-vac meet-acc meet-long meet-new meet-rew meet-chg meet-cr jm-br-vac jm-br-long jm-br-new jm-ts-acc jm-ts-rew rec-new rec-chg rec-inline nb-new nb-thought nb-contra nb-noauth nb-file nb-view-api nb-view-chat nb-dispute nb-answer nb-ask nb-long nb-view-part meet-out ni-vac ni-acc ni-new ni-chg ni-cr ni-rew ni-mr-new ni-mr-chg ni-nb-in ni-nb-ans ni-nb-pick nb-pts-in nb-pts-new nb-pts-rec nb-export nb-export-since nb-route nb-desc-one nb-desc-two nb-auto"; exit 1 ;;
 esac
 
@@ -579,7 +598,7 @@ SKILL_DIR="${SKILL_DIR:-$HERE/../$SKILL}"
 [ -n "$IDLE_MAX" ] && export RT_IDLE_MAX="$IDLE_MAX"
 [ -n "$DONE_GREP" ] && export RT_DONE_GREP="$DONE_GREP"
 if [ -n "$TWIN_CARD" ]; then
-  export RT_TWIN="$HERE/fixtures/$FIXTURE/$TWIN_CARD" RT_TWIN_PROMPT="$HERE/twin-analyst.md"
+  export RT_TWIN="$HERE/fixtures/$FIXTURE/$TWIN_CARD" RT_TWIN_PROMPT="$HERE/${TWIN_PROMPT:-twin-analyst.md}"
 fi
 if [ -n "$MEET_ENV" ]; then
   export RUN_TIMEOUT="${RUN_TIMEOUT:-3600}" SM_MODEL="${SM_MODEL:-sonnet}" CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0
@@ -759,7 +778,7 @@ mkdir -p "$ROUND/$PROBE"
   [ -n "$DONE_RE" ] && echo "конец диалога по файлу: $DONE_RE"
   [ -n "$IDLE_MAX" ] && echo "пустых ходов подряд: $IDLE_MAX"
   [ -n "$DONE_GREP" ] && echo "конец диалога по содержимому docs/: $DONE_GREP"
-  [ -n "$TWIN_CARD" ] && echo "двойник аналитика: $TWIN_CARD, модель ${RT_TWIN_MODEL:-sonnet}"
+  [ -n "$TWIN_CARD" ] && echo "двойник аналитика: $TWIN_CARD, промпт ${TWIN_PROMPT:-twin-analyst.md}, модель ${RT_TWIN_MODEL:-sonnet}"
   echo "прогонов: $N, параллельность: $CONC"
 } > "$ROUND/$PROBE/_settings.txt"
 echo "effort: ${EFFORT:-умолчание CLI}"

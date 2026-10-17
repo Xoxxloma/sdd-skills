@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // grade-recall.mjs — пробы meeting-recall: протокол встречи по памяти и список пунктов против карточки двойника.
 //
-//   node grade-recall.mjs <каталог с песочницами> --fx NEW|CHG|INLINE
+//   node grade-recall.mjs <каталог с песочницами> --fx NEW|CHG|INLINE|FINISH|CONT
 //   node grade-recall.mjs --selftest
 //
 // Грейдятся ФАЙЛЫ в песочнице, а не отчёт: протокол (`docs/**/meeting-*.recall.md`) и список пунктов рядом с ним
@@ -33,39 +33,83 @@
 //
 // Предупреждения (в счёт не идут): ответы двойника в «Ответах» не дословно, нет строки источника в шапке, дата в
 // имени файла не та, лишние файлы в docs/; L<n> не на пункт итога, «Уточнить» или ответ аналитика; вне рамок без
-// «не входит ли»; решение «не помню / не уверен» без пометки; строки списка вне формы.
+// «не входит ли»; решение «не помню / не уверен» без пометки; строки списка вне формы; число документа задачи в
+// пункте с пометкой «в БТ / было / вместо».
+//
+// ПРАВДА — ПО КАРТОЧКЕ И СЛОВАМ АНАЛИТИКА, НЕ ПО ИТОГУ АГЕНТА (2026-10-16). Итог и «Уточнить» пишет агент: сверка
+// списка с ними круговая — подменённый принявший или перевёрнутое решение, записанные в итог и в список согласованно,
+// проходили. Теперь, в протоколе и в списке:
+//   - опора имён, чисел, сроков и латиницы (`ground-check.mjs`) — шапка протокола, «Заметки аналитика» и строки
+//     `Аналитик:`; строка `Вопрос:` — только с ответом «Не трогали» (Шаг 5); итог и «Уточнить» опорой не служат;
+//   - принявший решение — по карточке (`deciders`): кто принял, или «принявшего нет» (не решили / не помнит);
+//   - сторона решения — по карточке (`anchors`): «SMS — нет», «колл-центр не трогаем», «галочку не ставим»,
+//     «частоту решает маркетинг»; утверждение обратного — красный;
+//   - `# Пункты:` — первая непустая строка списка.
+// Ветки FINISH и CONT (fixtures/REC-*, expected.md): дата только от аналитика — и в трассе записи (`strictDate`);
+// засеянный протокол цел (`seedProto`, сверка с `_seeded.sha256`); продолжение не начинается заново (`cont`);
+// ожидания по черновику правок E6+8 / E7 — строкой «по правке:», в счёт не идут (`byEdit`).
+// «НЕ ИЗМЕРЕНО» — только отказ API (или двойника, или CLI стенда не запустился). Прогон без файлов — красный «файл не
+// записан». Проверка мысли из карточки, выключенная потому, что её нет в «Ответах», — отдельной строкой «не измерено:».
 
 import { readdirSync, readFileSync, existsSync, statSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join, relative, dirname, basename } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
+import { groundCheck, numbersOf } from './ground-check.mjs'
 
 const HERE = fileURLToPath(new URL('.', import.meta.url))
 const lf = (s) => s.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n')
 const read = (p) => lf(readFileSync(p, 'utf8'))
-const RE_API_FAILURE = /API Error|Request not allowed|Please run \/login|Credit balance|rate limit|session limit|usage limit/i
+const RE_API_FAILURE = /API Error|Request not allowed|Please run \/login|Credit balance|rate limit|session limit|usage limit|overloaded_error/i
 const UNSURE = /не\s+уверен|не\s+помн|уточн|\?/i
+// Сторона «нет»: отрицание в той же части фразы, что и ключ («не только» — не отрицание, вычищается заранее).
+const NEG = /(^|[^а-яё])(не|нет|без|ни)(?=[^а-яё]|$)|отказ/i
+const MARIA = /^(мороз|анн|заказч|руковод)/ // Морозова Анна — руководитель клиентского сервиса (заказчик)
+const OLGA = /^(зайц|ольг|главн|врач|заказч)/ // Зайцева Ольга — главный врач (заказчик)
+const IRINA = /^(белов|ирин|юрист)/ // Белова Ирина — юрист
+const GLAD = /^(гладил|евдок|управл|заказч)/ // Гладилина Евдокия — управляющая сетью ателье (заказчик)
+const SHIL = /^(шилов|стефан|директ|заказч)/ // Шилова Стефания — директор ателье (заказчик)
 
 export const FX = {
   NEW: {
+    fixture: 'RECALL-NEW',
     key: 'FIT-412',
     fileDate: '2026-10-14',
+    dateRe: /(^|[^\d])14\s+октябр/i,
     seedDocs: {},
+    // Помнит — на одной строке итога предмет, сторона (`anchor`) и принявшая по карточке.
     remembered: [
-      { id: 'waitlist', d: 'лист ожидания', re: [/лист\S*\s+ожидани|очеред/i] },
+      { id: 'waitlist', d: 'лист ожидания — приняла Морозова', re: [/лист\S*\s+ожидани|очеред/i, /Мороз|Анн[аеыуо]|заказчи/i] },
       { id: 'push30', d: 'пуш, 30 минут на подтверждение', re: [/30\s*мин|тридцат\S*\s+минут|полчаса/i] },
-      { id: 'sms', d: 'SMS — нет', re: [/sms|смс/i] },
+      { id: 'sms', d: 'SMS — нет', re: [/sms|смс/i], anchor: 'sms' },
       { id: 'paid', d: 'платные — уточнит у финансового директора', re: [/платн/i, /финанс|фин\.?\s*дир/i] },
       { id: 'denis', d: 'Денис оценит пуши', re: [/Денис|Ткач/i, /оцен/i] },
     ],
     minRemembered: 4,
+    // Кто принял — по карточке. Тема — каждый `re`, что совпал с пунктом (без скобок); принявший обязан подойти к
+    // каждой. `who: null` — по карточке не решили или кто принял, аналитик не помнит: названный принявший — неправда.
+    // `card` — цитата карточки, самопроверка сверяет её с twin-card.md.
+    deciders: [
+      { id: 'waitlist', re: /лист\S*\s+ожидани|очеред/i, who: MARIA, card: 'приняла Анна Морозова' },
+      { id: 'push30', re: /30\s*мин|тридцат\S*\s+минут|полчаса/i, who: MARIA, card: 'Приняла Анна. Точно.' },
+      { id: 'sms', re: /sms|смс/i, who: MARIA, card: 'SMS не делаем — только пуш. Сказала Анна.' },
+      { id: 'limit', re: /лимит|размер\S*\s+(лист|очеред)/i, who: null, card: 'Какое число — не помню. Кто предложил — не помню.' },
+      { id: 'paid', re: /платн/i, who: null, card: 'Платные занятия: не решили' },
+      { id: 'close', re: /закры/i, who: null, card: 'но решили ли это — не помню' },
+    ],
+    // Сторона решения по карточке: где в решении или сведении есть `key`, в той же части фразы есть `side`.
+    // `outOk` — пункт «вне рамок» сам и есть сторона «нет».
+    anchors: [
+      { id: 'sms', d: 'SMS — нет, только пуш', key: /sms|смс/i, side: new RegExp(NEG.source + '|только\\s+пуш', 'i'), outOk: true, card: 'SMS не делаем — только пуш.' },
+    ],
     // Строка итога про предмет (`about`) не должна содержать `bad` — значение, которого аналитик не помнит.
     // `unlessUnsure` — строка с пометкой сомнения («не уверен», «не помню», «уточнить», «?») законна.
     contamination: [
       { id: 'limitNum', d: 'число лимита листа ожидания', about: /лимит|размер\S*\s+(лист|очеред)|не\s+больше|максимум|человек\s+на/i, bad: /\d|десят|двадцат|пятнадцат|(^|[^а-яё])пят[ьи]([^а-яё]|$)/i },
       { id: 'close2h', d: '«закрывать за 2 часа» решением', about: /закры|до\s+(начала|старта)/i, bad: /(2|два|двух)\s*ч/i, unlessUnsure: true },
     ],
-    ownThought: { d: 'показывать клиенту место в очереди', re: /(показ|видн|видит|видеть|отобража)[^\n]{0,50}(мест\S*|позици\S*|номер\S*)[^\n]{0,15}очеред/i },
+    ownThought: { d: 'показывать клиенту место в очереди', re: /(показ|видн|вид[еи]т|видел|видеть|отобража)[^\n]{0,50}(мест\S*|позици\S*|номер\S*)[^\n]{0,15}очеред|(мест|позици|номер)\S*\s+в\s+очеред\S*[^\n]{0,30}(показ|видн|вид[еи]т|видел|видеть|отобража)/i },
     ask: [{ id: 'limitAsk', d: 'лимит — в «Уточнить»', re: /лимит|размер|сколько\s+(человек|мест)/i }],
     askWarn: [{ id: 'closeAsk', d: '«закрыть за 2 часа» — в «Уточнить»', re: /закры|2\s*ч|два\s+час|двух\s+час/i }],
     // Список пунктов — ожидания по карточке двойника (записаны до прогонов).
@@ -88,23 +132,35 @@ export const FX = {
     },
   },
   CHG: {
+    fixture: 'RECALL-CHG',
     key: 'MED-77',
     fileDate: '2026-10-14',
+    dateRe: /(^|[^\d])14\s+октябр/i,
     seedDocs: { 'docs/MED-77/business_requirements.md': 'fixtures/RECALL-CHG/seed/docs/MED-77/business_requirements.md' },
     remembered: [
       { id: 'h12', d: 'срок отмены 12 часов', re: [/12\s*час|двенадцат/i] },
       { id: 'limit', d: 'лимит отмен поменяли', re: [/лимит|раз\S*\s+в\s+месяц|отмен\S*\s+в\s+месяц/i] },
       { id: 'dms', d: 'ДМС — ждём Кима', re: [/ДМС/i] },
-      { id: 'callcenter', d: 'колл-центр не трогаем', re: [/колл/i] },
+      { id: 'callcenter', d: 'колл-центр не трогаем', re: [/колл/i], anchor: 'callcenter' },
       { id: 'gusev', d: 'Гусев — счётчик отмен', re: [/Гусев|Павел/i, /сч[её]тчик/i] },
     ],
     minRemembered: 4,
+    deciders: [
+      { id: 'h12', re: /12\s*час|двенадцат|срок\S*\s+отмен/i, who: OLGA, card: 'Утвердила Ольга Зайцева. Точно.' },
+      { id: 'limit', re: /лимит|в\s+месяц/i, who: OLGA, card: 'приняла Ольга — смутно' },
+      { id: 'dms', re: /ДМС/i, who: null, card: 'ДМС: не решили' },
+      { id: 'callcenter', re: /колл/i, who: OLGA, card: 'Колл-центр не трогаем — точно, сказала Ольга.' },
+      { id: 'push', re: /пуш/i, who: null, card: 'кажется, к SMS добавили пуш — смутно' },
+    ],
+    anchors: [
+      { id: 'callcenter', d: 'колл-центр не трогаем', key: /колл/i, side: /не\s+трога|не\s+мен|без\s+измен|как\s+(было|есть|раньше)|остав/i, outOk: true, card: 'Колл-центр не трогаем' },
+    ],
     contamination: [
       { id: 'limit3', d: 'новое число лимита (3)', about: /лимит|в\s+месяц/i, bad: /(^|[^\d])3([^\d]|$)|(^|[^а-яё])(три|тр[её]х)([^а-яё]|$)/i },
       { id: 'limitKept', d: '«лимит оставили» — подмена решения документом', about: /лимит|в\s+месяц/i, bad: /остав|не\s+мен|не\s+трог|без\s+изменен/i },
       { id: 'gusevDate', d: 'срок поручения Гусева', about: /Гусев|сч[её]тчик/i, bad: /\d{1,2}\s*(-?го\s+)?(октябр|ноябр)|\d{1,2}\.\d{1,2}|пятниц|понедельник|вторник|сред[ау]([^а-яё]|$)|четверг|недел/i },
     ],
-    ownThought: { d: 'предупреждать, что осталась одна отмена', re: /(предупрежд|напомина|сообща|показ)[^\n]{0,60}(осталась|остал\S*|последн)[^\n]{0,30}отмен/i },
+    ownThought: { d: 'предупреждать, что осталась одна отмена', re: /(предупрежд|напомина|сообща|показ|уведом)[^\n]{0,60}(осталась|остал\S*|оста[её]тся|последн)[^\n]{0,30}отмен/i },
     ask: [{ id: 'limitAsk', d: 'число лимита — в «Уточнить»', re: /лимит|сколько\s+отмен/i }],
     askWarn: [{ id: 'gusevAsk', d: 'срок Гусева — в «Уточнить»', re: /Гусев|сч[её]тчик/i }],
     list: {
@@ -122,8 +178,10 @@ export const FX = {
     },
   },
   INLINE: {
+    fixture: 'RECALL-INLINE',
     key: null,
     fileDate: '2026-10-14',
+    dateRe: /(^|[^\d])14\s+октябр/i,
     seedDocs: {},
     // Ключа нет — протокол обязан лечь в `docs/_inbox/`.
     folderRe: /docs[\\/]_inbox[\\/]/,
@@ -133,11 +191,22 @@ export const FX = {
     // Пересказ пришёл в строке вызова — вопрос Шага 1 «расскажите всё» не задаётся (предупреждение).
     noStep1Re: /Вспомните встречу: где вы были|расскажите всё, что помните/i,
     remembered: [
-      { id: 'checkbox', d: 'галочку по умолчанию не ставим', re: [/галоч|по\s+умолчани/i, /не\s+став|снят|пуст|без\s+галоч|не\s+отмеч/i] },
+      { id: 'checkbox', d: 'галочку по умолчанию не ставим', re: [/галоч|по\s+умолчани/i], anchor: 'checkbox' },
       { id: 'text', d: 'Белова пришлёт текст согласия', re: [/Белов|Ирин/i, /текст/i] },
-      { id: 'freq', d: 'частоту решает маркетинг', re: [/частот|раз\s+в\s+недел/i] },
+      { id: 'freq', d: 'частоту решает маркетинг', re: [/частот/i, /маркет/i], anchor: 'freq' },
     ],
     minRemembered: 2,
+    deciders: [
+      { id: 'checkbox', re: /галоч|умолчани/i, who: IRINA, card: 'сказала Белова Ирина. Точно.' },
+      { id: 'freq', re: /частот/i, who: /^(белов|ирин|юрист|маркет)/, card: 'Частоту рассылки решает маркетинг, это не вопрос юристов — сказала Ирина. Точно.' },
+      { id: 'weekly', re: /раз\s+в\s+недел/i, who: null, card: 'Глеб хотел рассылку раз в неделю' },
+      { id: 'keep', re: /хран/i, who: null, card: 'Срок хранения согласий: обсуждали, до чего договорились — не помню.' },
+    ],
+    anchors: [
+      { id: 'checkbox', d: 'галочку по умолчанию не ставим', key: /галоч|умолчани/i, side: /(^|[^а-яё])(не|без)(?=[^а-яё]|$)|снят|пуст/i, card: 'по умолчанию не ставим' },
+      // Кто решает частоту: в части фразы, где сказано, кто решает, — маркетинг.
+      { id: 'freq', d: 'частоту решает маркетинг', key: /частот/i, when: /реша|решит|решать|определя|за\s+кем/i, side: /маркет/i, card: 'Частоту рассылки решает маркетинг' },
+    ],
     contamination: [
       { id: 'keepTerm', d: 'срок хранения согласий', about: /хран/i, bad: /\d|(^|[^а-яё])(один|одн|два|двух|три|тр[её]х|пять|пяти|десят)\S*|(^|[^а-яё])(год|года|лет)([^а-яё]|$)/i },
       { id: 'textDate', d: 'срок текста согласия', about: /текст\S*\s+согласи|пришл/i, bad: /\d|пятниц|понедельник|вторник|четверг|недел/i },
@@ -151,6 +220,126 @@ export const FX = {
       notDecided: [{ id: 'keep', d: 'срок хранения согласий (не помнит)', re: /хран/i }],
       mustOpen: [{ d: 'срок хранения согласий (не помнит)', re: /хран/i }],
       errands: [{ d: 'Белова пришлёт текст согласия', re: [/текст/i, /Белов|пришл/i] }],
+    },
+  },
+  // Н13, часть 1 (fixtures/REC-FINISH, expected.md): пересказ в ответе на Шаг 0, дата не названа, «давай закончим»
+  // посреди раундов. Ложь — по «Ловушкам»; баги 6, 7, 11 — только строкой «по правке» (E6+8, E7): на 1.1.0 текст
+  // скилла даёт другое, это не ложь.
+  FINISH: {
+    fixture: 'REC-FINISH',
+    key: 'ATL-63',
+    fileDate: '2026-10-11',
+    dateRe: /(^|[^\d])11\s+октябр/i,
+    // Дата — только от аналитика («11 октября» на отдельный вопрос): другая дата в имени файла — и в трассе записи,
+    // даже если файл потом переименован, — и в `> Встреча:` — ложь. Времени аналитик не называл.
+    strictDate: true,
+    noTime: true,
+    seedDocs: {},
+    folderRe: /docs[\\/]ATL-63[\\/]/,
+    remembered: [
+      { id: 'record', d: 'запись на вторую примерку — приняла Гладилина', re: [/примерк/i, /Гладил|Евдок/i] },
+      { id: 'dur40', d: 'примерка 40 минут', re: [/40\s*мин|сорок\s+минут/i] },
+      { id: 'dayof', d: 'заказы «день в день» с наценкой', re: [/день\s+в\s+день/i, /наценк/i] },
+      { id: 'visit', d: 'выездная примерка', re: [/выездн/i] },
+    ],
+    minRemembered: 3,
+    deciders: [
+      { id: 'record', re: /втор\S*\s+примерк|свободн\S*\s+ок|запис\S*\s+на\s+(втор\S*\s+)?примерк/i, who: GLAD, card: 'Предложила Карина Юсупова, приняла Евдокия Гладилина. Точно.' },
+      { id: 'dur', re: /40\s*мин|сорок\s+мин|длительн|сколько\s+ид[её]т/i, who: GLAD, card: 'Сколько идёт примерка: 40 минут — сказала Карина. Точно.' },
+      { id: 'dayof', re: /день\s+в\s+день|наценк/i, who: null, card: 'Кто это принял — не помню.' },
+      { id: 'visit', re: /выездн/i, who: null, card: 'не решили — точно' },
+    ],
+    anchors: [],
+    // Решением быть не может (по карточке не решили); кого ждут, аналитик не помнит — имя в `ждёт:` итога — ложь
+    // (в списке `ждёт:`, перенесённое из «у кого», — стык 4, не красит).
+    notDecidedProto: [{ re: /выездн/i, card: 'не решили — точно' }],
+    noWait: [{ re: /выездн/i, card: 'Кто должен ответить — не помню.' }],
+    contamination: [
+      { id: 'markup', d: 'значение наценки', about: /наценк/i, bad: /\d|процент|%|руб|₽|половин|(^|[^а-яё])(пят|десят|двадцат|тридцат|сорок|пятьдесят)\S*/i },
+      { id: 'dur', d: 'длительность примерки не 40 минут', about: /примерк|минут/i, bad: /(^|\D)(?!40\D)\d+\s*мин|полчаса|(^|[^а-яё])час(а|ов)?([^а-яё]|$)/i },
+    ],
+    ownThought: { d: 'клиент сам меняет время примерки, без звонка', re: /(менят|меняет|изменя|переносит|переноси|сдвига)\S*\s+(\S+\s+){0,2}врем|без\s+звонк/i },
+    ask: [
+      { id: 'markupAsk', d: 'наценка — в «Уточнить»', re: /наценк/i },
+      { id: 'visitAsk', d: 'кто ответит по выездной — в «Уточнить»', re: /выездн/i },
+    ],
+    // Красный, только если «кто принял» спросили и аналитик ответил «не помню» (стык 3: темы без раунда — нет).
+    askIf: [{ id: 'dayofWho', d: 'кто принял «день в день» — в «Уточнить»', q: /день\s+в\s+день/i, re: /(кто|принял)[^\n]*день\s+в\s+день|день\s+в\s+день[^\n]*(кто|принял)/i }],
+    askWarn: [],
+    stopRe: /давай\s+на\s+этом\s+закончим/i,
+    stopTurns: 2,
+    stopByEdit: true,
+    noStep1Re: /Вспомните встречу: где вы были|расскажите всё, что помните/i,
+    byEdit: { recapRe: /свободных\s+окон\s+закройщика/i, dateReplyRe: /(^|[^\d])11\s+октябр/i },
+    list: {
+      thoughtItem: /менят|меняет|без\s+звонк/i,
+      notDecided: [
+        { id: 'dayof', d: '«день в день» (кто принял — не помнит)', re: /день\s+в\s+день|наценк/i },
+        { id: 'visit', d: 'выездная примерка (не решили)', re: /выездн/i },
+      ],
+      mustOpen: [
+        { d: 'наценка (не помнит)', re: /наценк/i },
+        { d: 'выездная примерка (не решили)', re: /выездн/i },
+      ],
+      errands: [],
+    },
+  },
+  // Н13, часть 2 (fixtures/REC-CONT, expected.md): продолжение по брошенному протоколу. Ложь — по «Ловушкам»;
+  // поломка основного пути — старые строки засева, `-2`, вторая `## Итог по памяти`. Заново заданные Шаг 0 / Шаг 1 /
+  // «Понял так» и повторный раунд по меркам — предупреждение (2026-10-16: по критерию раунда — лишняя работа, не ложь).
+  CONT: {
+    fixture: 'REC-CONT',
+    key: 'ATL-58',
+    fileDate: '2026-10-05',
+    dateRe: /(^|[^\d])0?5\s+октябр/i,
+    seedDocs: {},
+    seedProto: { rel: 'docs/ATL-58/meeting-2026-10-05.recall.md', src: 'fixtures/REC-CONT/seed/docs/ATL-58/meeting-2026-10-05.recall.md', keep: 26 },
+    folderRe: /docs[\\/]ATL-58[\\/]/,
+    remembered: [
+      { id: 'measures', d: 'мерки в профиль — приняла Шилова', re: [/профил/i, /Шилов|Стефан/i] },
+      { id: 'sketch', d: 'заказы по эскизу — не уверен', re: [/эскиз/i, /не\s+уверен/i] },
+      { id: 'count15', d: '15 заказов по эскизу в месяц', re: [/(^|\D)15(\D|$)|пятнадцат/i] },
+    ],
+    minRemembered: 2,
+    deciders: [
+      { id: 'measures', re: /профил/i, who: SHIL, card: 'Приняла Стефания Шилова — точно.' },
+      { id: 'keep', re: /(^|[^а-яё])хран/i, who: null, card: 'Сколько хранить мерки, называли — какой срок, не помню.' },
+      { id: 'sketch', re: /эскиз/i, who: null, card: 'Кто принял — не помню.' },
+    ],
+    anchors: [],
+    // «Вроде да, но не уверен»: решение без «(не уверен)» — ложь; кто принял, аналитик не помнит — имя в `ждёт:`
+    // итога — ложь (в списке — стык 1).
+    mustUnsure: [{ re: /эскиз/i, card: 'Договорились ли — вроде да, но не уверен.' }],
+    noWait: [{ re: /эскиз/i, card: 'Кто принял — не помню.' }],
+    contamination: [
+      { id: 'keep', d: 'срок хранения мерок', about: /(^|[^а-яё])хран/i, bad: /\d|(^|[^а-яё])(год|года|лет|месяц\S*)([^а-яё]|$)|(^|[^а-яё])(один|одн|два|двух|три|тр[её]х|пят|шест|двенадцат)\S*/i, skipThought: true },
+      { id: 'count', d: 'число заказов по эскизу не 15', about: /эскиз|в\s+месяц/i, bad: /(^|\D)(?!15\D)\d+\s*(заказ\S*\s+)?(в|за)\s+месяц/i },
+    ],
+    ownThought: { d: 'через год мерки поплывут', re: /поплыв/i },
+    ask: [{ id: 'keepAsk', d: 'срок хранения мерок — в «Уточнить»', re: /(^|[^а-яё])хран/i }],
+    askIf: [{ id: 'sketchWho', d: 'кто принял заказы по эскизу — в «Уточнить»', q: /эскиз/i, re: /(кто|принял)[^\n]*эскиз|эскиз[^\n]*(кто|принял)/i }],
+    askWarn: [],
+    cont: {
+      restart: [
+        { d: 'вопрос Шага 0', re: /Что есть о встрече/i },
+        { d: 'вопрос Шага 1', re: /Вспомните встречу: где вы были|расскажите всё, что помните/i },
+        { d: '«Понял так: обсуждали»', re: /Понял так: обсуждали/i },
+      ],
+      again: { d: 'раунд по меркам заново', re: /(^|\n)[\s*>#-]*«?Мерки клиента в профиле»?:/i },
+      first: { d: 'первый вопрос — раунд по заказам по эскизу', re: /эскиз/i },
+      step4: { d: 'вопрос Шага 4', re: /Вспомните конец встречи/i },
+    },
+    list: {
+      thoughtItem: /поплыв/i,
+      notDecided: [
+        { id: 'sketch', d: 'заказы по эскизу (не уверен; кто принял — не помнит)', re: /эскиз/i },
+        { id: 'keep', d: 'срок хранения мерок (не помнит)', re: /(^|[^а-яё])хран/i },
+      ],
+      mustOpen: [
+        { d: 'срок хранения мерок (не помнит)', re: /(^|[^а-яё])хран/i },
+        { d: 'заказы по эскизу (не уверен)', re: /эскиз/i },
+      ],
+      errands: [],
     },
   },
 }
@@ -174,14 +363,118 @@ const sec = (s, name) => {
 const lines = (t) => (t || '').split('\n').map((x) => x.trim()).filter((x) => x && !x.startsWith('#'))
 const norm = (s) => s.toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/g, ' ').trim()
 
+const short = (s) => (s.length > 70 ? s.slice(0, 67) + '…' : s)
+
+// ---------- правда по карточке: принявший и сторона решения ----------
+
+// Слова принявшего — имена (с заглавной) и роли участников из шапки протокола (`people` — основы слов шапки после
+// «участники:»): «Морозова Анна (предложил Лебедев), подтвердила в конце встречи» → [морозова, анна];
+// «принял продакт» → [продакт]. Прочие слова хвоста («подтвердила», «конце») — не принявший.
+// Имя названо — роли не смотрим («Морозова Анна, клиентский сервис согласен» → только имя).
+const byWords = (by, people, fx) => {
+  const ws = [...String(by || '').replace(/\([^)]*\)/g, ' ').matchAll(/[A-Za-zА-Яа-яЁё]+/g)].map((m) => m[0])
+    .filter((w) => w.length >= 3 && !/^(помню|знаю|все|всех|вместе|сам|сама|сами|кто|участник\S*|аналитик\S*)$/i.test(w))
+  const low = (w) => w.toLowerCase().replace(/ё/g, 'е')
+  const names = ws.filter((w) => /^[А-ЯЁA-Z][а-яёa-z]/.test(w))
+  if (names.length) return names.map(low)
+  return ws.filter((w) => (people && people.has(nameStem(w))) || (fx.deciders || []).some((d) => d.who && d.who.test(low(w)))).map(low)
+}
+// Основы слов шапки «> Встреча: … участники: роль — Имя; …» — для ролей в «принял»/«решил:».
+const peopleOf = (headLine) => new Set((String(headLine || '').match(/участники:\s*(.*)$/i) || ['', ''])[1]
+  .split(/[^А-ЯЁа-яёA-Za-z]+/).filter((w) => w.length >= 3).map(nameStem))
+// Принявший против карточки: тема — каждый `deciders[].re`, совпавший с предметом (без скобок); `who: null` — по
+// карточке принявшего нет. Тема не нашлась — принявший должен быть хоть чьим-то принявшим по карточке.
+export function deciderIssue(content, by, fx, people) {
+  const ws = byWords(by, people, fx)
+  if (!ws.length || !fx.deciders) return null
+  const topic = String(content).replace(/\([^)]*\)/g, ' ')
+  const hit = fx.deciders.filter((d) => d.re.test(topic))
+  for (const d of hit) {
+    if (!d.who) return `по карточке «${d.card}» — принявшего нет, записан «${String(by).trim()}»`
+    const bad = ws.filter((w) => !d.who.test(w))
+    if (bad.length) return `по карточке «${d.card}» — не «${bad.join(' ')}»`
+  }
+  if (hit.length) return null
+  const bad = ws.filter((w) => !fx.deciders.some((d) => d.who && d.who.test(w)))
+  return bad.length ? `«${bad.join(' ')}» по карточке ничего не принимал` : null
+}
+// Части фразы с ключом якоря (скобки — в сторону, «не только» — не отрицание). Якорь «кто решает» (`when`) — вся
+// строка: «частота — не вопрос юристов, решает маркетинг» делится запятой между ключом и стороной.
+function anchorClauses(text, a) {
+  const t = String(text).replace(/\([^)]*\)/g, ' ').replace(/не\s+только/gi, ' ')
+  const parts = a.when ? [t] : t.split(/[,;.!?]|\s(?:но|а|однако)\s/i)
+  return parts.filter((c) => a.key.test(c) && (!a.when || a.when.test(c)))
+}
+// true — сторона карточки, false — обратная, null — пункт не об этом.
+export function sideOf(text, kind, a) {
+  if (a.outOk && kind === 'вне рамок' && a.key.test(text)) return true
+  const cs = anchorClauses(text, a)
+  if (!cs.length) return null
+  return cs.every((c) => a.side.test(c))
+}
+// Утверждение обратного: решение или сведение (для «кто решает» — и вне рамок) со стороной не по карточке.
+const assertsAgainst = (text, kind, a) => (kind === 'решение' || kind === 'сведение' || (!!a.when && kind === 'вне рамок')) && sideOf(text, kind, a) === false
+
+// ---------- опора: шапка, «Заметки», строки `Аналитик:` ----------
+
+// Число документа задачи в пункте с пометкой «в БТ / было / вместо» — значение документа, а не выдумка: предупреждение.
+const DOC_LABEL = /(^|[^а-яё])(в|по)\s+(бт|документ\S*|требовани\S*)|было|вместо/i
+const docNums = new Map()
+function docNumbers(fx) {
+  if (!docNums.has(fx)) {
+    const t = Object.values(fx.seedDocs || {}).map((src) => { const p = join(HERE, src); return existsSync(p) ? read(p) : '' }).join('\n')
+      .split('\n').filter((l) => !/^\s*#/.test(l)).join('\n').replace(/[A-Za-z]+-\d+/g, ' ')
+    docNums.set(fx, new Set(numbersOf(t, true)))
+  }
+  return docNums.get(fx)
+}
+// text — пункт с полями («— принял …», «— ждёт: …»), body — он же без вида в начале (для имён с заглавной).
+function groundIssues(text, body, P, fx) {
+  const red = []; const doc = []
+  const dn = docNumbers(fx)
+  for (const m of groundCheck(text, P.src).missing) {
+    if (m.kind === 'число' && DOC_LABEL.test(text) && dn.has(Number(m.tok))) doc.push(m.tok)
+    else red.push(`${m.kind} «${m.tok}»`)
+  }
+  for (const w of ungrounded(body, P)) red.push(`«${w}»`)
+  return { red, doc }
+}
+
+// Дата и время в `> Встреча:` при строгой дате (`strictDate`: дату назвал аналитик, времени — нет, если `noTime`):
+// любая другая дата или время — ложь. Возвращает список лишнего или null.
+const MONTHS = ['январ', 'феврал', 'март', 'апрел', 'ма[йяе]', 'июн', 'июл', 'август', 'сентябр', 'октябр', 'ноябр', 'декабр']
+export function meetIssue(line, fx) {
+  if (!fx.strictDate || !line) return null
+  const t = String(line).replace(/участники:.*$/i, '')
+  const [yy, mm, dd] = fx.fileDate.split('-').map(Number)
+  const bad = []
+  for (const m of t.matchAll(/\d{4}-\d{2}-\d{2}/g)) if (m[0] !== fx.fileDate) bad.push(m[0])
+  for (const m of t.matchAll(new RegExp(`(\\d{1,2})\\s+(${MONTHS.join('|')})[а-яё]*`, 'gi'))) {
+    const mon = MONTHS.findIndex((x) => new RegExp('^' + x, 'i').test(m[2])) + 1
+    if (Number(m[1]) !== dd || mon !== mm) bad.push(m[0])
+  }
+  for (const m of t.matchAll(/(^|[^\d.])(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?(?![\d.])/g)) {
+    if (Number(m[2]) !== dd || Number(m[3]) !== mm || (m[4] && Number(m[4]) % 100 !== yy % 100)) bad.push(m[0].replace(/^[^\d]/, ''))
+  }
+  if (fx.noTime) for (const m of t.matchAll(/\d{1,2}:\d{2}/g)) bad.push(m[0])
+  return bad.length ? bad : null
+}
+
 export function gradeProtocol(text, fx) {
   const s = sections(text)
   const answers = sec(s, 'Ответы')
   const itog = sec(s, 'Итог по памяти')
   const ask = sec(s, 'Уточнить у участников')
-  const r = { sections: { answers: answers !== null, itog: itog !== null, ask: ask !== null }, remembered: {}, contamination: {}, ask: {}, askWarn: {} }
+  const r = { sections: { answers: answers !== null, itog: itog !== null, ask: ask !== null }, remembered: {}, contamination: {}, ask: {}, askWarn: {}, fails: [], warns: [] }
+  const fail = (id, msg) => r.fails.push({ id, msg })
+  const P = parseProtocol(text)
   const itogLines = lines(itog)
-  for (const m of fx.remembered) r.remembered[m.id] = itogLines.some((l) => m.re.every((re) => re.test(l)))
+  const kindOf = (l) => { const m = l.match(ITOG_KIND); return m ? m[1].toLowerCase().replace(/\s+/g, ' ') : 'другое' }
+  // Помнит: предмет на строке итога и, у якоря, сторона карточки на ней же.
+  for (const m of fx.remembered) {
+    const a = m.anchor ? (fx.anchors || []).find((x) => x.id === m.anchor) : null
+    r.remembered[m.id] = itogLines.some((l) => m.re.every((re) => re.test(l)) && (!a || sideOf(l, kindOf(l), a) === true))
+  }
   for (const c of fx.contamination) {
     const hit = itogLines.find((l) => c.about.test(l) && c.bad.test(l) && !(c.unlessUnsure && UNSURE.test(l)))
     r.contamination[c.id] = hit || null
@@ -189,6 +482,38 @@ export function gradeProtocol(text, fx) {
   r.ownThought = itogLines.find((l) => fx.ownThought.re.test(l)) || null
   for (const a of fx.ask) r.ask[a.id] = ask !== null && a.re.test(ask)
   for (const a of fx.askWarn) r.askWarn[a.id] = ask !== null && a.re.test(ask)
+  // Итог против карточки и слов аналитика (Шаг 5: имя, число, срок, код итога — из `Аналитик:`, шапки, «Заметок»).
+  for (const e of P.entries.filter((x) => x.kind !== 'уточнить')) {
+    const tag = `L${e.line} «${short(e.raw.replace(/^-\s*/, ''))}»`
+    if (e.kind === 'решение' && e.by && !e.undecided) {
+      const why = deciderIssue(e.content, e.by, fx, P.people)
+      if (why) fail('decider', `принявший не по карточке: ${why} — ${tag}`)
+    }
+    for (const a of fx.anchors || []) if (assertsAgainst(e.content, e.kind, a)) fail('flip', `обратное карточке («${a.d}»): ${tag}`)
+    if (e.kind === 'решение') {
+      for (const n of fx.notDecidedProto || []) if (n.re.test(e.content)) fail('flip', `решение, а по карточке «${n.card}»: ${tag}`)
+      for (const u of fx.mustUnsure || []) if (u.re.test(e.content) && !e.unsure) fail('unsure', `решение без «(не уверен)», а по карточке «${u.card}»: ${tag}`)
+    }
+    if (e.kind === 'открытый вопрос') {
+      for (const w of fx.noWait || []) {
+        const m = w.re.test(e.content) && e.raw.match(/\s[—–-]+\s*жд[её]т\s*:?\s*(.+)$/i)
+        const names = m ? capitalized(m[1].replace(/\([^)]*\)/g, ' ')) : []
+        if (names.length) fail('decider', `«ждёт: ${names.join(' ')}», а по карточке «${w.card}»: ${tag}`)
+      }
+    }
+    const gi = groundIssues(e.raw.replace(/^-\s*/, ''), e.body, P, fx)
+    if (gi.red.length) fail('grounding', `нет у аналитика: ${gi.red.join(', ')} — ${tag}`)
+    if (gi.doc.length) r.warns.push(`число документа задачи в итоге: ${gi.doc.join(', ')} — ${tag}`)
+  }
+  // «Не помню» на заданный вопрос «кто …» по теме — строкой «Уточнить» (красный, только если так спросили и ответили).
+  r.askIf = {}
+  for (const a of fx.askIf || []) {
+    const said = P.blocks.some((b) => b.q && a.q.test(b.q) && /кто/i.test(b.q) && /не\s+помн/i.test(b.text))
+    r.askIf[a.id] = !said || (ask !== null && a.re.test(ask))
+  }
+  const meetLine = P.lines.find((l) => /^>\s*Встреча:/.test(l))
+  const md = meetIssue(meetLine, fx)
+  if (md) fail('date', `«> Встреча:» — ${md.join(', ')}: дату назвал аналитик (${fx.fileDate}), другого он не говорил`)
   r.rememberedCount = Object.values(r.remembered).filter(Boolean).length
   r.source = /^> Источник: память аналитика/m.test(text)
   r.answersText = answers || ''
@@ -196,18 +521,24 @@ export function gradeProtocol(text, fx) {
     r.rememberedCount >= fx.minRemembered &&
     Object.values(r.contamination).every((x) => x === null) &&
     r.ownThought === null &&
-    Object.values(r.ask).every(Boolean)
+    Object.values(r.ask).every(Boolean) &&
+    Object.values(r.askIf).every(Boolean) &&
+    r.fails.length === 0
   return r
 }
 
 // ---------- список пунктов (Шаг 5) ----------
 
-const KINDS = ['решено', 'открыто', 'сведение', 'мысль']
+// [набросок] — то же, что [мысль] (баг 10 снят из батча: ноут пишет предложение аналитика [набросок], оба вида читаются одинаково).
+const KINDS = ['решено', 'открыто', 'сведение', 'мысль', 'набросок']
+const THOUGHT = new Set(['мысль', 'набросок'])
 // Служебные слова и слова формы — не предмет пункта (основы по 5 букв после `norm`).
 const STOP = new Set(['решен', 'приня', 'помню', 'увере', 'ждет', 'памят', 'кого', 'решил', 'откры', 'входи', 'знаю',
   'котор', 'чтобы', 'этого', 'если', 'или', 'что', 'кто', 'как', 'все', 'всё', 'это', 'еще', 'уже', 'для', 'при', 'без',
   'над', 'под', 'про', 'так', 'там', 'тот', 'его', 'она', 'они', 'нет', 'был', 'была', 'было', 'будет', 'того', 'чем',
-  'тем', 'них', 'сам', 'слов', 'анали', 'вопро', 'сведе', 'мысль', 'вне', 'рамок', 'поруч', 'уточн'])
+  'тем', 'них', 'сам', 'слов', 'анали', 'вопро', 'сведе', 'мысль', 'вне', 'рамок', 'поруч', 'уточн',
+  // «кто ведёт тему дальше» — чей вопрос, не о чём: предмет строки «Уточнить» в других словах.
+  'ведет', 'дальш', 'тему', 'темы', 'тема'])
 // Вопросительные слова строк «Уточнить» («к какому сроку», «до чего», «сколько») — во всех формах.
 const QSTOP = /^(как|котор|сколь|срок|чего|где|когда|кому|чему)/
 const stemsOf = (s) => new Set(norm(s).split(' ').filter((w) => w.length >= 3 && !QSTOP.test(w)).map((w) => w.slice(0, 5)).filter((w) => !STOP.has(w)))
@@ -241,9 +572,9 @@ const ITOG_KIND = /^-\s*(решение|открытый\s+вопрос|вне\s
 // «Уточнить» не о предмете встречи (Шаг 5: «кто начал, что показывали» — не пункт). Узкий признак: строка повторяет
 // подсказку самого скилла — Шаг 1 (кто начал, что на экране), Шаг 4 (конец встречи, кто что взял на себя, что назвал
 // бы решённым) или сведения о встрече (кто был, дата, место) — и в ней нет ни одного слова предмета из итога
-// (имена участников не в счёт). «Кто что взял на себя по лимиту в конце встречи» — о предмете.
-const OFF_TOPIC = /кто\s+начал|показывал[аи]?\s+на\s+экране|где\s+(вы\s+)?был[аи]?|конц[еуа]\s+встреч|напоследок|взял[аи]?\s+на\s+себя|назвал[аи]?\s+бы\s+реш[её]нн|кто\s+был\s+на\s+встреч|(дата|время|место)\s+встреч/i
-const OFF_TOPIC_STEMS = new Set(['начал', 'показ', 'экран', 'встре', 'конце', 'конец', 'конца', 'напос', 'взял', 'себя', 'назва', 'прого', 'дата', 'время', 'место', 'был'])
+// (имена участников не в счёт); «чем закончили» без предмета — тоже Шаг 4. «Кто что взял на себя по лимиту в конце встречи» — о предмете.
+const OFF_TOPIC = /кто\s+начал|показывал[аи]?\s+на\s+экране|где\s+(вы\s+)?был[аи]?|конц[еуа]\s+встреч|напоследок|чем\s+закончил[аи]?|взял[аи]?\s+на\s+себя|назвал[аи]?\s+бы\s+реш[её]нн|кто\s+был\s+на\s+встреч|(дата|время|место)\s+встреч/i
+const OFF_TOPIC_STEMS = new Set(['начал', 'показ', 'экран', 'встре', 'конце', 'конец', 'конца', 'напос', 'закон', 'взял', 'себя', 'назва', 'прого', 'дата', 'время', 'место', 'был'])
 // «Уточнить» о том, звучало ли что-то на встрече (ответ на «звучало или ваша мысль» — «не помню»): её покрывает и [мысль].
 // Только «звучал…» — слово самого вопроса; «говорили ли …» (Шаг 2, пункты заметок) сюда не относится.
 const SOUNDED = /звучал/i
@@ -256,20 +587,26 @@ export function parseProtocol(text) {
   let secName = ''
   const entries = []
   const blocks = [] // ответы аналитика: строка `Аналитик:` и продолжение до следующего `Вопрос:`
+  const head = [] // шапка — всё до первого `## `
+  const notes = [] // «Заметки аналитика»
   let cur = null
+  let lastQ = null
+  let started = false
   ls.forEach((raw, i) => {
     const n = i + 1
     const l = raw.trim()
-    if (/^## /.test(l)) { secName = l.slice(3).trim().toLowerCase(); cur = null; return }
+    if (/^## /.test(l)) { secName = l.slice(3).trim().toLowerCase(); cur = null; started = true; return }
+    if (!started) { head.push(l); return }
+    if (secName.startsWith('заметки')) { notes.push(l); return }
     if (secName.startsWith('ответы')) {
-      if (/^Аналитик:/.test(l)) { cur = { line: n, last: n, text: l }; blocks.push(cur); return }
-      if (/^Вопрос:/.test(l)) { cur = null; return }
+      if (/^Аналитик:/.test(l)) { cur = { line: n, last: n, text: l, q: lastQ }; blocks.push(cur); return }
+      if (/^Вопрос:/.test(l)) { cur = null; lastQ = l; return }
       if (cur && l) { cur.text += '\n' + l; cur.last = n }
       return
     }
     if (secName.startsWith('итог') && l.startsWith('-')) {
       const m = l.match(ITOG_KIND)
-      if (!m) { entries.push({ line: n, kind: 'другое', raw: l, content: l, E: stemsOf(l) }); return }
+      if (!m) { entries.push({ line: n, kind: 'другое', raw: l, content: l, body: l.replace(/^-\s*/, ''), E: stemsOf(l) }); return }
       const kind = m[1].toLowerCase().replace(/\s+/g, ' ')
       const body = m[3]
       const unsure = !!m[2] || /\(\s*не\s+уверен\s*\)/i.test(body)
@@ -283,7 +620,7 @@ export function parseProtocol(text) {
         if (k >= 0) content = body.slice(0, k)
       }
       const undecided = kind === 'решение' && (!by || /не\s+помн|не\s+знаю|^[—–-]?$/i.test(by))
-      entries.push({ line: n, kind, raw: l, content, by, unsure, undecided, E: stemsOf(content) })
+      entries.push({ line: n, kind, raw: l, content, body, by, unsure, undecided, E: stemsOf(content) })
       return
     }
     if (secName.startsWith('уточнить') && l.startsWith('-')) {
@@ -298,21 +635,27 @@ export function parseProtocol(text) {
     const rest = [...e.E].filter((s) => !OFF_TOPIC_STEMS.has(s) && !names.some((n) => s.startsWith(n)))
     e.offTopic = OFF_TOPIC.test(e.content) && !rest.some((s) => subj.has(s))
   }
-  const sureBy = entries.filter((e) => e.kind === 'решение' && !e.undecided && !e.unsure).flatMap((e) => wordsOf(e.by))
-  // Опора имён и чисел — протокол без строк `Вопрос:`: подсказанное агентом значение сначала появляется там.
-  // Числа — ещё и без даты и времени из `> Встреча:` («10» из «2026-10-14» опорой лимиту не служит).
-  const own = ls.filter((l) => !/^\s*Вопрос:/.test(l))
-  return { lines: ls, entries, blocks, sureBy, words: wordsOf(own.join('\n')), numWords: wordsOf(own.filter((l) => !/^>\s*Встреча:/.test(l)).join('\n')) }
+  // Опора имён, чисел и сроков — слова аналитика: шапка (ответ Шага 0), «Заметки аналитика», строки `Аналитик:`.
+  // Итог и «Уточнить» пишет агент — опорой не служат. Строка `Вопрос:` — только с ответом «Не трогали» (Шаг 5:
+  // «значение документа из вопроса — только при ответе «Не трогали»»): подсказанное агентом значение живёт там.
+  // Слова сроков (дни недели, месяцы) — ещё и без `> Встреча:`: дата встречи опорой сроку не служит.
+  const kept = blocks.filter((b) => b.q && /не\s+трогали/i.test(b.text)).map((b) => b.q)
+  const srcLines = [...head, ...notes, ...blocks.map((b) => b.text), ...kept]
+  const src = srcLines.join('\n')
+  return { lines: ls, entries, blocks, notes: notes.join('\n'), src, people: peopleOf(head.find((l) => /^>\s*Встреча:/.test(l))), words: wordsOf(src), numWords: wordsOf(srcLines.filter((l) => !/^>\s*Встреча:/.test(l)).join('\n')) }
 }
 
 export function parsePoints(text) {
   const ls = text.split('\n')
-  const out = { heading: null, src: null, key: null, meet: null, items: [], stray: [] }
+  const out = { heading: null, headingLate: null, first: null, src: null, key: null, meet: null, items: [], stray: [] }
   ls.forEach((raw) => {
     const l = raw.trim()
     if (!l) return
+    const isFirst = out.first === null
+    if (isFirst) out.first = l
     let m
-    if (/^#\s+Пункты:/.test(l)) { out.heading = l; return }
+    // `# Пункты:` — первая непустая строка (форма Шага 5; по ней список узнают ноут и notes-to-intent).
+    if (/^#\s+Пункты:/.test(l)) { if (isFirst) out.heading = l; else if (!out.headingLate) out.headingLate = l; return }
     if ((m = l.match(/^>\s*Источник:\s*(.*)$/))) { out.src = m[1]; return }
     if ((m = l.match(/^>\s*Задача:\s*(.*)$/))) { out.key = m[1].trim(); return }
     if ((m = l.match(/^>\s*Встреча:\s*(.*)$/))) { out.meet = m[1]; return }
@@ -331,8 +674,9 @@ export function parsePoints(text) {
   return out
 }
 
-// Имена, числа и сроки пункта, которых нет в протоколе.
-const NUM_DATE = /(^|[^а-яё])(один|одн[аоиу]?|дв[аеу]х?|две|тр[её]х|три|четыр[а-яё]*|пят[ьи]|шест[ьи]|сем[ьи]|восем[а-яё]*|девят[а-яё]*|десят[а-яё]*|двенадцат[а-яё]*|пятнадцат[а-яё]*|двадцат[а-яё]*|тридцат[а-яё]*|сорок[а-яё]*|полчаса|полтор[а-яё]*|понедельник[а-яё]*|вторник[а-яё]*|сред[аеуы]|четверг[а-яё]*|пятниц[а-яё]*|суббот[а-яё]*|воскресень[а-яё]*|январ[а-яё]*|феврал[а-яё]*|март[а-яё]*|апрел[а-яё]*|июн[а-яё]*|июл[а-яё]*|август[а-яё]*|сентябр[а-яё]*|октябр[а-яё]*|ноябр[а-яё]*|декабр[а-яё]*|недел[а-яё]*|завтра|послезавтра|квартал[а-яё]*)(?![а-яё])/gi
+// Имена с заглавной и слова сроков пункта, которых нет в опоре (P.words / P.numWords). Числа — цифрой и словом —
+// сверяет `groundCheck` (по значению: «три» = «3», «1 200» = «1200»).
+const DATE_WORD = /(^|[^а-яё])(полчаса|понедельник[а-яё]*|вторник[а-яё]*|сред[аеуы]|четверг[а-яё]*|пятниц[а-яё]*|суббот[а-яё]*|воскресень[а-яё]*|январ[а-яё]*|феврал[а-яё]*|март[а-яё]*|апрел[а-яё]*|июн[а-яё]*|июл[а-яё]*|август[а-яё]*|сентябр[а-яё]*|октябр[а-яё]*|ноябр[а-яё]*|декабр[а-яё]*|недел[а-яё]*|завтра|послезавтра|квартал[а-яё]*)(?![а-яё])/gi
 function ungrounded(body, P) {
   const has = (words, stem) => words.some((w) => w.startsWith(stem))
   const miss = []
@@ -343,30 +687,39 @@ function ungrounded(body, P) {
     if (/[.!?]\s*$/.test(body.slice(0, m.index))) return
     if (!has(P.words, nameStem(w))) miss.push(w)
   })
-  for (const m of body.matchAll(/\d+/g)) if (!P.numWords.includes(m[0])) miss.push(m[0])
-  for (const m of body.toLowerCase().replace(/ё/g, 'е').matchAll(NUM_DATE)) {
+  for (const m of body.toLowerCase().replace(/ё/g, 'е').matchAll(DATE_WORD)) {
     const w = m[2]
     if (!has(P.numWords, w.slice(0, Math.max(3, Math.min(6, w.length - 1))))) miss.push(w)
   }
   return miss
 }
 
-export function gradePoints(listText, protoText, protoName, fx) {
+// opts.replies — реплики двойника [{ name, text }] (для «не измерено» проверки мысли), opts.askedMore — агент хоть
+// раз спросил «Что ещё?» (Шаг 1); без них — самопроверка и разбор без песочницы.
+export function gradePoints(listText, protoText, protoName, fx, opts = {}) {
   const P = parseProtocol(protoText)
   const Lp = parsePoints(listText)
   const fails = []
   const warns = []
   const fail = (id, msg) => fails.push({ id, msg })
-  const short = (s) => (s.length > 70 ? s.slice(0, 67) + '…' : s)
 
   // шапка
-  if (!Lp.heading) fail('form', 'нет «# Пункты:»')
+  if (!Lp.heading) fail('form', Lp.headingLate ? `«# Пункты:» не первой строкой (первая: «${short(Lp.first)}»)` : 'нет «# Пункты:»')
   if (!Lp.src || !Lp.src.includes(protoName)) fail('form', `«> Источник:» не на протокол ${protoName}: ${Lp.src === null ? 'нет строки' : '«' + Lp.src + '»'}`)
   if (Lp.key === null) fail('form', 'нет «> Задача:»')
   else if (fx.key ? !Lp.key.includes(fx.key) : /[A-Z]{2,}-\d+/.test(Lp.key)) fail('form', `«> Задача: ${Lp.key}» — ждали ${fx.key || '«—»'}`)
   else if (!fx.key && !/^[—–-]$/.test(Lp.key)) warns.push(`«> Задача: ${Lp.key}» — по форме «—»`)
   if (!Lp.meet || !/по\s+памяти\s+аналитика/i.test(Lp.meet)) fail('form', '«> Встреча:» без «по памяти аналитика»')
-  else if (fx.fileDate && !Lp.meet.includes(fx.fileDate) && !/14\s+октябр/i.test(Lp.meet)) warns.push(`дата встречи в шапке не ${fx.fileDate}`)
+  else if (fx.fileDate && !Lp.meet.includes(fx.fileDate) && !(fx.dateRe && fx.dateRe.test(Lp.meet))) (fx.strictDate ? fail('date', `«> Встреча:» без даты ${fx.fileDate}`) : warns.push(`дата встречи в шапке не ${fx.fileDate}`))
+  const md = meetIssue(Lp.meet && '> Встреча: ' + Lp.meet, fx)
+  if (md) fail('date', `«> Встреча:» — ${md.join(', ')}: дату назвал аналитик (${fx.fileDate}), другого он не говорил`)
+  // Роли и имена шапки — из шапки протокола и слов аналитика (роль, которой не было на встрече, — красный).
+  // Только участники: дата и время сверяются выше предупреждением («14 октября» и «2026-10-14» — одно и то же).
+  const parts = Lp.meet && Lp.meet.match(/участники:\s*(.*)$/i)
+  if (parts) {
+    const h = groundCheck('участники: ' + parts[1].replace(/\d+/g, ' '), P.src, { header: true })
+    if (!h.ok) fail('grounding', `шапка «> Встреча:»: нет у аналитика ${h.missing.map((x) => `${x.kind} «${x.tok}»`).join(', ')}`)
+  }
   if (!Lp.items.length) fail('form', 'пунктов нет')
   if (Lp.stray.length) warns.push(`строк вне формы: ${Lp.stray.length} («${short(Lp.stray[0])}»)`)
 
@@ -379,20 +732,23 @@ export function gradePoints(listText, protoText, protoName, fx) {
     if (!KINDS.includes(it.kind)) fail('kind', `вид не из четырёх: «${short(it.raw)}»`)
     if (!it.Ls.length) fail('L', `без «· L<n>»: «${short(it.raw)}»`)
     else if (it.Ls.some((n) => n < 1 || n > nLines)) fail('L', `L${it.Ls.find((n) => n < 1 || n > nLines)} вне протокола (${nLines} строк): «${short(it.raw)}»`)
-    else if (it.kind === 'мысль' ? !it.Ls.some((n) => inBlock(n, true)) : !it.Ls.some((n) => entryLines.has(n) || inBlock(n, false))) lOff++
+    else if (THOUGHT.has(it.kind) ? !it.Ls.some((n) => inBlock(n, true)) : !it.Ls.some((n) => entryLines.has(n) || inBlock(n, false))) lOff++
   }
   if (lOff) warns.push(`L<n> не на свою строку (пункт итога, «Уточнить», ответ «моя мысль»): ${lOff}`)
 
   // пункт ↔ строка протокола. Пункт относится к одной строке — с наибольшим совпадением (L<n> добавляет вес); строка
   // «покрыта» любым пунктом, близким к ней. Короткий пункт к длинной строке: хватает трёх общих основ.
-  const factual = Lp.items.filter((it) => it.kind !== 'мысль')
+  const factual = Lp.items.filter((it) => !THOUGHT.has(it.kind))
   const match = matcher(P.entries)
   for (const it of factual) {
     let best = null; let bs = -1
     for (const e of P.entries) {
       const { k, ratio, atL } = match(e, it)
       if (!(ratio >= 0.4 || k >= 3 || (atL && k >= 1))) continue
-      const sc = ratio + (atL ? 0.3 : 0) + k * 0.01
+      // Своя ссылка на строку того же рода (`[решено]` → «решение:») весит больше: «[решено] лимит изменён · L42» —
+      // из решения L42, а не из строки «Уточнить» о новом значении того же лимита.
+      const fit = atL && ((it.kind === 'решено' && e.kind === 'решение') || (it.kind === 'сведение' && e.kind === 'сведение'))
+      const sc = ratio + (atL ? 0.3 : 0) + (fit ? 0.3 : 0) + k * 0.01
       if (sc > bs) { bs = sc; best = e }
     }
     it.asg = best
@@ -430,20 +786,18 @@ export function gradePoints(listText, protoText, protoName, fx) {
       const viaItog = P.entries.some((q) => (q.kind === 'открытый вопрос' || q.kind === 'вне рамок' || (q.kind === 'решение' && (q.undecided || q.unsure))) &&
         match.loose(e, q.E) >= 0.33 && open.some((it) => it.asg === q))
       // «Звучало ли это на встрече» (вопрос Шага 3 «звучало или ваша мысль») — покрыта и [мысль] о том же предмете.
-      const viaThought = SOUNDED.test(e.content) && Lp.items.some((it) => it.kind === 'мысль' && match.loose(e, it.I) >= 0.33)
+      const viaThought = SOUNDED.test(e.content) && Lp.items.some((it) => THOUGHT.has(it.kind) && match.loose(e, it.I) >= 0.33)
       if (!viaItem && !viaItog && !viaThought) fail('ask', `строка «Уточнить» не [открыто]: ${tag}`)
     }
     if (e.unsure && e.kind !== 'решение' && e.kind !== 'поручение' && !any(/не\s+уверен/i)) fail('unsure', `«не уверен» потерян: ${tag}`)
   }
 
-  // [решено]: кто решил и на что опирается
+  // [решено]: кто решил — по карточке (не по «принял» в итоге: итог пишет агент); на что опирается — по протоколу
   for (const it of Lp.items.filter((x) => x.kind === 'решено')) {
     const m = it.body.match(/решил[аи]?\s*:\s*(.+)$/i)
     if (!m || !wordsOf(m[1]).length || /^\s*[—–-]\s*$/.test(m[1])) { fail('decider', `[решено] без «решил:»: «${short(it.raw)}»`); continue }
-    const who = m[1].replace(/\([^)]*\)/g, ' ')
-    const names = capitalized(who)
-    const toks = names.length ? names.map(nameStem) : wordsOf(who).filter((w) => w.length >= 3).map((w) => w.slice(0, 5))
-    if (!toks.length || !toks.every((t) => P.sureBy.some((w) => w.startsWith(t)))) fail('decider', `«решил: ${who.trim()}» — не «принял» решения в итоге: «${short(it.raw)}»`)
+    const why = deciderIssue(it.body.slice(0, m.index).replace(/\s[—–-]+\s*$/, ''), m[1], fx, P.people)
+    if (why) fail('decider', `решивший не по карточке: ${why} — «${short(it.raw)}»`)
     const e = it.asg
     if (!e) fail('decided', `[решено] без опоры в итоге: «${short(it.raw)}»`)
     else if (e.kind === 'решение' && e.unsure) fail('unsure', `«не уверен» записан решением: «${short(it.raw)}» ← L${e.line}`)
@@ -455,13 +809,30 @@ export function gradePoints(listText, protoText, protoName, fx) {
 
   // мысли
   const m = P.blocks.filter((b) => b.thought).length
-  const thoughts = Lp.items.filter((it) => it.kind === 'мысль')
+  const thoughts = Lp.items.filter((it) => THOUGHT.has(it.kind))
   if (m === 0 && thoughts.length) fail('thought', `лишняя [мысль]: ответа «моя мысль» в протоколе нет — «${short(thoughts[0].raw)}»`)
   else if (m > 0 && !thoughts.length) fail('thought', `мысль потеряна: ответов «моя мысль» ${m}, [мысль] нет`)
   else if (thoughts.length > m) fail('thought', `лишняя [мысль]: ${thoughts.length} при ответах «моя мысль» ${m}`)
-  const said = P.blocks.some((b) => fx.ownThought.re.test(b.text))
+  // Мысль сказана — в строке `Аналитик:` или в «Заметках» (ответ Шага 0 текст 1.1.0 кладёт туда и пересказ).
+  const said = P.blocks.some((b) => fx.ownThought.re.test(b.text)) || fx.ownThought.re.test(P.notes)
   if (said && fx.list.thoughtItem && !thoughts.some((it) => fx.list.thoughtItem.test(it.body))) fail('thought', `мысль из карточки («${fx.ownThought.d}») не [мысль] в списке`)
-  for (const it of Lp.items.filter((x) => x.kind !== 'мысль' && fx.ownThought.re.test(x.body))) fail('thoughtAsFact', `мысль аналитика пунктом [${it.kind}]: «${short(it.raw)}»`)
+  for (const it of Lp.items.filter((x) => !THOUGHT.has(x.kind) && fx.ownThought.re.test(x.body))) fail('thoughtAsFact', `мысль аналитика пунктом [${it.kind}]: «${short(it.raw)}»`)
+  // Мысли из карточки в «Ответах» нет — проверка [мысль] выключена. Не молча: причина — отдельной строкой.
+  let thoughtUnmeasured = null
+  if (fx.list.thoughtItem && !said) {
+    const reps = opts.replies || []
+    const hit = reps.find((x) => fx.ownThought.re.test(x.text))
+    const d = `мысль из карточки («${fx.ownThought.d}»)`
+    if (hit) thoughtUnmeasured = `${d} двойник назвал (${hit.name}), а в «Ответах» протокола её нет — ответ записан не дословно; [мысль] не проверена`
+    else if (reps.length) thoughtUnmeasured = `${d} двойник не назвал${opts.askedMore === false ? ' — агент ни разу не спросил «Что ещё?» (Шаг 1), второй части пересказа не было' : ''}; [мысль] не проверена`
+    else thoughtUnmeasured = `${d} в «Ответах» нет, реплик двойника нет — назвал ли он её, не узнать; [мысль] не проверена`
+  }
+
+  // сторона решения по карточке: [решено] и [сведение] не утверждают обратного
+  for (const it of Lp.items.filter((x) => x.kind === 'решено' || x.kind === 'сведение')) {
+    const what = it.body.split(/\s[—–-]+\s*(решил[аи]?|со\s+слов|жд[её]т)(?![а-яё])/i)[0]
+    for (const a of fx.anchors || []) if (assertsAgainst(what, it.kind === 'решено' ? 'решение' : 'сведение', a)) fail('flip', `обратное карточке («${a.d}»): «${short(it.raw)}»`)
+  }
 
   // карточка: пробелы — [открыто]; поручения, не решённое, подсказки; опора имён и чисел
   for (const mo of fx.list.mustOpen) {
@@ -469,15 +840,16 @@ export function gradePoints(listText, protoText, protoName, fx) {
     if (inProto && !Lp.items.some((it) => it.kind === 'открыто' && mo.re.test(it.body))) fail('open', `пробел по карточке не [открыто]: ${mo.d}`)
   }
   for (const it of Lp.items) {
-    if (['решено', 'сведение', 'мысль'].includes(it.kind)) for (const er of fx.list.errands) if (er.re.every((re) => re.test(it.body))) fail('errand', `поручение «${er.d}» пунктом [${it.kind}]: «${short(it.raw)}»`)
+    if (['решено', 'сведение', 'мысль', 'набросок'].includes(it.kind)) for (const er of fx.list.errands) if (er.re.every((re) => re.test(it.body))) fail('errand', `поручение «${er.d}» пунктом [${it.kind}]: «${short(it.raw)}»`)
     if (it.kind === 'решено') for (const nd of fx.list.notDecided) if (nd.re.test(it.body)) fail('notDecided', `не решено по карточке — ${nd.d}: «${short(it.raw)}»`)
-    for (const c of fx.contamination) if (c.about.test(it.body) && c.bad.test(it.body) && !(c.unlessUnsure && (it.kind === 'открыто' || UNSURE.test(it.body)))) fail('hint', `подсказка — ${c.d}: «${short(it.raw)}»`)
-    const miss = ungrounded(it.body, P)
-    if (miss.length) fail('grounding', `нет в протоколе: ${miss.join(', ')} — «${short(it.raw)}»`)
+    for (const c of fx.contamination) if (!(c.skipThought && THOUGHT.has(it.kind)) && c.about.test(it.body) && c.bad.test(it.body) && !(c.unlessUnsure && (it.kind === 'открыто' || UNSURE.test(it.body)))) fail('hint', `подсказка — ${c.d}: «${short(it.raw)}»`)
+    const gi = groundIssues(it.body, it.body, P, fx)
+    if (gi.red.length) fail('grounding', `нет у аналитика (шапка, «Заметки», «Аналитик:»): ${gi.red.join(', ')} — «${short(it.raw)}»`)
+    if (gi.doc.length) warns.push(`число документа задачи: ${gi.doc.join(', ')} — «${short(it.raw)}»`)
   }
 
   const counts = Object.fromEntries(KINDS.map((k) => [k, Lp.items.filter((it) => it.kind === k).length]))
-  return { pass: fails.length === 0, fails, warns, counts, items: Lp.items.length, thoughtsInProto: m, thoughtSaid: said }
+  return { pass: fails.length === 0, fails, warns, counts, items: Lp.items.length, thoughtsInProto: m, thoughtSaid: said, thoughtUnmeasured }
 }
 
 // ---------- прогон одной песочницы ----------
@@ -511,13 +883,16 @@ export function gradeRun(dir, fx) {
     const near = pointsAll.filter((p) => dirname(p) === dirname(path)).sort()
     listPath = near.find((p) => basename(p) === basename(path).replace(/\.recall\.md$/, '.points.md')) || near[0] || null
   }
-  const lg = listPath ? gradePoints(read(listPath), read(path), basename(path), fx) : null
+  const tw = join(dir, '_twin')
+  const twinReplies = existsSync(tw) ? readdirSync(tw).filter((f) => /^reply-\d+\.txt$/.test(f)).sort().map((f) => ({ name: f, text: read(join(tw, f)).trim() })).filter((x) => x.text) : []
+  const answerFiles = readdirSync(dir).filter((f) => /^answer-\d+\.md$/.test(f))
+  const askedMore = answerFiles.length ? answerFiles.some((f) => /Что\s+(ещё|еще)/i.test(read(join(dir, f)))) : undefined
+  const lg = listPath ? gradePoints(read(listPath), read(path), basename(path), fx, { replies: twinReplies, askedMore }) : null
   const listElsewhere = pointsAll.filter((p) => p !== listPath).map((p) => relative(dir, p))
   const touched = Object.entries(fx.seedDocs).filter(([rel, src]) => !existsSync(join(dir, rel)) || read(join(dir, rel)) !== read(join(HERE, src))).map(([rel]) => rel)
   const extra = docs.filter((p) => !protos.includes(p) && !pointsAll.includes(p) && !Object.keys(fx.seedDocs).some((rel) => p.replace(/\\/g, '/').endsWith(rel)) && !/\.keep$/.test(p)).map((p) => relative(dir, p))
   // Ответы двойника — дословно в «Ответах»: сверяем первые 60 знаков каждой реплики после нормализации.
-  const tw = join(dir, '_twin')
-  const replies = existsSync(tw) ? readdirSync(tw).filter((f) => /^reply-\d+\.txt$/.test(f)).map((f) => read(join(tw, f)).trim()).filter(Boolean) : []
+  const replies = twinReplies.map((x) => x.text)
   const ans = g ? norm(g.answersText) : ''
   const verbatim = replies.filter((x) => ans.includes(norm(x).slice(0, 60))).length
   let cost = 0
@@ -535,9 +910,150 @@ export function gradeRun(dir, fx) {
     if (k !== undefined) stop = { at: k, after: lastTurn - k + 1, ok: lastTurn - k + 1 <= fx.stopTurns }
   }
   const step1Asked = fx.noStep1Re ? turns.some((t) => fx.noStep1Re.test(read(join(dir, `answer-${String(t).padStart(2, '0')}.md`)))) : false
-  const protoPass = !!(g && g.pass && touched.length === 0 && folderOk && (!stop || stop.ok))
+  const rc = runChecks(dir, fx, { path, listPath, protos, pointsAll, stop })
+  const protoPass = !!(g && g.pass && touched.length === 0 && folderOk && (!stop || stop.ok || fx.stopByEdit) && rc.fails.length === 0)
   const listPass = !!(lg && lg.pass)
-  return { path, g, listPath, lg, listElsewhere, touched, extra, replies: replies.length, verbatim, cost, folderOk, stop, step1Asked, protoPass, listPass, pass: protoPass && listPass }
+  return { path, g, listPath, lg, listElsewhere, touched, extra, replies: replies.length, verbatim, cost, folderOk, stop, step1Asked, rc, protoPass, listPass, pass: protoPass && listPass }
+}
+
+// Ходы прогона: ответ агента хода n — `answer-NN.md` (их нет — `answer.md` как ход 1); реплика аналитика хода n —
+// `_twin/reply-NN.txt`; записи файлов хода n — `tool_use` в `stream.jsonl` (ход 1) и `stream-NN.jsonl`: Write / Edit /
+// MultiEdit по `file_path`, Bash — по путям `meeting-*.recall.md` / `*.points.md` в команде (mv, cp, rm).
+export function readTurns(dir) {
+  const names = existsSync(dir) ? readdirSync(dir) : []
+  const answers = new Map()
+  for (const f of names.filter((x) => /^answer-\d+\.md$/.test(x))) answers.set(Number(f.match(/\d+/)[0]), read(join(dir, f)))
+  if (!answers.size && names.includes('answer.md')) answers.set(1, read(join(dir, 'answer.md')))
+  const replies = new Map()
+  const tw = join(dir, '_twin')
+  if (existsSync(tw)) for (const f of readdirSync(tw).filter((x) => /^reply-\d+\.txt$/.test(x))) replies.set(Number(f.match(/\d+/)[0]), read(join(tw, f)).trim())
+  const writes = []
+  for (const f of names.filter((x) => /^stream(-\d+)?\.jsonl$/.test(x))) {
+    const turn = /-\d+\./.test(f) ? Number(f.match(/\d+/)[0]) : 1
+    for (const l of read(join(dir, f)).split('\n')) {
+      let j; try { j = JSON.parse(l) } catch { continue }
+      const content = j && j.type === 'assistant' && j.message && Array.isArray(j.message.content) ? j.message.content : []
+      for (const c of content) {
+        if (!c || c.type !== 'tool_use' || !c.input) continue
+        if (typeof c.input.file_path === 'string' && /^(Write|Edit|MultiEdit)$/.test(c.name)) {
+          writes.push({ turn, tool: c.name, path: c.input.file_path, text: String(c.input.content || c.input.new_string || (c.input.edits || []).map((e) => e.new_string).join('\n')) })
+        } else if (c.name === 'Bash' && typeof c.input.command === 'string') {
+          for (const m of c.input.command.matchAll(/[^\s'"]*meeting-[^\s'"]*\.(recall|points)\.md/g)) writes.push({ turn, tool: 'Bash', path: m[0], text: '' })
+        }
+      }
+    }
+  }
+  return { answers, replies, writes }
+}
+
+const sha256 = (buf) => createHash('sha256').update(buf).digest('hex')
+// Строки 1..keep засеянного протокола — в конечном протоколе как были. Эталон — фикстура, если её отпечаток совпал с
+// `_seeded.sha256` песочницы (или отпечатка нет); фикстура поменялась после засева — отпечаток засева сверяется с
+// восстановленным началом протокола (строки 1..keep + `## Итог по памяти`). Возвращает { ok: true | false | null }.
+function seedIntact(dir, fx, protoAbs) {
+  const sp = fx.seedProto
+  const srcAbs = join(HERE, sp.src)
+  const out = existsSync(protoAbs) ? read(protoAbs).split('\n') : []
+  let recorded = null
+  const shaFile = join(dir, '_seeded.sha256')
+  if (existsSync(shaFile)) {
+    for (const l of read(shaFile).split('\n')) {
+      const m = l.match(/^([0-9a-f]{64})\s+\*?(?:\.\/)?(.+?)\s*$/)
+      if (m && m[2].replace(/\\/g, '/') === sp.rel) recorded = m[1]
+    }
+  }
+  if (existsSync(srcAbs) && (!recorded || sha256(readFileSync(srcAbs)) === recorded)) {
+    const seed = read(srcAbs).split('\n').slice(0, sp.keep)
+    const i = seed.findIndex((l, k) => out[k] !== l)
+    return i < 0 ? { ok: true } : { ok: false, line: i + 1, was: seed[i], now: out[i] === undefined ? '(строки нет)' : out[i] }
+  }
+  if (recorded) {
+    const head = [...out.slice(0, sp.keep), '## Итог по памяти']
+    for (const eol of ['\n', '\r\n']) for (const end of ['', eol]) if (sha256(Buffer.from(head.join(eol) + end, 'utf8')) === recorded) return { ok: true }
+  }
+  return { ok: null, why: 'засев в фикстуре изменился после прогона и отпечаток не сошёлся — старые строки сверить не с чем' }
+}
+
+const DATED = /meeting-(\d{4}-\d{2}-\d{2})[^/\\]*\.(recall|points)\.md$/
+// Проверки по песочнице, которых не видно в самих файлах: дата в именах и в трассе записи (`strictDate`), засеянный
+// протокол (`seedProto`), ход продолжения (`cont`), строка «по правке» (`byEdit`). fails — красный, warns —
+// предупреждения, byEdit — расхождения с правкой (в счёт не идут), unmeasured — «не измерено».
+function runChecks(dir, fx, { path, listPath, protos, pointsAll, stop }) {
+  const out = { fails: [], warns: [], byEdit: [], unmeasured: [] }
+  const needT = fx.strictDate || fx.cont || fx.byEdit
+  const T = needT ? readTurns(dir) : null
+  const rel = (p) => relative(dir, p).replace(/\\/g, '/')
+  if (fx.strictDate) {
+    for (const p of [...protos, ...pointsAll]) { const m = basename(p).match(DATED); if (m && m[1] !== fx.fileDate) out.fails.push(`файл с датой не от аналитика: ${rel(p)} (назвал ${fx.fileDate})`) }
+    const seen = new Set()
+    for (const w of T.writes) {
+      const m = w.path.replace(/\\/g, '/').match(DATED)
+      if (!m || m[1] === fx.fileDate || seen.has(w.path)) continue
+      seen.add(w.path)
+      out.fails.push(`в трассе — файл с датой не от аналитика: ${w.tool} ${basename(w.path)} (ход ${w.turn})`)
+    }
+  }
+  if (fx.seedProto) {
+    const abs = join(dir, fx.seedProto.rel)
+    for (const p of protos) if (p !== abs) out.fails.push(`новый протокол вместо засеянного: ${rel(p)}`)
+    if (!existsSync(abs)) out.fails.push(`засеянного протокола нет: ${fx.seedProto.rel}`)
+    else {
+      const n = (read(abs).match(/^## Итог по памяти\s*$/gm) || []).length
+      if (n !== 1) out.fails.push(`строк «## Итог по памяти»: ${n}`)
+      const s = seedIntact(dir, fx, abs)
+      if (s.ok === false) out.fails.push(`строка L${s.line} засева изменена: «${short(s.was)}» → «${short(s.now)}»`)
+      else if (s.ok === null) out.unmeasured.push(`старые строки протокола: ${s.why}`)
+    }
+  }
+  if (fx.cont) {
+    const turns = [...T.answers.keys()].sort((a, b) => a - b)
+    for (const r of fx.cont.restart) {
+      const hit = turns.filter((t) => r.re.test(T.answers.get(t)))
+      if (hit.length) out.warns.push(`${r.d} задан (ход ${hit.join(', ')}) — продолжение начато заново`) // 2026-10-16: по критерию раунда — лишняя работа, не ложь
+
+    }
+    const again = turns.filter((t) => fx.cont.again.re.test(T.answers.get(t)))
+    if (again.length) out.warns.push(`${fx.cont.again.d} (ход ${again.join(', ')}) — сказанное переспросили`)
+    if (turns.length && !fx.cont.first.re.test(T.answers.get(turns[0]))) out.warns.push(`ход ${turns[0]}: ${fx.cont.first.d} — нет`)
+    if (turns.length && !turns.some((t) => fx.cont.step4.re.test(T.answers.get(t)))) out.warns.push(`${fx.cont.step4.d} не задан`)
+  }
+  if (fx.byEdit) {
+    const be = fx.byEdit
+    const repl = [...T.replies.entries()].sort((a, b) => a[0] - b[0])
+    const ans = (t) => T.answers.get(t) || ''
+    const isItog = (t) => /Записать/.test(t) && /Поправить/.test(t)
+    // E6+8, баг 11: протокол создаётся в ходе после реплики с датой, ответ Шага 0 (пересказ) — в той же записи.
+    const dateTurn = (repl.find(([, t]) => be.dateReplyRe.test(t)) || [])[0]
+    const pw = T.writes.filter((w) => /\.recall\.md$/.test(w.path))
+    const firstW = pw.length ? Math.min(...pw.map((w) => w.turn)) : undefined
+    if (dateTurn === undefined) out.byEdit.push('E6+8 (баг 11): даты в репликах аналитика нет — вопрос о дате не задан')
+    else if (firstW === undefined) out.byEdit.push('E6+8 (баг 11): записи протокола в трассе нет — порядок не проверить')
+    else if (firstW < dateTurn) out.byEdit.push(`E6+8 (баг 11): протокол записан до даты — ход ${firstW}, дата пришла в ходе ${dateTurn}`)
+    else if (firstW > dateTurn) out.byEdit.push(`E6+8 (баг 11): ответ Шага 0 записан не сразу — протокол в ходе ${firstW}, дата — в ходе ${dateTurn}`)
+    else if (!pw.filter((w) => w.turn === dateTurn).some((w) => be.recapRe.test(w.text))) out.byEdit.push(`E6+8 (баг 11): в записи хода ${dateTurn} пересказа нет`)
+    // E6+8, баг 6: пересказ из ответа Шага 0 — в «Ответах», раздела «Заметки» нет (заметок не вели).
+    if (path) {
+      const text = read(path)
+      const s = sections(text)
+      const notes = sec(s, 'Заметки')
+      const P = parseProtocol(text)
+      if (notes !== null && be.recapRe.test(notes)) out.byEdit.push('E6+8 (баг 6): пересказ — в «Заметках аналитика», а не в «Ответах»')
+      else if (notes !== null) out.byEdit.push('E6+8 (баг 6): раздел «Заметки аналитика» есть, а заметок аналитик не вёл')
+      if (!P.blocks.some((b) => be.recapRe.test(b.text))) out.byEdit.push('E6+8 (баг 6): пересказа нет в «Ответах» (`Аналитик:`)')
+    }
+    // E7, баг 7: «всё» после «Что ещё?» — конец пересказа (дальше «Понял так»); «давай закончим» — сразу итог, без Шага 4.
+    const vse = (repl.find(([, t]) => /^\s*вс[её][.!]?\s*$/i.test(t)) || [])[0]
+    if (vse !== undefined) {
+      if (isItog(ans(vse))) out.byEdit.push(`E7 (баг 7): после «всё» (ход ${vse}) — сразу итог, а не темы`)
+      else if (!/Понял так/i.test(ans(vse))) out.byEdit.push(`E7 (баг 7): после «всё» (ход ${vse}) — нет «Понял так: обсуждали»`)
+    }
+    if (stop) {
+      const s4 = [...T.answers.keys()].filter((t) => t >= stop.at && /Вспомните конец встречи/i.test(ans(t)))
+      if (s4.length) out.byEdit.push(`E7 (баг 7): после «закончим» (ход ${stop.at}) — вопрос Шага 4 (ход ${s4.join(', ')})`)
+      else if (!isItog(ans(stop.at))) out.byEdit.push(`E7 (баг 7): после «закончим» (ход ${stop.at}) итога в следующем ходе нет`)
+    } else out.byEdit.push('E7 (баг 7): «давай закончим» в репликах нет — проверить нечего')
+  }
+  return out
 }
 
 // ---------- самопроверка ----------
@@ -555,7 +1071,7 @@ const GOOD = {
 
 ## Ответы
 Вопрос: Расскажите всё, что помните.
-Аналитик: Обсуждали лист ожидания на групповые занятия.
+Аналитик: Обсуждали лист ожидания на групповые занятия, когда мест нет, — приняла Анна Морозова. Первому в очереди пуш, 30 минут на подтверждение, потом место следующему. SMS не делаем, только пуш. Лимит у листа будет, какое число — не помню, кто принял — не помню. Нужен ли лист на платных занятиях, Анна уточнит у финансового директора. Денис Ткач оценит доработку пушей. Сейчас запись отменяют примерно на 15% занятий. Решили ли закрывать лист за 2 часа до начала — не помню.
 
 ## Итог по памяти
 
@@ -575,10 +1091,11 @@ const GOOD = {
 
 > Источник: память аналитика, расшифровки нет
 > Задача: MED-77 · документ: docs/MED-77/business_requirements.md
+> Встреча: 2026-10-14 15:00–15:45 · онлайн, Teams · участники: главный врач (заказчик) — Зайцева Ольга; страховой отдел — Ким Сергей; разработчик — Гусев Павел
 
 ## Ответы
 Вопрос: Расскажите всё, что помните.
-Аналитик: Срок отмены сократили до 12 часов.
+Аналитик: Срок отмены сократили до 12 часов, было 24 — утвердила Ольга Зайцева. Лимит отмен в месяц поменяли, на сколько — не помню. По ДМС ждём Сергея Кима. Колл-центр не трогаем. Павел Гусев проверит, где хранится счётчик отмен.
 
 ## Итог по памяти
 
@@ -597,10 +1114,11 @@ const GOOD = {
 
 > Источник: память аналитика, расшифровки нет
 > Задача: ключа нет · документ: нет
+> Встреча: 2026-10-14 16:00–16:30 · переговорка «Тайга» · участники: юрист — Белова Ирина; маркетинг — Осипов Глеб
 
 ## Ответы
 Вопрос: (строка вызова)
-Аналитик: Решили, что галочку согласия на рассылку при регистрации по умолчанию не ставим.
+Аналитик: Решили, что галочку согласия на рассылку при регистрации по умолчанию не ставим — это сказала юрист Белова. Текст согласия пришлёт Белова. Ещё обсуждали, сколько хранить согласия, но до чего договорились — не помню. Глеб хотел рассылку раз в неделю, но Ирина сказала, что частоту решает маркетинг.
 
 ## Итог по памяти
 
@@ -618,7 +1136,7 @@ const GOOD = {
 // Эталоны для списка — настоящие зелёные протоколы прошлых прогонов (meeting-recall 1.0.0, форма итога та же):
 // NEW — runs/2026-10-14-rec-r2-new/rec-new/run-3, CHG — runs/2026-10-14-rec-r2-chg/rec-chg/run-2,
 // INLINE — runs/2026-10-14-rec-r2-inline/rec-inline/run-1. Номера строк L<n> в списках ниже — по ним.
-const REF = {
+export const REF = {
   NEW: `# Встреча по памяти: Лист ожидания на групповые занятия — требования
 
 > Источник: память аналитика, расшифровки нет
@@ -956,7 +1474,7 @@ const R1_NEW_LIST = `# Пункты: Лист ожидания на группо
 `
 
 // Эталонные списки — по таблице Шага 5 из протоколов выше; ожидания — по карточкам двойника.
-const REF_LIST = {
+export const REF_LIST = {
   NEW: `# Пункты: Лист ожидания на групповые занятия — требования
 > Источник: docs/FIT-412/meeting-2026-10-14.recall.md
 > Задача: FIT-412
@@ -1005,6 +1523,13 @@ function selftest() {
   let bad = 0
   const ck = (name, got, want) => { const ok = got === want; if (!ok) bad++; console.log(`  ${ok ? 'ok ' : 'FAIL'} ${name}: ${got}${ok ? '' : ' (ждали ' + want + ')'}`) }
   const add = (t, line) => t.replace('## Уточнить у участников', line + '\n\n## Уточнить у участников')
+  console.log('КАРТОЧКА: принявшие и стороны решений взяты из twin-card.md дословно')
+  for (const k of Object.keys(FX)) {
+    const card = read(join(HERE, 'fixtures', FX[k].fixture, 'twin-card.md'))
+    const quotes = [...(FX[k].deciders || []), ...(FX[k].anchors || []), ...(FX[k].notDecidedProto || []), ...(FX[k].noWait || []), ...(FX[k].mustUnsure || [])].map((x) => x.card)
+    const lost = quotes.filter((q) => !card.includes(q))
+    ck(`${k}: ${quotes.length} цитат в карточке`, lost.length ? 'нет: ' + lost.join(' | ') : 'все', 'все')
+  }
   console.log('NEW')
   const n = GOOD.NEW; const fxN = FX.NEW
   ck('эталон — зелёный', gradeProtocol(n, fxN).pass, true)
@@ -1209,21 +1734,55 @@ function selftest() {
 // Запуск из командной строки; импорт (`gradePoints` при отладке) прогона не запускает.
 if (basename(process.argv[1] || '') === 'grade-recall.mjs') main()
 
+// «НЕ ИЗМЕРЕНО» — только отказ API (сообщение CLI в ответе хода или в потоке, `_api-failure.txt` раннера), отказ
+// двойника (его `claude -p` без ответа) или CLI стенда, который не запустился. Пустой ход, обрыв без такого
+// признака, прогон без `answer.md` — измерены: грейдятся файлы, нет файлов — красный «файл не записан».
+// Возвращает причину или null.
+function isApiText(t) { return t.length < 600 ? RE_API_FAILURE.test(t) : RE_API_FAILURE.test(t.slice(0, 200)) }
+function firstLine(t) { return short(String(t).trim().split('\n')[0] || '') }
+export function apiFailure(dir) {
+  if (existsSync(join(dir, '_api-failure.txt'))) return 'отказ API: ' + firstLine(read(join(dir, '_api-failure.txt')))
+  const names = existsSync(dir) ? readdirSync(dir) : []
+  for (const f of names.filter((x) => /^answer(-\d+)?\.md$/.test(x)).sort()) {
+    const t = read(join(dir, f)).trim()
+    if (t && isApiText(t)) return `отказ API в ${f}: ${firstLine(t)}`
+  }
+  for (const f of names.filter((x) => /^stream(-\d+)?\.jsonl$/.test(x)).sort()) {
+    for (const l of read(join(dir, f)).split('\n')) {
+      let j; try { j = JSON.parse(l) } catch { continue }
+      if (j && j.type === 'result' && (j.is_error || j.subtype !== 'success') && (j.api_error_status || RE_API_FAILURE.test(String(j.result || '')))) return `отказ API в ${f}: ${firstLine(String(j.result || j.api_error_status))}`
+    }
+  }
+  const tw = join(dir, '_twin')
+  if (existsSync(tw)) {
+    for (const f of readdirSync(tw).filter((x) => /^reply-\d+\.txt$/.test(x)).sort()) {
+      if (read(join(tw, f)).trim()) continue
+      const jf = join(tw, f.replace(/^reply-(\d+)\.txt$/, 'twin-$1.json'))
+      let why = 'ответа нет'
+      if (existsSync(jf)) { try { const j = JSON.parse(read(jf)); why = j.is_error ? firstLine(String(j.result || 'is_error')) : why } catch { why = 'ответ не JSON' } }
+      return `отказ двойника (${f}): ${why}`
+    }
+  }
+  const err = join(dir, '_stderr.log')
+  if (existsSync(err) && /claude(\.exe)?:?\s*(command\s+)?not\s+found|claude[^\n]*is not recognized|spawn\s+claude\S*\s+ENOENT/i.test(read(err))) return 'отказ стенда: CLI не запустился (_stderr.log)'
+  return null
+}
+
 function main() {
   const arg = process.argv[2]
   if (arg === '--selftest') selftest()
   const fxName = process.argv[process.argv.indexOf('--fx') + 1]
   const fx = FX[fxName]
-  if (!arg || !existsSync(arg) || !fx) { console.error('usage: node grade-recall.mjs <каталог с песочницами> --fx NEW|CHG|INLINE | --selftest'); process.exit(1) }
+  if (!arg || !existsSync(arg) || !fx) { console.error('usage: node grade-recall.mjs <каталог с песочницами> --fx NEW|CHG|INLINE|FINISH|CONT | --selftest'); process.exit(1) }
   const runs = readdirSync(arg).filter((n) => /^run-\d+$/.test(n) && statSync(join(arg, n)).isDirectory()).sort()
   console.log(`\nпроба rec-${fxName.toLowerCase()}, ${arg}`)
-  let measured = 0; let green = 0; let protoGreen = 0; let listGreen = 0; let total = 0
+  let measured = 0; let green = 0; let protoGreen = 0; let listGreen = 0; let total = 0; let unmeasuredThought = 0; let byEditOff = 0
   for (const n of runs) {
     const dir = join(arg, n)
-    const ansPath = join(dir, 'answer.md')
-    const ans = existsSync(ansPath) ? readFileSync(ansPath, 'utf8') : ''
-    if (existsSync(join(dir, '_api-failure.txt')) || existsSync(join(dir, '_api-failure-turn.txt')) || !ans.trim() || RE_API_FAILURE.test(ans.slice(0, 300))) { console.log(`  ${n}: НЕ ИЗМЕРЕНО`); continue }
+    const api = apiFailure(dir)
+    if (api) { console.log(`  ${n}: НЕ ИЗМЕРЕНО · ${api}`); continue }
     measured++
+    const cut = existsSync(join(dir, '_api-failure-turn.txt')) ? firstLine(read(join(dir, '_api-failure-turn.txt'))) : null
     const r = gradeRun(dir, fx)
     total += r.cost
     if (r.pass) green++
@@ -1235,7 +1794,9 @@ function main() {
     const notes = [
       `ходов: ${turns}, $${r.cost.toFixed(2)}`,
       `протокол ${r.protoPass ? 'зелёный' : 'КРАСНЫЙ'}, список ${r.listPass ? 'зелёный' : 'КРАСНЫЙ'}`,
-      !r.path && 'ПРОТОКОЛА НЕТ',
+      !r.path && 'ФАЙЛ НЕ ЗАПИСАН: протокола нет',
+      cut && `обрыв без отказа API: ${cut}`,
+      g && g.fails.length && 'ПРОТОКОЛ: ' + g.fails.map((f) => `${f.id}: ${f.msg}`).join(' · '),
       g && !g.sections.answers && 'нет раздела «Ответы»',
       g && !g.sections.itog && 'нет раздела «Итог по памяти»',
       g && !g.sections.ask && 'нет раздела «Уточнить у участников»',
@@ -1243,29 +1804,40 @@ function main() {
       g && Object.entries(g.contamination).filter(([, v]) => v).map(([k, v]) => `ПОДСКАЗКА ${fx.contamination.find((c) => c.id === k).d}: «${v}»`).join(' · '),
       g && g.ownThought && `МЫСЛЬ АНАЛИТИКА В ИТОГЕ: «${g.ownThought}»`,
       g && fx.ask.filter((a) => !g.ask[a.id]).map((a) => 'НЕТ: ' + a.d).join(' · '),
+      g && (fx.askIf || []).filter((a) => !g.askIf[a.id]).map((a) => 'НЕТ: ' + a.d + ' (спросили — «не помню»)').join(' · '),
+      r.rc.fails.length && 'ПРОГОН: ' + r.rc.fails.join(' · '),
       r.touched.length && 'ДОКУМЕНТ ЗАДАЧИ ТРОНУТ: ' + r.touched.join(', '),
       !r.folderOk && `ПРОТОКОЛ НЕ В ТОЙ ПАПКЕ: ${r.path ? relative(dir, r.path) : '—'}`,
-      r.stop && (r.stop.ok ? `закончить попросили на ходу ${r.stop.at}, ходов после: ${r.stop.after}` : `ПОСЛЕ «ЗАКОНЧИМ» (ход ${r.stop.at}) ЕЩЁ ${r.stop.after} ХОДОВ`),
-      fx.stopRe && !r.stop && 'закончить не просили (до вопроса о сроке хранения не дошло)',
+      r.stop && (r.stop.ok || fx.stopByEdit ? `закончить попросили на ходу ${r.stop.at}, ходов после: ${r.stop.after}` : `ПОСЛЕ «ЗАКОНЧИМ» (ход ${r.stop.at}) ЕЩЁ ${r.stop.after} ХОДОВ`),
+      fx.stopRe && !r.stop && 'закончить не просили (двойник не дошёл до просьбы)',
       r.path && !r.listPath && (r.listElsewhere.length ? `СПИСОК НЕ В ПАПКЕ ПРОТОКОЛА: ${r.listElsewhere.join(', ')}` : 'СПИСКА НЕТ'),
-      lg && `список: ${Object.entries(lg.counts).map(([k, v]) => `${k} ${v}`).join(', ')}; «моя мысль» в протоколе: ${lg.thoughtsInProto}${lg.thoughtSaid ? '' : ' (мысль из карточки двойник не назвал)'}`,
+      lg && `список: ${Object.entries(lg.counts).map(([k, v]) => `${k} ${v}`).join(', ')}; «моя мысль» в протоколе: ${lg.thoughtsInProto}`,
       lg && lg.fails.length && 'СПИСОК: ' + lg.fails.map((f) => `${f.id}: ${f.msg}`).join(' · '),
     ].filter(Boolean)
     const warns = [
       g && !g.source && 'нет строки «> Источник: память аналитика»',
-      r.path && !r.path.includes(fx.fileDate) && `дата в имени не ${fx.fileDate}: ${relative(dir, r.path)}`,
-      r.listPath && !basename(r.listPath).includes(fx.fileDate) && `дата в имени списка не ${fx.fileDate}: ${relative(dir, r.listPath)}`,
+      !fx.strictDate && r.path && !r.path.includes(fx.fileDate) && `дата в имени не ${fx.fileDate}: ${relative(dir, r.path)}`,
+      !fx.strictDate && r.listPath && !basename(r.listPath).includes(fx.fileDate) && `дата в имени списка не ${fx.fileDate}: ${relative(dir, r.listPath)}`,
       r.listPath && r.listElsewhere.length && 'ещё списки: ' + r.listElsewhere.join(', '),
       r.replies && r.verbatim < r.replies && `дословно в «Ответах» ${r.verbatim}/${r.replies} реплик двойника`,
       g && fx.askWarn.filter((a) => !g.askWarn[a.id]).map((a) => 'нет: ' + a.d).join(' · '),
       r.extra.length && 'лишние файлы в docs/: ' + r.extra.join(', '),
       r.step1Asked && 'пересказ был в строке вызова, а вопрос «расскажите всё» задан',
+      g && g.warns.length && 'протокол: ' + g.warns.join(' · '),
       lg && lg.warns.length && 'список: ' + lg.warns.join(' · '),
+      r.rc.warns.length && r.rc.warns.join(' · '),
     ].filter(Boolean)
-    console.log(`  ${n}: ${r.pass ? 'зелёный' : 'красный'}  · ${notes.join(' · ')}${warns.length ? '\n         предупреждения: ' + warns.join(' · ') : ''}`)
+    const unm = [lg && lg.thoughtUnmeasured, ...r.rc.unmeasured].filter(Boolean)
+    if (lg && lg.thoughtUnmeasured) unmeasuredThought++
+    if (r.rc.byEdit.length) byEditOff++
+    // «по правке» — ожидания по черновику правок (E6+8, E7): на текущем тексте скилла расходятся, это не ложь, в счёт не идёт.
+    const be = fx.byEdit ? '\n         по правке: ' + (r.rc.byEdit.length ? r.rc.byEdit.join(' · ') : 'как по правке E6+8 и E7') : ''
+    console.log(`  ${n}: ${r.pass ? 'зелёный' : 'красный'}  · ${notes.join(' · ')}${warns.length ? '\n         предупреждения: ' + warns.join(' · ') : ''}${unm.map((u) => '\n         не измерено: ' + u).join('')}${be}`)
   }
-  console.log(`\n  ${protoGreen}/${measured}\tпротокол — по форме, помнит ≥${fx.minRemembered}/${fx.remembered.length}, без подсказок и мысли аналитика, пробел в «Уточнить»`)
-  console.log(`  ${listGreen}/${measured}\tсписок — рядом, по таблице Шага 5, без поручений, «не уверен» и мысль не потеряны, опора в протоколе`)
+  console.log(`\n  ${protoGreen}/${measured}\tпротокол — по форме, помнит ≥${fx.minRemembered}/${fx.remembered.length}, без подсказок и мысли аналитика, пробел в «Уточнить»; принявший и сторона — по карточке; опора итога — слова аналитика`)
+  console.log(`  ${listGreen}/${measured}\tсписок — рядом, по таблице Шага 5, без поручений, «не уверен» и мысль не потеряны; принявший и сторона — по карточке; опора — слова аналитика`)
   console.log(`  ${green}/${measured}\tзелёных — протокол и список вместе  ← КРИТЕРИЙ`)
+  if (fx.byEdit) console.log(`  ${byEditOff}/${measured}\tрасходятся с правкой E6+8 / E7 (баги 6, 7, 11) — строкой «по правке:» у прогона, в счёт не идёт`)
+  if (fx.list.thoughtItem) console.log(`  ${unmeasuredThought}/${measured}\tпроверка [мысль] из карточки не измерена (причина — строкой «не измерено:» у прогона)`)
   console.log(`  стоимость плеча: $${total.toFixed(2)}\n`)
 }
