@@ -223,6 +223,24 @@ case "$PROBE" in
   # `chb-s-idk` — на звено тел INT-2 «не знаю», пометок у INT-2 нет (читать парой). Грейдер — `grade-id.mjs`, таблица SCEN.
   chb-s-mmd)   FIXTURE=ID-CHB;  PROMPT_FILE=mmd-prompt.txt;        SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt;  TURN3_FILE=s-turn2.txt;   TURNS_CAP=3 ;;
   chb-s-idk)   FIXTURE=ID-CHB;  PROMPT_FILE=mmd-prompt.txt;        SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt;  TURN3_FILE=idk-turn2.txt; TURNS_CAP=3 ;;
+  # Путь пользователя по БТ (скилл 5.1.0, `PLAN-ID-CORE.md` §8.2), фикстура `ID-BT`: тип один, формат назван — ход 1 —
+  # список прочтения и вопросы (порядок, вторая ветка, конец ответвления), ход 2 — реплика и файл `user_flow.*`.
+  # `bt-uf-idk` — «Не знаю.», `bt-uf-y` — «Да, всё верно.» (гипотезы скилла). Грейдер — `grade-uf.mjs`.
+  bt-uf-mmd)   FIXTURE=ID-BT;   PROMPT_FILE=mmd-prompt.txt;        SKILL=interaction-diagram; TURN2_FILE=s-turn2.txt;   TURNS_CAP=2 ;;
+  bt-uf-puml)  FIXTURE=ID-BT;   PROMPT_FILE=puml-prompt.txt;       SKILL=interaction-diagram; TURN2_FILE=s-turn2.txt;   TURNS_CAP=2 ;;
+  bt-uf-idk)   FIXTURE=ID-BT;   PROMPT_FILE=mmd-prompt.txt;        SKILL=interaction-diagram; TURN2_FILE=idk-turn2.txt; TURNS_CAP=2 ;;
+  bt-uf-y)     FIXTURE=ID-BT;   PROMPT_FILE=mmd-prompt.txt;        SKILL=interaction-diagram; TURN2_FILE=yes-turn2.txt; TURNS_CAP=2 ;;
+  # Список пунктов (скилл 5.2.0, `PLAN-ID-CORE.md` §8.3), фикстура `ID-PT`: типов два — ход 1 — вопрос о типе, ход 2 — тип
+  # (TURN2_FILE) и вопросы, ход 3 — реплика (TURN3_FILE) и файл `<основа списка>.interaction_diagram.md` / `.user_flow.puml`.
+  # `pt-raw` — `interaction-diagram` дали ноут вместо списка, `pt-nb` — схему просят у `analyst-notebook`: отсылка одним
+  # ходом, файла нет. Грейдер — `grade-pt.mjs`.
+  pt-sh-mmd)   FIXTURE=ID-PT;   PROMPT_FILE=sh-mmd-prompt.txt;     SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=sh-s-turn2.txt;  TURNS_CAP=3 ;;
+  pt-sh-idk)   FIXTURE=ID-PT;   PROMPT_FILE=sh-mmd-prompt.txt;     SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=idk-turn2.txt;   TURNS_CAP=3 ;;
+  pt-sh-no)    FIXTURE=ID-PT;   PROMPT_FILE=sh-mmd-prompt.txt;     SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=no-turn2.txt;    TURNS_CAP=3 ;;
+  pt-uf-puml)  FIXTURE=ID-PT;   PROMPT_FILE=uf-puml-prompt.txt;    SKILL=interaction-diagram; TURN2_FILE=type-uf-turn2.txt;    TURN3_FILE=uf-s-turn2.txt;  TURNS_CAP=3 ;;
+  pt-uf-idk)   FIXTURE=ID-PT;   PROMPT_FILE=uf-puml-prompt.txt;    SKILL=interaction-diagram; TURN2_FILE=type-uf-turn2.txt;    TURN3_FILE=idk-turn2.txt;   TURNS_CAP=3 ;;
+  pt-raw)      FIXTURE=ID-PT;   PROMPT_FILE=raw-prompt.txt;        SKILL=interaction-diagram ;;
+  pt-nb)       FIXTURE=ID-PT;   PROMPT_FILE=nb-prompt.txt;         SKILL=analyst-notebook ;;
   # ПЕРВЫЙ ХОД на богатом входе: то же БТ и те же карточки сервисов, что у ts-conv, но ответов
   # аналитика в промпте НЕТ — агент обязан спрашивать сам. Заведена 2026-08-26 под жалобу с
   # прода: варианты ответа мудрёные именно на подробном входе, а все существующие плечи спеки
@@ -587,7 +605,7 @@ case "$PROBE" in
   nb-big-export) FIXTURE=NB-BIG; PROMPT_FILE=w-prompt-export.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2-export.txt; TURNS_CAP=3; IDLE_MAX=3; DONE_RE='/notes/[^/]+/notebook-20[0-9][0-9]-[0-9][0-9]-[0-9][0-9](-2)?\.points\.md$'; MEET_ENV=1 ;;
   nb-big-view)   FIXTURE=NB-BIG; PROMPT_FILE=w-prompt-view.txt;   SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2-view.txt;   TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/[^/]*-20[0-9][0-9]-[0-9][0-9]-[0-9][0-9](-2)?\.md$'; MEET_ENV=1 ;;
   nb-twin)    FIXTURE=NB-TWIN;    PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=6; IDLE_MAX=6; DONE_GREP='получател'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-objector.md; MEET_ENV=1 ;;
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q sq-audit meet-vac meet-acc meet-long meet-new meet-rew meet-chg meet-cr jm-br-vac jm-br-long jm-br-new jm-ts-acc jm-ts-rew rec-new rec-chg rec-inline nb-new nb-thought nb-contra nb-noauth nb-file nb-view-api nb-view-chat nb-dispute nb-answer nb-ask nb-long nb-view-part meet-out ni-vac ni-acc ni-new ni-chg ni-cr ni-rew ni-mr-new ni-mr-chg ni-nb-in ni-nb-ans ni-nb-pick nb-pts-in nb-pts-new nb-pts-rec nb-export nb-export-since nb-route nb-desc-one nb-desc-two nb-auto"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk bt-uf-mmd bt-uf-puml bt-uf-idk bt-uf-y pt-sh-mmd pt-sh-idk pt-sh-no pt-uf-puml pt-uf-idk pt-raw pt-nb ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q sq-audit meet-vac meet-acc meet-long meet-new meet-rew meet-chg meet-cr jm-br-vac jm-br-long jm-br-new jm-ts-acc jm-ts-rew rec-new rec-chg rec-inline nb-new nb-thought nb-contra nb-noauth nb-file nb-view-api nb-view-chat nb-dispute nb-answer nb-ask nb-long nb-view-part meet-out ni-vac ni-acc ni-new ni-chg ni-cr ni-rew ni-mr-new ni-mr-chg ni-nb-in ni-nb-ans ni-nb-pick nb-pts-in nb-pts-new nb-pts-rec nb-export nb-export-since nb-route nb-desc-one nb-desc-two nb-auto"; exit 1 ;;
 esac
 
 SKILL_DIR="${SKILL_DIR:-$HERE/../$SKILL}"
@@ -707,7 +725,7 @@ rm -rf "$SEED"; mkdir -p "$SEED"
 # `KEY.md` — ключ пробы `sr-verify`: по каждому вопросу сказано, отвечает ли спека. Засеянный в
 # песочницу, он превращает замер в списывание: прогон закроет ровно то, что в ключе, и «закрыто
 # 12 из 40» будет означать «прочитал ответы», а не «нашёл их в спеке».
-( cd "$SEED_SRC" && tar cf - --exclude=README.md --exclude='*-prompt.txt' --exclude='*-turn2.txt' --exclude=_manifest.txt --exclude=expected.md --exclude=KEY.md --exclude=stubs --exclude=PROVENANCE.txt . ) | ( cd "$SEED" && tar xf - )
+( cd "$SEED_SRC" && tar cf - --exclude=README.md --exclude='*-prompt.txt' --exclude='*-turn2.txt' --exclude=_manifest.txt --exclude=expected.md --exclude=KEY.md --exclude=stubs --exclude=PROVENANCE.txt --exclude='truth-*.json' . ) | ( cd "$SEED" && tar xf - )
 
 echo "проба: $PROBE   фикстура: $FIXTURE   скилл: $SKILL"
 STUBS_DIR=""
@@ -800,7 +818,7 @@ bash "$POOL" "$SNAP" "$PROMPT" "$ROUND/$PROBE" "$N" "$CONC" "$SEED" "$STUBS_DIR"
 # ВНИМАНИЕ: список материала стенда выписан ДВАЖДЫ — здесь и в исключениях `tar` при засеве выше.
 # Добавляешь имя — добавляй в оба места. 2026-08-18: `expected.md` добавили только в засев, и
 # караул тут же дал ложную тревогу «фикстура изменилась» на файле, который просто перестал ездить.
-DIRT="$(diff -rq "$SEED" "$SEED_SRC" 2>/dev/null | grep -v "README.md\|-prompt.txt\|-turn2.txt\|_manifest.txt\|expected.md\|KEY.md\|stubs\|PROVENANCE" || true)"
+DIRT="$(diff -rq "$SEED" "$SEED_SRC" 2>/dev/null | grep -v "README.md\|-prompt.txt\|-turn2.txt\|_manifest.txt\|expected.md\|KEY.md\|stubs\|PROVENANCE\|truth-" || true)"
 if [ -n "$DIRT" ]; then
   echo ""
   echo "!!! ФИКСТУРА ИЗМЕНИЛАСЬ ВО ВРЕМЯ ПРОГОНА — плечо недостоверно, перегнать после чистки:"

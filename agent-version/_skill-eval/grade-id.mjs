@@ -42,6 +42,7 @@
 // цепочка без знака в скобках рисуется, как прочитана. «Схема верна» — якоря И0–И13 и И15.
 // Отдельным счётом: В1, В4, К1 (вопроса о карточке, о которой спрашивать не положено, нет), Ш1 (фраза о порядке в
 // шапке файла), Р1 (ведущий открыл `reference/short.md`; по скиллу — на первом ходу, засчитывается в любом).
+// С 5.0.0 Р1 — файл входа, типа и формата (`reference/inputs|kinds|notation/`), по одному из папки (`readReference`).
 // Пороги раунда — в `GATES`, сводка — `--round`.
 //
 // Этап С (скилл 4.1.0, `reference/scenario.md`, `PLAN-ID-SCENARIO.md` §10): сценарная схема по PRK-9, пробы — таблица
@@ -81,7 +82,7 @@
 import { readFileSync, existsSync, readdirSync, statSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { join, dirname, relative } from 'node:path';
+import { join, dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -500,7 +501,8 @@ const FILES_DET = { mmd: 'interaction_diagram_detailed.md', puml: 'interaction_d
 export const wantFile = (rel, format, detailed) => rel.replace('technical_specification.md', (detailed ? FILES_DET : FILES)[format]);
 /** И1: новый файл один, и это файл нужного типа и формата. */
 export const onlyFile = (made, want) => made.length === 1 && made[0] === want;
-const JUNK = new Set(['answer.md', 'stream.jsonl', '_seeded.txt', '_stderr.log', 'answer-02.md']);
+// `_seeded.sha256` — снимок засева, раннер пишет его с 2026-10-15 (раунды ноута); файлом прогона он не считается.
+const JUNK = new Set(['answer.md', 'stream.jsonl', '_seeded.txt', '_seeded.sha256', '_stderr.log', 'answer-02.md']);
 /** Служебные файлы пула, в «новые файлы» (И1) не идут: плюс файлы ходов `answer-NN.md`, `stream-NN.jsonl` и метки сбоя API. */
 const isJunk = (name) => JUNK.has(name) || /^(answer-\d+\.md|stream-\d+\.jsonl|_api-failure(-turn)?\.txt)$/.test(name);
 /** Пул пометил прогон сбоем API (на первом ходу — `_api-failure.txt`, на следующих — `_api-failure-turn.txt`). */
@@ -551,10 +553,20 @@ function leadTools(stream) {
 const WRITERS = new Set(['Write', 'Edit', 'Bash']);
 export const wroteDiagram = (stream) => leadTools(stream).some((c) => WRITERS.has(c.name) && /interaction_(diagram|scenarios)/.test(JSON.stringify(c.input ?? '')));
 
-/** Р1: в потоке любого хода (`stream.jsonl`, `stream-NN.jsonl`) ведущий открыл `reference/<file>` инструментом `Read`. */
-export const readReference = (runDir, file = 'short.md') => (existsSync(runDir) ? readdirSync(runDir) : []).filter((e) => /^stream(-\d+)?\.jsonl$/.test(e))
-  .some((f) => leadTools(read(join(runDir, f))).some((c) => c.name === 'Read' && typeof c.input?.file_path === 'string'
-    && c.input.file_path.replace(/\\/g, '/').includes(`reference/${file}`)));
+/**
+ * Р1 (скилл 5.0.0): в потоке любого хода (`stream.jsonl`, `stream-NN.jsonl`) ведущий открыл инструментом `Read` файл входа
+ * `reference/inputs/spec.md`, файл типа `reference/kinds/<kind>` и файл формата `reference/notation/<mermaid|plantuml>.md` —
+ * и ни одного другого файла из этих трёх папок (по одному из папки за прогон).
+ */
+const REF_DIRS = /reference\/(inputs|kinds|notation)\//;
+export function readReference(runDir, kind = 'short.md', format = 'mmd') {
+  const want = ['reference/inputs/spec.md', `reference/kinds/${kind}`, `reference/notation/${format === 'puml' ? 'plantuml' : 'mermaid'}.md`];
+  const got = (existsSync(runDir) ? readdirSync(runDir) : []).filter((e) => /^stream(-\d+)?\.jsonl$/.test(e))
+    .flatMap((f) => leadTools(read(join(runDir, f))).filter((c) => c.name === 'Read' && typeof c.input?.file_path === 'string')
+      .map((c) => c.input.file_path.replace(/\\/g, '/')))
+    .filter((p) => REF_DIRS.test(p));
+  return want.every((w) => got.some((p) => p.endsWith(w))) && got.every((p) => want.some((w) => p.endsWith(w)));
+}
 
 /**
  * Часть ответа первого хода с вопросами: всё после последней строки-итога письменной проверки «поводы: …».
@@ -753,7 +765,7 @@ export function gradeRun(runDir, format, fx = 'id', detailed = false, q = null, 
     if (st.said) r['В4 со слов аналитика'] = bySaid(answer, st.said);
     r['К1 лишнего вопроса о карточке нет'] = a2 != null && noCardQuestion(a2, asIs);
     r['Ш1 шапка: порядок'] = headOrder(read(join(runDir, want)), st.known);
-    r['Р1 прочитан reference'] = readReference(runDir);
+    r['Р1 прочитан reference'] = readReference(runDir, 'short.md', format);
     return { r, made, miss };
   }
   if (q) { // И14 не ставится: строку «нет в §1.2» заменил вопрос П3
@@ -1319,7 +1331,7 @@ export function gradeScenRun(runDir, format, sc) {
   r['Т1 первый ход — вопрос о типе'] = typeTurn(runDir).length === 0;
   r['В1 спросил'] = miss.length === 0;
   r['Ш1 шапка: источник сценариев'] = headScen(text, sc.known);
-  r['Р1 прочитан reference'] = readReference(runDir, 'scenario.md');
+  r['Р1 прочитан reference'] = readReference(runDir, 'scenario.md', format);
   const extra = sc.extraBody ? bodyAsk(qTurn(runDir)[0], sc.extraBody.n, sc.extraBody.fields) : null;
   return { r, made, miss, diag, extra };
 }
@@ -2291,18 +2303,27 @@ function selftest() {
       && !sameQuestion('INT-3: это синхронный вызов?', asIs('det')) && sameQuestion('INT-10: «бэкенд возвратов» — это `returns-api`?', asIs('ring'))
       && sameQuestion('INT-6: repairy-telegram — это Telegram-бот из §1.2?', asIs('rep')));
     check('этап, К1: номер карточки без «?» и «?» в строке с двумя номерами — не вопрос о карточке', nq('det', ['INT-3 — одно звено.', 'INT-3 идёт после INT-6?']));
-    const refEv = ev('Read', { file_path: 'C:/Users/u/AppData/Local/Temp/skill-eval-seed/r-skills/interaction-diagram/reference/short.md' });
+    // Скилл 5.0.0: за прогон — файл входа, типа и формата, по одному из папки `reference/`.
+    const SEED = 'C:/Users/u/AppData/Local/Temp/skill-eval-seed/r-skills/interaction-diagram/reference';
+    const refOne = (p, parent = null) => ev('Read', { file_path: `${SEED}/${p}` }, parent);
+    const refs = (kind, format) => ['inputs/spec.md', `kinds/${kind}`, `notation/${format === 'puml' ? 'plantuml' : 'mermaid'}.md`].map((p) => refOne(p)).join('\n');
+    const refEv = refs('short.md', 'mmd');
     const rd = (name, files) => {
       mkdirSync(join(tmp, 'ref', name), { recursive: true });
       for (const [f, text] of Object.entries(files)) writeFileSync(join(tmp, 'ref', name, f), text);
       return join(tmp, 'ref', name);
     };
-    check('этап, Р1: Read `…/reference/short.md` на первом ходу, на втором ходу или с обратными косыми в пути → прочитан', readReference(rd('first', { 'stream.jsonl': [readEv, refEv].join('\n'), 'stream-02.jsonl': writeEv(null) }))
-      && readReference(rd('two', { 'stream.jsonl': readEv, 'stream-02.jsonl': refEv }))
-      && readReference(rd('back', { 'stream.jsonl': ev('Read', { file_path: 'C:\\seed\\interaction-diagram\\reference\\short.md' }) })));
-    check('этап, Р1: без Read, Read субагента, другой файл reference, путь в Bash, папки нет → не прочитан', readReference(rd('none', { 'stream.jsonl': readEv, 'stream-02.jsonl': writeEv(null) })) === false
-      && readReference(rd('sub', { 'stream.jsonl': ev('Read', { file_path: 'C:/seed/interaction-diagram/reference/short.md' }, 'toolu_parent') })) === false
-      && readReference(rd('other', { 'stream.jsonl': [ev('Read', { file_path: 'C:/seed/interaction-diagram/reference/scenario.md' }), ev('Bash', { command: 'cat C:/seed/interaction-diagram/reference/short.md' })].join('\n') })) === false
+    check('этап, Р1: Read входа, типа и формата — на первом ходу, по ходам или с обратными косыми в пути → прочитан', readReference(rd('first', { 'stream.jsonl': [readEv, refEv].join('\n'), 'stream-02.jsonl': writeEv(null) }))
+      && readReference(rd('two', { 'stream.jsonl': [readEv, refOne('inputs/spec.md')].join('\n'), 'stream-02.jsonl': [refOne('kinds/short.md'), refOne('notation/mermaid.md')].join('\n') }))
+      && readReference(rd('back', { 'stream.jsonl': ['inputs\\spec.md', 'kinds\\short.md', 'notation\\mermaid.md'].map((p) => ev('Read', { file_path: `C:\\seed\\interaction-diagram\\reference\\${p}` })).join('\n') }))
+      && readReference(rd('puml', { 'stream.jsonl': refs('scenario.md', 'puml') }), 'scenario.md', 'puml'));
+    check('этап, Р1: без Read, Read субагента, файла формата нет, лишний файл из папки, не тот тип или формат, путь в Bash, папки нет → не прочитан', readReference(rd('none', { 'stream.jsonl': readEv, 'stream-02.jsonl': writeEv(null) })) === false
+      && readReference(rd('sub', { 'stream.jsonl': ['inputs/spec.md', 'kinds/short.md', 'notation/mermaid.md'].map((p) => refOne(p, 'toolu_parent')).join('\n') })) === false
+      && readReference(rd('nonot', { 'stream.jsonl': [refOne('inputs/spec.md'), refOne('kinds/short.md')].join('\n') })) === false
+      && readReference(rd('extra', { 'stream.jsonl': [refEv, refOne('kinds/scenario.md')].join('\n') })) === false
+      && readReference(rd('kind', { 'stream.jsonl': refs('scenario.md', 'mmd') })) === false
+      && readReference(rd('fmt', { 'stream.jsonl': refEv }), 'short.md', 'puml') === false
+      && readReference(rd('bash', { 'stream.jsonl': [refOne('inputs/spec.md'), refOne('notation/mermaid.md'), ev('Bash', { command: `cat ${SEED}/kinds/short.md` })].join('\n') })) === false
       && readReference(join(tmp, 'ref', 'нет-такой')) === false);
 
     // Раунд этапа К на синтетике: прогон на пробу с эталоном по истине; якоря песочницы, сводка и итог по порогам.
@@ -2318,7 +2339,7 @@ function selftest() {
       const a1 = ask(s.fx, CARD_Q[s.fx]);
       const a2 = [`схема: ${file}`, `порядок: ${head(k)}`, `со слов аналитика: ${SAID[k] ?? '—'}`, `без ответа: ${s.known ? '—' : 'участники, порядок, INT-2 — цепочка, INT-3 — цепочка'}`, // «без стрелки» — только INT-3
         `без стрелки: ${ST[k].filter((c) => !c.hops).map((c) => `INT-${c.n}`).join(', ') || '—'}`, 'другой формат рядом: —'].join('\n');
-      return { 'answer-01.md': a1, 'answer-02.md': a2, 'answer.md': a1 + a2, 'stream.jsonl': [readEv, refEv].join('\n'), 'stream-02.jsonl': writeEv(null), [file]: se(k), ...over };
+      return { 'answer-01.md': a1, 'answer-02.md': a2, 'answer.md': a1 + a2, 'stream.jsonl': [readEv, refs('short.md', s.format)].join('\n'), 'stream-02.jsonl': writeEv(null), [file]: se(k), ...over };
     };
     const srAt = (root, k, run, over, t1, s1) => {
       mk3(run, box(k, over), STAGE[k].fx, join(root, k), t1, s1);
@@ -2350,8 +2371,11 @@ function selftest() {
       && ra.out.includes('контроль (К1) det-o-one + det-o-two: 2/2 — порог 2/2: да') && ra.out.includes('сбой API (вне знаменателей): 0'));
     // Отдельный счёт «схему верной» не красит, якорь файла — красит; сбой API и чужие папки раунда — вне знаменателей.
     const one = (k, run, over) => reds(sr(k, run, over));
-    check('этап: файл схемы первым ходом → В1; reference не открыт → Р1; «со слов аналитика: —» → В4', one('ring-q-one', 'run-02', { 'stream.jsonl': [readEv, refEv, writeEv(null)].join('\n') }) === 'В1'
+    check('этап: файл схемы первым ходом → В1; reference не открыт → Р1; «со слов аналитика: —» → В4', one('ring-q-one', 'run-02', { 'stream.jsonl': [readEv, refs('short.md', 'puml'), writeEv(null)].join('\n') }) === 'В1'
       && one('ring-q-one', 'run-03', { 'stream.jsonl': readEv }) === 'Р1' && one('det-o-one', 'run-02', { 'answer-02.md': 'порядок: по времени, со слов аналитика\nсо слов аналитика: —' }) === 'В4');
+    check('этап: снимок засева `_seeded.sha256` от раннера — не новый файл (И1 зелёный); чужой файл рядом — И1',
+      reds(srAt(join(tmp, 'junk'), 'det-o-one', 'run-01', { '_seeded.sha256': 'abc  docs/PRK-9/technical_specification.md\n' })) === ''
+      && reds(srAt(join(tmp, 'junk'), 'det-o-one', 'run-02', { 'notes.md': 'x' })) === 'И1');
     check('этап: вопрос о карточке с одним звеном → К1; INT-11 не назван в последнем ответе → И13; шапка не та → Ш1', one('det-o-one', 'run-03', { 'answer-01.md': ask('det', [...CARD_Q.det, `4. ${K3}`]) }) === 'К1'
       && one('ring-q-two', 'run-02', { 'answer-02.md': 'со слов аналитика: «бэкенд возвратов» — отдельный участник\nбез стрелки: одна карточка' }) === 'И13'
       && one('chain-q-idk', 'run-02', { [wantFile(specRel('chain'), 'mmd', false)]: se('chain-q-idk', undefined, 'по времени, со слов аналитика') }) === 'Ш1');
@@ -2417,13 +2441,13 @@ function selftest() {
     SCEN_T['det-y-scen'] = hypothesis(S1, det, SB, PERSON.det).cands[0].rows;
     check('det-y-scen: гипотеза вопросов S1 — u1[3] | u5 | 2 | 4 | 6, не по правилу; построчно', sigAll(hypoReadings(S1, det)[0]) === 'u1[3] | u5 | 2 | 4 | 6' && !hypothesis(S1, det, SB, PERSON.det).rule
       && flowOfC(SCEN_T['det-y-scen'], det) === 'u r1.1 q1 r3.1 a3.1 p3 a1.1 p1 | u r5.1 r5.2 a5.2 a5.1 p5 | r2.1 q2 | r4.1 a4.1 | r6.1 q6 a6.1');
-    const refScen = ev('Read', { file_path: 'C:/Users/u/AppData/Local/Temp/skill-eval-seed/r-skills/interaction-diagram/reference/scenario.md' });
+    const refScen = (k) => refs('scenario.md', SCEN[k].format);
     const sfile = (k) => specRel(SCEN[k].fx).replace('technical_specification.md', SCEN_FILES[SCEN[k].format]);
     const QS = { det: S1, rep: RS1, chb: CS1 };
     const sbox = (k, over = {}) => {
       const a1 = QS[SCEN[k].fx];
       const a2 = `схема: ${sfile(k)}\nсценариев: ${SCEN_T[k].length}\nсценарии: ${SCEN[k].known ? 'со слов аналитика' : 'не подтверждены, по карточке на сценарий'}`;
-      const files = { 'answer-01.md': a1, 'answer-02.md': a2, 'answer.md': a1 + a2, 'stream.jsonl': [readEv, refEv, refScen].join('\n'), 'stream-02.jsonl': writeEv(null), [sfile(k)]: se2(k), ...over };
+      const files = { 'answer-01.md': a1, 'answer-02.md': a2, 'answer.md': a1 + a2, 'stream.jsonl': [readEv, refScen(k)].join('\n'), 'stream-02.jsonl': writeEv(null), [sfile(k)]: se2(k), ...over };
       return Object.fromEntries(Object.entries(files).filter(([, v]) => v != null));
     };
     const sx = join(tmp, 'scen');
@@ -2435,10 +2459,10 @@ function selftest() {
     check('сценарная, песочница: короткий файл вместо сценарного → С1, И2, Ш1; сценарный и короткий вместе → С1',
       reds(ssr('det-s-mmd', 'run-02', { [sfile('det-s-mmd')]: null, 'docs/PRK-9/interaction_diagram.md': ts.mmd })) === 'С1,И2,Ш1'
       && reds(ssr('det-s-mmd', 'run-03', { 'docs/PRK-9/interaction_diagram.md': ts.mmd })) === 'С1');
-    check('сценарная, песочница: файл сценариев ходом вопросов → В1; вопроса о шагах нет → В1; открыт только reference/short.md → Р1',
-      reds(ssr('det-s-alt', 'run-02', { 'stream.jsonl': [readEv, refEv, refScen, ev('Write', { file_path: 'C:/sb/docs/PRK-9/interaction_scenarios.md', content: 'x' })].join('\n') })) === 'В1'
+    check('сценарная, песочница: файл сценариев ходом вопросов → В1; вопроса о шагах нет → В1; открыт файл короткой вместо сценарной → Р1',
+      reds(ssr('det-s-alt', 'run-02', { 'stream.jsonl': [readEv, refScen('det-s-alt'), ev('Write', { file_path: 'C:/sb/docs/PRK-9/interaction_scenarios.md', content: 'x' })].join('\n') })) === 'В1'
       && reds(ssr('det-s-alt', 'run-03', { 'answer-01.md': S1.replace('4. Внутренних шагов в карточках нет — рисую без них. Верно?', '') })) === 'В1'
-      && reds(ssr('det-s-idk', 'run-02', { 'stream.jsonl': [readEv, refEv].join('\n') })) === 'Р1');
+      && reds(ssr('det-s-idk', 'run-02', { 'stream.jsonl': [readEv, refs('short.md', SCEN['det-s-idk'].format)].join('\n') })) === 'Р1');
     check('det-y-scen, песочница: схема по другой гипотезе (реплика А) → красный; та же гипотеза, ход 2 без неё → эталон по правилу, красный; строка пула — гипотеза и «по правилу»',
       !Object.values(ssr('det-y-scen', 'run-02', { [sfile('det-y-scen')]: se2('det-s-mmd') })).every(Boolean)
       && !Object.values(ssr('det-y-scen', 'run-03', { 'answer-01.md': S1.replace(/3\. Сценарии:.*\n/, '') })).every(Boolean)
@@ -2508,13 +2532,14 @@ function selftest() {
     check('раунд без проб этапов: оба типа не оцениваются, итог красный', nx.out.filter((l) => l.endsWith('пороги не оцениваются')).length === 2 && nx.out[nx.out.length - 1] === 'ИТОГ: КРАСНЫЙ');
     // Известный результат: реальный зелёный прогон 4.2.0 `runs/2026-09-30-s-pool2/det-s-mmd/run-02` (два хода) сдвинут на ход
     // вперёд, ход 1 — выдуманный верный вопрос о типе: грейд обязан остаться зелёным. Тот же прогон как есть — красный Т1, В1.
+    // Прогон 4.2.0 открывал `reference/scenario.md` — в копию дописаны чтения путей 5.0.0 (Р1); как есть он красный и по Р1.
     const real = join(HERE, 'runs/2026-09-30-s-pool2/det-s-mmd/run-02');
     if (existsSync(join(real, 'stream-02.jsonl'))) {
       const kr = join(tmp, 'known', 'det-s-mmd');
-      mk3('run-02', Object.fromEntries(listFiles(real).map((f) => [f, readFileSync(join(real, f), 'utf8')])), 'det', kr);
-      check('известный результат: det-s-mmd/run-02 из s-pool2 со сдвигом на ход — зелёный; без сдвига (ход 1 — список и вопросы) → Т1, В1',
+      mk3('run-02', Object.fromEntries(listFiles(real).map((f) => [f, readFileSync(join(real, f), 'utf8') + (f === 'stream-02.jsonl' ? `\n${refScen('det-s-mmd')}` : '')])), 'det', kr);
+      check('известный результат: det-s-mmd/run-02 из s-pool2 со сдвигом на ход — зелёный; без сдвига (ход 1 — список и вопросы) → Т1, В1 (и Р1: пути 4.2.0)',
         gradePool(kr, parseProbe('det-s-mmd')).out.includes('run-02: зелёный  новые файлы: docs/PRK-9/interaction_scenarios.md')
-        && reds(gradeScenRun(real, 'mmd', SCEN['det-s-mmd']).r) === 'Т1,В1');
+        && reds(gradeScenRun(real, 'mmd', SCEN['det-s-mmd']).r) === 'Т1,В1,Р1');
     } else console.log('skip: прогона runs/2026-09-30-s-pool2/det-s-mmd/run-02 нет на диске');
     // Известный результат для динамической истины: файлы `t-pool1/det-s-alt` (реплика Б), гипотеза хода 2 той же формы, что
     // старая реплика Б. Зелёные по `SCEN_B` run-01 — зелёный и здесь; run-05 (INT-2 раньше INT-4) — красный и здесь.
@@ -2681,6 +2706,9 @@ export function gradeRound(roundDir) {
     scen: { asked: scen[0][1], core: scen[1][1], pair: scen[2][1] } };
 }
 
+// CLI — только при запуске этого файла, не при импорте из другого грейдера (`grade-pt.mjs`).
+const isMain = process.argv[1] != null && resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase();
+if (isMain) {
 const args = process.argv.slice(2);
 if (args[0] === '--selftest') selftest();
 else if (args[0] === '--round') {
@@ -2698,4 +2726,5 @@ else if (args[0] === '--round') {
 } else {
   console.error('usage: node grade-id.mjs <папка-пробы> [--format=mmd|puml|ask] | --round <папка-раунда> | --selftest');
   process.exit(1);
+}
 }
