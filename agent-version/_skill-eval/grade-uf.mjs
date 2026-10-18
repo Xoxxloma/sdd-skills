@@ -212,6 +212,7 @@ export function parsePlantuml(text) {
 // id пункта в начале текста узла: у БТ — `FR-N ·`, у списка пунктов (срез 2б) — `п.N ·`. Номер пункта в истине — поле `fr`.
 export const ID_FR = /^\s*FR-(\d+)\s*·/;
 export const ID_PT = /^\s*[пП]\.\s?(\d+)\s*·/;
+export const ID_TX = /^\s*[сС][тТ][рР]\.\s?(\d+)\s*·/;
 const frOf = (t, idRe = ID_FR) => { const m = (t ?? '').match(idRe); return m ? Number(m[1]) : null; };
 
 /** Узлы истины ↔ узлы схемы: тот же номер пункта в начале текста, тот же вид, все основы. Возвращает карту id схемы → id истины. */
