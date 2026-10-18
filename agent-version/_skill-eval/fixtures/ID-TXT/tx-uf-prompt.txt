@@ -1,0 +1,1 @@
+Нарисуй схему по docs/VSL-23/client-process.txt в PlantUML.

@@ -13,6 +13,11 @@
 // - `pt-uf-puml`, `pt-uf-idk` — путь пользователя по выгрузке ноута, те же три хода;
 // - `pt-raw` — `interaction-diagram` дали ноут вместо списка: отсылка к `собери пункты`, файла нет;
 // - `pt-nb` — `analyst-notebook` просят схему, кто кого вызывает: отсылка к `/interaction-diagram`, файла нет.
+// Запасной вход (5.3.0, `PLAN-ID-CORE.md` §9), фикстура `ID-TXT`, id `стр.N`:
+// - `tx-sh-mmd` — короткая по тексту файлом, с ответами; `tx-sh-idk` — тот же текст в чате, «не знаю», схема `draft.*`;
+// - `tx-uf-puml` — путь по тексту процесса; `pt-prose` — `*.points.md` из одной прозы — черновиком;
+// - `pt-junk` — список с кривыми строками: схема по нормальным пунктам, кривые названы в списке прочтения (Н1).
+// У текста ещё Ч1 (шапка «черновик по тексту»).
 //
 // «Схема верна»: короткая — К0 (список и соседи не тронуты), К1 (файл один, имя с основой списка), К2 (разбор), К3
 // (участники = истине), К4 (стрелки = истине: стороны, вид, id, токен), К5 (порядок стрелок); путь — К0, К1 и У2–У4
@@ -24,10 +29,14 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseDiagram } from './grade-id.mjs';
-import { gradeGraph, foreignWords, ID_PT, leadTools, listFiles } from './grade-uf.mjs';
+import { gradeGraph, foreignWords, ID_PT, ID_TX, leadTools, listFiles } from './grade-uf.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const FIX = join(HERE, 'fixtures', 'ID-PT');
+const fixOf = (p) => join(HERE, 'fixtures', p.fix ?? 'ID-PT');
+const FIX = fixOf({});
+// Пробы запасного входа (`inputs/text.md`, фикстура `ID-TXT`): `src: 'text'` — вход «текст», id `стр.N`; `chat` — текст в
+// промпте, схема `draft.*` в корне; `junk` — кривые строки списка названы в списке прочтения (Н1).
+const TXT = { fix: 'ID-TXT', src: 'text', pre: 'стр' };
 const PROBES = {
   'pt-sh-mmd': { kind: 'short', format: 'mmd', truth: 'truth-sh-s.json', reply: 'sh-s-turn2.txt' },
   'pt-sh-idk': { kind: 'short', format: 'mmd', truth: 'truth-sh-idk.json', reply: 'idk-turn2.txt' },
@@ -36,6 +45,11 @@ const PROBES = {
   'pt-uf-idk': { kind: 'uf', format: 'puml', truth: 'truth-uf-idk.json', reply: 'idk-turn2.txt' },
   'pt-raw': { kind: 'route', want: ['собери пункты'] },
   'pt-nb': { kind: 'route', want: ['interaction-diagram', 'собери пункты'] },
+  'tx-sh-mmd': { ...TXT, kind: 'short', format: 'mmd', truth: 'truth-tx-s.json', reply: 'tx-s-turn2.txt' },
+  'tx-sh-idk': { ...TXT, kind: 'short', format: 'mmd', truth: 'truth-tx-idk.json', reply: 'idk-turn2.txt', chat: true },
+  'tx-uf-puml': { ...TXT, kind: 'uf', format: 'puml', truth: 'truth-uf-s.json', reply: 'uf-s-turn2.txt' },
+  'pt-junk': { fix: 'ID-TXT', kind: 'short', format: 'mmd', truth: 'truth-junk.json', reply: 'idk-turn2.txt' },
+  'pt-prose': { ...TXT, kind: 'short', format: 'mmd', truth: 'truth-prose.json', reply: 'idk-turn2.txt' },
 };
 const GATE = { core: 4, asked: 5, of: 5 }; // Sonnet, на пробу: схема верна (у отсылки — О1) ≥ 4/5, Т1 и В1 5/5
 
@@ -43,14 +57,32 @@ const norm = (s) => s.replace(/\r/g, '');
 const read = (p) => (existsSync(p) ? norm(readFileSync(p, 'utf8')) : null);
 const low = (s) => (s ?? '').toLowerCase().replace(/ё/g, 'е');
 const JUNK = /^(answer(-\d+)?\.md|stream(-\d+)?\.jsonl|_seeded\.(txt|sha256)|_stderr\.log|_api-failure(-turn)?\.txt)$/;
-const ptRe = (n) => new RegExp(`п\\.\\s?${Number(n)}(?!\\d)`, 'i');
+const ptRe = (n, pre = 'п') => new RegExp(`${pre}\\.\\s?${Number(n)}(?!\\d)`, 'i');
+const anyId = (pre = 'п') => new RegExp(`${pre}\\.\\s?\\d`, 'i');
 const streams = (runDir) => (existsSync(runDir) ? readdirSync(runDir) : []).filter((e) => /^stream(-\d+)?\.jsonl$/.test(e)).map((f) => read(join(runDir, f)));
 const wrote = (stream) => leadTools(stream).some((c) => ['Write', 'Edit', 'Bash'].includes(c.name) && /interaction_|user_flow/.test(JSON.stringify(c.input ?? '')));
 const flatHead = (text) => low(text).replace(/\s*\n[ \t]*[>']?\s*/g, ' ');
 const lastAnswer = (runDir) => { const f = readdirSync(runDir).filter((x) => /^answer-\d+\.md$/.test(x)).sort().at(-1); return read(join(runDir, f ?? 'answer.md')) ?? ''; };
 
-/** Имя файла схемы: основа списка + имя из таблицы типов и форматов. */
-export const diagramFile = (list, kind, format) => list.replace(/\.points\.md$/, `.${kind === 'uf' ? 'user_flow' : 'interaction_diagram'}.${format === 'puml' ? 'puml' : 'md'}`);
+/** Имя файла схемы: основа источника + имя из таблицы типов и форматов; основа — имя без `.points.md` или без расширения;
+ *  черновик по тексту (`draft`) — `<основа>.draft.<имя>`, текст в чате (`null`) — `draft-*.<имя>` в корне (дата и `-N`). */
+export function diagramFile(src, kind, format, draft = false) {
+  const name = `${kind === 'uf' ? 'user_flow' : 'interaction_diagram'}.${format === 'puml' ? 'puml' : 'md'}`;
+  if (src == null) return `draft-*.${name}`;
+  const base = /\.points\.md$/.test(src) ? src.replace(/\.points\.md$/, '') : src.replace(/\.[^./]+$/, '');
+  return `${base}.${draft ? 'draft.' : ''}${name}`;
+}
+
+/** Файл `f` — тот, что задаёт `diagramFile`: для чата — `draft-ГГГГ-ММ-ДД[-N].<имя>` в корне. */
+export const fits = (want, f) => (want.startsWith('draft-*.') ? /^draft-\d{4}-\d{2}-\d{2}(-\d+)?\./.test(f) && f.endsWith(want.slice('draft-*'.length)) && !f.includes('/') : f === want);
+
+/** Строки текста: номер непустой строки → строка. */
+export function textLines(text) {
+  const out = {};
+  let n = 0;
+  for (const l of (text ?? '').split('\n')) if (l.trim()) out[++n] = l.trim();
+  return out;
+}
 
 /** Пункты списка: номер → текст строки (без `- `). */
 export function points(text) {
@@ -66,13 +98,13 @@ const nameKey = (s) => low(s).replace(/[`"«»]/g, '').replace(/\s+/g, ' ').trim
 const unesc = (s) => s.replace(/#59;/g, ';').replace(/#35;/g, '#').replace(/#quot;/g, '"');
 
 /** Подпись `п.N` или `п.N · <токен>` → { id, token }; иначе null. */
-export function parseLabel(label) {
-  const m = unesc(label).trim().match(/^[пП]\.\s?(\d+)\s*(?:·\s*(.+))?$/);
+export function parseLabel(label, pre = 'п') {
+  const m = unesc(label).trim().match(new RegExp(`^${pre}\\.\\s?(\\d+)\\s*(?:·\\s*(.+))?$`, 'i'));
   return m ? { id: Number(m[1]), token: m[2] ? m[2].replace(/`/g, '').replace(/\s+/g, ' ').trim() : null } : null;
 }
 
 /** К2–К5 по тексту файла короткой. */
-export function gradeShort(text, truth) {
+export function gradeShort(text, truth, pre = 'п') {
   const r = {};
   const d = text == null ? null : parseDiagram(text, 'mmd');
   r['К2 разбор'] = d != null && d.other.length === 0 && d.notes.length === 0 && d.actors.size === 0 && d.parts.size > 0;
@@ -85,7 +117,7 @@ export function gradeShort(text, truth) {
   const who = (alias) => idx(d.parts.get(alias) ?? alias);
   const key = (a) => `${a.from}>${a.to}|${a.kind}|п.${a.id}|${a.token ? nameKey(a.token) : ''}`;
   const mine = d.arrows.map((a) => {
-    const l = parseLabel(a.label);
+    const l = parseLabel(a.label, pre);
     const kind = a.dashed || a.both || a.cross ? 'bad' : a.async ? 'event' : 'req';
     return { from: who(a.from), to: who(a.to), kind, id: l?.id ?? '?', token: l?.token ?? null };
   });
@@ -105,46 +137,51 @@ export function gradeShort(text, truth) {
 // ---------- ходы ----------
 
 /** Т1 по ходу 1: вопрос о типе — «?», короткая и путь, без «сценар», без строк списка `п.N`, файла нет. Пусто — в порядке. */
-export function typeMiss(a1, s1) {
+export function typeMiss(a1, s1, pre = 'п') {
   if (a1 == null) return ['первого хода нет'];
   return [...(a1.includes('?') ? [] : ['знака «?» нет']), ...(/коротк/i.test(a1) ? [] : ['нет «коротк»']), ...(/пут[ьи]/i.test(a1) ? [] : ['нет «путь»']),
-    ...(/сценар/i.test(a1) ? ['есть «сценар»'] : []), ...(/п\.\s?\d/.test(a1) ? ['есть п.N'] : []), ...(wrote(s1) ? ['файл записан ходом 1'] : [])];
+    ...(/сценар/i.test(a1) ? ['есть «сценар»'] : []), ...(anyId(pre).test(a1) ? [`есть ${pre}.N`] : []), ...(wrote(s1) ? ['файл записан ходом 1'] : [])];
 }
 
 /** В1 по ходу 2: «?», «поряд», по каждому пункту-дыре строка с `п.N` и «?» (в ней или в следующей), оба имени одной системы. */
-export function unasked(a2, s2, truth) {
+export function unasked(a2, s2, truth, pre = 'п') {
   if (a2 == null) return ['второго хода нет'];
   const out = [...(wrote(s2) ? ['файл записан ходом 2'] : []), ...(a2.includes('?') ? [] : ['знака «?» нет'])];
   if (truth.asks.order && !/поряд/i.test(a2)) out.push('порядок');
   const lines = a2.split('\n');
-  const about = (n) => lines.some((l, i) => ptRe(n).test(l) && (l.includes('?') || (lines[i + 1] ?? '').includes('?')));
-  for (const n of [...(truth.asks.open ?? []), ...(truth.asks.dir ?? []), ...(truth.asks.branch ?? []), ...(truth.asks.end ?? [])]) if (!about(n)) out.push(`п.${n}`);
+  const about = (n) => lines.some((l, i) => ptRe(n, pre).test(l) && (l.includes('?') || (lines[i + 1] ?? '').includes('?')));
+  for (const n of [...(truth.asks.open ?? []), ...(truth.asks.dir ?? []), ...(truth.asks.branch ?? []), ...(truth.asks.end ?? [])]) if (!about(n)) out.push(`${pre}.${n}`);
   for (const nm of truth.asks.same ?? []) if (!low(a2).includes(low(nm))) out.push(`участник ${nm}`);
   return out;
 }
 
-/** Р1: вход `points.md`, тип и формат — по одному файлу из папки, других из этих папок нет. */
-export function readRefs(runDir, kind, format) {
-  const want = ['reference/inputs/points.md', `reference/kinds/${kind === 'uf' ? 'user-flow' : 'short'}.md`, `reference/notation/${format === 'puml' ? 'plantuml' : 'mermaid'}.md`];
+/** Р1: вход (`points.md` или `text.md`), тип и формат — по одному файлу из папки, других из этих папок нет. */
+export function readRefs(runDir, kind, format, src = 'points') {
+  const want = [`reference/inputs/${src}.md`, `reference/kinds/${kind === 'uf' ? 'user-flow' : 'short'}.md`, `reference/notation/${format === 'puml' ? 'plantuml' : 'mermaid'}.md`];
   const got = streams(runDir).flatMap((s) => leadTools(s).filter((c) => c.name === 'Read' && typeof c.input?.file_path === 'string')
     .map((c) => c.input.file_path.replace(/\\/g, '/'))).filter((p) => /reference\/(inputs|kinds|notation)\//.test(p));
   return want.every((w) => got.some((p) => p.endsWith(w))) && got.every((p) => want.some((w) => p.endsWith(w)));
 }
 
 /** Ш1: шапка говорит, откуда порядок. */
-export function headOrder(text, kind, known) {
+export function headOrder(text, kind, known, word = 'пунктов') {
   const h = flatHead(text);
-  if (kind === 'uf') return known ? h.includes('по порядку со слов аналитика') : h.includes('по номерам пунктов') && !h.includes('со слов аналитика');
-  return known ? h.includes('по времени, со слов аналитика') : h.includes('по номерам пунктов, не по времени');
+  if (kind === 'uf') return known ? h.includes('по порядку со слов аналитика') : h.includes(`по номерам ${word}`) && !h.includes('со слов аналитика');
+  return known ? h.includes('по времени, со слов аналитика') : h.includes(`по номерам ${word}, не по времени`);
 }
 
+/** Н1: каждая кривая строка списка названа в ходе 2 — в списке прочтения: строка-не-пункт — по началу текста, пункт с
+ *  незнакомым видом (`{id, word}`) — строкой с его `п.N` и словом вида. */
+export const junkNamed = (a2, junk) => (junk ?? []).every((j) => (typeof j === 'string' ? nameKey(a2 ?? '').includes(nameKey(j))
+  : (a2 ?? '').split('\n').some((l) => ptRe(j.id).test(l) && low(l).includes(low(j.word)))));
+
 /** Д1: строка «в источник стоит внести» называет каждый `п.N` из `holes` (и склейку участников), ни одного из `notHoles`; дыр нет — без `п.N`. */
-export function sourceLine(answer, truth) {
+export function sourceLine(answer, truth, pre = 'п') {
   const l = (answer ?? '').split('\n').find((x) => /^[\s>*_•-]*в источник стоит внести/i.test(x));
   if (!l) return false;
   const glue = truth.glued ? /участник/i.test(l) : true;
-  return (truth.holes.length ? truth.holes.every((n) => ptRe(n).test(l)) : !/п\.\s?\d/.test(l)) && glue
-    && (truth.notHoles ?? []).every((n) => !ptRe(n).test(l));
+  return (truth.holes.length ? truth.holes.every((n) => ptRe(n, pre).test(l)) : !anyId(pre).test(l)) && glue
+    && (truth.notHoles ?? []).every((n) => !ptRe(n, pre).test(l));
 }
 
 /** М1: в отчёте строка с «мысль», «набросок» и их числом. */
@@ -154,9 +191,11 @@ export const thoughtsLine = (answer, n) => (answer ?? '').split('\n').some((l) =
 
 export function gradeRun(runDir, probe) {
   const p = PROBES[probe];
-  const fixFiles = new Set(listFiles(FIX));
+  const fix = fixOf(p);
+  const pre = p.pre ?? 'п';
+  const fixFiles = new Set(listFiles(fix));
   const made = listFiles(runDir).filter((f) => !fixFiles.has(f) && !JUNK.test(f.split('/').pop()));
-  const kept = [...fixFiles].filter((f) => /^(docs|notes)\//.test(f)).every((f) => read(join(runDir, f)) === read(join(FIX, f)));
+  const kept = [...fixFiles].filter((f) => /^(docs|notes)\//.test(f)).every((f) => read(join(runDir, f)) === read(join(fix, f)));
   const r = {};
   if (p.kind === 'route') {
     const a = lastAnswer(runDir) ?? '';
@@ -164,32 +203,38 @@ export function gradeRun(runDir, probe) {
     r['О1 отсылка, файла нет'] = kept && made.length === 0 && miss.length === 0;
     return { r, why: [made.length ? `файлы: ${made.join(', ')}` : '', miss.length ? `нет: ${miss.join(', ')}` : ''].filter(Boolean).join('; '), miss: [], words: [], made };
   }
-  const truth = JSON.parse(read(join(FIX, p.truth)));
-  const want = diagramFile(truth.list, p.kind, p.format);
+  const truth = JSON.parse(read(join(fix, p.truth)));
+  const src = p.chat ? null : truth.source !== undefined ? truth.source : truth.list;
+  const want = diagramFile(src, p.kind, p.format, p.src === 'text');
+  const file = made.find((f) => fits(want, f));
   r['К0 список и соседи не тронуты'] = kept;
-  r['К1 файл один, имя'] = made.length === 1 && made[0] === want;
-  const text = read(join(runDir, want));
-  const g = p.kind === 'uf' ? gradeGraph(text, p.format, truth, ID_PT) : gradeShort(text, truth);
+  r['К1 файл один, имя'] = made.length === 1 && file != null;
+  const text = file ? read(join(runDir, file)) : null;
+  const g = p.kind === 'uf' ? gradeGraph(text, p.format, truth, pre === 'стр' ? ID_TX : ID_PT) : gradeShort(text, truth, pre);
   Object.assign(r, g.r);
-  const miss = [...typeMiss(read(join(runDir, 'answer-01.md')), read(join(runDir, 'stream.jsonl'))).map((x) => `Т1: ${x}`),
-    ...unasked(read(join(runDir, 'answer-02.md')), read(join(runDir, 'stream-02.jsonl')), truth)];
+  const a2 = read(join(runDir, 'answer-02.md'));
+  if (truth.junk) r['Н1 кривые строки названы'] = junkNamed(a2, truth.junk);
+  const miss = [...typeMiss(read(join(runDir, 'answer-01.md')), read(join(runDir, 'stream.jsonl')), pre).map((x) => `Т1: ${x}`),
+    ...unasked(a2, read(join(runDir, 'stream-02.jsonl')), truth, pre)];
   r['Т1 вопрос о типе'] = !miss.some((x) => x.startsWith('Т1'));
   r['В1 спросил'] = !miss.some((x) => !x.startsWith('Т1'));
-  r['Р1 прочитан reference'] = readRefs(runDir, p.kind, p.format);
+  r['Р1 прочитан reference'] = readRefs(runDir, p.kind, p.format, p.src ?? 'points');
   const known = p.kind === 'uf' ? truth.asks.order && p.reply !== 'idk-turn2.txt' : truth.ordered;
-  r['Ш1 шапка: порядок'] = headOrder(text, p.kind, known);
+  r['Ш1 шапка: порядок'] = headOrder(text, p.kind, known, pre === 'стр' ? 'строк' : 'пунктов');
+  if (p.src === 'text') r['Ч1 шапка: черновик по тексту'] = flatHead(text).includes('черновик по тексту');
   const last = lastAnswer(runDir);
-  r['Д1 в источник стоит внести'] = sourceLine(last, truth);
+  r['Д1 в источник стоит внести'] = sourceLine(last, truth, pre);
   let words = [];
   if (p.kind === 'uf') {
-    r['М1 мысль и набросок в отчёте'] = thoughtsLine(last, truth.thoughts);
-    words = g.graph ? foreignWords(g.graph, points(read(join(FIX, truth.list))), read(join(FIX, p.reply)), ID_PT) : ['нет графа'];
+    if (p.src !== 'text' && truth.thoughts != null) r['М1 мысль и набросок в отчёте'] = thoughtsLine(last, truth.thoughts);
+    const items = pre === 'стр' ? textLines(read(join(fix, src))) : points(read(join(fix, src)));
+    words = g.graph ? foreignWords(g.graph, items, read(join(fix, p.reply)), pre === 'стр' ? ID_TX : ID_PT) : ['нет графа'];
     r['Сл слова источника'] = words.length === 0;
   }
   return { r, why: g.why, miss, words, made };
 }
 
-const CORE = ['К0', 'К1', 'К2', 'К3', 'К4', 'К5', 'У2', 'У3', 'У4', 'О1'];
+const CORE = ['К0', 'К1', 'К2', 'К3', 'К4', 'К5', 'У2', 'У3', 'У4', 'О1', 'Н1'];
 const isCore = (k) => CORE.some((c) => k.startsWith(`${c} `));
 const failed = (runDir) => existsSync(runDir) && readdirSync(runDir).some((f) => /^_api-failure/.test(f));
 const modelOf = (probeDir) => (read(join(probeDir, '_settings.txt')) ?? '').match(/модель:\s*(\S+)/)?.[1] ?? '?';
@@ -267,6 +312,16 @@ function selftest() {
     && !sourceLine('в источник стоит внести: п.4', { holes: [], glued: false })
     && sourceLine('в источник стоит внести: п.10: A → B', { holes: [10], notHoles: [5], glued: false })
     && !sourceLine('в источник стоит внести: п.5: не рисовать; п.10: A → B', { holes: [10], notHoles: [5], glued: false }));
+  check('текст: имя файла (файл, `*.points.md`, чат), номера непустых строк, подпись `стр.N`, кривые строки',
+    diagramFile('docs/K-1/notes.txt', 'short', 'mmd', true) === 'docs/K-1/notes.draft.interaction_diagram.md'
+    && diagramFile('docs/K-1/sync.points.md', 'short', 'mmd', true) === 'docs/K-1/sync.draft.interaction_diagram.md' && diagramFile(null, 'uf', 'puml') === 'draft-*.user_flow.puml'
+    && fits('draft-*.user_flow.puml', 'draft-2026-10-18.user_flow.puml') && fits('draft-*.user_flow.puml', 'draft-2026-10-18-2.user_flow.puml')
+    && !fits('draft-*.user_flow.puml', 'draft.user_flow.puml') && !fits('draft-*.user_flow.puml', 'docs/draft-2026-10-18.user_flow.puml')
+    && fits('docs/a.md', 'docs/a.md')
+    && textLines('A\n\n  \nB отдаёт C\n')[2] === 'B отдаёт C' && parseLabel('стр.3 · `POST /x`', 'стр')?.token === 'POST /x' && parseLabel('п.3', 'стр') === null
+    && reds(gradeShort(MMD.replace(/п\.(\d)/g, 'стр.$1'), T, 'стр')) === '' && reds(gradeShort(MMD, T, 'стр')).startsWith('К4')
+    && junkNamed('«Курьер потом звонит клиенту»: не на схеме — не пункт списка\nп.5 «Сайт шлёт SMS»: не на схеме — вид «идея» не распознан', ['Курьер потом звонит', { id: 5, word: 'идея' }])
+    && !junkNamed('п.1 «…»: A → B', ['Курьер потом звонит']) && !junkNamed('п.15 — идея', [{ id: 5, word: 'идея' }]));
   check('М1: «мысль, набросок: 2»', thoughtsLine('не на схеме: п.3 — нет действия; мысль, набросок: 2', 2) && !thoughtsLine('мысль, набросок: 12', 2));
   check('имя файла и пункты списка', diagramFile('notes/a/notebook-2026-01-01.points.md', 'uf', 'puml') === 'notes/a/notebook-2026-01-01.user_flow.puml'
     && diagramFile(T.list, 'short', 'mmd') === 'docs/X-1/meeting-2026-01-01.interaction_diagram.md'
