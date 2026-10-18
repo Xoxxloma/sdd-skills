@@ -82,7 +82,7 @@
 import { readFileSync, existsSync, readdirSync, statSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { join, dirname, relative } from 'node:path';
+import { join, dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -2706,6 +2706,9 @@ export function gradeRound(roundDir) {
     scen: { asked: scen[0][1], core: scen[1][1], pair: scen[2][1] } };
 }
 
+// CLI — только при запуске этого файла, не при импорте из другого грейдера (`grade-pt.mjs`).
+const isMain = process.argv[1] != null && resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase();
+if (isMain) {
 const args = process.argv.slice(2);
 if (args[0] === '--selftest') selftest();
 else if (args[0] === '--round') {
@@ -2723,4 +2726,5 @@ else if (args[0] === '--round') {
 } else {
   console.error('usage: node grade-id.mjs <папка-пробы> [--format=mmd|puml|ask] | --round <папка-раунда> | --selftest');
   process.exit(1);
+}
 }

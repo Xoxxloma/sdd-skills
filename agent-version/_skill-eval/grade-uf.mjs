@@ -17,7 +17,7 @@
 
 import { readFileSync, existsSync, readdirSync, statSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, dirname, relative } from 'node:path';
+import { join, dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -35,7 +35,7 @@ const read = (p) => (existsSync(p) ? norm(readFileSync(p, 'utf8')) : null);
 const low = (s) => s.toLowerCase().replace(/ё/g, 'е');
 const JUNK = /^(answer(-\d+)?\.md|stream(-\d+)?\.jsonl|_seeded\.(txt|sha256)|_stderr\.log|_api-failure(-turn)?\.txt)$/;
 
-function listFiles(dir, base = dir) {
+export function listFiles(dir, base = dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).flatMap((e) => {
     const p = join(dir, e);
@@ -209,15 +209,18 @@ export function parsePlantuml(text) {
 
 // ---------- сверка с истиной ----------
 
-const frOf = (t) => { const m = (t ?? '').match(/^\s*FR-(\d+)\s*·/); return m ? Number(m[1]) : null; };
+// id пункта в начале текста узла: у БТ — `FR-N ·`, у списка пунктов (срез 2б) — `п.N ·`. Номер пункта в истине — поле `fr`.
+export const ID_FR = /^\s*FR-(\d+)\s*·/;
+export const ID_PT = /^\s*[пП]\.\s?(\d+)\s*·/;
+const frOf = (t, idRe = ID_FR) => { const m = (t ?? '').match(idRe); return m ? Number(m[1]) : null; };
 
-/** Узлы истины ↔ узлы схемы: тот же FR в начале текста, тот же вид, все основы. Возвращает карту id схемы → id истины. */
-export function matchNodes(graph, truth) {
+/** Узлы истины ↔ узлы схемы: тот же номер пункта в начале текста, тот же вид, все основы. Возвращает карту id схемы → id истины. */
+export function matchNodes(graph, truth, idRe = ID_FR) {
   const map = new Map();
   const free = new Set(graph.nodes.map((n) => n.id));
   const miss = [];
   for (const t of truth.nodes) {
-    const c = graph.nodes.find((g) => free.has(g.id) && frOf(g.text) === t.fr && (g.kind === 'decision') === (t.kind === 'decision')
+    const c = graph.nodes.find((g) => free.has(g.id) && frOf(g.text, idRe) === t.fr && (g.kind === 'decision') === (t.kind === 'decision')
       && t.stems.every((s) => low(g.text).includes(low(s))));
     if (c) { map.set(c.id, t.id); free.delete(c.id); } else miss.push(t.id);
   }
@@ -226,12 +229,12 @@ export function matchNodes(graph, truth) {
 
 const key = (a, b) => `${a}>${b}`;
 
-export function gradeGraph(text, format, truth) {
+export function gradeGraph(text, format, truth, idRe = ID_FR) {
   const r = {};
   const g = format === 'puml' ? parsePlantuml(text) : parseMermaid(text);
   r['У2 разбор'] = !g.error;
   if (g.error) { r['У3 узлы = истине'] = false; r['У4 стрелки = истине'] = false; return { r, why: g.error }; }
-  const { map, miss, extra } = matchNodes(g, truth);
+  const { map, miss, extra } = matchNodes(g, truth, idRe);
   r['У3 узлы = истине'] = miss.length === 0 && extra.length === 0;
   const id = (x) => (x === 'start' || x === 'end' ? x : map.get(x) ?? `?${x}`);
   const got = new Set(g.edges.map((e) => key(id(e.from), id(e.to))));
@@ -255,12 +258,12 @@ export function frTexts(bt) {
 }
 
 /** Сл: слова узла (≥ 5 букв, основа — первые 5) есть в тексте его FR или в реплике аналитика. Пусто — в порядке. */
-export function foreignWords(graph, frs, reply) {
+export function foreignWords(graph, frs, reply, idRe = ID_FR) {
   const bad = [];
   for (const n of graph.nodes) {
-    const fr = frOf(n.text);
+    const fr = frOf(n.text, idRe);
     const pool = low(`${frs[fr] ?? ''}\n${reply ?? ''}`);
-    const words = low(n.text.replace(/^\s*FR-\d+\s*·/, '')).match(/[а-я]{5,}/g) ?? [];
+    const words = low(n.text.replace(idRe, '')).match(/[а-я]{5,}/g) ?? [];
     for (const w of words) if (!pool.includes(w.slice(0, 5))) bad.push(`${n.id}:${w}`);
   }
   return bad;
@@ -268,7 +271,7 @@ export function foreignWords(graph, frs, reply) {
 
 // ---------- прогон ----------
 
-function leadTools(stream) {
+export function leadTools(stream) {
   const out = [];
   for (const line of (stream ?? '').split('\n')) {
     let ev = null;
@@ -524,6 +527,9 @@ stop
   process.exit(ok ? 0 : 1);
 }
 
+// CLI — только при запуске этого файла, не при импорте из другого грейдера (`grade-pt.mjs`).
+const isMain = process.argv[1] != null && resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase();
+if (isMain) {
 const args = process.argv.slice(2);
 if (args[0] === '--selftest') selftest();
 else if (args[0] === '--round') { const g = gradeRound(args[1]); console.log(g.out.join('\n')); }
@@ -533,3 +539,4 @@ else if (args[0]) {
   if (!PROBES[probe]) { console.error(`неизвестная проба: ${probe}; есть: ${Object.keys(PROBES).join(' ')}`); process.exit(1); }
   console.log(gradePool(dir, probe).out.join('\n'));
 } else console.log('usage: node grade-uf.mjs <папка-пробы> | --round <папка-раунда> | --selftest');
+}
