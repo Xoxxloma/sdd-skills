@@ -30,7 +30,9 @@ POOL="$HERE/run-pool-ctx-v2.sh"
 case "$PROBE" in
   loop-chain) FIXTURE=LOOP-CHAIN ;;
   loop-twice) FIXTURE=LOOP-TWICE ;;
-  *) echo "неизвестная цепочка: '$PROBE'"; echo "есть: loop-chain loop-twice"; exit 1 ;;
+  nb-chain-3) FIXTURE=NB-CHAIN-3 ;;
+  nb-chain-spor) FIXTURE=NB-CHAIN-SPOR ;;
+  *) echo "неизвестная цепочка: '$PROBE'"; echo "есть: loop-chain loop-twice nb-chain-3 nb-chain-spor"; exit 1 ;;
 esac
 [ -n "$ROUND" ] || { echo "usage: ./run-chain.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
 
