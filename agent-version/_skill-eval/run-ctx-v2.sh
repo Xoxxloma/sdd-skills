@@ -133,6 +133,9 @@ case "$PROBE" in
   # Встреча RECALL-NEW и пять фактов, которые двойник называет только на прямой вопрос разбора (свой промпт двойника —
   # общий `twin-analyst.md` не трогаем). Грейдер `grade-recall.mjs --fx DEEP`: скрытое в итоге, ловушки «а если».
   rec-deep) FIXTURE=RECALL-DEEP; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=34; IDLE_MAX=34; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-analyst-deep.md; MEET_ENV=1 ;;
+  # Та же встреча RECALL-DEEP, двойник отвечает как человек: на сообщение из трёх и больше вопросов — только на первые два
+  # (twin-analyst-human.md). Анкета из многих строк не выигрывает за счёт послушного двойника. Грейдер — `--fx DEEP`.
+  rec-deep-h) FIXTURE=RECALL-DEEP; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=34; IDLE_MAX=34; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-analyst-human.md; MEET_ENV=1 ;;
   # analyst-notebook 1.0.0 и meeting-intake 1.1.0 (план product/plans/notebook.md): запись в ноут, сборка выкладки,
   # ноут на входе и цель «в ноут». Ноут лежит в `notes/` — конец по содержимому смотрит и туда (`RT_DONE_GREP`).
   nb-new)     FIXTURE=NB-NEW;     PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/notebook\.md$'; MEET_ENV=1 ;;
