@@ -124,11 +124,15 @@ case "$PROBE" in
   # ── `meeting-recall`: встреча по памяти → протокол (2026-10-14) ───────────────────────────────
   # За аналитика отвечает двойник: `twin-analyst.md` + `twin-card.md` фикстуры. Конец — в протоколе
   # появился раздел «Уточнить у участников». Грейдер `grade-recall.mjs --fx NEW|CHG`.
-  rec-new) FIXTURE=RECALL-NEW; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
-  rec-chg) FIXTURE=RECALL-CHG; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  # meeting-recall 1.2.0 (разбор темы): раунд длиннее — потолок ходов 30 (был 18), у rec-deep — 34.
+  rec-new) FIXTURE=RECALL-NEW; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=30; IDLE_MAX=30; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  rec-chg) FIXTURE=RECALL-CHG; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=30; IDLE_MAX=30; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
   # Стык «протокол по памяти → meeting-intake»: засев — зелёный протокол `meeting-recall` (r2-new run-3, r2-chg run-2).
   # Пересказ в строке вызова, ключа нет (протокол — в docs/_inbox/), аналитик просит закончить посреди раундов.
-  rec-inline) FIXTURE=RECALL-INLINE; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  rec-inline) FIXTURE=RECALL-INLINE; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=30; IDLE_MAX=30; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  # Встреча RECALL-NEW и пять фактов, которые двойник называет только на прямой вопрос разбора (свой промпт двойника —
+  # общий `twin-analyst.md` не трогаем). Грейдер `grade-recall.mjs --fx DEEP`: скрытое в итоге, ловушки «а если».
+  rec-deep) FIXTURE=RECALL-DEEP; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=34; IDLE_MAX=34; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-analyst-deep.md; MEET_ENV=1 ;;
   # analyst-notebook 1.0.0 и meeting-intake 1.1.0 (план product/plans/notebook.md): запись в ноут, сборка выкладки,
   # ноут на входе и цель «в ноут». Ноут лежит в `notes/` — конец по содержимому смотрит и туда (`RT_DONE_GREP`).
   nb-new)     FIXTURE=NB-NEW;     PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/notebook\.md$'; MEET_ENV=1 ;;
@@ -604,8 +608,8 @@ case "$PROBE" in
   meet-notes) FIXTURE=MEET-NOTES; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
   meet-sameday) FIXTURE=MEET-SAMEDAY; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-2026-10-19-2\.points\.md$'; DONE_GREP='^> Встреча:.*14:[0-5][0-9]'; MEET_ENV=1 ;;
   meet-twin)  FIXTURE=MEET-TWIN;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-objector.md; MEET_ENV=1 ;;
-  rec-finish) FIXTURE=REC-FINISH; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
-  rec-cont)   FIXTURE=REC-CONT;   PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=12; IDLE_MAX=12; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  rec-finish) FIXTURE=REC-FINISH; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=30; IDLE_MAX=30; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  rec-cont)   FIXTURE=REC-CONT;   PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=24; IDLE_MAX=24; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
   ni-spec-bt) FIXTURE=NI-SPEC-BT; PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-13-(bt|spec)\.md$'; MEET_ENV=1 ;;
   ni-nb-repeat) FIXTURE=NI-NB-REPEAT; PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/notebook-2026-10-14-(spec|2-bt|bt-2|2-spec)\.md$'; MEET_ENV=1 ;;
   ni-twin)    FIXTURE=NI-TWIN;    PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=12; IDLE_MAX=12; DONE_RE='/docs/.*/meeting-2026-10-12-(bt|spec)\.md$'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-objector.md; MEET_ENV=1 ;;
