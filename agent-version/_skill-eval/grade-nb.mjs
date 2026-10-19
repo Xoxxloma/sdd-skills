@@ -39,6 +39,7 @@ import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { groundCheck } from './ground-check.mjs'
+import { parseNotebook } from './nb-state.mjs'
 
 const HERE = fileURLToPath(new URL('.', import.meta.url))
 const lf = (s) => s.replace(/\r\n/g, '\n')
@@ -56,16 +57,23 @@ const LAST_SEED = '2026-10-10'
 const FIRST_SEED = '2026-10-06'
 const NB_RET = 'notes/возврат-товара-без-чека/notebook.md'
 const NB_API = 'notes/api-бонусной-программы-для-партнёров/notebook.md'
-const KINDS = new Set(['решено', 'открыто', 'сведение', 'мысль', 'набросок'])
+// 2.2.0: видов четыре — `набросок` слит в `мысль` (PLAN-NOTEBOOK-STATE.md, Р4).
+const KINDS = new Set(['решено', 'открыто', 'сведение', 'мысль'])
 // Ссылка «дата №»: «2026-10-06 №1», «2026-10-06, №1».
 const REF = /\d{4}-\d{2}-\d{2},?\s*№\s*\d+/
 const refAt = (date, n) => new RegExp(date + ',?\\s*№\\s*' + n + '(?!\\d)')
 const REFS_G = /(\d{4}-\d{2}-\d{2}),?\s*№\s*(\d+)/g
-const STRIP_REFS = (s) => s.replace(/\d{4}-\d{2}-\d{2}(,?\s*№\s*\d+)?/g, ' ').replace(/№\s*\d+/g, ' ')
+const STRIP_REFS = (s) => s.replace(/\d{4}-\d{2}-\d{2}(,?\s*№\s*\d+(\.\d+)?)?/g, ' ').replace(/№\s*\d+(\.\d+)?/g, ' ')
 const DATE_H = /^## (\d{4}-\d{2}-\d{2})\s*$/
 const DECIDED_BY = /решил[аи]?\s*:/i
 // Старый пункт NB-CONTRA — строка засева дословно (сравнение строкой, не регуляркой).
-const OLD_CARD = '- [решено] Возврат только на карту, с которой платили — решил: Соколова М.'
+const OLD_CARD = '- [решено] Возврат только на карту, с которой платили — решил: Соколова М. · 2026-10-08 №1.2'
+// 2.0.0: номера пунктов засева, на которые ссылаются замена и ответ (fixtures/NB-CONTRA, NB-ANSWER).
+const OLD_CARD_ID = '2026-10-08 №1.2'
+const OLD_Q_ACT_ID = '2026-10-09 №1.2'
+const OLD_Q_LINE = '- [открыто] Кто подписывает акт возврата без чека — ждёт: Гарипова Л. · 2026-10-09 №1.2'
+// Есть ли у строки засева пометка `‖ <state>…` в выходе.
+const markedAs = (text, seedText, line, state) => (marksAdded(text, seedText).get(line) || []).some((m) => new RegExp('^' + state, 'i').test(m))
 // Начало пункта для «…» после `вместо:` и `отвечает на:` (сравнение словами через flat, не регуляркой).
 const OLD_CARD_TEXT = 'Возврат только на карту, с которой платили'
 const OLD_Q_ACT = 'Кто подписывает акт возврата без чека'
@@ -139,7 +147,7 @@ const BIG_GONE = [
   { ln: '31', t: (y) => y.kind === 'открыто' && w('освободил').test(y.l) },
   { ln: '41', t: (y) => w('сутк').test(y.l) && y.ref === '2026-09-23 №1' },
   { ln: '62', t: (y) => y.kind === 'открыто' && w('интернет').test(y.l) },
-  { ln: '66', t: (y) => y.kind === 'набросок' && y.ref === '2026-09-24 №2' && w('один').test(y.l) },
+  { ln: '66', t: (y) => y.kind === 'мысль' && y.ref === '2026-09-24 №2' && w('один').test(y.l) },
   { ln: '74/118', t: (y) => /100\s*%/.test(y.l) && ['2026-09-25 №1', '2026-10-01 №2'].includes(y.ref) },
   { ln: '83', t: (y) => y.kind === 'решено' && w('не\\s+сработал').test(y.l) },
   { ln: '94', t: (y) => y.kind === 'открыто' && w('кто\\s+пишет').test(y.l) },
@@ -151,9 +159,9 @@ const HANDLES = [
   { id: 'balance', re: /\/balance(?![\w-])/, kind: 'решено', ref: '2026-10-06 №1' },
   { id: 'accruals', re: /\/accruals(?![\w/-])/, kind: 'решено', ref: '2026-10-06 №1' },
   { id: 'reversals', re: /\/reversals(?![\w-])/, kind: 'решено', ref: '2026-10-09 №1' },
-  { id: 'redemptions', re: /\/redemptions(?![\w-])/, kind: 'набросок', ref: '2026-10-08 №1' },
-  { id: 'transactions', re: /\/transactions(?![\w-])/, kind: 'набросок', ref: '2026-10-08 №1' },
-  { id: 'webhooks', re: /\/webhooks(?![\w-])/, kind: 'набросок', ref: '2026-10-08 №1' },
+  { id: 'redemptions', re: /\/redemptions(?![\w-])/, kind: 'мысль', ref: '2026-10-08 №1' },
+  { id: 'transactions', re: /\/transactions(?![\w-])/, kind: 'мысль', ref: '2026-10-08 №1' },
+  { id: 'webhooks', re: /\/webhooks(?![\w-])/, kind: 'мысль', ref: '2026-10-08 №1' },
 ]
 const OLD_A = /\/bonus\/cancel(?![\w-])/
 // Зачёркнутый путь A — тоже пометка замены.
@@ -163,8 +171,8 @@ const DECIDED = /(?<![а-яё])(?<!не\s)(решено|согласовано|�
 // Путь — и после `**` и `[`: «**/partners/…**», «[/partners/…](…)».
 const PATH_RE = /(^|[\s`(|«"'*[])(\/[a-z{][A-Za-z0-9_{}-]*(?:\/[A-Za-z0-9_{}-]+)*)/g
 const PAIR_RE = /(GET|POST|PUT|PATCH|DELETE)[\s|`*[]*(\/[a-z{][A-Za-z0-9_{}/-]*)/g
-// Вид «набросок» в любом падеже и числе: набросок, наброски, наброска.
-const DRAFT = w('наброс(?:ок|к)')
+// Вид «мысль» у слов аналитика (2.2.0; прежнее «набросок» — тоже): мысль, мысли, набросок, наброски.
+const DRAFT = w('(мысл[ьи]|наброс(?:ок|к))')
 // Открытые вопросы 2026-10-08 №2: авторизация; списание, когда бонусов не хватает.
 const OPEN_Q = [{ id: 'авторизация', re: w('авториз') }, { id: 'бонусов не хватает', re: w('(не\\s+хват|недостат)') }]
 const AS_DECIDED = (c) => (DECIDED.test(c) || DECIDED_BY.test(c)) && !w('(открыт|жд[её]т|не\\s+решен)').test(c)
@@ -205,15 +213,20 @@ const RE_CONFIRM = w('(?:записат|записыва|запиш|пишу|п�
 const disputeAsk = (l) => { const u = unquoted(l); return whichAsk(l) || w('спор').test(u) || (w('в\\s+открыт').test(u) && !RE_WHO.test(u)) }
 // Текст в кавычках после ссылки: «…», "…", “…”, „…“ — какие кавычки, не важно.
 const QUOTED = String.raw`(?:«([^»\n]*)»|"([^"\n]*)"|[“„]([^”“\n]*)[”“])`
-const RE_REPL_CONTRA = new RegExp(String.raw`вместо\s*:\s*` + refAt('2026-10-08', 1).source + String.raw`\s*` + QUOTED + '?')
-const RE_ANS_ACT = new RegExp(String.raw`отвечает\s+на\s*:\s*` + refAt('2026-10-09', 1).source + String.raw`\s*` + QUOTED + '?')
-const quoteOf = (m) => (m ? m.slice(1).find((x) => x !== undefined) || '' : '')
+const RE_REPL_CONTRA = new RegExp(String.raw`вместо\s*:\s*(2026-10-08,?\s*№\s*1(?:\.(\d+))?)(?!\d)\s*` + QUOTED + '?')
+const RE_ANS_ACT = new RegExp(String.raw`отвечает\s+на\s*:\s*(2026-10-09,?\s*№\s*1(?:\.(\d+))?)(?!\d)\s*` + QUOTED + '?')
+const quoteOf = (m) => (m ? m.slice(3).find((x) => x !== undefined) || '' : '')
 // В кавычках — начало старого пункта: одно слово — мало, весь пункт с хвостом — законно.
 const startsItem = (quote, item) => { const q = flat(quote); const it = flat(item); return q.split(' ').length >= 2 && (it.startsWith(q) || q.startsWith(it)) }
 // Текст пункта без вида, хвостов связи (`; вместо: <дата> №<n> «…»`, `; отвечает на: …` — где бы ни стояли) и ссылок
 // ` · L<n>`: так пункт ноута сравнивается с пунктом списка.
-const LINK_TAIL = new RegExp(String.raw`;?\s*(?:вместо|отвечает\s+на)\s*:\s*\d{4}-\d{2}-\d{2},?\s*№\s*\d+\s*` + QUOTED + '?', 'gi')
-const core = (l) => l.replace(/^\s*(?:[-*•+]|\d+[.)])\s*\[[^\]]*\]\s*/, '').replace(LINK_TAIL, ' ').replace(new RegExp(L_ANY.source, 'g'), ' ')
+const LINK_TAIL = new RegExp(String.raw`;?\s*(?:вместо|отвечает\s+на)\s*:\s*\d{4}-\d{2}-\d{2},?\s*№\s*\d+(?:\.\d+)?\s*` + QUOTED + '?', 'gi')
+// 2.0.0: номер пункта в конце строки (` · 2026-10-08 №1.2`) и пометки состояния (` ‖ заменён: …`) — не текст пункта.
+const ID_TAIL = /\s*·\s*\d{4}-\d{2}-\d{2},?\s*№\s*\d+\.\d+\s*$/
+const MARKS = /\s*‖[^\n]*$/
+// Строка выгрузки из строки ноута: без пометок и хвостов связей, концевой номер пункта — как есть.
+const exportLine = (l) => l.replace(MARKS, '').replace(/;\s*(?:вместо|отвечает\s+на)\s*:\s*\d{4}-\d{2}-\d{2},?\s*№\s*\d+(?:\.\d+)?/gi, '').trimEnd()
+const core = (l) => l.replace(MARKS, '').replace(ID_TAIL, '').replace(/^\s*(?:[-*•+]|\d+[.)])\s*\[[^\]]*\]\s*/, '').replace(LINK_TAIL, ' ').replace(new RegExp(L_ANY.source, 'g'), ' ')
 
 // ---------- вопрос по ноуту (NB-ASK) ----------
 
@@ -289,9 +302,10 @@ const D = {
   quote: 'строки чата под «>»',
   heading: '### 1 · мысль аналитика',
   thought: 'пункт [мысль]',
-  noDecided: 'нет [решено] и [набросок]',
+  noDecided: 'нет [решено]',
   asked: 'до записи задан вопрос',
   beforeWrite: 'на первом ходу ноут не записан (до ответа на вопрос Шага 5)',
+  writeFirst: 'список без находок записан на ходу 1, без вопроса «Записать так?» (Р5)',
   replaced: '[решено] наличными — решил: Соколова; вместо: 2026-10-08 №1',
   oldItem: 'старый пункт про карту на месте',
   openItem: 'пункт про склад есть и не [решено]',
@@ -320,7 +334,7 @@ const D = {
   openDispute: '[открыто] что верно: оба ответа — ждёт: Соколова',
   noDecidedNew: 'нет [решено] с позицией Гариповой',
   noReplace: 'нет «вместо:» в новой записи',
-  answered: 'пункт про старшего кассира — отвечает на: 2026-10-09 №1 «…»',
+  answered: 'пункт про старшего кассира — отвечает на: 2026-10-09 №1.2, у вопроса «‖ закрыт»',
   money: 'деньги — наличными, ссылка 2026-10-09 №1',
   noReplaced: 'заменённое «только на карту» не подано действующим',
   closed: 'акт — старший кассир со ссылкой 2026-10-10 №1, не открытый вопрос',
@@ -445,7 +459,8 @@ const FX = {
   // Список из протокола по памяти (meeting-recall 1.1.0) — ожидания старой MI-NB-REC: мысль осталась мыслью.
   'PTS-REC': { dir: 'NB-PTS-REC', mode: 'write', prompt: 'w-prompt.txt', reply: 'w-turn2.txt', notebook: NB_REC, list: LIST_REC,
     meet: { memo: true, date: '2026-10-14' },
-    checks: [...WRITE_COMMON, 'listHead', 'asIs', 'noLineRef', 'sourceList', 'noLinks', 'decided12', 'thoughtKept'],
+    // 2.3.0 (Р5): ноут известен, сверка ничего не нашла — список пишется на ходу 1, без вопроса.
+    checks: [...WRITE_COMMON.filter((id) => id !== 'beforeWrite'), 'writeFirst', 'listHead', 'asIs', 'noLineRef', 'sourceList', 'noLinks', 'decided12', 'thoughtKept'],
     desc: { files: 'кроме ноута ничего не создано и не изменено (список и протокол — байт в байт)' } },
   // Выгрузка всего ноута и с даты: замена, закрытый вопрос, мысли и наброски в двух записях.
   EXPORT: { dir: 'NB-EXPORT', mode: 'export', prompt: 'w-prompt.txt', reply: 'w-turn2.txt', notebook: NB_RET, since: null,
@@ -494,6 +509,7 @@ const desc = (fx, id) => (fx.desc && fx.desc[id]) || D[id]
 // Файлы стенда в корне песочницы: их пишет пул, а не скилл.
 const STAND = /^(answer(-\d+)?\.md|stream(-\d+)?\.jsonl|_.*)$/
 
+// Пути — в NFC: засев песочницы на macOS ложится в NFD («й», «ё» — буква и знак), а пути в константах и спеках — в NFC.
 function listFiles (dir, base = dir, out = []) {
   if (!existsSync(dir)) return out
   for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -501,7 +517,7 @@ function listFiles (dir, base = dir, out = []) {
     if (dir === base && STAND.test(e.name)) continue
     const p = join(dir, e.name)
     if (e.isDirectory()) listFiles(p, base, out)
-    else out.push(relative(base, p).split('\\').join('/'))
+    else out.push(relative(base, p).split('\\').join('/').normalize('NFC'))
   }
   return out
 }
@@ -603,9 +619,37 @@ const field = (front, name) => {
   return l === undefined ? null : l.slice(name.length + 1).trim()
 }
 
+// 2.0.0: к строке засева можно дописать только пометки ` ‖ <состояние>: <номер>` в конце. Для сверки старой части они
+// снимаются: строка выхода, которая — строка засева плюс одни пометки, становится строкой засева. `\r` в конце — как был.
+// Строки тела сверяются от конца шапки `---`: шапку скилл править вправе, число её строк может измениться.
+const bodyAt = (L) => { if (L[0]?.replace(/\r$/, '') !== '---') return 0; const j = L.findIndex((l, k) => k > 0 && l.replace(/\r$/, '') === '---'); return j < 0 ? 0 : j + 1 }
+export function unmark (finalText, seedText) {
+  if (seedText == null) return finalText
+  const S = seedText.split('\n'); const F = finalText.split('\n')
+  const s0 = bodyAt(S); const f0 = bodyAt(F)
+  for (let j = 0; s0 + j < S.length && f0 + j < F.length; j++) {
+    const i = f0 + j; const a = S[s0 + j].replace(/\r$/, ''); const b = F[i].replace(/\r$/, '')
+    if (a !== b && b.startsWith(a) && /^(\s*‖\s*[^‖\r]+)+$/.test(b.slice(a.length))) F[i] = F[i].endsWith('\r') ? a + '\r' : a
+  }
+  return F.join('\n')
+}
+// Пометки, дописанные к строкам засева: строка засева → её пометки в выходе.
+export function marksAdded (finalText, seedText) {
+  const out = new Map(); if (seedText == null) return out
+  // Строки тела — от конца шапки, как в `unmark`: дописанная в шапку строка (`роли:`) не сдвигает сверку.
+  const S = seedText.split('\n'); const F = finalText.split('\n')
+  const s0 = bodyAt(S); const f0 = bodyAt(F)
+  for (let j = 0; s0 + j < S.length && f0 + j < F.length; j++) {
+    const a = S[s0 + j].replace(/\r$/, ''); const b = F[f0 + j].replace(/\r$/, '')
+    if (a !== b && b.startsWith(a) && /^(\s*‖\s*[^‖\r]+)+$/.test(b.slice(a.length))) out.set(a, b.slice(a.length).split('‖').map((x) => x.trim()).filter(Boolean))
+  }
+  return out
+}
+
 // Новое — то, что дописано после засеянного тела ноута. Тело засева изменено — новое ищется от первого
 // раздела даты позже засева, чтобы остальные проверки всё равно отработали.
-export function splitNew (finalText, seedText, last = LAST_SEED) {
+export function splitNew (finalText0, seedText, last = LAST_SEED) {
+  const finalText = unmark(finalText0, seedText)
   const F = splitFront(finalText)
   if (seedText == null) return { front: F.front, newPart: F.body.replace(/^\s*# [^\n]*(\n|$)/, ''), oldOk: null, headChanged: false }
   const S = splitFront(seedText)
@@ -654,7 +698,7 @@ const stemOf = (x) => norm(x).slice(0, Math.max(3, Math.min(5, x.length - 1)))
 const knownIn = (who, text) => { const ns = namesIn(who); const ws = words(text); return ns.length > 0 && !/\d/.test(STRIP_REFS(who)) && ns.every((n) => ws.some((x) => x.startsWith(stemOf(n)))) }
 function disputeTails (t, nb) {
   if (!nb || !/что\s+верно/i.test(t)) return t
-  return t.replace(/\(([^()\n]*?)[\s,;·—–-]*\d{4}-\d{2}-\d{2},?\s*№\s*\d+\s*\)/g, (m, who) => (knownIn(who, nb) ? ' ' : m))
+  return t.replace(/\(([^()\n]*?)[\s,;·—–-]*\d{4}-\d{2}-\d{2},?\s*№\s*\d+(?:\.\d+)?\s*\)/g, (m, who) => (knownIn(who, nb) ? ' ' : m))
     .replace(/(жд[её]т\s*:)([^;\n]*)/gi, (m, k, who) => (knownIn(who, nb) ? k + ' ' : m))
 }
 
@@ -781,7 +825,8 @@ const RE_OLD_NAMED = [refAt('2026-10-08', 1), w('только\\s+на\\s+кар�
 // Тело засева (после шапки ---) — в начале тела ноута байт в байт: CRLF, BOM, пробелы — изменение. Шапку скилл
 // править вправе.
 const rawBody = (s) => { const m = s.match(/^---\r?\n[\s\S]*?\r?\n---[ \t]*(\r?\n|$)/); return m ? s.slice(m[0].length) : s }
-export function oldBytesOk (finalRaw, seedRaw) {
+export function oldBytesOk (finalRaw0, seedRaw) {
+  const finalRaw = unmark(finalRaw0, seedRaw)
   const sb = rawBody(seedRaw).replace(/\s+$/, ''); const fb = rawBody(finalRaw)
   return fb.startsWith(sb) && (fb.length === sb.length || /[\r\n]/.test(fb[sb.length]))
 }
@@ -832,6 +877,11 @@ function gradeWrite (dir, fx) {
   // На ходу 1 — только вопрос Шага 5; запись ноута или исходника — после ответа.
   const w1 = wroteFirstTurn(dir)
   R.beforeWrite = w1 ? `ноут записан на ходу 1: ${w1}` : null
+  // 2.3.0 (Р5): список без находок сверки — запись на ходу 1, без вопроса «Записать так?».
+  if (fx.checks.includes('writeFirst')) {
+    const q = answerTurn(dir, 1).split('\n').find((l) => l.includes('?') && RE_CONFIRM.test(l))
+    R.writeFirst = !w1 ? 'ноут не записан на ходу 1' : q ? `вопрос перед записью: «${short(q.trim())}»` : null
+  }
   const text = nbPath && existsSync(join(dir, nbPath)) ? read(join(dir, nbPath)) : null
   if (text === null) { for (const id of fx.checks) if (!(id in R)) R[id] = 'ноута нет'; return { R, warn } }
 
@@ -897,7 +947,7 @@ function gradeWrite (dir, fx) {
     const e = entries[0]
     R.heading = e && e.n === 1 && w('мысл').test(e.title) ? null : `«### ${e ? e.n + ' · ' + e.title : '—'}»`
     R.thought = items.some((l) => kindOf(l) === 'мысль') ? null : 'нет'
-    const bad = items.find((l) => ['решено', 'набросок'].includes(kindOf(l)))
+    const bad = items.find((l) => kindOf(l) === 'решено')
     R.noDecided = bad ? `«${short(bad)}»` : null
   }
   const a1 = answerTurn(dir, 1)
@@ -916,14 +966,12 @@ function gradeWrite (dir, fx) {
   if (fx === FX.CONTRA || fx === FX['PTS-IN']) {
     R.confirm = qLines.some((l) => RE_CONFIRM.test(l)) ? null : 'вопроса «Записать так?» в ответе хода 1 нет'
     const its = items.filter((l) => kindOf(l) === 'решено' && w('налич').test(l) && /решил[аи]?\s*:[^;\n]*Соколов/i.test(l))
+    // 2.0.0: `вместо:` — номером пункта (2026-10-08 №1.2), у старой строки — `‖ заменён`; кавычки не нужны.
     const m = its.map((l) => l.match(RE_REPL_CONTRA)).find(Boolean)
-    const q = quoteOf(m).trim()
-    const hit = q ? quotedItems(nbSeed, '2026-10-08 №1', q) : []
-    const other = hit.length && !hit.some((x) => startsItem(OLD_CARD_TEXT, x.text)) ? hit[0] : null
-    R.replaced = !its.length ? 'нет [решено] наличными — решил: Соколова' : !m ? 'нет «вместо: 2026-10-08 №1»' : !q ? 'нет «…» после ссылки'
-      : other ? `в кавычках начало другого пункта 2026-10-08 №1 — заменён не тот: «${short(other.line)}»` : null
-    if (q && !hit.length) warn.push(`в кавычках не начало старого пункта: «${q}»`)
-    R.oldItem = text.split('\n').includes(OLD_CARD) ? null : 'нет'
+    R.replaced = !its.length ? 'нет [решено] наличными — решил: Соколова' : !m ? `нет «вместо: ${OLD_CARD_ID}»`
+      : !m[2] ? `ссылка на запись, а не на пункт: «вместо: ${m[1]}»` : m[2] !== '2' ? `заменён не тот пункт: «вместо: ${m[1]}»`
+        : !markedAs(text, nbSeed, OLD_CARD, 'замен') ? `у ${OLD_CARD_ID} нет «‖ заменён»` : null
+    R.oldItem = text.split('\n').some((l) => l === OLD_CARD || l.startsWith(OLD_CARD + ' ‖')) ? null : 'нет'
   }
   if (fx === FX.CONTRA) {
     const later = [2, 3, 4, 5].map((n) => answerTurn(dir, n)).join('\n')
@@ -941,9 +989,11 @@ function gradeWrite (dir, fx) {
     R.bothSides = miss.length ? miss.join('; ') : null
     const od = items.filter((l) => kindOf(l) === 'открыто' && /что\s+верно/i.test(l))
     const good = od.find((l) => w('налич').test(l) && w('карт').test(l) && /жд[её]т\s*:[^\n]*Соколов/i.test(l))
-    R.openDispute = good ? null : od.length ? `«${short(od[0])}»` : 'нет [открыто] что верно'
+    // 2.0.0: сторона спора — номером пункта (2026-10-08 №1.2), у оспоренного — `‖ оспорен`.
+    R.openDispute = !good ? (od.length ? `«${short(od[0])}»` : 'нет [открыто] что верно')
+      : !/2026-10-08,?\s*№\s*1\.2(?!\d)/.test(good) ? `сторона спора не номером ${OLD_CARD_ID}: «${short(good)}»`
+        : !markedAs(text, nbSeed, OLD_CARD, 'оспор') ? `у ${OLD_CARD_ID} нет «‖ оспорен»` : null
     if (good && !w('Гарипов').test(good)) warn.push('в «что верно» нет Гариповой')
-    if (good && !refAt('2026-10-08', 1).test(good)) warn.push('в «что верно» нет ссылки 2026-10-08 №1')
     // Конец диалога стенда — `что верно` строчными: «Что верно:» его не ловит, реплика уходит ещё раз и запись дублируется.
     if (od.length > 1) warn.push(`«что верно» в записи: ${od.length}`)
     const dec = items.find((l) => kindOf(l) === 'решено' && (w('налич').test(l) || /решил[аи]?\s*:[^;\n]*Гарипов/i.test(l)))
@@ -952,16 +1002,14 @@ function gradeWrite (dir, fx) {
   }
   if (fx === FX.ANSWER || fx === FX['PTS-IN']) {
     const its = items.filter((l) => w('старш').test(l))
+    // 2.0.0: `отвечает на:` — номером пункта (2026-10-09 №1.2), у вопроса — `‖ закрыт`.
     const m = its.map((l) => l.match(RE_ANS_ACT)).find(Boolean)
-    const q = quoteOf(m).trim()
-    const hit = q ? quotedItems(nbSeed, '2026-10-09 №1', q) : []
-    const otherQ = hit.length && !hit.some((x) => startsItem(OLD_Q_ACT, x.text)) ? hit[0] : null
     // ANSWER: `отвечает на:` у пункта не про старшего кассира закрывает вопрос, на который письмо не отвечает (PTS-IN — `noExtraLinks`).
     const extraAns = fx === FX.ANSWER ? items.find((l) => /отвечает\s+на\s*:/i.test(l) && !w('старш').test(l)) : null
-    R.answered = !its.length ? 'пункта про старшего кассира нет' : !m ? 'нет «отвечает на: 2026-10-09 №1»' : !q ? 'нет «…» после ссылки'
-      : otherQ ? `в кавычках начало другого пункта 2026-10-09 №1 — закрыт не тот: «${short(otherQ.line)}»`
-        : extraAns ? `«отвечает на:» у пункта, который на вопрос не отвечает: «${short(extraAns)}»` : null
-    if (q && !hit.length) warn.push(`в кавычках не начало вопроса: «${q}»`)
+    R.answered = !its.length ? 'пункта про старшего кассира нет' : !m ? `нет «отвечает на: ${OLD_Q_ACT_ID}»`
+      : !m[2] ? `ссылка на запись, а не на пункт: «отвечает на: ${m[1]}»` : m[2] !== '2' ? `закрыт не тот пункт: «отвечает на: ${m[1]}»`
+        : !markedAs(text, nbSeed, OLD_Q_LINE, 'закрыт') ? `у ${OLD_Q_ACT_ID} нет «‖ закрыт»`
+          : extraAns ? `«отвечает на:» у пункта, который на вопрос не отвечает: «${short(extraAns)}»` : null
   }
   if (fx === FX.LONG) {
     const folder = dirname(nbPath)
@@ -1261,10 +1309,10 @@ export function gradeViewText (v, nb, gsrc = groundSrc(nb)) {
   const asCurrent = ctxs(OLD_A).find((c) => !MARK.test(c) && !STRUCK_A.test(c))
   R.oldPath = asCurrent ? `«${short(asCurrent.split('\n')[0])}»` : null
   const draftBad = []
-  for (const h of HANDLES.filter((x) => x.kind === 'набросок')) {
+  for (const h of HANDLES.filter((x) => x.kind === 'мысль')) {
     const cs = ctxs(h.re)
     if (!cs.length) continue
-    if (!cs.some((c) => DRAFT.test(c))) draftBad.push(`${h.id}: нет «набросок»`)
+    if (!cs.some((c) => DRAFT.test(c))) draftBad.push(`${h.id}: нет «мысль»`)
     else if (cs.some((c) => handlesIn(c) === 1 && DECIDED.test(c))) draftBad.push(`${h.id}: «решено»`)
   }
   R.drafts = draftBad.length ? draftBad.join('; ') : null
@@ -1326,7 +1374,7 @@ export function gradeChatText (ans, nb, run = [], gsrc = groundSrc(nb)) {
     }).filter((c) => c !== null && REF.test(c))
     if (!cands.length) { missing.push(s.d); continue }
     if (!STORY_REF.test(cands[0])) warn.push(`история «${s.d}»: ссылка не 2026-10-08 №1`)
-    // Истории в ноуте — наброски: «решено» или «решил:» у истории — набросок, поданный решённым (view-check.md, «Вид»).
+    // Истории в ноуте — наброски: «решено» или «решил:» у истории — мысль, поданный решённым (view-check.md, «Вид»).
     // Вид — с собственной строки истории (с её ссылкой), если она есть: «решено» у ручки под историей — вид ручки
     // (view-check.md: ссылка элемента — его собственная).
     const own = cands[0].split('\n').find((l) => has(s, l) && REF.test(l)) || cands[0]
@@ -1334,8 +1382,11 @@ export function gradeChatText (ans, nb, run = [], gsrc = groundSrc(nb)) {
   }
   R.stories = missing.length ? 'нет со ссылкой: ' + missing.join('; ') : null
   R.drafts = decided.length ? 'подана решённой: ' + decided.join('; ') : null
-  R.elemWords = elemNotGrounded(lines, gsrc, (i) => REF.test(ctx(i)), { only: ['num', 'person'] })
-  const dl = lines.map((l, i) => (DEADLINE.test(l) ? i : -1)).filter((i) => i >= 0)
+  // Элемент — строка со своей ссылкой (после « · » или в клетке таблицы, как в рубрике) или её продолжение. Строка, где
+  // ссылка внутри фразы («все 15 элементов … Пункт 2026-10-06 №2.1 не вошёл»), — отчёт о сборке, не элемент.
+  const OWN_REF = /(·|\|)\s*\d{4}-\d{2}-\d{2},?\s*№\s*\d+/
+  R.elemWords = elemNotGrounded(lines, gsrc, (i) => REF.test(ctx(i)) && !(REF.test(lines[i]) && !OWN_REF.test(lines[i])), { only: ['num', 'person'] })
+  const dl =lines.map((l, i) => (DEADLINE.test(l) ? i : -1)).filter((i) => i >= 0)
   R.noDeadline = dl.some((i) => lines.slice(i, i + 4).some((l) => NOPE.test(l))) ? null : 'нет'
   const nbDates = new Set([...nb.matchAll(/^## (\d{4}-\d{2}-\d{2})/gm)].map((m) => m[1]))
   const win = [...new Set(dl.flatMap((i) => [i, i + 1, i + 2, i + 3]))].filter((i) => i < lines.length).map((i) => lines[i])
@@ -1343,7 +1394,8 @@ export function gradeChatText (ans, nb, run = [], gsrc = groundSrc(nb)) {
   for (const l0 of win) {
     // Дата в пути или имени файла (`notes/…/user-stories-2026-10-14.md`) — не дата запуска: пилот 2026-10-14,
     // предложенное имя файла рядом со строкой «Сроки запуска» красило зелёный прогон.
-    const l = l0.replace(/`[^`]*`/g, ' ').replace(/\S*\.md\S*/g, ' ')
+    // Номер пункта (`№1.4`) — не дата «1.4»: форма 2.x ставит его у каждого элемента.
+    const l = l0.replace(/`[^`]*`/g, ' ').replace(/\S*\.md\S*/g, ' ').replace(/№\s*\d+(\.\d+)?/g, ' ')
     // Строка о сборке («выкладка собрана из ноута … на 2026-10-14» — круг 4): дата в ней — дата прогона (дата изменения
     // answer.md) или дата ноута, другая — выдумка. Слова-даты в ней не ищем: это дата сборки, а не запуска.
     const sob = SOBRANO.test(l0)
@@ -1530,7 +1582,7 @@ const OPEN_MARK = w('(открыт|спор|что\\s+верно|не\\s+реш�
 export function rowKind (t) {
   if (OPEN_MARK.test(t) && !w('(закрыт|закрыл)').test(t)) return 'открыто'
   if (DECIDED.test(t) || DECIDED_BY.test(t)) return 'решено'
-  if (DRAFT.test(t)) return 'набросок'
+  if (DRAFT.test(t)) return 'мысль'
   if (w('мысл').test(t)) return 'мысль'
   if (w('сведени').test(t)) return 'сведение'
   return 'решено'
@@ -1701,48 +1753,26 @@ export function nbItems (nb) {
   nb.split('\n').forEach((l, k) => {
     const d = l.match(DATE_H); if (d) { date = d[1]; n = null; return }
     const e = l.match(/^### (\d+)/); if (e && date) { n = Number(e[1]); return }
-    if (date && n && isItem(l)) out.push({ ref: `${date} №${n}`, date, kind: kindOf(l), line: l, text: core(l), ln: k + 1 })
+    if (date && n && isItem(l)) out.push({ ref: `${date} №${n}`, id: (l.match(/·\s*(\d{4}-\d{2}-\d{2}),?\s*№\s*(\d+\.\d+)\s*(?:‖|$)/) || []).slice(1).join(' №') || null, date, kind: kindOf(l), line: l, text: core(l), ln: k + 1, marks: (l.match(/‖[^‖]+/g) || []).map((x) => x.slice(1).trim()) })
   })
   return out
 }
 // Пункты записи `ref`, которые начинаются с текста в кавычках: какой пункт заменяет `вместо:` или закрывает `отвечает на:`.
 export const quotedItems = (nb, ref, q) => nbItems(nb).filter((x) => x.ref === ref && startsItem(q, x.text))
 
-// Действующее (выгрузка, Шаг 3): пункт с `вместо: <дата> №<n> «…»` заменяет пункт той записи, который начинается с текста
-// в кавычках; `отвечает на:` так же закрывает вопрос; пункт `[открыто] что верно: <старое> (<кто>, <дата> №<n>) или …` —
-// спор: пункт той записи, о котором <старое> (ближе всех к нему), не идёт, идёт спор; остальные пункты записи идут. Спор
-// с ответом (`отвечает на:` этот спор) закрыт и ничего не снимает — правка E9 (runs/2026-10-16-harden-edits.md).
-// Ожидание строится из засева тем же правилом, что в скилле.
+// Действующее (выгрузка, Шаг 3) — 2.0.0: строка пункта без пометки `‖`. Выбывший — по последней пометке: `заменён` —
+// заменён, `закрыт` — закрытый вопрос, `оспорен` без замены — оспорен (идёт спор). Ожидание строится из засева тем же
+// правилом, что в скилле (PLAN-NOTEBOOK-STATE.md, «Форма строки»).
 export function activeOf (nb) {
   const all = nbItems(nb)
-  const gone = new Map()
-  const LINK = new RegExp(String.raw`(вместо|отвечает\s+на)\s*:\s*(\d{4}-\d{2}-\d{2}),?\s*№\s*(\d+)\s*` + QUOTED, 'gi')
-  for (const it of all) {
-    for (const m of it.line.matchAll(LINK)) {
-      const q = m.slice(4).find((x) => x !== undefined) || ''
-      const i = all.findIndex((x) => x.ref === `${m[2]} №${m[3]}` && startsItem(q, x.text))
-      if (i >= 0) gone.set(i, /^вместо/i.test(m[1]) ? 'replaced' : 'closed')
-    }
-  }
-  for (const [j, it] of all.entries()) {
-    if (it.kind !== 'открыто' || gone.get(j) === 'closed') continue
-    const d = it.text.match(/что\s+верно\s*:\s*/i)
-    if (!d) continue
-    const rest = it.text.slice(d.index + d[0].length)
-    for (const m of rest.matchAll(/\(([^()\n]*?)(\d{4}-\d{2}-\d{2}),?\s*№\s*(\d+)\s*\)/g)) {
-      const old = rest.slice(0, m.index)
-      const cand = all.map((x, i) => [x, i]).filter(([x]) => x.ref === `${m[2]} №${m[3]}` && x !== it)
-      const best = cand.length === 1 ? cand[0] : cand.reduce((b, c) => (sim(old, c[0].text) > (b ? sim(old, b[0].text) : 0) ? c : b), null)
-      if (best && !gone.has(best[1])) gone.set(best[1], 'disputed')
-    }
-  }
-  const by = (why) => all.filter((_, i) => gone.get(i) === why)
-  return { all, active: all.filter((_, i) => !gone.has(i)), replaced: by('replaced'), closed: by('closed'), disputed: by('disputed') }
+  const why = (x) => (!x.marks.length ? null : x.marks.some((m) => /^замен/i.test(m)) ? 'replaced' : x.marks.some((m) => /^закрыт/i.test(m)) ? 'closed' : x.marks.some((m) => /^оспорен/i.test(m)) ? 'disputed' : 'replaced')
+  const by = (w0) => all.filter((x) => why(x) === w0)
+  return { all, active: all.filter((x) => !why(x)), replaced: by('replaced'), closed: by('closed'), disputed: by('disputed') }
 }
 
 const PTS_ITEM = /^\s*(?:[-*•+]|\d+[.)])\s*\[([^\]]*)\]/
 // Ссылка в конце пункта списка: ` · 2026-10-07 №1`, ` — 2026-10-07, №1`, `(2026-10-07 №1)`.
-const PTS_REF = /[\s·—–(-]*(\d{4}-\d{2}-\d{2}),?\s*№\s*(\d+)\)?\s*$/
+const PTS_REF = /[\s·—–(-]*(\d{4}-\d{2}-\d{2}),?\s*№\s*(\d+)(?:\.\d+)?\)?\s*$/
 const bestOf = (text, pool) => pool.reduce((b, x) => { const s = sim(text, x.text); return s > b.s ? { x, s } : b }, { x: null, s: 0 })
 
 export function gradeExportText (v, nb, fx) {
@@ -1812,7 +1842,7 @@ export function gradeExportText (v, nb, fx) {
   const answers = part.filter((x) => /отвечает\s+на\s*:/i.test(x.line))
   const noAns = answers.filter((x) => !has(x))
   R.answerIn = !answers.length ? 'в части нет ответа — ошибка фикстуры' : noAns.length ? `нет: «${short(noAns[0].line)}»` : null
-  const th = part.filter((x) => ['мысль', 'набросок'].includes(x.kind))
+  const th = part.filter((x) => x.kind === 'мысль')
   const thBad = th.map((x) => { if (has(x)) return null; const o = its.find((y) => sim(y.text, x.text) >= 0.6); return o ? `вид ${o.kind} у «${short(x.text)}»` : `нет «${short(x.text)}»` }).filter(Boolean)
   R.thoughts = !th.length ? 'в части нет мыслей и набросков — ошибка фикстуры' : thBad.length ? thBad.join('; ') : null
   const refBad = its.map((y) => {
@@ -1944,7 +1974,7 @@ function goodSpec (name) {
   const done = `Записал: ${NB_RET}, 2026-10-14 №1.\n`
   const edit = ev('Edit', { file_path: SB + NB_RET, old_string: 'x', new_string: 'y' })
   const t1 = [ev('Glob', { pattern: 'notes/*/notebook.md' }), ev('Grep', { pattern: '^- \\[', path: SB + NB_RET })]
-  const appendTo = (entry) => seed[NB_RET].replace(/\s+$/, '') + '\n\n' + entry
+  const appendTo = (entry, marks = []) => marks.reduce((t, [line, m]) => sub(t, line + '\n', `${line} ‖ ${m}\n`), seed[NB_RET]).replace(/\s+$/, '') + '\n\n' + entry
   if (name === 'NEW') {
     const chat = prompt.split('\n').filter((l) => /^[А-ЯЁ][а-яё]+ [А-ЯЁ]\.: /.test(l)).join('\n')
     const entry = '## 2026-10-14\n\n### 1 · чат с Соколовой М., Ильиным П., Дёминым К., Гариповой Л.\n' +
@@ -1962,30 +1992,30 @@ function goodSpec (name) {
   }
   if (name === 'CONTRA') {
     const entry = '## 2026-10-14\n\n### 1 · письмо Соколовой М.\n' +
-      '- [решено] Деньги за возврат без чека возвращаем наличными на кассе, на карту не возвращаем — решил: Соколова М.; вместо: 2026-10-08 №1 «Возврат только на карту, с которой платили»\n' +
-      '- [сведение] Возврат на карту идёт через банк, покупатели ждут и звонят — со слов Соколова М.\n' +
+      '- [решено] Деньги за возврат без чека возвращаем наличными на кассе, на карту не возвращаем — решил: Соколова М.; вместо: 2026-10-08 №1.2 · 2026-10-14 №1.1\n' +
+      '- [сведение] Возврат на карту идёт через банк, покупатели ждут и звонят — со слов Соколова М. · 2026-10-14 №1.2\n' +
       quote(prompt.split('\n').slice(2).join('\n').trim()) + '\n'
     // 1.1.0: тот же человек передумал — замена строкой, без вопроса «что верно»; вопрос Шага 5 «Записать так?» есть.
     const a1 = 'Соколова М. сама меняет своё решение 2026-10-08 №1 «Возврат только на карту, с которой платили» — п.1 его заменяет.\n' +
       ask('1. [решено] Деньги возвращаем наличными на кассе, на карту не возвращаем — решил: Соколова М.; вместо: 2026-10-08 №1 «Возврат только на карту, с которой платили»')
-    return { seed, files: { [NB_RET]: appendTo(entry) }, answers: [a1, `Записал: ${NB_RET}, 2026-10-14 №1. Замена: п.1 вместо 2026-10-08 №1.\n`], streams: [t1, [edit]] }
+    return { seed, files: { [NB_RET]: appendTo(entry, [[OLD_CARD, 'заменён: 2026-10-14 №1.1']]) }, answers: [a1, `Записал: ${NB_RET}, 2026-10-14 №1. Замена: п.1 вместо 2026-10-08 №1.2.\n`], streams: [t1, [edit]] }
   }
   if (name === 'DISPUTE') {
     const entry = '## 2026-10-14\n\n### 1 · письмо Гариповой Л. (бухгалтерия)\n' +
-      '- [открыто] что верно: возврат только на карту, с которой платили (Соколова М., 2026-10-08 №1) или наличными на кассе, на карту не возвращаем (Гарипова Л.) — ждёт: Соколова М.\n' +
-      '- [сведение] Возврат на карту без чека касса провести не может, банк такие операции отклоняет — со слов Гарипова Л.\n' +
+      '- [открыто] что верно: возврат только на карту, с которой платили (Соколова М., 2026-10-08 №1.2) или наличными на кассе, на карту не возвращаем (Гарипова Л.) — ждёт: Соколова М. · 2026-10-14 №1.1\n' +
+      '- [сведение] Возврат на карту без чека касса провести не может, банк такие операции отклоняет — со слов Гарипова Л. · 2026-10-14 №1.2\n' +
       quote(prompt.split('\n').slice(2).join('\n').trim()) + '\n'
     const a1 = ask('1. [решено] Деньги покупателю отдаём наличными на кассе, на карту не возвращаем — решил: Гарипова Л.\n2. [сведение] Возврат на карту без чека касса провести не может, банк такие операции отклоняет — со слов Гарипова Л.') +
       'Спор: п.1 и 2026-10-08 №1 «Возврат только на карту, с которой платили» (Соколова М.). Сейчас (Гарипова Л.): наличными на кассе. Что действует — новое, старое или спор в открытые (кто решает)?\n'
-    return { seed, files: { [NB_RET]: appendTo(entry) }, answers: [a1, done], streams: [t1, [edit]] }
+    return { seed, files: { [NB_RET]: appendTo(entry, [[OLD_CARD, 'оспорен: 2026-10-14 №1.1']]) }, answers: [a1, done], streams: [t1, [edit]] }
   }
   if (name === 'ANSWER') {
     const entry = '## 2026-10-14\n\n### 1 · письмо Гариповой Л. (бухгалтерия)\n' +
-      '- [решено] Акт возврата без чека подписывает старший кассир смены, директор магазина не нужен — решил: Гарипова Л.; отвечает на: 2026-10-09 №1 «Кто подписывает акт возврата без чека»\n' +
-      '- [сведение] Оригинал акта остаётся в магазине, бухгалтерии — скан к дневному отчёту — со слов Гарипова Л.\n' +
+      '- [решено] Акт возврата без чека подписывает старший кассир смены, директор магазина не нужен — решил: Гарипова Л.; отвечает на: 2026-10-09 №1.2 · 2026-10-14 №1.1\n' +
+      '- [сведение] Оригинал акта остаётся в магазине, бухгалтерии — скан к дневному отчёту — со слов Гарипова Л. · 2026-10-14 №1.2\n' +
       quote(prompt.split('\n').slice(2).join('\n').trim()) + '\n'
     const a1 = ask('1. [решено] Акт возврата без чека подписывает старший кассир смены, директор магазина не нужен — решил: Гарипова Л.; отвечает на: 2026-10-09 №1 «Кто подписывает акт возврата без чека»\n2. [сведение] Оригинал акта остаётся в магазине, бухгалтерии — скан к дневному отчёту — со слов Гарипова Л.')
-    return { seed, files: { [NB_RET]: appendTo(entry) }, answers: [a1, done], streams: [t1, [edit]] }
+    return { seed, files: { [NB_RET]: appendTo(entry, [[OLD_Q_LINE, 'закрыт: 2026-10-14 №1.1']]) }, answers: [a1, done], streams: [t1, [edit]] }
   }
   if (name === 'ASK') {
     const a1 = `Ноут: ${NB_RET}.\n\n` +
@@ -2028,12 +2058,12 @@ function goodSpec (name) {
   const readList = (rel) => ev('Read', { file_path: SB + rel })
   if (name === 'PTS-IN') {
     const [money, act, check, launch] = listOf(LIST_IN)
-    const its = [money + '; вместо: 2026-10-08 №1 «Возврат только на карту, с которой платили»',
-      act + '; отвечает на: 2026-10-09 №1 «Кто подписывает акт возврата без чека»', check, launch]
+    const its = [money + '; вместо: 2026-10-08 №1.2 · 2026-10-14 №1.1', act + '; отвечает на: 2026-10-09 №1.2 · 2026-10-14 №1.2',
+      check + ' · 2026-10-14 №1.3', launch + ' · 2026-10-14 №1.4']
     const entry = '## 2026-10-14\n\n### 1 · встреча 2026-10-13: возврат товара без чека\n' + its.join('\n') + '\n> исходник: docs/_inbox/meeting-2026-10-13.points.md\n'
     const a1 = 'Пункт 1 заменяет решение той же Соколовой М. 2026-10-08 №1 «Возврат только на карту, с которой платили»; пункт 2 отвечает на открытый вопрос 2026-10-09 №1.\n' +
       ask(its.map((l, i) => `${i + 1}. ${l.slice(2)}`).join('\n'))
-    return { seed, files: { [NB_RET]: appendTo(entry) }, answers: [a1, `Записал: ${NB_RET}, 2026-10-14 №1. Замена: п.1 вместо 2026-10-08 №1; ответ: п.2 на 2026-10-09 №1.\n`],
+    return { seed, files: { [NB_RET]: appendTo(entry, [[OLD_CARD, 'заменён: 2026-10-14 №1.1'], [OLD_Q_LINE, 'закрыт: 2026-10-14 №1.2']]) }, answers: [a1, `Записал: ${NB_RET}, 2026-10-14 №1. Замена: п.1 вместо 2026-10-08 №1.2; ответ: п.2 на 2026-10-09 №1.2.\n`],
       streams: [[...t1, readList(LIST_IN)], [edit]] }
   }
   if (name === 'PTS-NEW') {
@@ -2048,10 +2078,11 @@ function goodSpec (name) {
   if (name === 'PTS-REC') {
     const its = listOf(LIST_REC)
     const entry = '## 2026-10-14\n\n### 1 · встреча по памяти 2026-10-14: отмена записи, правки по итогам пилота\n' + its.join('\n') + '\n> исходник: docs/MED-77/meeting-2026-10-14.points.md\n'
-    const a1 = `Пишу в ноут «отмена записи пациентом после пилота» (${NB_REC}), 2026-10-14 №1, встреча по памяти 2026-10-14:\n` +
-      its.map((l, i) => `${i + 1}. ${l.slice(2)}`).join('\n') + '\nЗаписать так или поправить?\n'
-    return { seed, nb: NB_REC, files: { [NB_REC]: seed[NB_REC].replace(/\s+$/, '') + '\n\n' + entry }, answers: [a1, `Записал: ${NB_REC}, 2026-10-14 №1.\n`],
-      streams: [[ev('Grep', { pattern: '^- \\[', path: SB + NB_REC }), readList(LIST_REC)], [ev('Edit', { file_path: SB + NB_REC, old_string: 'x', new_string: 'y' })]] }
+    // 2.3.0 (Р5): сверка ничего не нашла — запись на ходу 1, отчёт вместо вопроса.
+    const a1 = `Записал в ноут «отмена записи пациентом после пилота» (${NB_REC}), 2026-10-14 №1, встреча по памяти 2026-10-14:\n` +
+      its.map((l, i) => `${i + 1}. ${l.slice(2)}`).join('\n') + '\nСовпадений с прошлыми записями нет.\n'
+    return { seed, nb: NB_REC, files: { [NB_REC]: seed[NB_REC].replace(/\s+$/, '') + '\n\n' + entry }, answers: [a1],
+      streams: [[ev('Grep', { pattern: '^- \\[', path: SB + NB_REC }), readList(LIST_REC), ev('Edit', { file_path: SB + NB_REC, old_string: 'x', new_string: 'y' })]] }
   }
   if (name === 'EXPORT' || name === 'EXPORT-SINCE') {
     const pts = 'notes/возврат-товара-без-чека/notebook-2026-10-14.points.md'
@@ -2060,12 +2091,12 @@ function goodSpec (name) {
       ['2026-10-07 №1', '- [открыто] Нужен ли паспорт покупателя при возврате без чека — ждёт: юристы'],
       ['2026-10-07 №2', '- [мысль] А если покупку оплатили подарочной картой, а чека нет, — куда тогда возвращать деньги?'],
       ['2026-10-08 №1', '- [сведение] Возвраты без чека бухгалтерия хочет видеть отдельной строкой в дневном отчёте — со слов Гарипова Л.'],
-      ['2026-10-08 №2', '- [набросок] Экран кассира: найти покупку в истории по карте лояльности, отметить возвращаемый товар, напечатать акт'],
+      ['2026-10-08 №2', '- [мысль] Экран кассира: найти покупку в истории по карте лояльности, отметить возвращаемый товар, напечатать акт'],
       ['2026-10-09 №1', '- [решено] Деньги за возврат без чека возвращаем наличными на кассе, на карту не возвращаем — решил: Соколова М.'],
       ['2026-10-09 №1', '- [сведение] Возврат на карту идёт через банк, покупатели ждут и звонят — со слов Соколова М.'],
       ['2026-10-10 №1', '- [решено] Акт возврата без чека подписывает старший кассир смены — решил: Гарипова Л.'],
       ['2026-10-10 №2', '- [мысль] Может, акт печатать прямо на кассе, без бумажного бланка?'],
-      ['2026-10-10 №2', '- [набросок] Отчёт по возвратам без чека: дата, магазин, сумма, кто подписал акт'],
+      ['2026-10-10 №2', '- [мысль] Отчёт по возвратам без чека: дата, магазин, сумма, кто подписал акт'],
     ].filter(([r]) => !fx.since || r.slice(0, 10) >= fx.since)
     const first = items[0][0].slice(0, 10)
     const v = '# Пункты: возврат товара без чека\n> Источник: notes/возврат-товара-без-чека/notebook.md\n> Задача: —\n' +
@@ -2102,7 +2133,7 @@ function goodSpec (name) {
     const pts = 'notes/заселение-без-администратора/notebook-2026-10-14.points.md'
     const act = nbItems(parse(seed[NB_BIG])).filter((x) => !GONE_LN.includes(x.ln))
     const v = '# Пункты: заселение без администратора\n> Источник: notes/заселение-без-администратора/notebook.md\n> Задача: HST-318\n' +
-      '> Ноут: заселение без администратора · записи 2026-09-21–2026-10-13\n\n' + act.map((x) => `${x.line.replace(LINK_TAIL, '').trimEnd()} · ${x.ref}`).join('\n') + '\n'
+      '> Ноут: заселение без администратора · записи 2026-09-21–2026-10-13\n\n' + act.map((x) => exportLine(x.line)).join('\n') + '\n'
     return { seed, nb: NB_BIG, files: { [pts]: v }, view: pts,
       answers: [`Список: ${pts} — пунктов ${act.length}.\nДальше: \`/notes-to-intent ${pts}\`\n`],
       streams: [[ev('Grep', { pattern: '^- \\[', path: SB + NB_BIG }), ev('Grep', { pattern: '^## |^### ', path: SB + NB_BIG }),
@@ -2147,9 +2178,9 @@ function goodSpec (name) {
       '- GET /partners/{partnerId}/customers/{customerId}/balance — баланс клиента — решено (Белкина Т.) · 2026-10-06 №1\n' +
       '- POST /partners/{partnerId}/accruals — начисление за покупку — решено (Орлов Д.) · 2026-10-06 №1\n' +
       '- POST /partners/{partnerId}/reversals — отмена начисления, номер начисления в теле — решено (Белкина Т.) · 2026-10-09 №1\n' +
-      '- POST /partners/{partnerId}/redemptions — списание бонусов при оплате — набросок · 2026-10-08 №1\n' +
-      '- GET /partners/{partnerId}/customers/{customerId}/transactions — история операций клиента — набросок · 2026-10-08 №1\n' +
-      '- POST /partners/{partnerId}/webhooks — подписка партнёра на события — набросок · 2026-10-08 №1\n\n' +
+      '- POST /partners/{partnerId}/redemptions — списание бонусов при оплате — мысль · 2026-10-08 №1\n' +
+      '- GET /partners/{partnerId}/customers/{customerId}/transactions — история операций клиента — мысль · 2026-10-08 №1\n' +
+      '- POST /partners/{partnerId}/webhooks — подписка партнёра на события — мысль · 2026-10-08 №1\n\n' +
       '## Кто вызывает\n' +
       '- Начисление вызывает кассовое ПО партнёра сразу после оплаты — сведение (Орлов Д.) · 2026-10-06 №1\n' +
       '- Баланс запрашивают касса партнёра и его мобильное приложение — сведение (Орлов Д.) · 2026-10-06 №1\n' +
@@ -2177,9 +2208,9 @@ function goodSpec (name) {
   const a2 = '# User stories по партнёрам и сроки запуска\n\n' +
     `> Собрано из ноута ${NB_API} на 2026-10-14.\n\n` +
     '## Истории партнёров\n' +
-    '1. Как партнёр, хочу видеть баланс клиента на кассе, чтобы сразу предложить оплатить покупку бонусами — набросок · 2026-10-08 №1\n' +
-    '2. Как партнёр, хочу получать событие, когда клиент списал бонусы в моей точке, чтобы не опрашивать историю — набросок · 2026-10-08 №1\n' +
-    '3. Как партнёр, хочу выгрузить все начисления за месяц, чтобы сверить их со своим учётом — набросок · 2026-10-08 №1\n\n' +
+    '1. Как партнёр, хочу видеть баланс клиента на кассе, чтобы сразу предложить оплатить покупку бонусами — мысль · 2026-10-08 №1\n' +
+    '2. Как партнёр, хочу получать событие, когда клиент списал бонусы в моей точке, чтобы не опрашивать историю — мысль · 2026-10-08 №1\n' +
+    '3. Как партнёр, хочу выгрузить все начисления за месяц, чтобы сверить их со своим учётом — мысль · 2026-10-08 №1\n\n' +
     '## Сроки запуска\nВ ноуте нет.\n'
   return { seed, files: {}, answers: ['Разделы: истории партнёров, сроки запуска — так?\nКуда: файлом или в чат? Рекомендую файлом.\n', a2, 'Готово, выкладка выше.\n'],
     streams: [[ev('Grep', { pattern: '^- \\[', path: SB + NB_API })], [ev('Agent', { prompt: 'Прочитай рубрику …' })], []] }
@@ -2218,7 +2249,8 @@ const nbEdit = (from, to) => (s) => { s.files[nbOf(s)] = sub(s.files[nbOf(s)], f
 const nbInsertItem = (line) => (s) => { const t = s.files[nbOf(s)]; const i = t.indexOf('\n- [', t.indexOf('## 2026-10-14')); if (i < 0) throw new Error('нет пункта'); const j = t.indexOf('\n', i + 1); s.files[nbOf(s)] = t.slice(0, j + 1) + line + '\n' + t.slice(j + 1); return s }
 const addFile = (rel, c = 'x') => (s) => { s.files[rel] = c; return s }
 // Засев ноута лёг в CRLF (рабочая копия с `core.autocrlf`), дописанное — как есть.
-const seedCrlfOk = (s) => { const base = s.seed[nbOf(s)].replace(/\s+$/, ''); const tail = s.files[nbOf(s)].slice(base.length); s.seedCrlf = true; s.files[nbOf(s)] = base.replace(/\n/g, '\r\n') + tail; return s }
+// Старая часть — по строкам засева (2.0.0: в ней могут стоять пометки ` ‖ …`): эти строки — в CRLF, дописанное — в LF.
+const seedCrlfOk = (s) => { const n = s.seed[nbOf(s)].replace(/\s+$/, '').split('\n').length; const ls = s.files[nbOf(s)].split('\n'); s.seedCrlf = true; s.files[nbOf(s)] = ls.map((l, i) => (i < n - 1 ? l + '\r' : l)).join('\n'); return s }
 const ansEdit = (k, f) => (s) => { s.answers[k] = f(s.answers[k]); return s }
 const viewEdit = (from, to) => (s) => { s.files[s.view] = sub(s.files[s.view], from, to); return s }
 
@@ -2272,40 +2304,40 @@ const BIG_ROW = {
 const BIG_TABLE = '| Решение | Кто решил | Вид | Запись |\n|---|---|---|---|\n' + Object.values(BIG_ROW).join('\n') + '\n'
 // Строки выгрузки NB-BIG по номеру строки ноута: пункт без хвостов связи и ` · <запись>` — для эталона и порч.
 const BIG_X = Object.fromEntries(nbItems(parse(readFileSync(join(HERE, 'fixtures', 'NB-BIG', 'seed', NB_BIG), 'utf8')))
-  .map((x) => [x.ln, `${x.line.replace(LINK_TAIL, '').trimEnd()} · ${x.ref}`]))
+  .map((x) => [x.ln, exportLine(x.line)]))
 const ptsAdd = (line) => (s) => { s.files[s.view] = s.files[s.view].replace(/\s+$/, '') + '\n' + line + '\n'; return s }
 
 // Выкладка VIEW-PART: зелёная — списком; законные варианты — той же сутью в другой нотации.
 const VP_LIST =
-  '- Партнёр → наш API: подписка на события (POST /partners/{partnerId}/webhooks) — набросок · 2026-10-08 №1\n' +
+  '- Партнёр → наш API: подписка на события (POST /partners/{partnerId}/webhooks) — мысль · 2026-10-08 №1\n' +
   '- Наш API → партнёр: вебхук о каждом списании бонусов на адрес из подписки — решено (Белкина Т.) · 2026-10-10 №1\n' +
   '- Мобильное приложение партнёра → наш API: запрос истории операций клиента — сведение (Ахмедов Р.) · 2026-10-10 №1\n' +
   '- Наш API → учётная система бонусов: каждое списание, балансы клиентов хранятся там — сведение (Белкина Т.) · 2026-10-10 №1\n' +
-  '- Наш API → касса партнёра: баланс клиента, чтобы предложить оплатить покупку бонусами — набросок · 2026-10-08 №1\n' +
-  '- Наш API → партнёр: выгрузка всех начислений за месяц для сверки — набросок · 2026-10-08 №1\n'
+  '- Наш API → касса партнёра: баланс клиента, чтобы предложить оплатить покупку бонусами — мысль · 2026-10-08 №1\n' +
+  '- Наш API → партнёр: выгрузка всех начислений за месяц для сверки — мысль · 2026-10-08 №1\n'
 const VP_MERMAID = '```mermaid\nflowchart LR\n' +
   '  P[Партнёр]\n  K[Касса партнёра]\n  M[Мобильное приложение партнёра]\n  A[Наш API]\n  U[Учётная система бонусов]\n' +
-  '  P -->|подписка на события — набросок · 2026-10-08 №1| A\n' +
+  '  P -->|подписка на события — мысль · 2026-10-08 №1| A\n' +
   '  A -->|вебхук о каждом списании — решено · 2026-10-10 №1| P\n' +
   '  M -->|запрос истории операций — сведение · 2026-10-10 №1| A\n' +
   '  A -->|каждое списание — сведение · 2026-10-10 №1| U\n' +
-  '  A -->|баланс клиента на кассе — набросок · 2026-10-08 №1| K\n' +
-  '  A -->|выгрузка начислений за месяц — набросок · 2026-10-08 №1| P\n```\n'
+  '  A -->|баланс клиента на кассе — мысль · 2026-10-08 №1| K\n' +
+  '  A -->|выгрузка начислений за месяц — мысль · 2026-10-08 №1| P\n```\n'
 const VP_SEQ = '```mermaid\nsequenceDiagram\n' +
   '  participant P as Партнёр\n  participant K as Касса партнёра\n  participant M as Мобильное приложение партнёра\n  participant A as Наш API\n  participant U as Учётная система бонусов\n' +
-  '  P->>A: подписка на события — набросок · 2026-10-08 №1\n' +
+  '  P->>A: подписка на события — мысль · 2026-10-08 №1\n' +
   '  A->>P: вебхук о каждом списании — решено · 2026-10-10 №1\n' +
   '  M->>A: запрос истории операций — сведение · 2026-10-10 №1\n' +
   '  A->>U: каждое списание — сведение · 2026-10-10 №1\n' +
-  '  A->>K: баланс клиента на кассе — набросок · 2026-10-08 №1\n```\n'
+  '  A->>K: баланс клиента на кассе — мысль · 2026-10-08 №1\n```\n'
 const VP_TABLE = '| Откуда | Куда | Что | Вид | Запись |\n|---|---|---|---|---|\n' +
-  '| Партнёр | Наш API | подписка на события | набросок | 2026-10-08 №1 |\n' +
+  '| Партнёр | Наш API | подписка на события | мысль | 2026-10-08 №1 |\n' +
   '| Наш API | Партнёр | вебхук о каждом списании | решено (Белкина Т.) | 2026-10-10 №1 |\n' +
   '| Мобильное приложение партнёра | Наш API | запрос истории операций | сведение | 2026-10-10 №1 |\n' +
   '| Наш API | Учётная система бонусов | каждое списание | сведение | 2026-10-10 №1 |\n' +
-  '| Наш API | Касса партнёра | баланс клиента | набросок | 2026-10-08 №1 |\n'
-const VP_HEADS = '### Наш API → партнёр\n- вебхук о каждом списании — решено (Белкина Т.) · 2026-10-10 №1\n- выгрузка всех начислений за месяц — набросок · 2026-10-08 №1\n\n' +
-  '### Партнёр → наш API\n- подписка на события — набросок · 2026-10-08 №1\n\n' +
+  '| Наш API | Касса партнёра | баланс клиента | мысль | 2026-10-08 №1 |\n'
+const VP_HEADS = '### Наш API → партнёр\n- вебхук о каждом списании — решено (Белкина Т.) · 2026-10-10 №1\n- выгрузка всех начислений за месяц — мысль · 2026-10-08 №1\n\n' +
+  '### Партнёр → наш API\n- подписка на события — мысль · 2026-10-08 №1\n\n' +
   '### Мобильное приложение партнёра → наш API\n- запрос истории операций клиента — сведение (Ахмедов Р.) · 2026-10-10 №1\n\n' +
   '### Наш API → учётная система бонусов\n- каждое списание — сведение (Белкина Т.) · 2026-10-10 №1\n'
 
@@ -2332,7 +2364,8 @@ const BAD = {
     ...SEEDED_BAD, ...COMMON_BAD,
     { id: 'heading', d: 'запись не «мысль»', f: nbEdit('### 1 · мысль аналитика', '### 1 · вопрос аналитика') },
     { id: 'thought', d: 'вид [открыто]', f: nbEdit('- [мысль]', '- [открыто]') },
-    { id: 'noDecided', d: '[набросок] в записи', f: nbInsertItem('- [набросок] Подарочной картой — только обмен на другой товар') },
+    { id: 'kinds', d: '[набросок] — вид вне четырёх (2.2.0)', f: nbInsertItem('- [набросок] Подарочной картой — только обмен на другой товар') },
+    { id: 'noDecided', d: '[решено] в записи мысли', f: nbInsertItem('- [решено] Подарочной картой — только обмен на другой товар — решил: Соколова М.') },
   ],
   CONTRA: [
     ...SEEDED_BAD, ...COMMON_BAD,
@@ -2341,11 +2374,12 @@ const BAD = {
     { id: 'noWhich', d: 'спрошено «новое или старое»', f: ansEdit(0, (a) => a + 'Оставляем новое или старое?\n') },
     { id: 'noWhich', d: 'спрошено «какое решение действует»', f: ansEdit(0, (a) => a + 'Какое из двух решений действует?\n') },
     { id: 'beforeWrite', d: 'запись на ходу 1', f: (s) => { s.streams[0].push(ev('Edit', { file_path: SB + NB_RET, old_string: 'x', new_string: 'y' })); return s } },
-    { id: 'replaced', d: 'без «вместо:»', f: nbEdit('; вместо: 2026-10-08 №1 «Возврат только на карту, с которой платили»', '') },
-    { id: 'replaced', d: '«вместо:» без кавычек', f: nbEdit(' «Возврат только на карту, с которой платили»\n- [сведение]', '\n- [сведение]') },
+    { id: 'replaced', d: 'без «вместо:»', f: nbEdit('; вместо: 2026-10-08 №1.2', '') },
+    { id: 'replaced', d: '«вместо:» на запись, а не на пункт', f: nbEdit('вместо: 2026-10-08 №1.2', 'вместо: 2026-10-08 №1') },
+    { id: 'replaced', d: 'у старого пункта нет пометки', f: nbEdit(OLD_CARD + ' ‖ заменён: 2026-10-14 №1.1', OLD_CARD) },
     { id: 'replaced', d: 'решил не Соколова', f: nbEdit('не возвращаем — решил: Соколова М.; вместо', 'не возвращаем — решил: Ильин П.; вместо') },
-    { id: 'oldItem', d: 'старый пункт удалён', f: nbEdit(OLD_CARD + '\n', '') },
-    { id: 'replaced', d: 'в кавычках начало другого пункта той же записи', f: nbEdit('«Возврат только на карту, с которой платили»\n', '«Без чека возврат принимаем»\n') },
+    { id: 'oldItem', d: 'старый пункт удалён', f: nbEdit(OLD_CARD + ' ‖ заменён: 2026-10-14 №1.1\n', '') },
+    { id: 'replaced', d: 'заменён другой пункт той же записи', f: nbEdit('вместо: 2026-10-08 №1.2', 'вместо: 2026-10-08 №1.1') },
     // Снимок засева: засеяно в CRLF (рабочая копия с `core.autocrlf`), старая часть после прогона — в LF.
     { id: 'old', d: 'засев в CRLF по снимку, старая часть переписана в LF', f: (s) => { s.seedCrlf = true; return s } },
     { id: 'noWhich', d: '«Какое решение записать как действующее?»', f: ansEdit(0, (a) => a + 'Какое решение записать как действующее?\n') },
@@ -2356,26 +2390,29 @@ const BAD = {
     { id: 'bothSides', d: 'старая сторона без имени и ответа', f: ansEdit(0, (a) => sub(a, 'Спор: п.1 и 2026-10-08 №1 «Возврат только на карту, с которой платили» (Соколова М.).', 'Расходится с прошлым пунктом.')) },
     { id: 'bothSides', d: 'замена без вопроса, как у того же человека', f: ansEdit(0, (a) => sub(a, 'Спор: п.1 и 2026-10-08 №1 «Возврат только на карту, с которой платили» (Соколова М.). Сейчас (Гарипова Л.): наличными на кассе. Что действует — новое, старое или спор в открытые (кто решает)?\n', 'п.1 заменяет 2026-10-08 №1 «Возврат только на карту, с которой платили».\n')) },
     { id: 'beforeWrite', d: 'запись на ходу 1', f: (s) => { s.streams[0].push(ev('Edit', { file_path: SB + NB_RET, old_string: 'x', new_string: 'y' })); return s } },
-    { id: 'openDispute', d: 'ждёт не Соколову', f: nbEdit('— ждёт: Соколова М.\n', '— ждёт: —\n') },
+    { id: 'openDispute', d: 'ждёт не Соколову', f: nbEdit('— ждёт: Соколова М. · 2026-10-14 №1.1', '— ждёт: — · 2026-10-14 №1.1') },
+    { id: 'openDispute', d: 'сторона спора — запись, а не пункт', f: nbEdit('(Соколова М., 2026-10-08 №1.2)', '(Соколова М., 2026-10-08 №1)') },
+    { id: 'openDispute', d: 'у оспоренного нет пометки', f: nbEdit(OLD_CARD + ' ‖ оспорен: 2026-10-14 №1.1', OLD_CARD) },
     { id: 'openDispute', d: 'без «что верно»', f: nbEdit('- [открыто] что верно: возврат', '- [открыто] Куда возвращать деньги: возврат') },
     { id: 'openDispute', d: 'одна сторона', f: nbEdit(' или наличными на кассе, на карту не возвращаем (Гарипова Л.)', '') },
     { id: 'noDecidedNew', d: '[решено] Гариповой', f: nbInsertItem('- [решено] Деньги покупателю отдаём наличными на кассе — решил: Гарипова Л.') },
-    { id: 'noReplace', d: '«вместо:» в записи', f: nbInsertItem('- [сведение] Банк отклоняет возвраты на карту без чека — со слов Гарипова Л.; вместо: 2026-10-08 №1 «Возврат только на карту»') },
+    { id: 'noReplace', d: '«вместо:» в записи', f: nbInsertItem('- [сведение] Банк отклоняет возвраты на карту без чека — со слов Гарипова Л.; вместо: 2026-10-08 №1.2 · 2026-10-14 №1.3') },
     // «…или „не знаю“ — тогда в открытые» под вопросом «кто решил» — не вопрос о споре.
     { id: 'bothSides', d: 'замена без вопроса о споре, но с «кто решил … в открытые?»', f: ansEdit(0, (a) => sub(a, 'Спор: п.1 и 2026-10-08 №1 «Возврат только на карту, с которой платили» (Соколова М.). Сейчас (Гарипова Л.): наличными на кассе. Что действует — новое, старое или спор в открытые (кто решает)?\n', 'п.1 заменяет решение Соколовой М. 2026-10-08 №1 «Возврат только на карту, с которой платили».\nп.1: решил Гарипова Л.? или «не знаю» — тогда в открытые.\n')) },
     // Хвосты спора — именем из ноута; имя не из ноута и имя из ноута в обычном пункте — выдумка.
-    { id: 'invented', d: 'в скобке спора имя не из ноута', f: nbEdit('(Соколова М., 2026-10-08 №1)', '(Петров А., 2026-10-08 №1)') },
-    { id: 'invented', d: 'в «ждёт:» спора имя не из ноута', f: nbEdit('— ждёт: Соколова М.\n', '— ждёт: Соколова М., Белов С.\n') },
+    { id: 'invented', d: 'в скобке спора имя не из ноута', f: nbEdit('(Соколова М., 2026-10-08 №1.2)', '(Петров А., 2026-10-08 №1.2)') },
+    { id: 'invented', d: 'в «ждёт:» спора имя не из ноута', f: nbEdit('— ждёт: Соколова М. · 2026-10-14 №1.1', '— ждёт: Соколова М., Белов С. · 2026-10-14 №1.1') },
     { id: 'invented', d: 'имя из ноута в «ждёт:» обычного пункта', f: nbInsertItem('- [открыто] Как кассе проводить возврат наличными — ждёт: Дёмин К.') },
   ],
   ANSWER: [
     ...SEEDED_BAD, ...COMMON_BAD,
     { id: 'noWhich', d: 'спрошено «что действует»', f: ansEdit(0, (a) => a + 'Что действует — новое или старое?\n') },
-    { id: 'answered', d: 'без «отвечает на:»', f: nbEdit('; отвечает на: 2026-10-09 №1 «Кто подписывает акт возврата без чека»', '') },
-    { id: 'answered', d: 'ответ не на тот вопрос', f: nbEdit('отвечает на: 2026-10-09 №1', 'отвечает на: 2026-10-08 №2') },
-    { id: 'answered', d: 'без кавычек', f: nbEdit(' «Кто подписывает акт возврата без чека»', '') },
-    { id: 'answered', d: 'в кавычках — сведение той же записи, не вопрос', f: nbEdit('«Кто подписывает акт возврата без чека»\n', '«Возвраты без чека бухгалтерия хочет видеть»\n') },
-    { id: 'answered', d: 'сведение «отвечает» на другой вопрос', f: nbEdit('скан к дневному отчёту — со слов Гарипова Л.\n', 'скан к дневному отчёту — со слов Гарипова Л.; отвечает на: 2026-10-08 №1 «Нужен ли паспорт покупателя»\n') },
+    { id: 'answered', d: 'без «отвечает на:»', f: nbEdit('; отвечает на: 2026-10-09 №1.2', '') },
+    { id: 'answered', d: 'ответ не на тот вопрос', f: nbEdit('отвечает на: 2026-10-09 №1.2', 'отвечает на: 2026-10-08 №2.1') },
+    { id: 'answered', d: 'ссылка на запись, а не на пункт', f: nbEdit('отвечает на: 2026-10-09 №1.2', 'отвечает на: 2026-10-09 №1') },
+    { id: 'answered', d: 'закрыт другой пункт той же записи', f: nbEdit('отвечает на: 2026-10-09 №1.2', 'отвечает на: 2026-10-09 №1.1') },
+    { id: 'answered', d: 'у вопроса нет пометки', f: nbEdit(OLD_Q_LINE + ' ‖ закрыт: 2026-10-14 №1.1', OLD_Q_LINE) },
+    { id: 'answered', d: 'сведение «отвечает» на другой вопрос', f: nbEdit('скан к дневному отчёту — со слов Гарипова Л. · 2026-10-14 №1.2', 'скан к дневному отчёту — со слов Гарипова Л.; отвечает на: 2026-10-08 №1.3 · 2026-10-14 №1.2') },
   ],
   ASK: [
     { id: 'files', d: 'ноут дописан', f: (s) => { s.files[NB_RET] = s.seed[NB_RET] + '\n## 2026-10-14\n'; return s } },
@@ -2447,11 +2484,11 @@ const BAD = {
     { id: 'viewFile', d: 'дата засева в имени', f: (s) => { const v = s.files[s.view]; delete s.files[s.view]; s.view = s.view.replace('2026-10-14', '2026-10-09'); s.files[s.view] = v; return s } },
     { id: 'viewFile', d: 'выкладка не в папке ноута', f: (s) => { const v = s.files[s.view]; delete s.files[s.view]; s.view = 'notes/выкладки/проектировка-api-2026-10-14.md'; s.files[s.view] = v; return s } },
     { id: 'vhead', d: 'нет шапки', f: viewEdit(`> Собрано из ноута ${NB_API} на 2026-10-14. Правки — в ноут, выкладку пересобрать.\n`, '') },
-    { id: 'all6', d: 'нет webhooks', f: viewEdit('- POST /partners/{partnerId}/webhooks — подписка партнёра на события — набросок · 2026-10-08 №1\n', '') },
+    { id: 'all6', d: 'нет webhooks', f: viewEdit('- POST /partners/{partnerId}/webhooks — подписка партнёра на события — мысль · 2026-10-08 №1\n', '') },
     { id: 'oldPath', d: 'путь A действующим', f: viewEdit('## Кто вызывает', '- POST /bonus/cancel — отмена начисления — решено (Белкина Т.) · 2026-10-06 №2\n\n## Кто вызывает') },
-    { id: 'drafts', d: 'набросок подан решённым', f: viewEdit('списание бонусов при оплате — набросок', 'списание бонусов при оплате — решено (Орлов Д.)') },
-    { id: 'drafts', d: 'набросок без подписи', f: viewEdit('история операций клиента — набросок', 'история операций клиента') },
-    { id: 'refs', d: 'ручка без ссылки', f: viewEdit('подписка партнёра на события — набросок · 2026-10-08 №1', 'подписка партнёра на события — набросок') },
+    { id: 'drafts', d: 'набросок подан решённым', f: viewEdit('списание бонусов при оплате — мысль', 'списание бонусов при оплате — решено (Орлов Д.)') },
+    { id: 'drafts', d: 'набросок без подписи', f: viewEdit('история операций клиента — мысль', 'история операций клиента') },
+    { id: 'refs', d: 'ручка без ссылки', f: viewEdit('подписка партнёра на события — мысль · 2026-10-08 №1', 'подписка партнёра на события — мысль') },
     { id: 'noInvented', d: 'путь не из ноута', f: viewEdit('## Кто вызывает', '- DELETE /partners/{partnerId}/accruals/{accrualId} — отмена — решено (Белкина Т.) · 2026-10-09 №1\n\n## Кто вызывает') },
     { id: 'noInvented', d: 'метод не из ноута', f: viewEdit('- POST /partners/{partnerId}/reversals', '- PUT /partners/{partnerId}/reversals') },
     { id: 'noInvented', d: 'путь не из ноута после «**»', f: viewEdit('## Кто вызывает', '- **/partners/{partnerId}/refunds** — возврат — решено (Белкина Т.) · 2026-10-09 №1\n\n## Кто вызывает') },
@@ -2469,21 +2506,21 @@ const BAD = {
   'VIEW-CHAT': [
     { id: 'files', d: 'выкладка файлом', f: addFile(dirname(NB_API) + '/истории-2026-10-14.md') },
     { id: 'notebook', d: 'ноут изменён', f: (s) => { s.files[NB_API] = s.seed[NB_API].replace('раз в сутки', 'раз в час'); return s } },
-    { id: 'stories', d: 'история без ссылки', f: ansEdit(1, (a) => sub(a, 'чтобы не опрашивать историю — набросок · 2026-10-08 №1', 'чтобы не опрашивать историю — набросок')) },
+    { id: 'stories', d: 'история без ссылки', f: ansEdit(1, (a) => sub(a, 'чтобы не опрашивать историю — мысль · 2026-10-08 №1', 'чтобы не опрашивать историю — мысль')) },
     { id: 'noDeadline', d: 'про сроки ничего', f: ansEdit(1, (a) => sub(a, '## Сроки запуска\nВ ноуте нет.\n', '')) },
     { id: 'noDate', d: 'выдуманная дата', f: ansEdit(1, (a) => sub(a, 'В ноуте нет.', 'В ноуте нет. Ориентир по запуску — 1 декабря.')) },
     { id: 'noDate', d: 'выдуманный квартал', f: ansEdit(1, (a) => sub(a, 'В ноуте нет.', 'В ноуте нет, но запуск — в следующем квартале.')) },
     // Грейдится ход, где собрана выкладка, а не склейка ходов: история и «в ноуте нет» из плана хода 1 не в счёт.
-    { id: 'stories', d: 'история со ссылкой только в плане хода 1', f: (s) => { s.answers[0] += '2. Как партнёр, хочу получать событие, когда клиент списал бонусы в моей точке, чтобы не опрашивать историю — набросок · 2026-10-08 №1\n'; s.answers[1] = sub(s.answers[1], '2. Как партнёр, хочу получать событие, когда клиент списал бонусы в моей точке, чтобы не опрашивать историю — набросок · 2026-10-08 №1\n', ''); return s } },
+    { id: 'stories', d: 'история со ссылкой только в плане хода 1', f: (s) => { s.answers[0] += '2. Как партнёр, хочу получать событие, когда клиент списал бонусы в моей точке, чтобы не опрашивать историю — мысль · 2026-10-08 №1\n'; s.answers[1] = sub(s.answers[1], '2. Как партнёр, хочу получать событие, когда клиент списал бонусы в моей точке, чтобы не опрашивать историю — мысль · 2026-10-08 №1\n', ''); return s } },
     { id: 'noDeadline', d: '«в ноуте нет» про сроки только в плане хода 1', f: (s) => { s.answers[0] += 'Сроков запуска в ноуте нет.\n'; s.answers[1] = sub(s.answers[1], '## Сроки запуска\nВ ноуте нет.\n', '## Сроки запуска\n'); return s } },
     // Истории списком без пустых строк: блок — пункт, ссылка соседнего пункта не его.
-    { id: 'stories', d: 'ссылка только у последней истории списка', f: ansEdit(1, (a) => a.replace(' — набросок · 2026-10-08 №1\n2.', ' — набросок\n2.').replace(' — набросок · 2026-10-08 №1\n3.', ' — набросок\n3.')) },
+    { id: 'stories', d: 'ссылка только у последней истории списка', f: ansEdit(1, (a) => a.replace(' — мысль · 2026-10-08 №1\n2.', ' — мысль\n2.').replace(' — мысль · 2026-10-08 №1\n3.', ' — мысль\n3.')) },
     { id: 'noDate', d: 'чужая дата в строке «Собрано из ноута»', f: ansEdit(1, (a) => sub(a, `> Собрано из ноута ${NB_API} на 2026-10-14.`, `> Собрано из ноута ${NB_API} на 2026-12-01.`)) },
     // Истории в ноуте — наброски.
-    { id: 'drafts', d: 'история подана «решено»', f: ansEdit(1, (a) => sub(a, 'покупку бонусами — набросок · 2026-10-08 №1', 'покупку бонусами — решено (Белкина Т.) · 2026-10-08 №1')) },
-    { id: 'drafts', d: 'история с «решил:»', f: ansEdit(1, (a) => sub(a, 'со своим учётом — набросок · 2026-10-08 №1', 'со своим учётом — набросок; решил: Орлов Д. · 2026-10-08 №1')) },
+    { id: 'drafts', d: 'история подана «решено»', f: ansEdit(1, (a) => sub(a, 'покупку бонусами — мысль · 2026-10-08 №1', 'покупку бонусами — решено (Белкина Т.) · 2026-10-08 №1')) },
+    { id: 'drafts', d: 'история с «решил:»', f: ansEdit(1, (a) => sub(a, 'со своим учётом — мысль · 2026-10-08 №1', 'со своим учётом — мысль; решил: Орлов Д. · 2026-10-08 №1')) },
     { id: 'elemWords', d: 'число не из ноута в истории', f: ansEdit(1, (a) => sub(a, 'все начисления за месяц', 'все начисления за 3 месяца')) },
-    { id: 'elemWords', d: 'роль в «ждёт:» не из ноута', f: ansEdit(1, (a) => sub(a, 'опрашивать историю — набросок · 2026-10-08 №1', 'опрашивать историю — набросок, ждёт: юристы · 2026-10-08 №1')) },
+    { id: 'elemWords', d: 'роль в «ждёт:» не из ноута', f: ansEdit(1, (a) => sub(a, 'опрашивать историю — мысль · 2026-10-08 №1', 'опрашивать историю — мысль, ждёт: юристы · 2026-10-08 №1')) },
   ],
   'VIEW-PART': [
     { id: 'files', d: 'лишний файл', f: addFile(dirname(NB_API) + '/черновик.md') },
@@ -2520,17 +2557,18 @@ const BAD = {
     { id: 'listHead', d: '«встреча по памяти» у расшифровки', f: nbEdit('### 1 · встреча 2026-10-13:', '### 1 · встреча по памяти 2026-10-13:') },
     { id: 'listHead', d: 'дата прогона вместо даты встречи', f: nbEdit('### 1 · встреча 2026-10-13:', '### 1 · встреча 2026-10-14:') },
     { id: 'asIs', d: 'пункт пересказан', f: nbEdit('Касса печатает покупателю чек возврата сразу после операции', 'Касса сразу печатает чек') },
-    { id: 'asIs', d: 'пункт списка потерян', f: nbEdit('- [решено] Возврат без чека запускаем сразу во всех магазинах сети, без пилота — решил: Соколова М.\n', '') },
+    { id: 'asIs', d: 'пункт списка потерян', f: nbEdit('- [решено] Возврат без чека запускаем сразу во всех магазинах сети, без пилота — решил: Соколова М. · 2026-10-14 №1.4\n', '') },
     { id: 'asIs', d: 'хвост автора потерян', f: nbEdit('сразу после операции — со слов Дёмин К.', 'сразу после операции') },
-    { id: 'noLineRef', d: '« · L39» перенесена в ноут', f: nbEdit('сразу после операции — со слов Дёмин К.\n', 'сразу после операции — со слов Дёмин К. · L39\n') },
+    { id: 'noLineRef', d: '« · L39» перенесена в ноут', f: nbEdit('сразу после операции — со слов Дёмин К. · 2026-10-14 №1.3\n', 'сразу после операции — со слов Дёмин К. · L39 · 2026-10-14 №1.3\n') },
     { id: 'sourceList', d: 'нет «> исходник:»', f: nbEdit('> исходник: docs/_inbox/meeting-2026-10-13.points.md\n', '> встреча 2026-10-13\n') },
     { id: 'sourceList', d: 'путь мимо списка', f: nbEdit('> исходник: docs/_inbox/meeting-2026-10-13.points.md', '> исходник: docs/_inbox/meeting-2026-10-12.points.md') },
-    { id: 'replaced', d: 'без «вместо:»', f: nbEdit('; вместо: 2026-10-08 №1 «Возврат только на карту, с которой платили»', '') },
-    { id: 'answered', d: 'без «отвечает на:»', f: nbEdit('; отвечает на: 2026-10-09 №1 «Кто подписывает акт возврата без чека»', '') },
-    { id: 'replaced', d: 'в кавычках начало другого пункта той же записи', f: nbEdit('«Возврат только на карту, с которой платили»', '«Без чека возврат принимаем»') },
-    { id: 'answered', d: 'в кавычках — сведение той же записи, не вопрос', f: nbEdit('«Кто подписывает акт возврата без чека»', '«Возвраты без чека бухгалтерия хочет видеть»') },
-    { id: 'noExtraLinks', d: 'сведение Дёмина — «ответом» на его вопрос', f: nbEdit('сразу после операции — со слов Дёмин К.\n', 'сразу после операции — со слов Дёмин К.; отвечает на: 2026-10-08 №2 «Как касса проводит возврат без чека»\n') },
-    { id: 'noExtraLinks', d: 'запуск «заменяет» решение Соколовой', f: nbEdit('без пилота — решил: Соколова М.\n', 'без пилота — решил: Соколова М.; вместо: 2026-10-08 №1 «Без чека возврат принимаем»\n') },
+    { id: 'replaced', d: 'без «вместо:»', f: nbEdit('; вместо: 2026-10-08 №1.2', '') },
+    { id: 'answered', d: 'без «отвечает на:»', f: nbEdit('; отвечает на: 2026-10-09 №1.2', '') },
+    { id: 'replaced', d: 'заменён другой пункт той же записи', f: nbEdit('вместо: 2026-10-08 №1.2', 'вместо: 2026-10-08 №1.1') },
+    { id: 'answered', d: 'закрыт другой пункт той же записи', f: nbEdit('отвечает на: 2026-10-09 №1.2', 'отвечает на: 2026-10-09 №1.1') },
+    { id: 'replaced', d: 'у старого пункта нет пометки', f: nbEdit(OLD_CARD + ' ‖ заменён: 2026-10-14 №1.1', OLD_CARD) },
+    { id: 'noExtraLinks', d: 'сведение Дёмина — «ответом» на его вопрос', f: nbEdit('сразу после операции — со слов Дёмин К. · 2026-10-14 №1.3', 'сразу после операции — со слов Дёмин К.; отвечает на: 2026-10-08 №2.2 · 2026-10-14 №1.3') },
+    { id: 'noExtraLinks', d: 'запуск «заменяет» решение Соколовой', f: nbEdit('без пилота — решил: Соколова М. · 2026-10-14 №1.4', 'без пилота — решил: Соколова М.; вместо: 2026-10-08 №1.1 · 2026-10-14 №1.4') },
   ],
   'PTS-NEW': [
     ...COMMON_BAD,
@@ -2548,7 +2586,9 @@ const BAD = {
     { id: 'files', d: 'список изменён', f: (s) => { s.files[LIST_NEW] = s.seed[LIST_NEW].replace(/ · L\d+/g, ''); return s } },
   ],
   'PTS-REC': [
-    ...seededBad('около 340 записей', 'около 350 записей'), ...COMMON_BAD,
+    ...seededBad('около 340 записей', 'около 350 записей'), ...COMMON_BAD.filter((c) => c.id !== 'beforeWrite'),
+    { id: 'writeFirst', d: 'вопрос «Записать так?» и запись на ходу 2', f: (s) => { s.answers = [s.answers[0].replace('Записал в ноут', 'Пишу в ноут').replace('Совпадений с прошлыми записями нет.', 'Записать так или поправить?'), 'Записал.\n']; s.streams = [s.streams[0].slice(0, -1), [s.streams[0][s.streams[0].length - 1]]]; return s } },
+    { id: 'writeFirst', d: 'запись на ходу 1, но с вопросом «Записать так?»', f: ansEdit(0, (a) => a + 'Записать так или поправить?\n') },
     { id: 'listHead', d: '«встреча» вместо «встреча по памяти»', f: nbEdit('### 1 · встреча по памяти 2026-10-14:', '### 1 · встреча 2026-10-14:') },
     { id: 'asIs', d: '«(по памяти, не уверен)» потеряно', f: nbEdit('К SMS добавили пуш? (по памяти, не уверен) — ждёт: —', 'К SMS добавили пуш — ждёт: —') },
     { id: 'noLineRef', d: '« · L57» перенесена в ноут', f: nbEdit('(по памяти, не уверен) — ждёт: —\n', '(по памяти, не уверен) — ждёт: — · L57\n') },
@@ -2562,7 +2602,7 @@ const BAD = {
   EXPORT: [
     ...exportBad('2026-10-07'),
     { id: 'noReplacedItem', d: 'заменённый пункт в выгрузке', f: viewEdit('- [открыто] Нужен ли паспорт', '- [решено] Возврат только на карту, с которой платили — решил: Соколова М. · 2026-10-07 №1\n- [открыто] Нужен ли паспорт') },
-    { id: 'noClosedQ', d: 'закрытый вопрос в выгрузке', f: viewEdit('- [набросок] Экран кассира', '- [открыто] Кто подписывает акт возврата без чека — ждёт: Гарипова Л. · 2026-10-08 №1\n- [набросок] Экран кассира') },
+    { id: 'noClosedQ', d: 'закрытый вопрос в выгрузке', f: viewEdit('- [мысль] Экран кассира', '- [открыто] Кто подписывает акт возврата без чека — ждёт: Гарипова Л. · 2026-10-08 №1\n- [мысль] Экран кассира') },
     { id: 'thoughts', d: 'ранняя мысль потеряна', f: viewEdit('- [мысль] А если покупку оплатили подарочной картой, а чека нет, — куда тогда возвращать деньги? · 2026-10-07 №2\n', '') },
     { id: 'range', d: 'первая дата не та', f: viewEdit('записи 2026-10-07–2026-10-10', 'записи 2026-10-08–2026-10-10') },
   ],
@@ -2640,7 +2680,7 @@ const BAD = {
     { id: 'refsRows', d: 'строка без ссылки: решение не из ноута («и на почту»)', f: viewEdit(BIG_ROW[43], BIG_ROW[43] + '\n| Код уходит и на почту | Калинкина В. | решено | |') },
     { id: 'refsRows', d: 'строка без ссылки: число не из ноута', f: viewEdit(BIG_ROW[43], BIG_ROW[43] + '\n| Код действует 48 часов | Калинкина В. | решено | |') },
     { id: 'winners', d: 'победитель стр. 126 потерян', f: viewEdit(BIG_ROW[126] + '\n', '') },
-    { id: 'winners', d: 'принятый набросок стр. 144 подан наброском', f: viewEdit(BIG_ROW[144], BIG_ROW[144].replace('| решено |', '| набросок |')) },
+    { id: 'winners', d: 'принятый набросок стр. 144 подан наброском', f: viewEdit(BIG_ROW[144], BIG_ROW[144].replace('| решено |', '| мысль |')) },
     // Ловушка 2 / баг 2: оспоренное как решённое.
     { id: 'disputeOpen', d: 'баг 2: стр. 83 «диспетчер» подана «решено»', f: viewEdit(BIG_ROW[85], '| Если код не сработал, постоялец звонит на дежурный телефон, отвечает диспетчер в офисе | Калинкина В. | решено | 2026-09-29 №1 |\n' + BIG_ROW[85]) },
     // На текущей версии — по правке (решение 2026-10-16); строка пилота 2026-10-16 (run-1, стр. 28) дословно.
@@ -2728,7 +2768,7 @@ function exportBad (first) {
     { id: 'answerIn', d: 'ответа нет', f: viewEdit('- [решено] Акт возврата без чека подписывает старший кассир смены — решил: Гарипова Л. · 2026-10-10 №1\n', '') },
     { id: 'thoughts', d: 'мысль потеряна в выгрузке', f: viewEdit('- [мысль] Может, акт печатать прямо на кассе, без бумажного бланка? · 2026-10-10 №2\n', '') },
     { id: 'thoughts', d: 'мысль подана открытым вопросом', f: viewEdit('- [мысль] Может, акт печатать', '- [открыто] Может, акт печатать') },
-    { id: 'thoughts', d: 'набросок подан решением', f: viewEdit('- [набросок] Отчёт по возвратам', '- [решено] Отчёт по возвратам') },
+    { id: 'thoughts', d: 'набросок подан решением', f: viewEdit('- [мысль] Отчёт по возвратам', '- [решено] Отчёт по возвратам') },
     { id: 'refsOk', d: 'неверная ссылка «дата №»', f: viewEdit('без бумажного бланка? · 2026-10-10 №2', 'без бумажного бланка? · 2026-10-10 №1') },
     { id: 'refsOk', d: 'ссылки нет', f: viewEdit('звонят — со слов Соколова М. · 2026-10-09 №1', 'звонят — со слов Соколова М.') },
     { id: 'noLinksOut', d: '«вместо:» в выгрузке', f: viewEdit('на карту не возвращаем — решил: Соколова М. · 2026-10-09 №1', 'на карту не возвращаем — решил: Соколова М.; вместо: 2026-10-07 №1 «Возврат только на карту, с которой платили» · 2026-10-09 №1') },
@@ -2775,14 +2815,13 @@ const OK_VARIANTS = {
     { d: 'мета-строка: вопрос «что действует» в кавычках', f: ansEdit(0, (a) => sub(a, 'Записать так или поправить?', 'Тот же человек — вопрос «что действует» не задаю. Записать так или поправить?')) },
     { d: '«Правильно?»', f: ansEdit(0, (a) => sub(a, 'Записать так или поправить?', 'Правильно?')) },
     { d: '«подтвердите замену?»', f: ansEdit(0, (a) => sub(a, 'Записать так или поправить?', 'Подтвердите замену — записываю?')) },
-    { d: 'в кавычках весь старый пункт с хвостом', f: nbEdit('«Возврат только на карту, с которой платили»\n', '«Возврат только на карту, с которой платили — решил: Соколова М.»\n') },
-    { d: 'в кавычках не начало — предупреждение', warn: /не начало старого/, f: nbEdit('«Возврат только на карту, с которой платили»\n', '«на карту, с которой платили»\n') },
+    { d: 'после номера — начало старого пункта в кавычках', f: nbEdit('вместо: 2026-10-08 №1.2 · ', 'вместо: 2026-10-08 №1.2 «Возврат только на карту, с которой платили» · ') },
     { d: 'отчёта о замене нет — предупреждение', warn: /строки о замене/, f: ansEdit(1, () => 'Записал.\n') },
     // Вопрос Шага 5 о самой записи — не «что верно».
     { d: '«Всё, что выше, — верно?»', f: ansEdit(0, (a) => sub(a, 'Записать так или поправить?', 'Всё, что выше, — верно?')) },
     { d: '«Что записываю — верно?»', f: ansEdit(0, (a) => sub(a, 'Записать так или поправить?', 'Что записываю — верно?')) },
-    { d: 'кавычки "…" после «вместо:»', f: nbEdit('«Возврат только на карту, с которой платили»\n', '"Возврат только на карту, с которой платили"\n') },
-    { d: 'ссылка «2026-10-08, №1» в «вместо:»', f: nbEdit('вместо: 2026-10-08 №1 «Возврат', 'вместо: 2026-10-08, №1 «Возврат') },
+    { d: 'кавычки "…" после номера', f: nbEdit('вместо: 2026-10-08 №1.2 · ', 'вместо: 2026-10-08 №1.2 "Возврат только на карту, с которой платили" · ') },
+    { d: 'ссылка «2026-10-08, №1.2» в «вместо:»', f: nbEdit('вместо: 2026-10-08 №1.2', 'вместо: 2026-10-08, №1.2') },
     // Снимок засева: рабочая копия с `core.autocrlf` засеяла ноут в CRLF, а фикстура — LF; запись дописана в LF.
     { d: 'засев в CRLF, снимок `_seeded.sha256`', f: seedCrlfOk },
     { d: 'засев в CRLF, снимок в форме Windows « *»', f: (s) => { s.shaStar = true; return seedCrlfOk(s) } },
@@ -2790,22 +2829,21 @@ const OK_VARIANTS = {
   ],
   DISPUTE: [
     { d: '«Что верно:» с заглавной', f: nbEdit('- [открыто] что верно:', '- [открыто] Что верно:') },
-    { d: '«ждёт: Соколова М. (розница)»', f: nbEdit('— ждёт: Соколова М.\n', '— ждёт: Соколова М. (розница)\n') },
+    { d: '«ждёт: Соколова М. (розница)»', f: nbEdit('— ждёт: Соколова М. · 2026-10-14 №1.1', '— ждёт: Соколова М. (розница) · 2026-10-14 №1.1') },
     { d: 'вопрос «новое, старое или в открытые?»', f: ansEdit(0, (a) => sub(a, 'Что действует — новое, старое или спор в открытые (кто решает)?', 'Новое, старое или в открытые — и кто решает?')) },
     { d: 'без имени Гариповой в «что верно» — предупреждение', warn: /нет Гариповой/, f: nbEdit(' (Гарипова Л.) — ждёт', ' — ждёт') },
     { d: '[решено] не про деньги', f: nbInsertItem('- [решено] Кассирам о порядке сообщит бухгалтерия — решил: Соколова М.') },
     { d: 'два «что верно» — предупреждение', warn: /«что верно» в записи: 2/, f: nbInsertItem('- [открыто] Что верно: только на карту (Соколова М.) или наличными (Гарипова Л.) — ждёт: Соколова М.') },
     // Хвосты спора 1.1.0 — с именами из ноута, которых нет в письме и реплике.
-    { d: 'в «ждёт:» спора второе имя из ноута', f: nbEdit('— ждёт: Соколова М.\n', '— ждёт: Соколова М., Ильин П.\n') },
-    { d: 'скобка спора «(решил: Соколова М., 2026-10-08 №1)»', f: nbEdit('(Соколова М., 2026-10-08 №1)', '(решил: Соколова М., 2026-10-08 №1)') },
-    { d: 'в скобке спора автор из ноута не из письма', f: nbEdit('(Соколова М., 2026-10-08 №1)', '(Соколова М. и Ильин П., 2026-10-08 №1)') },
+    { d: 'в «ждёт:» спора второе имя из ноута', f: nbEdit('— ждёт: Соколова М. · 2026-10-14 №1.1', '— ждёт: Соколова М., Ильин П. · 2026-10-14 №1.1') },
+    { d: 'скобка спора «(решил: Соколова М., 2026-10-08 №1.2)»', f: nbEdit('(Соколова М., 2026-10-08 №1.2)', '(решил: Соколова М., 2026-10-08 №1.2)') },
+    { d: 'в скобке спора автор из ноута не из письма', f: nbEdit('(Соколова М., 2026-10-08 №1.2)', '(Соколова М. и Ильин П., 2026-10-08 №1.2)') },
   ],
   ANSWER: [
     { d: 'пункт [сведение]', f: nbEdit('- [решено] Акт возврата без чека подписывает старший кассир смены, директор магазина не нужен — решил: Гарипова Л.;', '- [сведение] Акт возврата без чека подписывает старший кассир смены, директор магазина не нужен — со слов Гарипова Л.;') },
-    { d: 'в кавычках короче: «Кто подписывает акт»', f: nbEdit('«Кто подписывает акт возврата без чека»', '«Кто подписывает акт»') },
-    { d: 'в кавычках не начало — предупреждение', warn: /не начало вопроса/, f: nbEdit('«Кто подписывает акт возврата без чека»', '«подписывает акт»') },
+    { d: 'после номера — начало вопроса в кавычках', f: nbEdit('отвечает на: 2026-10-09 №1.2 · ', 'отвечает на: 2026-10-09 №1.2 «Кто подписывает акт» · ') },
     { d: '«Записать так?» и «решил Гарипова?»', f: ansEdit(0, (a) => a + 'п.1: решил Гарипова Л.? Записать так?\n') },
-    { d: 'ссылка «2026-10-09, №1» в «отвечает на:»', f: nbEdit('отвечает на: 2026-10-09 №1', 'отвечает на: 2026-10-09, №1') },
+    { d: 'ссылка «2026-10-09, №1.2» в «отвечает на:»', f: nbEdit('отвечает на: 2026-10-09 №1.2', 'отвечает на: 2026-10-09, №1.2') },
   ],
   ASK: [
     { d: 'ответ на ходу 2 (ход 1 — вопрос о ноуте)', f: (s) => { s.answers = ['Отвечаю по ноуту «возврат товара без чека»?\n', s.answers[0]]; return s } },
@@ -2870,24 +2908,24 @@ const OK_VARIANTS = {
     { d: 'путь A зачёркнут', f: viewEdit('## Кто вызывает', '- ~~POST /bonus/cancel~~ · 2026-10-06 №2\n\n## Кто вызывает') },
     { d: 'пути в обратных кавычках', f: (s) => { s.files[s.view] = s.files[s.view].replace(/^- (GET|POST) (\S+) —/gm, '- `$1 $2` —'); return s } },
     { d: 'путь наброска в открытом вопросе', f: viewEdit('- Что отвечать при списании,', '- Что отвечать при списании (POST /partners/{partnerId}/redemptions),') },
-    { d: 'ссылка на строке продолжения', f: viewEdit('— подписка партнёра на события — набросок · 2026-10-08 №1', '— подписка партнёра на события\n  набросок · 2026-10-08 №1') },
-    { d: 'ручка на вложенной строке, ссылка на строке пункта', f: viewEdit('- POST /partners/{partnerId}/webhooks — подписка партнёра на события — набросок · 2026-10-08 №1', '- Подписка партнёра на события — набросок · 2026-10-08 №1\n  - POST /partners/{partnerId}/webhooks') },
+    { d: 'ссылка на строке продолжения', f: viewEdit('— подписка партнёра на события — мысль · 2026-10-08 №1', '— подписка партнёра на события\n  набросок · 2026-10-08 №1') },
+    { d: 'ручка на вложенной строке, ссылка на строке пункта', f: viewEdit('- POST /partners/{partnerId}/webhooks — подписка партнёра на события — мысль · 2026-10-08 №1', '- Подписка партнёра на события — мысль · 2026-10-08 №1\n  - POST /partners/{partnerId}/webhooks') },
     { d: 'пути от префикса, названного в выкладке', f: (s) => { s.files[s.view] = sub(s.files[s.view], '## Ручки\n', '## Ручки\nВсе ручки — под /partners/{partnerId}.\n').replace(/^- (GET|POST) \/partners\/\{partnerId\}\//gm, '- $1 /'); return s } },
     { d: 'ссылки «дата, №»', f: (s) => { s.files[s.view] = s.files[s.view].replace(/(\d{4}-\d{2}-\d{2}) №/g, '$1, №'); return s } },
     { d: 'пути в «**…**»', f: (s) => { s.files[s.view] = s.files[s.view].replace(/^- (GET|POST) (\S+) —/gm, '- **$1** **$2** —'); return s } },
-    { d: '«наброски», «из наброска»', f: (s) => { s.files[s.view] = s.files[s.view].replace('списание бонусов при оплате — набросок', 'списание бонусов при оплате — из наброска аналитика').replace('история операций клиента — набросок', 'история операций клиента — наброски'); return s } },
+    { d: '«наброски», «из наброска»', f: (s) => { s.files[s.view] = s.files[s.view].replace('списание бонусов при оплате — мысль', 'списание бонусов при оплате — из наброска аналитика').replace('история операций клиента — мысль', 'история операций клиента — наброски'); return s } },
     { d: 'ручки нумерованным списком (номера — не числа элемента)', f: (s) => { let k = 0; s.files[s.view] = s.files[s.view].replace(/^- (GET|POST)/gm, (m, x) => `${++k}. ${x}`); return s } },
     { d: 'Write выкладки после проверки, черновик для проверки — другим файлом', f: (s) => { s.streams[1].unshift(ev('Write', { file_path: SB + dirname(NB_API) + '/draft-check.tmp', content: '…' })); return s } },
     { d: 'метки «Ручка 1», «**2.**» у ручек', f: (s) => { let k = 0; s.files[s.view] = s.files[s.view].replace(/^- (GET|POST)/gm, (m, x) => (++k === 1 ? `- Ручка 1: ${x}` : `- **${k}.** ${x}`)); return s } },
   ],
   'VIEW-CHAT': [
-    { d: 'ссылка на следующей строке', f: ansEdit(1, (a) => a.replace(/ — набросок · 2026-10-08 №1/g, '\n   набросок · 2026-10-08 №1')) },
+    { d: 'ссылка на следующей строке', f: ansEdit(1, (a) => a.replace(/ — мысль · 2026-10-08 №1/g, '\n   мысль · 2026-10-08 №1')) },
     { d: '«нет ни одного пункта про сроки»', f: ansEdit(1, (a) => sub(a, 'В ноуте нет.', 'Ни одного пункта про сроки — нет в ноуте.')) },
     { d: 'имя файла с датой рядом со сроками', f: ansEdit(1, (a) => sub(a, 'В ноуте нет.', 'В ноуте нет.\nКуда: файлом или в чат? Рекомендую файлом: `notes/x/user-stories-2026-10-14.md`.')) },
     // Дата прогона — дата изменения answer.md (в самопроверке 2026-10-14), а не окно дат.
     { d: '«выкладка собрана из ноута … на <дата прогона>» рядом со сроками', f: ansEdit(1, (a) => sub(a, 'В ноуте нет.', `В ноуте нет. Выкладка собрана из ноута \`${NB_API}\` на 2026-10-14.`)) },
-    { d: 'история в несколько строк под своим заголовком', f: ansEdit(1, (a) => sub(a, '1. Как партнёр, хочу видеть баланс клиента на кассе, чтобы сразу предложить оплатить покупку бонусами — набросок · 2026-10-08 №1\n', '### 1. Баланс на кассе\nКак партнёр, хочу видеть баланс клиента на кассе,\nчтобы сразу предложить оплатить покупку бонусами.\nнабросок · 2026-10-08 №1\n\n### Остальные\n')) },
-    { d: 'вид и ссылка вложенными пунктами', f: ansEdit(1, (a) => sub(a, '1. Как партнёр, хочу видеть баланс клиента на кассе, чтобы сразу предложить оплатить покупку бонусами — набросок · 2026-10-08 №1\n', '1. Как партнёр, хочу видеть баланс клиента на кассе, чтобы сразу предложить оплатить покупку бонусами.\n   - вид: набросок\n   - пункт: 2026-10-08 №1\n')) },
+    { d: 'история в несколько строк под своим заголовком', f: ansEdit(1, (a) => sub(a, '1. Как партнёр, хочу видеть баланс клиента на кассе, чтобы сразу предложить оплатить покупку бонусами — мысль · 2026-10-08 №1\n', '### 1. Баланс на кассе\nКак партнёр, хочу видеть баланс клиента на кассе,\nчтобы сразу предложить оплатить покупку бонусами.\nнабросок · 2026-10-08 №1\n\n### Остальные\n')) },
+    { d: 'вид и ссылка вложенными пунктами', f: ansEdit(1, (a) => sub(a, '1. Как партнёр, хочу видеть баланс клиента на кассе, чтобы сразу предложить оплатить покупку бонусами — мысль · 2026-10-08 №1\n', '1. Как партнёр, хочу видеть баланс клиента на кассе, чтобы сразу предложить оплатить покупку бонусами.\n   - вид: набросок\n   - пункт: 2026-10-08 №1\n')) },
     { d: 'ход 1 без перевода строки в конце', f: ansEdit(0, (a) => a.replace(/\n$/, '')) },
     { d: 'после выкладки ход с одной ссылкой', f: (s) => { s.answers[2] = 'Выкладка выше; истории — из 2026-10-08 №1.\n'; return s } },
     { d: 'ссылки «дата, №»', f: ansEdit(1, (a) => a.replace(/(\d{4}-\d{2}-\d{2}) №/g, '$1, №')) },
@@ -2903,17 +2941,17 @@ const OK_VARIANTS = {
     { d: 'подразделы со стрелкой в заголовке', f: viewEdit(VP_LIST, VP_HEADS) },
     { d: 'строка о записях вне части с их ссылками', f: viewEdit('## Кто кому что передаёт\n', '## Кто кому что передаёт\nЗаписи 2026-10-06 №1 и 2026-10-07 №1 не вошли — они до 2026-10-08.\n') },
     { d: '«вне среза» со ссылками на записи до части', f: viewEdit('## Кто кому что передаёт\n', '## Кто кому что передаёт\nВне среза: 2026-10-06 №1, 2026-10-06 №2, 2026-10-07 №1.\n') },
-    { d: 'ASCII-стрелка «──▶» без глагола', f: viewEdit('## Открыто', 'Касса партнёра ◀── баланс клиента (набросок · 2026-10-08 №1) ── Наш API\n\n## Открыто') },
+    { d: 'ASCII-стрелка «──▶» без глагола', f: viewEdit('## Открыто', 'Касса партнёра ◀── баланс клиента (мысль · 2026-10-08 №1) ── Наш API\n\n## Открыто') },
     { d: 'легенда со стрелкой', f: viewEdit('## Кто кому что передаёт\n', '## Кто кому что передаёт\nЛегенда: A → B — A передаёт B.\n') },
     { d: '«почти», «в первую очередь» — не участники', f: viewEdit('## Кто кому что передаёт\n', '## Кто кому что передаёт\nПочти все обмены идут через наш API, в первую очередь — списания.\n') },
     { d: 'список участников без ссылки', f: viewEdit('## Кто кому что передаёт\n', '## Кто кому что передаёт\nУчастники: партнёр, касса партнёра, мобильное приложение партнёра, наш API, учётная система бонусов.\n') },
-    { d: 'списание с кассой — предупреждение', warn: /списание с кассой/, f: viewEdit('## Открыто', '- Касса партнёра → наш API: списание бонусов при оплате (POST /partners/{partnerId}/redemptions) — набросок · 2026-10-08 №1\n\n## Открыто') },
+    { d: 'списание с кассой — предупреждение', warn: /списание с кассой/, f: viewEdit('## Открыто', '- Касса партнёра → наш API: списание бонусов при оплате (POST /partners/{partnerId}/redemptions) — мысль · 2026-10-08 №1\n\n## Открыто') },
     // Круг 4 (2026-10-15): шапка таблицы со стрелкой и строка раздела «В ноуте нет» со стрелкой — не связи.
     { d: 'таблица с шапкой «| Кто → кому | Что передаёт | Статус |» (круг 4, run-1)', f: viewEdit(VP_LIST, '| Кто → кому | Что передаёт | Статус |\n|---|---|---|\n' +
       '| Наш API → партнёру (на адрес из его подписки) | вебхук о каждом списании бонусов — решено (Белкина Т.) · 2026-10-10 №1 | решено |\n' +
       '| Мобильное приложение партнёра → наш API | запрос истории операций клиента напрямую — сведение (со слов Ахмедов Р.) · 2026-10-10 №1 | сведение |\n' +
       '| Наш API → учётная система бонусов | каждое списание; балансы клиентов хранятся там — сведение (со слов Белкина Т.) · 2026-10-10 №1 | сведение |\n' +
-      '| Партнёр → наш API | подписка партнёра на события: POST /partners/{partnerId}/webhooks — набросок · 2026-10-08 №1 | набросок |\n') },
+      '| Партнёр → наш API | подписка партнёра на события: POST /partners/{partnerId}/webhooks — мысль · 2026-10-08 №1 | мысль |\n') },
     { d: 'раздел «## В ноуте нет» со стрелкой и «не входят» (круг 4, run-2)', f: viewEdit('## Открыто', '## В ноуте нет\n- Связи касса партнёра ↔ наш API в записях с 2026-10-08 (они в записях до этой даты, в срез не входят).\n\n## Открыто') },
     { d: 'строка со стрелкой «не вошли в срез» без ссылки', f: viewEdit('## Открыто', '- Касса партнёра → наш API: обмены до 2026-10-08 в срез не вошли\n\n## Открыто') },
   ],
@@ -2926,8 +2964,8 @@ const OK_VARIANTS = {
     { d: 'дата встречи «13 октября»', f: nbEdit('### 1 · встреча 2026-10-13:', '### 1 · встреча 13 октября:') },
     { d: 'без «: предмет» — предупреждение', warn: /нет «: <предмет>»/, f: nbEdit('### 1 · встреча 2026-10-13: возврат товара без чека', '### 1 · встреча 2026-10-13') },
     { d: 'пункты в другом порядке', f: (s) => { const t = s.files[NB_RET]; const a = t.match(/^- \[сведение\] Касса печатает[^\n]*\n/m)[0]; s.files[NB_RET] = t.replace(a, '').replace('\n> исходник:', '\n' + a.trimEnd() + '\n> исходник:'); return s } },
-    { d: '«отвечает на:» перед «решил:»', f: nbEdit('директор магазина не нужен — решил: Гарипова Л.; отвечает на: 2026-10-09 №1 «Кто подписывает акт возврата без чека»', 'директор магазина не нужен; отвечает на: 2026-10-09 №1 «Кто подписывает акт возврата без чека» — решил: Гарипова Л.') },
-    { d: 'кавычки "…" после «вместо:»', f: nbEdit('«Возврат только на карту, с которой платили»', '"Возврат только на карту, с которой платили"') },
+    { d: '«отвечает на:» перед «решил:»', f: nbEdit('директор магазина не нужен — решил: Гарипова Л.; отвечает на: 2026-10-09 №1.2', 'директор магазина не нужен; отвечает на: 2026-10-09 №1.2 — решил: Гарипова Л.') },
+    { d: 'кавычки после номера', f: nbEdit('вместо: 2026-10-08 №1.2 · ', 'вместо: 2026-10-08 №1.2 «Возврат только на карту» · ') },
     { d: 'протокол не читался, список прочитан Grep', f: (s) => { s.streams[0].push(ev('Grep', { pattern: '^- \\[', path: SB + LIST_IN })); return s } },
   ],
   'PTS-NEW': [
@@ -3059,10 +3097,10 @@ function fixtureSanity (ck) {
   ck('VIEW: про сроки в ноуте ничего', DEADLINE.test(nb), false)
   ck('VIEW: других .md с датой в notes/ нет', Object.keys(S('VIEW-API')).some((f) => /^notes\/.*-\d{4}-\d{2}-\d{2}(-2)?\.md$/.test(f)), false)
   ck('VIEW: все 6 ручек и путь A в ноуте', HANDLES.every((h) => h.re.test(nb)) && OLD_A.test(nb), true)
-  ck('VIEW: замена пути A — вместо: 2026-10-06 №2', /^- \[решено\][^\n]*\/reversals[^\n]*вместо: 2026-10-06 №2( «[^»\n]*»)?$/m.test(nb), true)
+  ck('VIEW: замена пути A — вместо: 2026-10-06 №2.1', /^- \[решено\][^\n]*\/reversals[^\n]*вместо: 2026-10-06 №2\.1 · /m.test(nb), true)
   ck('VIEW: путь A один в записи 2026-10-06 №2', /### 2 [^\n]*\n- \[решено\][^\n]*\/bonus\/cancel[^\n]*\n>[^\n]*\n\n## 2026-10-08/.test(nb), true)
-  ck('VIEW: решено с «решил:» — 4, наброски — 6, открыто — 2', [/^- \[решено\].*решил:/gm, /^- \[набросок\]/gm, /^- \[открыто\]/gm].map((re) => (nb.match(re) || []).length).join('/'), '4/6/2')
-  ck('VIEW: истории — 3', STORIES.every((s) => nb.split('\n').some((l) => /^- \[набросок\] Как партнёр/.test(l) && s.re.every((re) => re.test(l)))), true)
+  ck('VIEW: решено с «решил:» — 4, мысли — 6, открыто — 2', [/^- \[решено\].*решил:/gm, /^- \[мысль\]/gm, /^- \[открыто\]/gm].map((re) => (nb.match(re) || []).length).join('/'), '4/6/2')
+  ck('VIEW: истории — 3', STORIES.every((s) => nb.split('\n').some((l) => /^- \[мысль\] Как партнёр/.test(l) && s.re.every((re) => re.test(l)))), true)
   const chatN = fixtureText(FX.NEW, 'w-prompt.txt').split('\n').filter((l) => /^[А-ЯЁ][а-яё]+ [А-ЯЁ]\.: /.test(l)).length
   ck('NEW: строк чата 12–18', chatN >= 12 && chatN <= 18, true)
   // Ожидаемый исход заканчивает диалог стенда (DONE_GREP/DONE_RE run-ctx-v2.sh).
@@ -3083,7 +3121,7 @@ function fixtureSanity (ck) {
   ck('DISPUTE: Соколовой в промпте нет', w('Соколов').test(fixtureText(FX.DISPUTE, 'w-prompt.txt')), false)
   ck('ANSWER: засев = засев CONTRA', N('ANSWER') === N('CONTRA'), true)
   ck('ANSWER: «отвечает на:» в засеве нет', N('ANSWER').includes('отвечает на:'), false)
-  ck('ANSWER: вопрос про акт — открыто в 2026-10-09 №1', /## 2026-10-09\n\n### 1 [^\n]*\n(- [^\n]*\n)*/.exec(N('ANSWER'))[0].split('\n').includes(`- [открыто] ${OLD_Q_ACT} — ждёт: Гарипова Л.`), true)
+  ck('ANSWER: вопрос про акт — открыто в 2026-10-09 №1', /## 2026-10-09\n\n### 1 [^\n]*\n(- [^\n]*\n)*/.exec(N('ANSWER'))[0].split('\n').some((l) => l.startsWith(`- [открыто] ${OLD_Q_ACT} — ждёт: Гарипова Л. · ${OLD_Q_ACT_ID}`)), true)
   ck('ASK: в засеве вместо:, отвечает на:, что верно:', ['вместо:', 'отвечает на:', 'что верно:'].every((x) => N('ASK').includes(x)), true)
   ck('ASK: про лимит и сумму в засеве ничего', ABSENT_Q.test(N('ASK')), false)
   ck('ASK: вопросов в промпте — 4', (fixtureText(FX.ASK, 'w-prompt.txt').match(/\?/g) || []).length, 4)
@@ -3129,7 +3167,7 @@ function fixtureSanity (ck) {
   ck('EXPORT: действующих 10, заменён 1, закрыт 1', `${ex.active.length}/${ex.replaced.length}/${ex.closed.length}`, '10/1/1')
   ck('EXPORT: заменён «Возврат только на карту»', (ex.replaced[0] || {}).text.startsWith(OLD_CARD_TEXT), true)
   ck('EXPORT: закрыт «Кто подписывает акт»', (ex.closed[0] || {}).text.startsWith(OLD_Q_ACT), true)
-  ck('EXPORT: мысли и наброски — 2 и 2 в двух днях', ['мысль', 'набросок'].map((k) => new Set(ex.active.filter((x) => x.kind === k).map((x) => x.date)).size).join('/'), '2/2')
+  ck('EXPORT: мысли — в трёх днях', String(new Set(ex.active.filter((x) => x.kind === 'мысль').map((x) => x.date)).size), '3')
   ck('EXPORT: расходящихся пунктов без пометок нет («что верно» не нужен)', /что верно/i.test(S('EXPORT')[NB_RET]), false)
   ck('EXPORT-SINCE: засев = засев EXPORT', S('EXPORT-SINCE')[NB_RET] === S('EXPORT')[NB_RET], true)
   const exS = ex.active.filter((x) => x.date >= FX['EXPORT-SINCE'].since)
@@ -3142,7 +3180,7 @@ function fixtureSanity (ck) {
   ck('спор: в ноуте NB-ASK оспорен один пункт — «14 дней», 2026-10-08 №2', ak.disputed.map((x) => x.ref + ' ' + V14.test(x.line)).join(), '2026-10-08 №2 true')
   ck('спор: сам спор действует', ak.active.some((x) => /что\s+верно/.test(x.line)), true)
   const expOf = (xs) => '# Пункты: возврат товара без чека\n> Источник: notes/возврат-товара-без-чека/notebook.md\n> Задача: —\n> Ноут: возврат товара без чека · записи 2026-10-07–2026-10-10\n\n' +
-    xs.map((x) => `${x.line.replace(LINK_TAIL, '').trimEnd()} · ${x.ref}`).join('\n') + '\n'
+    xs.map((x) => exportLine(x.line)).join('\n') + '\n'
   const exFx = { notebook: NB_RET, since: null }
   const okE = gradeExportText(expOf(ak.active), askNb, exFx).R
   ck('спор: выгрузка по правилу — полна, как в ноуте, без оспоренного', [okE.complete, okE.expAsIs, okE.noReplacedItem, okE.ptsLines].join('|'), '|||')
@@ -3182,7 +3220,7 @@ function fixtureSanity (ck) {
   const goneB = [...ba.replaced, ...ba.closed, ...ba.disputed]
   ck('BIG: пунктов 64, действующих 56', `${ba.all.length}/${ba.active.length}`, '64/56')
   ck('BIG: выбывают стр. 31, 41, 62, 66, 74, 83, 94, 118', goneB.map((x) => x.ln).sort((a, b) => a - b).join(), '31,41,62,66,74,83,94,118')
-  ck('BIG: действующие — решено 15, открыто 10, сведение 25, мысль 3, набросок 3', ['решено', 'открыто', 'сведение', 'мысль', 'набросок'].map((k) => ba.active.filter((x) => x.kind === k).length).join('/'), '15/10/25/3/3')
+  ck('BIG: действующие — решено 15, открыто 10, сведение 25, мысль 6', ['решено', 'открыто', 'сведение', 'мысль'].map((k) => ba.active.filter((x) => x.kind === k).length).join('/'), '15/10/25/6')
   const asY = (x) => ({ l: BIG_X[x.ln], kind: x.kind, ref: x.ref })
   ck('BIG: метки выбывших не бьют действующих', ba.active.filter((x) => BIG_GONE.some((m) => m.t(asY(x)))).map((x) => x.ln).join() || 'нет', 'нет')
   ck('BIG: у каждого выбывшего — своя метка', goneB.every((x) => BIG_GONE.some((m) => m.t(asY(x)))), true)

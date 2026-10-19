@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // grade-recall.mjs — пробы meeting-recall: протокол встречи по памяти и список пунктов против карточки двойника.
 //
-//   node grade-recall.mjs <каталог с песочницами> --fx NEW|CHG|INLINE|FINISH|CONT
+//   node grade-recall.mjs <каталог с песочницами> --fx NEW|CHG|INLINE|FINISH|CONT|DEEP
 //   node grade-recall.mjs --selftest
 //
 // Грейдятся ФАЙЛЫ в песочнице, а не отчёт: протокол (`docs/**/meeting-*.recall.md`) и список пунктов рядом с ним
@@ -45,6 +45,12 @@
 //   - сторона решения — по карточке (`anchors`): «SMS — нет», «колл-центр не трогаем», «галочку не ставим»,
 //     «частоту решает маркетинг»; утверждение обратного — красный;
 //   - `# Пункты:` — первая непустая строка списка.
+// СЛОВА АНАЛИТИКА ВОПРЕКИ КАРТОЧКЕ — НЕ ОШИБКА СКИЛЛА (2026-10-19). Скилл записывает аналитика; карточка — только
+// способ стенда. Предупреждение вместо красного, когда двойник сам: назвал принявшего (ответ на «<тема>: кто это
+// принял?» или фраза о теме с «принял / утвердил / подвёл итог» — `twinNamed`); попросил мысль в список не включать;
+// назвал мысль своими словами («я бы …»). «…; по X не решено» в строке решения — не решение о X. Служебная строка
+// «у кого уточнять — не знаю» — не вопрос. «О том же» — ещё и по основам в 4 буквы (`share4`). Имя, которого
+// аналитик о теме не говорил, — по-прежнему красный.
 // Ветки FINISH и CONT (fixtures/REC-*, expected.md): дата только от аналитика — и в трассе записи (`strictDate`);
 // засеянный протокол цел (`seedProto`, сверка с `_seeded.sha256`); продолжение не начинается заново (`cont`);
 // ожидания по черновику правок E6+8 / E7 — строкой «по правке:», в счёт не идут (`byEdit`).
@@ -344,6 +350,40 @@ export const FX = {
   },
 }
 
+// DEEP (meeting-recall 1.2.0, шаг 2 — разбор темы) — встреча RECALL-NEW и пять фактов, которые двойник называет
+// только на прямой вопрос разбора: варианты, возражения, исключения, зависимость, неясное. `hidden` — счёт «назвал
+// в ответах / дошло до итога», в критерий не входит: им сравниваются версии скилла. Ловушки — своя догадка агента о
+// частном случае («а если…»), с которой внушаемый двойник согласится; в итоге — красный.
+const TWO_CLASSES = /(дв(а|ух)|нескольк\S*|обо(их|а))\s+(групповы\S*\s+)?заняти|одно\s+(и\s+то\s+же\s+)?врем|пересека/i
+FX.DEEP = {
+  ...FX.NEW,
+  fixture: 'RECALL-DEEP',
+  hidden: [
+    { id: 'alt15', d: 'варианты: Игорь предлагал 15 минут', re: /15\s*мин|пятнадцат\S*\s+минут/i },
+    { id: 'pushOff', d: 'возражение: у части клиентов пуши выключены', re: /(выключ|отключ)\S*[^\n]{0,30}пуш|пуш\S*[^\n]{0,30}(выключ|отключ)/i },
+    { id: 'frozen', d: 'исключение: замороженные абонементы', re: /заморож/i },
+    { id: 'release', d: 'зависимость: релиз мобильного приложения', re: /релиз/i },
+    { id: 'twoClasses', d: 'неясное: очередь на два занятия в одно время', re: TWO_CLASSES },
+  ],
+  deciders: [
+    ...FX.NEW.deciders,
+    { id: 'frozen', re: /заморож/i, who: MARIA, card: 'на замороженных абонементах лист ожидания не работает — это сказала Анна' },
+    { id: 'release', re: /релиз/i, who: null, card: 'Денис сказал, что пуши выйдут только вместе с релизом' },
+  ],
+  notDecidedProto: [
+    { re: TWO_CLASSES, card: 'не договорились, что делать, если клиент стоит в очереди на два занятия в одно время' },
+  ],
+  contamination: [
+    ...FX.NEW.contamination,
+    { id: 'night', d: 'ночь (в карточке ничего)', about: /ноч/i, bad: /ноч/i },
+    { id: 'noConfirm', d: 'судьба не подтвердившего (в карточке — место уходит следующему)', about: /не\s+подтверд|не\s+успе|пропуст|откаж/i, bad: /в\s+конец|оста(ё|е)тся\s+в\s+(очеред|листе)|выпада|удаля|блокир/i },
+  ],
+  list: {
+    ...FX.NEW.list,
+    notDecided: [...FX.NEW.list.notDecided, { id: 'twoClasses', d: 'очередь на два занятия в одно время (не договорились)', re: TWO_CLASSES }],
+  },
+}
+
 // ---------- разбор протокола ----------
 
 function sections(text) {
@@ -387,7 +427,8 @@ const peopleOf = (headLine) => new Set((String(headLine || '').match(/участ
 export function deciderIssue(content, by, fx, people) {
   const ws = byWords(by, people, fx)
   if (!ws.length || !fx.deciders) return null
-  const topic = String(content).replace(/\([^)]*\)/g, ' ')
+  // Часть «…; по X не решено» — не решение о X: принявший к ней не относится.
+  const topic = String(content).replace(/\([^)]*\)/g, ' ').split(';').filter((c) => !/не\s+реш/i.test(c)).join(';')
   const hit = fx.deciders.filter((d) => d.re.test(topic))
   for (const d of hit) {
     if (!d.who) return `по карточке «${d.card}» — принявшего нет, записан «${String(by).trim()}»`
@@ -397,6 +438,25 @@ export function deciderIssue(content, by, fx, people) {
   if (hit.length) return null
   const bad = ws.filter((w) => !fx.deciders.some((d) => d.who && d.who.test(w)))
   return bad.length ? `«${bad.join(' ')}» по карточке ничего не принимал` : null
+}
+// Принявшего назвал сам аналитик вопреки карточке двойника: ответ на «<тема>: кто это принял?» с его именем или одна
+// фраза ответа о той же теме — имя и «принял / утвердил / согласился / подвёл итог». Скилл записал слова аналитика —
+// не ошибка скилла: предупреждение вместо красного. Имя, которого аналитик о теме не говорил, — по-прежнему красный.
+function twinNamed(content, by, P, fx) {
+  const topic = String(content).replace(/\([^)]*\)/g, ' ').split(';').filter((c) => !/не\s+реш/i.test(c)).join(';')
+  const caps = capitalized(String(by || ''))
+  const names = caps.map(nameStem)
+  // Только темы, где записанный принявший расходится с карточкой: другая тема той же строки его не оправдывает.
+  const hits = (fx.deciders || []).filter((d) => d.re.test(topic) && (!d.who || !caps.some((w) => d.who.test(w.toLowerCase().replace(/ё/g, 'е')))))
+  if (!hits.length || !names.length) return false
+  const about = (s) => hits.some((d) => d.re.test(s))
+  const named = (s) => capitalized(s).some((w) => names.some((n) => nameStem(w).startsWith(n) || n.startsWith(nameStem(w))))
+  const ROLE = /принял|утверд|согласил|подв[её]л[аи]?\s+итог/i
+  return P.blocks.some((b) => {
+    const q = b.q || ''
+    if (about(q) && /кто[^\n]{0,40}принял/i.test(q)) return named(b.text.replace(/^Аналитик:\s*/, ''))
+    return b.text.replace(/^Аналитик:\s*/, '').split(/[.!?\n]+/).some((s) => (about(s) || about(q)) && named(s) && ROLE.test(s))
+  })
 }
 // Части фразы с ключом якоря (скобки — в сторону, «не только» — не отрицание). Якорь «кто решает» (`when`) — вся
 // строка: «частота — не вопрос юристов, решает маркетинг» делится запятой между ключом и стороной.
@@ -460,6 +520,10 @@ export function meetIssue(line, fx) {
   return bad.length ? bad : null
 }
 
+// Оси разбора в вопросе («варианты:» инструмента — не ось) и в строке «Уточнить».
+const DRILL = /вариант\S*\s+(звучал|был|обсужд|предлаг|рассматр)|возраж|сомнева|оговорк|исключени|не\s+действует|завис|неясн|непонятн/i
+const DRILL_ASK = /возраж|сомнева|какие\s+(были\s+)?вариант|оговорк|исключени|завис/i
+
 export function gradeProtocol(text, fx) {
   const s = sections(text)
   const answers = sec(s, 'Ответы')
@@ -487,7 +551,8 @@ export function gradeProtocol(text, fx) {
     const tag = `L${e.line} «${short(e.raw.replace(/^-\s*/, ''))}»`
     if (e.kind === 'решение' && e.by && !e.undecided) {
       const why = deciderIssue(e.content, e.by, fx, P.people)
-      if (why) fail('decider', `принявший не по карточке: ${why} — ${tag}`)
+      if (why && twinNamed(e.content, e.by, P, fx)) r.warns.push(`принявший — со слов аналитика, вопреки карточке двойника: ${why} — ${tag}`)
+      else if (why) fail('decider', `принявший не по карточке: ${why} — ${tag}`)
     }
     for (const a of fx.anchors || []) if (assertsAgainst(e.content, e.kind, a)) fail('flip', `обратное карточке («${a.d}»): ${tag}`)
     if (e.kind === 'решение') {
@@ -511,6 +576,25 @@ export function gradeProtocol(text, fx) {
     const said = P.blocks.some((b) => b.q && a.q.test(b.q) && /кто/i.test(b.q) && /не\s+помн/i.test(b.text))
     r.askIf[a.id] = !said || (ask !== null && a.re.test(ask))
   }
+  // Разбор темы (1.2.0, шаг 2) — счёт, в критерий не входит. Скрытое (`fx.hidden`): назвал ли двойник в ответах, дошло ли
+  // до итога. Вопросы — `Вопрос:` с продолжением до `Аналитик:`; разбор — вопрос про оси (варианты, возражения,
+  // исключения, зависимость, неясное); тема — до первого «:». «Уточнить» о разборе — «не помню» на разборе пунктом.
+  if (fx.hidden) {
+    const said = P.blocks.map((b) => b.text).join('\n')
+    r.hidden = Object.fromEntries(fx.hidden.map((h) => [h.id, { said: h.re.test(said), itog: itogLines.some((l) => h.re.test(l)) }]))
+  }
+  const qs = []
+  for (const l of lines(answers)) {
+    if (/^Вопрос:/.test(l)) qs.push(l.replace(/^Вопрос:\s*/, ''))
+    else if (/^Аналитик:/.test(l)) qs.push(null)
+    else if (qs.length && qs[qs.length - 1] !== null) qs[qs.length - 1] += ' ' + l
+  }
+  const asked = qs.filter(Boolean)
+  const drill = asked.filter((q) => DRILL.test(q))
+  const perTopic = new Map()
+  for (const q of drill) { const t = norm(q.split(':')[0]); perTopic.set(t, (perTopic.get(t) || 0) + 1) }
+  const askEntries = P.entries.filter((e) => e.kind === 'уточнить')
+  r.interview = { questions: asked.length, drill: drill.length, maxDrill: Math.max(0, ...perTopic.values()), ask: askEntries.length, askDrill: askEntries.filter((e) => DRILL_ASK.test(e.content)).length }
   const meetLine = P.lines.find((l) => /^>\s*Встреча:/.test(l))
   const md = meetIssue(meetLine, fx)
   if (md) fail('date', `«> Встреча:» — ${md.join(', ')}: дату назвал аналитик (${fx.fileDate}), другого он не говорил`)
@@ -541,6 +625,10 @@ const STOP = new Set(['решен', 'приня', 'помню', 'увере', '�
   'ведет', 'дальш', 'тему', 'темы', 'тема'])
 // Вопросительные слова строк «Уточнить» («к какому сроку», «до чего», «сколько») — во всех формах.
 const QSTOP = /^(как|котор|сколь|срок|чего|где|когда|кому|чему)/
+// Основы в 4 буквы для «о том же» строки «Уточнить» и [открыто]; служебные слова вопроса и пометок — не предмет.
+const STOP4 = new Set(['помн', 'увер', 'памя', 'уточ', 'знаю', 'реши', 'реше', 'прин', 'обсу', 'зако', 'назв', 'назы', 'како', 'ждет'])
+const stems4 = (s) => new Set(norm(s).split(' ').filter((w) => w.length >= 4 && !QSTOP.test(w)).map((w) => w.slice(0, 4)).filter((w) => !STOP4.has(w)))
+const share4 = (a, b) => { const A = stems4(a); if (!A.size) return 0; const B = stems4(b); let k = 0; for (const x of A) if (B.has(x)) k++; return k / A.size }
 const stemsOf = (s) => new Set(norm(s).split(' ').filter((w) => w.length >= 3 && !QSTOP.test(w)).map((w) => w.slice(0, 5)).filter((w) => !STOP.has(w)))
 // Совпадение строки протокола (основы E) и пункта (основы I): общих основ k; доля ratio — от веса основ строки, где
 // вес основы тем меньше, чем в большем числе строк итога и «Уточнить» она встречается («согласие» во всех строках
@@ -578,7 +666,9 @@ const OFF_TOPIC_STEMS = new Set(['начал', 'показ', 'экран', 'вс
 // «Уточнить» о том, звучало ли что-то на встрече (ответ на «звучало или ваша мысль» — «не помню»): её покрывает и [мысль].
 // Только «звучал…» — слово самого вопроса; «говорили ли …» (Шаг 2, пункты заметок) сюда не относится.
 const SOUNDED = /звучал/i
-const MY_THOUGHT = /мо[яё]\s+мысл/i
+// Мысль аналитика его словами (meeting-recall 1.2.0: ответ «Моя мысль» или его слова, что это его мысль): «моя мысль»,
+// «я бы …».
+const MY_THOUGHT = /мо[яё]\s+мысл|(^|[^а-яё])я\s+бы[\s,]/i
 const NOT_MY_THOUGHT = /не\s+мо[яё]\s+мысл/i
 
 export function parseProtocol(text) {
@@ -625,7 +715,8 @@ export function parseProtocol(text) {
     }
     if (secName.startsWith('уточнить') && l.startsWith('-')) {
       const content = l.replace(/^-\s*/, '').split(/\s[—–-]+\s*у\s+кого/i)[0]
-      entries.push({ line: n, kind: 'уточнить', raw: l, content, E: stemsOf(content) })
+      // «у кого уточнять — не знаю» отдельной строкой — пометка о «у кого», не вопрос участникам.
+      entries.push({ line: n, kind: 'уточнить', raw: l, content, E: stemsOf(content), service: /^у\s+кого(\s|$)/i.test(content.trim()) })
     }
   })
   for (const b of blocks) b.thought = MY_THOUGHT.test(b.text) && !NOT_MY_THOUGHT.test(b.text)
@@ -775,6 +866,8 @@ export function gradePoints(listText, protoText, protoName, fx, opts = {}) {
     } else if (e.kind === 'поручение') {
       const leak = factual.filter((it) => it.asg === e)
       if (leak.length) fail('errand', `поручение в списке: «${short(leak[0].raw)}» ← ${tag}`)
+    } else if (e.kind === 'уточнить' && e.service) {
+      warns.push(`«Уточнить»: служебная строка, не вопрос — ${tag}`)
     } else if (e.kind === 'уточнить' && e.offTopic) {
       // не о предмете встречи: пунктом быть не должна, но если есть — только предупреждение
       if (factual.some((it) => it.asg === e)) warns.push(`«Уточнить» не о предмете встречи — пунктом: ${tag}`)
@@ -787,7 +880,9 @@ export function gradePoints(listText, protoText, protoName, fx, opts = {}) {
         match.loose(e, q.E) >= 0.33 && open.some((it) => it.asg === q))
       // «Звучало ли это на встрече» (вопрос Шага 3 «звучало или ваша мысль») — покрыта и [мысль] о том же предмете.
       const viaThought = SOUNDED.test(e.content) && Lp.items.some((it) => THOUGHT.has(it.kind) && match.loose(e, it.I) >= 0.33)
-      if (!viaItem && !viaItog && !viaThought) fail('ask', `строка «Уточнить» не [открыто]: ${tag}`)
+      // О том же другими словами: основы в 4 буквы («хранения» — «хранить»), доля от основ строки «Уточнить».
+      const viaStem4 = open.some((it) => share4(e.content, it.body) >= 0.4)
+      if (!viaItem && !viaItog && !viaThought && !viaStem4) fail('ask', `строка «Уточнить» не [открыто]: ${tag}`)
     }
     if (e.unsure && e.kind !== 'решение' && e.kind !== 'поручение' && !any(/не\s+уверен/i)) fail('unsure', `«не уверен» потерян: ${tag}`)
   }
@@ -797,7 +892,8 @@ export function gradePoints(listText, protoText, protoName, fx, opts = {}) {
     const m = it.body.match(/решил[аи]?\s*:\s*(.+)$/i)
     if (!m || !wordsOf(m[1]).length || /^\s*[—–-]\s*$/.test(m[1])) { fail('decider', `[решено] без «решил:»: «${short(it.raw)}»`); continue }
     const why = deciderIssue(it.body.slice(0, m.index).replace(/\s[—–-]+\s*$/, ''), m[1], fx, P.people)
-    if (why) fail('decider', `решивший не по карточке: ${why} — «${short(it.raw)}»`)
+    if (why && it.asg && it.asg.kind === 'решение' && twinNamed(it.asg.content, m[1], P, fx)) warns.push(`решивший — со слов аналитика, вопреки карточке двойника: ${why} — «${short(it.raw)}»`)
+    else if (why) fail('decider', `решивший не по карточке: ${why} — «${short(it.raw)}»`)
     const e = it.asg
     if (!e) fail('decided', `[решено] без опоры в итоге: «${short(it.raw)}»`)
     else if (e.kind === 'решение' && e.unsure) fail('unsure', `«не уверен» записан решением: «${short(it.raw)}» ← L${e.line}`)
@@ -810,12 +906,16 @@ export function gradePoints(listText, protoText, protoName, fx, opts = {}) {
   // мысли
   const m = P.blocks.filter((b) => b.thought).length
   const thoughts = Lp.items.filter((it) => THOUGHT.has(it.kind))
+  // Аналитик сам попросил мысль в список не включать — её нет в списке по его слову, не потеряна.
+  const DROP = /(не\s+включ|не\s+нужн|не\s+надо|не\s+пиши|убер)/i
+  const dropAsked = P.blocks.some((b) => b.text.split(/[.!?\n]+/).some((s) => /мысл/i.test(s) && DROP.test(s)))
   if (m === 0 && thoughts.length) fail('thought', `лишняя [мысль]: ответа «моя мысль» в протоколе нет — «${short(thoughts[0].raw)}»`)
+  else if (m > 0 && !thoughts.length && dropAsked) warns.push('мысли в списке нет — аналитик просил не включать')
   else if (m > 0 && !thoughts.length) fail('thought', `мысль потеряна: ответов «моя мысль» ${m}, [мысль] нет`)
   else if (thoughts.length > m) fail('thought', `лишняя [мысль]: ${thoughts.length} при ответах «моя мысль» ${m}`)
   // Мысль сказана — в строке `Аналитик:` или в «Заметках» (ответ Шага 0 текст 1.1.0 кладёт туда и пересказ).
   const said = P.blocks.some((b) => fx.ownThought.re.test(b.text)) || fx.ownThought.re.test(P.notes)
-  if (said && fx.list.thoughtItem && !thoughts.some((it) => fx.list.thoughtItem.test(it.body))) fail('thought', `мысль из карточки («${fx.ownThought.d}») не [мысль] в списке`)
+  if (said && fx.list.thoughtItem && !thoughts.some((it) => fx.list.thoughtItem.test(it.body)) && !dropAsked) fail('thought', `мысль из карточки («${fx.ownThought.d}») не [мысль] в списке`)
   for (const it of Lp.items.filter((x) => !THOUGHT.has(x.kind) && fx.ownThought.re.test(x.body))) fail('thoughtAsFact', `мысль аналитика пунктом [${it.kind}]: «${short(it.raw)}»`)
   // Мысли из карточки в «Ответах» нет — проверка [мысль] выключена. Не молча: причина — отдельной строкой.
   let thoughtUnmeasured = null
@@ -841,7 +941,15 @@ export function gradePoints(listText, protoText, protoName, fx, opts = {}) {
   }
   for (const it of Lp.items) {
     if (['решено', 'сведение', 'мысль', 'набросок'].includes(it.kind)) for (const er of fx.list.errands) if (er.re.every((re) => re.test(it.body))) fail('errand', `поручение «${er.d}» пунктом [${it.kind}]: «${short(it.raw)}»`)
-    if (it.kind === 'решено') for (const nd of fx.list.notDecided) if (nd.re.test(it.body)) fail('notDecided', `не решено по карточке — ${nd.d}: «${short(it.raw)}»`)
+    if (it.kind === 'решено') {
+      // «…; по X не решено» — не [решено] о X; решённым его назвал сам аналитик — предупреждение (twinNamed).
+      const byM = it.body.match(/решил[аи]?\s*:\s*(.+)$/i)
+      const decided = it.body.split(';').filter((c) => !/не\s+реш/i.test(c)).join(';')
+      for (const nd of fx.list.notDecided) if (nd.re.test(decided)) {
+        if (byM && it.asg && twinNamed(it.asg.content, byM[1], P, fx)) warns.push(`решено со слов аналитика, вопреки карточке — ${nd.d}: «${short(it.raw)}»`)
+        else fail('notDecided', `не решено по карточке — ${nd.d}: «${short(it.raw)}»`)
+      }
+    }
     for (const c of fx.contamination) if (!(c.skipThought && THOUGHT.has(it.kind)) && c.about.test(it.body) && c.bad.test(it.body) && !(c.unlessUnsure && (it.kind === 'открыто' || UNSURE.test(it.body)))) fail('hint', `подсказка — ${c.d}: «${short(it.raw)}»`)
     const gi = groundIssues(it.body, it.body, P, fx)
     if (gi.red.length) fail('grounding', `нет у аналитика (шапка, «Заметки», «Аналитик:»): ${gi.red.join(', ')} — «${short(it.raw)}»`)
@@ -886,7 +994,7 @@ export function gradeRun(dir, fx) {
   const tw = join(dir, '_twin')
   const twinReplies = existsSync(tw) ? readdirSync(tw).filter((f) => /^reply-\d+\.txt$/.test(f)).sort().map((f) => ({ name: f, text: read(join(tw, f)).trim() })).filter((x) => x.text) : []
   const answerFiles = readdirSync(dir).filter((f) => /^answer-\d+\.md$/.test(f))
-  const askedMore = answerFiles.length ? answerFiles.some((f) => /Что\s+(ещё|еще)/i.test(read(join(dir, f)))) : undefined
+  const askedMore = answerFiles.length ? answerFiles.some((f) => /(Что|Вспоминается)\s+(ещё|еще)/i.test(read(join(dir, f)))) : undefined
   const lg = listPath ? gradePoints(read(listPath), read(path), basename(path), fx, { replies: twinReplies, askedMore }) : null
   const listElsewhere = pointsAll.filter((p) => p !== listPath).map((p) => relative(dir, p))
   const touched = Object.entries(fx.seedDocs).filter(([rel, src]) => !existsSync(join(dir, rel)) || read(join(dir, rel)) !== read(join(HERE, src))).map(([rel]) => rel)
@@ -1561,6 +1669,33 @@ function selftest() {
   ck('«текст пришлёт до пятницы» — красный', gradeProtocol(add(i, '- поручение: Белова — прислать текст согласия — до пятницы'), fxI).pass, false)
   ck('срок хранения не в «Уточнить» — красный', gradeProtocol(i.replace(/- До чего договорились[^\n]*\n/, ''), fxI).pass, false)
   ck('«частоту решает маркетинг» — не срок текста', gradeProtocol(add(i, '- вне рамок: частоту рассылки (Глеб хотел раз в неделю) решает маркетинг'), fxI).pass, true)
+  console.log('DEEP')
+  const fxD = FX.DEEP
+  const ansD = (t, q, a) => t.replace('\n## Итог по памяти', `Вопрос: ${q}\nАналитик: ${a}\n\n## Итог по памяти`)
+  ck('эталон NEW — зелёный и по DEEP', gradeProtocol(n, fxD).pass, true)
+  ck('эталон NEW — скрытого в итоге 0', Object.values(gradeProtocol(n, fxD).hidden).filter((h) => h.itog).length, 0)
+  const nD = ansD(n, 'Пуш: какие варианты звучали и почему 30 минут? Кто возражал или сомневался?', 'Игорь предлагал 15 минут, Анна выбрала 30. Денис сомневался — у части клиентов пуши выключены.')
+  const gD = gradeProtocol(add(nD, '- сведение: Игорь предлагал 15 минут, Анна выбрала 30 — со слов аналитика'), fxD)
+  ck('скрытое: назвал в ответах 2', Object.values(gD.hidden).filter((h) => h.said).length, 2)
+  ck('скрытое: в итоге 1 (15 минут)', Object.values(gD.hidden).filter((h) => h.itog).length, 1)
+  ck('разбор: вопрос с осями — 1, на тему до 1', `${gD.interview.drill}/${gD.interview.maxDrill}`, '1/1')
+  ck('«; варианты:» инструмента — не разбор', gradeProtocol(ansD(n, 'Лимит: кто это принял?; варианты: Морозова Анна / Не помню', 'Не помню.'), fxD).interview.drill, 0)
+  ck('исключение с Морозовой — зелёный', gradeProtocol(add(n, '- решение: на замороженных абонементах лист ожидания не работает — принял Морозова Анна'), fxD).pass, true)
+  ck('«ночью пуши не шлём» — красный', gradeProtocol(add(n, '- решение: ночью пуши не шлём — принял Морозова Анна'), fxD).pass, false)
+  ck('«не подтвердил — остаётся в очереди» — красный', gradeProtocol(add(n, '- решение: кто не подтвердил, остаётся в очереди — принял Морозова Анна'), fxD).pass, false)
+  ck('«не подтвердил — место следующему» — зелёный', gradeProtocol(add(n, '- сведение: если не подтвердил за 30 минут, место уходит следующему — со слов Морозовой'), fxD).pass, true)
+  ck('«два занятия в одно время» решением — красный', gradeProtocol(add(n, '- решение: в очередь на два занятия в одно время не ставим — принял Морозова Анна'), fxD).pass, false)
+  ck('«два занятия в одно время» открытым — зелёный', gradeProtocol(add(n, '- открытый вопрос: что делать, если клиент в очереди на два занятия в одно время — ждёт: —'), fxD).pass, true)
+  ck('«релиз» с принявшим — красный', gradeProtocol(add(n, '- решение: пуши выйдут с релизом приложения — принял Ткач Денис'), fxD).pass, false)
+  console.log('СЛОВА АНАЛИТИКА, НЕ ОШИБКА СКИЛЛА')
+  ck('«…; по платным не решено» с принявшим — принявший не к платным', gradeProtocol(add(n, '- решение: делаем лист ожидания на групповые занятия; по платным занятиям не решено — принял Морозова Анна'), fxN).pass, true)
+  ck('  …«платные решили» с принявшим — красный', gradeProtocol(add(n, '- решение: на платных занятиях лист ожидания делаем — принял Морозова Анна'), fxN).pass, false)
+  const twA = ansD(n, 'Лимит: кто это принял?; варианты: Морозова Анна / Лебедев Игорь / Не помню', 'Анна.')
+  ck('принявшего лимита назвал аналитик — зелёный', gradeProtocol(add(twA, '- решение: у листа будет лимит — принял Морозова Анна'), fxN).pass, true)
+  ck('  …и предупреждение', gradeProtocol(add(twA, '- решение: у листа будет лимит — принял Морозова Анна'), fxN).warns.some((w) => /со слов аналитика/.test(w)), true)
+  ck('  …аналитик не называл — красный', gradeProtocol(add(n, '- решение: у листа будет лимит — принял Морозова Анна'), fxN).pass, false)
+  ck('  …Анна «подвела итог» о другом — красный', gradeProtocol(add(ansD(n, 'Что ещё?', 'Анна подвела итог: лист ожидания делаем, SMS нет.'), '- решение: у листа будет лимит — принял Морозова Анна'), fxN).pass, false)
+  ck('«я бы, кстати, ещё…» — мысль аналитика', parseProtocol(ansD(n, 'Что ещё?', 'Я бы, кстати, ещё дал клиенту выбирать время.')).blocks.some((b) => b.thought), true)
 
   // ---- список пунктов: зелёное — зелёное, красное — красное И по своей причине ----
   const LG = (fx, list, proto = REF[fx]) => gradePoints(list, proto, 'meeting-2026-10-14.recall.md', FX[fx])
@@ -1594,6 +1729,11 @@ function selftest() {
   console.log('СПИСОК NEW')
   const ln = REF_LIST.NEW
   green('NEW', 'эталон', ln)
+  const noThought = drop(ln, '- [мысль] Показ клиенту места в очереди · L34')
+  green('NEW', 'мысли нет — аналитик просил не включать', noThought, sub(REF.NEW, 'Аналитик: Записать\n', 'Аналитик: Записать. Мысль про место в очереди в список не включать.\n'))
+  red('NEW', '  …не просил — мысль потеряна', noThought, 'thought')
+  green('NEW', 'служебная строка «у кого уточнять — не знаю» — не вопрос', ln, put(REF.NEW, '- у кого уточнять — не знаю'))
+  green('NEW', '«кто предложил лимит и кто принял» — о том же, что [открыто] о лимите', ln, put(REF.NEW, '- кто предложил лимит и кто принял решение о нём — у кого: не знаю'))
   const offIt = put(ln, '- [открыто] Кто начал встречу и что показывали на экране (по памяти: не помню) — ждёт: — · L69')
   green('NEW', '«Уточнить» не о предмете пунктом [открыто]', offIt)
   ck('  …и предупреждение о нём', LG('NEW', offIt).warns.some((w) => /не о предмете/.test(w)), true)
@@ -1773,10 +1913,11 @@ function main() {
   if (arg === '--selftest') selftest()
   const fxName = process.argv[process.argv.indexOf('--fx') + 1]
   const fx = FX[fxName]
-  if (!arg || !existsSync(arg) || !fx) { console.error('usage: node grade-recall.mjs <каталог с песочницами> --fx NEW|CHG|INLINE|FINISH|CONT | --selftest'); process.exit(1) }
+  if (!arg || !existsSync(arg) || !fx) { console.error('usage: node grade-recall.mjs <каталог с песочницами> --fx NEW|CHG|INLINE|FINISH|CONT|DEEP | --selftest'); process.exit(1) }
   const runs = readdirSync(arg).filter((n) => /^run-\d+$/.test(n) && statSync(join(arg, n)).isDirectory()).sort()
   console.log(`\nпроба rec-${fxName.toLowerCase()}, ${arg}`)
   let measured = 0; let green = 0; let protoGreen = 0; let listGreen = 0; let total = 0; let unmeasuredThought = 0; let byEditOff = 0
+  let hidSaid = 0; let hidItog = 0; let qSum = 0; let drillSum = 0; let fuse = 0
   for (const n of runs) {
     const dir = join(arg, n)
     const api = apiFailure(dir)
@@ -1791,6 +1932,9 @@ function main() {
     const turns = readdirSync(dir).filter((f) => /^answer-\d+\.md$/.test(f)).length || 1
     const g = r.g
     const lg = r.lg
+    const hv = g && g.hidden ? Object.values(g.hidden) : null
+    if (hv) { hidSaid += hv.filter((h) => h.said).length; hidItog += hv.filter((h) => h.itog).length }
+    if (g) { qSum += g.interview.questions; drillSum += g.interview.drill; if (g.interview.maxDrill > 4) fuse++ }
     const notes = [
       `ходов: ${turns}, $${r.cost.toFixed(2)}`,
       `протокол ${r.protoPass ? 'зелёный' : 'КРАСНЫЙ'}, список ${r.listPass ? 'зелёный' : 'КРАСНЫЙ'}`,
@@ -1801,6 +1945,8 @@ function main() {
       g && !g.sections.itog && 'нет раздела «Итог по памяти»',
       g && !g.sections.ask && 'нет раздела «Уточнить у участников»',
       g && `помнит в итоге: ${g.rememberedCount}/${fx.remembered.length}` + (g.rememberedCount < fx.remembered.length ? ' (нет: ' + fx.remembered.filter((m) => !g.remembered[m.id]).map((m) => m.d).join('; ') + ')' : ''),
+      hv && `скрытое: в ответах ${hv.filter((h) => h.said).length}/${hv.length}, в итоге ${hv.filter((h) => h.itog).length}/${hv.length}` + (hv.some((h) => !h.itog) ? ' (нет в итоге: ' + fx.hidden.filter((h) => !g.hidden[h.id].itog).map((h) => h.d + (g.hidden[h.id].said ? ', назван' : '')).join('; ') + ')' : ''),
+      g && `вопросов: ${g.interview.questions}, разбора: ${g.interview.drill}, разбора на тему до ${g.interview.maxDrill}; «Уточнить»: ${g.interview.ask}`,
       g && Object.entries(g.contamination).filter(([, v]) => v).map(([k, v]) => `ПОДСКАЗКА ${fx.contamination.find((c) => c.id === k).d}: «${v}»`).join(' · '),
       g && g.ownThought && `МЫСЛЬ АНАЛИТИКА В ИТОГЕ: «${g.ownThought}»`,
       g && fx.ask.filter((a) => !g.ask[a.id]).map((a) => 'НЕТ: ' + a.d).join(' · '),
@@ -1823,6 +1969,8 @@ function main() {
       g && fx.askWarn.filter((a) => !g.askWarn[a.id]).map((a) => 'нет: ' + a.d).join(' · '),
       r.extra.length && 'лишние файлы в docs/: ' + r.extra.join(', '),
       r.step1Asked && 'пересказ был в строке вызова, а вопрос «расскажите всё» задан',
+      g && g.interview.maxDrill > 4 && `разбор одной темы — ${g.interview.maxDrill} кругов (предохранитель — 4)`,
+      g && g.interview.askDrill && `«Уточнить» о разборе: ${g.interview.askDrill}`,
       g && g.warns.length && 'протокол: ' + g.warns.join(' · '),
       lg && lg.warns.length && 'список: ' + lg.warns.join(' · '),
       r.rc.warns.length && r.rc.warns.join(' · '),
@@ -1839,5 +1987,7 @@ function main() {
   console.log(`  ${green}/${measured}\tзелёных — протокол и список вместе  ← КРИТЕРИЙ`)
   if (fx.byEdit) console.log(`  ${byEditOff}/${measured}\tрасходятся с правкой E6+8 / E7 (баги 6, 7, 11) — строкой «по правке:» у прогона, в счёт не идёт`)
   if (fx.list.thoughtItem) console.log(`  ${unmeasuredThought}/${measured}\tпроверка [мысль] из карточки не измерена (причина — строкой «не измерено:» у прогона)`)
+  if (fx.hidden) console.log(`  ${hidItog}/${fx.hidden.length * measured}\tскрытое в итоге (названо в ответах: ${hidSaid}) — счёт, в критерий не входит`)
+  if (measured) console.log(`  вопросов на прогон: ${(qSum / measured).toFixed(1)}, из них разбора: ${(drillSum / measured).toFixed(1)}; предохранитель сработал: ${fuse}/${measured}`)
   console.log(`  стоимость плеча: $${total.toFixed(2)}\n`)
 }

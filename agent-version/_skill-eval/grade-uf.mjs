@@ -35,11 +35,12 @@ const read = (p) => (existsSync(p) ? norm(readFileSync(p, 'utf8')) : null);
 const low = (s) => s.toLowerCase().replace(/ё/g, 'е');
 const JUNK = /^(answer(-\d+)?\.md|stream(-\d+)?\.jsonl|_seeded\.(txt|sha256)|_stderr\.log|_api-failure(-turn)?\.txt)$/;
 
+// Пути — в NFC: засев песочницы на macOS ложится в NFD («й», «ё» — буква и знак), а фикстура — в NFC.
 export function listFiles(dir, base = dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).flatMap((e) => {
     const p = join(dir, e);
-    return statSync(p).isDirectory() ? listFiles(p, base) : [relative(base, p).replace(/\\/g, '/')];
+    return statSync(p).isDirectory() ? listFiles(p, base) : [relative(base, p).replace(/\\/g, '/').normalize('NFC')];
   });
 }
 

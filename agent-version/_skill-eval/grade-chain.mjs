@@ -105,13 +105,16 @@ function apiRefused (sb) {
 
 const items = (t) => String(t).split('\n').filter((l) => /^- \[/.test(l))
 const kindOf = (l) => norm((String(l).match(/^- \[([^\]]+)\]/) || [])[1] || '')
-const body = (l) => String(l).replace(/^- \[[^\]]+\]\s*/, '').replace(/;\s*(вместо|отвечает на):.*$/, '')
-// Пункты, которых не было в старом тексте (мультимножество строк).
+// 2.0.0: без пометок ` ‖ …`, номера пункта в конце и хвостов связей.
+const body = (l) => String(l).replace(/\s*‖.*$/, '').replace(/\s*·\s*\d{4}-\d{2}-\d{2}\s*№\s*\d+\.\d+\s*$/, '').replace(/^- \[[^\]]+\]\s*/, '').replace(/;\s*(вместо|отвечает на):.*$/, '')
+// Пункты, которых не было в старом тексте (мультимножество строк). 2.0.0: пометка ` ‖ …`, дописанная к старой строке, —
+// не новый пункт: строки сравниваются без пометок.
+const unmarked = (l) => String(l).replace(/\s*‖[^\n]*$/, '')
 function addedItems (oldT, newT) {
   const left = new Map()
-  for (const l of items(oldT)) left.set(l, (left.get(l) || 0) + 1)
+  for (const l of items(oldT).map(unmarked)) left.set(l, (left.get(l) || 0) + 1)
   const out = []
-  for (const l of items(newT)) { const c = left.get(l) || 0; if (c) left.set(l, c - 1); else out.push(l) }
+  for (const l of items(newT)) { const k = unmarked(l); const c = left.get(k) || 0; if (c) left.set(k, c - 1); else out.push(l) }
   return out
 }
 // Время начала реплик расшифровки `чч:мм` — опора для времени встречи в шапке списка (`numbersOf` метки чч:мм:сс снимает).
@@ -139,7 +142,9 @@ function parseNb (t) {
   }
   return out
 }
-const LINK = /(вместо|отвечает на):\s*(\d{4}-\d{2}-\d{2})\s*№\s*(\d+)\s*«([^»]*)»/g
+// Связь — номером пункта (2.0.0: `<дата> №<запись>.<позиция>`), кавычки после номера — по желанию; старая форма
+// `<дата> №<запись> «<начало>»` — тоже читается.
+const LINK = /(вместо|отвечает на):\s*(\d{4}-\d{2}-\d{2})\s*№\s*(\d+)(?:\.(\d+))?\s*(?:«([^»]*)»)?/g
 const qnorm = (s) => N(s).replace(/[«»"“”…]+/g, ' ').replace(/\.+\s*$/, '').replace(/\s+/g, ' ').trim()
 const topicsOf = (fx, text) => { const n = N(text); return Object.keys(fx.topics).filter((k) => fx.topics[k].test(n)) }
 
@@ -154,7 +159,7 @@ function ground (F, k, what, line, src, opts) {
 function formList (F, k, what, t) {
   const lines = String(t).split('\n')
   if (!/^# Пункты:/.test(lines[0] || '')) F('б', k, 'форма', `${what}: первая строка не «# Пункты:»`)
-  const bad = lines.filter((l) => /^\s*(?:[-*+•]|\d+[.)])\s*\[/.test(l) && !/^- \[(решено|открыто|сведение|мысль|набросок)\]/.test(l))
+  const bad = lines.filter((l) => /^\s*(?:[-*+•]|\d+[.)])\s*\[/.test(l) && !/^- \[(решено|открыто|сведение|мысль)\]/.test(l))
   if (bad.length) F('б', k, 'форма', `${what}: пункт не строкой «- [вид]» — «${short(bad[0])}»`)
   if (!items(t).length) F('б', k, 'форма', `${what}: ни одной строки «- [»`)
 }
@@ -164,10 +169,11 @@ function checkLinks (F, k, fx, nbText, newLines) {
   const ents = parseNb(nbText)
   for (const l of newLines) {
     for (const m of l.matchAll(LINK)) {
-      const [, type, date, n, q] = m
+      const [, type, date, n, pos, q0] = m
+      const q = q0 || (pos ? `№${n}.${pos}` : '')
       const ent = ents.find((e) => e.date === date && e.n === n)
-      const qq = qnorm(q)
-      const tgt = ent && qq && ent.items.find((it) => { const b = qnorm(body(it)); return b.startsWith(qq) || qq.startsWith(b) })
+      const qq = q0 ? qnorm(q0) : ''
+      const tgt = !ent ? null : pos ? ent.items[Number(pos) - 1] : qq ? ent.items.find((it) => { const b = qnorm(body(it)); return b.startsWith(qq) || qq.startsWith(b) }) : null
       if (!tgt) { F('а', k, 'связь', `${type}: ${date} №${n} «${short(q)}» — такого пункта нет`); continue }
       if (tgt === l) { F('а', k, 'связь', `${type} на самого себя: «${short(body(l))}»`); continue }
       if (fx.forbidTarget && fx.forbidTarget.test(N(body(tgt)))) { F('а', k, 'связь', `${type} на мысль аналитика, которой на встрече не было: «${short(body(l))}» → «${short(q)}»`); continue }
@@ -188,7 +194,9 @@ function checkSeed (run, k, fx, F) {
     const ap = fx.appendOnly[k]
     if (ap && ap.test(rel)) {
       const old = readIf(k > 1 ? join(stageDir(run, k - 1), rel) : join(FIXROOT, fx.dir, 'seed', rel))
-      if (old && read(p).startsWith(old.replace(/\s+$/, ''))) continue
+      // 2.0.0: к прошлой строке можно дописать только пометку ` ‖ …` — сверка без пометок.
+      const strip = (t) => t.split('\n').map(unmarked).join('\n')
+      if (old && strip(read(p)).startsWith(strip(old).replace(/\s+$/, ''))) continue
       F('б', k, 'засев', `${rel}: прошлые записи изменены (дописывать можно только в конец)`)
     } else F('б', k, 'засев', `${rel} изменён — это выход прошлой стадии или засев`)
   }
@@ -210,7 +218,8 @@ const CH_T = 'meeting-2026-10-14.txt'
 const RE_DISPUTED = /вахт\S*\s+(\S+\s+){0,3}не\s+принима/
 const RE_GATE_DECIDED = /вахт[\s\S]*за\s+жильц|за\s+жильц[\s\S]*вахт/
 const RE_CLOSEDQ = re('может ли сотрудник|(войти|заходL*|входL*)[^.?]*жильцL*\\s+нет')
-const RE_N37_LINK = /отвечает на:\s*2026-10-02\s*№\s*1\s*«[^»]*(может ли сотрудник|войти)/i
+// N37 — 2026-10-02 №1.3 «Может ли сотрудник эксплуатации войти…»: номером пункта или старой формой с кавычками.
+const RE_N37_LINK = /отвечает на:\s*2026-10-02\s*№\s*1(\.3(?!\d)|\s*«[^»]*(может ли сотрудник|войти))/i
 const RE_N36 = re('запаснL*\\s+ключ')
 const RE_TASK_CH = /макет/
 const RE_NOISE = /чемодан|подвал|автобус|насос|слышно/

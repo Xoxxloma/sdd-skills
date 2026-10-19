@@ -5,7 +5,9 @@
   # итогом и списком. `DONE_RE` — список в любой папке `docs/` (и прямо в `docs/`, и с `-2`); запасной `DONE_GREP` —
   # шапка списка `# Пункты:` в файле `docs/` или `notes/`: список под чужим именем тоже конец (грейдер его не
   # найдёт — красный, но платных ходов после него нет). Грейдер `grade-recall.mjs --fx NEW|CHG|INLINE` — протокол и список.
-  rec-new) FIXTURE=RECALL-NEW; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
-  rec-chg) FIXTURE=RECALL-CHG; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  rec-new) FIXTURE=RECALL-NEW; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=30; IDLE_MAX=30; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  rec-chg) FIXTURE=RECALL-CHG; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=30; IDLE_MAX=30; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
   # Пересказ в строке вызова, ключа нет (протокол и список — в docs/_inbox/), аналитик просит закончить посреди раундов.
-  rec-inline) FIXTURE=RECALL-INLINE; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  rec-inline) FIXTURE=RECALL-INLINE; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=30; IDLE_MAX=30; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  # Встреча RECALL-NEW и пять фактов, которые двойник называет только на прямой вопрос разбора (свой промпт двойника).
+  rec-deep) FIXTURE=RECALL-DEEP; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=34; IDLE_MAX=34; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-analyst-deep.md; MEET_ENV=1 ;;

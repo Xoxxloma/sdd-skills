@@ -184,8 +184,8 @@ export function sourceLine(answer, truth, pre = 'п') {
     && (truth.notHoles ?? []).every((n) => !ptRe(n, pre).test(l));
 }
 
-/** М1: в отчёте строка с «мысль», «набросок» и их числом. */
-export const thoughtsLine = (answer, n) => (answer ?? '').split('\n').some((l) => /мысл/i.test(l) && /набросок/i.test(l) && new RegExp(`(^|\\D)${Number(n)}(\\D|$)`).test(l));
+/** М1: в отчёте строка с «мысли» и их числом (`interaction-diagram` после слияния видов ноута: «мысли: <N>»). */
+export const thoughtsLine = (answer, n) => (answer ?? '').split('\n').some((l) => /мысл/i.test(l) && new RegExp(`(^|\\D)${Number(n)}(\\D|$)`).test(l));
 
 // ---------- прогон ----------
 
@@ -322,7 +322,7 @@ function selftest() {
     && reds(gradeShort(MMD.replace(/п\.(\d)/g, 'стр.$1'), T, 'стр')) === '' && reds(gradeShort(MMD, T, 'стр')).startsWith('К4')
     && junkNamed('«Курьер потом звонит клиенту»: не на схеме — не пункт списка\nп.5 «Сайт шлёт SMS»: не на схеме — вид «идея» не распознан', ['Курьер потом звонит', { id: 5, word: 'идея' }])
     && !junkNamed('п.1 «…»: A → B', ['Курьер потом звонит']) && !junkNamed('п.15 — идея', [{ id: 5, word: 'идея' }]));
-  check('М1: «мысль, набросок: 2»', thoughtsLine('не на схеме: п.3 — нет действия; мысль, набросок: 2', 2) && !thoughtsLine('мысль, набросок: 12', 2));
+  check('М1: «мысли: 2»', thoughtsLine('не на схеме: п.3 — нет действия; мысли: 2', 2) && thoughtsLine('мысль, набросок: 2', 2) && !thoughtsLine('мысли: 12', 2));
   check('имя файла и пункты списка', diagramFile('notes/a/notebook-2026-01-01.points.md', 'uf', 'puml') === 'notes/a/notebook-2026-01-01.user_flow.puml'
     && diagramFile(T.list, 'short', 'mmd') === 'docs/X-1/meeting-2026-01-01.interaction_diagram.md'
     && points('# Пункты: x\n> Задача: —\n\n- [решено] a — решил: Б · L3\n- [мысль] b · L9')[2] === '[мысль] b · L9');

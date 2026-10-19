@@ -30,7 +30,9 @@ POOL="$HERE/run-pool-ctx-v2.sh"
 case "$PROBE" in
   loop-chain) FIXTURE=LOOP-CHAIN ;;
   loop-twice) FIXTURE=LOOP-TWICE ;;
-  *) echo "неизвестная цепочка: '$PROBE'"; echo "есть: loop-chain loop-twice"; exit 1 ;;
+  nb-chain-3) FIXTURE=NB-CHAIN-3 ;;
+  nb-chain-spor) FIXTURE=NB-CHAIN-SPOR ;;
+  *) echo "неизвестная цепочка: '$PROBE'"; echo "есть: loop-chain loop-twice nb-chain-3 nb-chain-spor"; exit 1 ;;
 esac
 [ -n "$ROUND" ] || { echo "usage: ./run-chain.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
 
@@ -134,7 +136,8 @@ run_chain() {
         echo "  run-$i — ЦЕПОЧКА ОБОРВАНА на стадии $k: {{$var}} ($cnt)"
         return 0
       fi
-      sed -i "s|{{$var}}|$(esc_sed "$found")|g" "$pf"
+      # Без `sed -i`: у BSD sed (macOS) первый аргумент `-i` — суффикс копии, подстановка молча не делалась.
+      sed "s|{{$var}}|$(esc_sed "$found")|g" "$pf" > "$pf.tmp" && mv "$pf.tmp" "$pf"
       [ "$var" = "$done_var" ] && done_path="$found"
     done
 

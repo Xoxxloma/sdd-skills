@@ -776,7 +776,8 @@ export function thoughtPoint (t, name) {
   const th = pts.filter((p) => p.kind === 'мысль' || p.kind === 'набросок')
   if (!th.length) return null
   const k = thoughtKind(t)
-  if (k) return th.find((p) => p.kind === k) || null
+  // 2.2.0: вид у обоих — `мысль`; какую из двух узнал классификатор, решает её же текст, а не вид.
+  if (k) return th.find((p) => p.kind === k) || th.find((p) => thoughtKind(mainText(p.text)) === k) || null
   const bp = bestPoint(t, pts)
   if (bp) return th.includes(bp) ? bp : null
   const other = new Set(pts.filter((p) => !th.includes(p)).flatMap((p) => [...tStems(mainText(p.text))]))
