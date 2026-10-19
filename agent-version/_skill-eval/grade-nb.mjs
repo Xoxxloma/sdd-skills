@@ -501,7 +501,7 @@ function listFiles (dir, base = dir, out = []) {
     if (dir === base && STAND.test(e.name)) continue
     const p = join(dir, e.name)
     if (e.isDirectory()) listFiles(p, base, out)
-    else out.push(relative(base, p).split('\\').join('/'))
+    else out.push(relative(base, p).split('\\').join('/').normalize('NFC'))
   }
   return out
 }

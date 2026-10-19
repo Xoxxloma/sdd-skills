@@ -134,7 +134,8 @@ run_chain() {
         echo "  run-$i — ЦЕПОЧКА ОБОРВАНА на стадии $k: {{$var}} ($cnt)"
         return 0
       fi
-      sed -i "s|{{$var}}|$(esc_sed "$found")|g" "$pf"
+      # Без `sed -i`: у BSD sed (macOS) первый аргумент `-i` — суффикс копии, подстановка молча не делалась.
+      sed "s|{{$var}}|$(esc_sed "$found")|g" "$pf" > "$pf.tmp" && mv "$pf.tmp" "$pf"
       [ "$var" = "$done_var" ] && done_path="$found"
     done
 

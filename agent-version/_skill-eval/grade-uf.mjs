@@ -39,7 +39,7 @@ export function listFiles(dir, base = dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir).flatMap((e) => {
     const p = join(dir, e);
-    return statSync(p).isDirectory() ? listFiles(p, base) : [relative(base, p).replace(/\\/g, '/')];
+    return statSync(p).isDirectory() ? listFiles(p, base) : [relative(base, p).replace(/\\/g, '/').normalize('NFC')];
   });
 }
 
