@@ -70,8 +70,9 @@ parse_card() {
   ' "$1"
 }
 
-# Ключи описи: «ключ<TAB>фактов<TAB>есть-файл». Ключ — строка без отступа с « — » (до него);
-# строки «состояние:/справочник:/сообщение:/ограничение:» дают ключи «Бизнес-правил».
+# Ключи описи: «ключ<TAB>фактов<TAB>есть-файл<TAB>служебный». Ключ — строка без отступа с « — » (до него);
+# строки «состояние:/справочник:/сообщение:/ограничение:» дают ключи «Бизнес-правил». Файл — и путём,
+# и именем с номером строки (`name.ext:42`).
 parse_opis() {
   awk '
     function norm(s,   v) {
@@ -82,12 +83,13 @@ parse_opis() {
       if (s ~ /^(сообщение|ограничение) /) { gsub(/«|»/, "", s); gsub(/[ 	]+/, " ", s); sub(/[ 	]+$/, "", s) }
       return s
     }
-    function flush() { if (key != "") print key "\t" facts "\t" src; key = "" }
+    function flush() { if (key != "") print key "\t" facts "\t" src "\t" svc; key = "" }
     { sub(/\r$/, "") }
     /^[ \t]+/ {                                         # второй уровень
       if (key == "") next
       t = $0; sub(/^[ \t]+/, "", t)
       if (t ~ /^·/) facts++
+      if (t ~ /^\(фактов нет/) svc = 1
       next
     }
     /^(#|⟹|\(|>|-|```|<!--)/ || /^$/ { flush(); next }
@@ -99,8 +101,9 @@ parse_opis() {
         head = line; rest = ""; src = 0
       } else {
         head = substr(line, 1, p - 1); rest = substr(line, p + 5)
-        src = (rest ~ /[^ ]\.[A-Za-z0-9]+([ ,)(+]|$)/ || rest ~ /\//) ? 1 : 0
+        src = (rest ~ /[^ ]\.[A-Za-z0-9]+([ ,)(+:#]|$)/ || rest ~ /\//) ? 1 : 0
       }
+      svc = (line ~ /\(фактов нет/) ? 1 : 0
       if (head ~ /^состояние:/) {
         h = head; sub(/^состояние:[ ]*/, "", h); sub(/[. ].*/, "", h)
         key = "объект " norm(h)
@@ -128,8 +131,9 @@ awk -F'\t' '
   function bare(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
   FNR == NR { have[$1] = 1; next }
   { k = $1; b = bare(k); if (b != k && (b in have)) k = b
-    if (!(k in f)) { order[++n] = k; f[k] = $2; s[k] = $3 } else if ($2 > f[k]) f[k] = $2 }
-  END { for (i = 1; i <= n; i++) print order[i] "\t" f[order[i]] "\t" s[order[i]] }
+    if (!(k in f)) { order[++n] = k; f[k] = $2; s[k] = $3 } else if ($2 > f[k]) f[k] = $2
+    if ($4 == 1) v[k] = 1 }
+  END { for (i = 1; i <= n; i++) print order[i] "\t" f[order[i]] "\t" s[order[i]] "\t" (v[order[i]] + 0) }
 ' "$TMP/opis.raw" "$TMP/opis.raw" > "$TMP/opis"
 
 # Ключ блока «Бизнес-правил» в карточке приводится к ключу описи: `Имя` → «объект Имя»,
@@ -152,6 +156,7 @@ title() {  # title <вид пункта перечня добора> — заг�
     MISSED) echo 'пропущено частью — проверь ключ по источнику и допиши карточку и опись' ;;
     DECL) echo 'блок у ключа «объявлено без реализации» — обработчик есть: убери пометку; нет: убери блок' ;;
     PARTEMPTY) echo 'у части больше половины блоков контракта без фактов — допиши факты из кода в эти блоки; факта в коде нет — блок оставь, не выдумывай' ;;
+    NOFACTK) echo 'ни факта ни в описи, ни в блоке — перечитай обработчик: что он отдаёт, проверяет и отфильтровывает; факта в коде нет — блок оставь, не выдумывай' ;;
   esac
 }
 
@@ -292,6 +297,7 @@ if [ -n "${CHECK_PLAN:-}" ]; then
         delete seen
         for (i = 1; i <= n; i++) {
           t = w[i]; gsub(/[`()]/, "", t); gsub(/\\/, "/", t); sub(/^\.\//, "", t)
+          sub(/^(\.\.\.|…)\/*/, "", t); sub(/:[0-9]+(-[0-9]+)?$/, "", t); sub(/#L[0-9].*$/, "", t)   # «…/dir/name.ext», «name.ext:42» — хвост пути
           if (t !~ /\// && t !~ /\.[A-Za-z0-9]+$/) continue
           if (!(t in seen)) { seen[t] = 1; tok[t]++ }
         }
@@ -333,15 +339,16 @@ fi
 # Сверка запись не останавливает: опись пишет тот же субагент, и её расхождение с карточкой — чаще
 # форма записи, чем пропуск в коде. В перечень добора идёт то, что можно исправить по коду: ключ описи
 # с источником без блока, блок при ключе описи без источника, факт описи при пустом блоке, один ключ
-# двумя блоками, ключ контракта без метода. Блок без ключа в описи и строка описи без источника и без
-# блока — справка.
+# двумя блоками, ключ контракта без метода, у нарезанного — ещё ключ без единого факта и в описи, и в блоке
+# (кроме служебного и ушедшего в «пустоту части»). Блок без ключа в описи и строка описи без источника и
+# без блока — справка.
 echo "== СВЕРКА ОПИСЬ → ЧЕРНОВИК"
 awk -F'\t' '
   function noq(k) { sub(/\?[A-Za-z_][^=?\/ ]*=.*$/, "", k); return k }
   function nop(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
   function bop(k) { k = nop(k); sub(/^(query|mutation|subscription) /, "", k); return k }
   FILENAME == ARGV[1] { d[$2] = $3; cl[$2] = $1; dk[++nd] = $2; if ($1 == "потребляет") { split($2, pp, " :: "); alt[pp[2]] = $2 }; next }
-  { ok[++m] = $1; fc[m] = $2; sc[m] = $3 }
+  { ok[++m] = $1; fc[m] = $2; sc[m] = $3; sv[m] = $4 }
   END {
     for (i = 1; i <= m; i++) {
       k = ok[i]; hit = (k in d) ? k : ""
@@ -365,12 +372,15 @@ awk -F'\t' '
       print "CLS\t" cl[hit]
       if (sc[i] == 0) print "NOSRCPAIR\t" k
       if (fc[i] > 0 && d[hit] == 0 && cl[hit] != "экраны" && cl[hit] != "роли" && cl[hit] != "зависит" && cl[hit] != "потребляет" && cl[hit] != "состояние") print "EMPTY\t" k
-      if (fc[i] == 0 && d[hit] == 0 && (cl[hit] == "контракт" || cl[hit] == "задачи" || cl[hit] == "топики")) print "NOFACT\t" cl[hit] ": " k
+      if (fc[i] == 0 && d[hit] == 0 && sv[i] != 1 && (cl[hit] == "контракт" || cl[hit] == "задачи" || cl[hit] == "топики")) { print "NOFACT\t" cl[hit] ": " k; print "NOFACTK\t" hit }
     }
     for (k in d) if (!(k in used) && cl[k] != "зависит" && cl[k] != "потребляет" && cl[k] != "состояние") print "EXTRA\t" cl[k] ": " k
   }
 ' "$TMP/draft.k" "$TMP/opis" > "$TMP/join"
-for t in MISS MISSRC NOSRCPAIR EXTRA EMPTY DUP NOFACT; do grep "^$t	" "$TMP/join" | cut -f2- | sort > "$TMP/$t"; done
+for t in MISS MISSRC NOSRCPAIR EXTRA EMPTY DUP NOFACT NOFACTK; do grep "^$t	" "$TMP/join" | cut -f2- | sort > "$TMP/$t"; done
+# Ключ без фактов и в описи, и в блоке — добор только у нарезанного сервиса: у одиночного добор — его
+# последний прогон на все причины, и такой ключ идёт человеку (Шаг 6).
+if [ -n "${CHECK_PARTS:-}" ]; then sort -u "$TMP/NOFACTK" | grep -v -x -F -f "$TMP/PARTEMPTY" > "$TMP/nf"; mv "$TMP/nf" "$TMP/NOFACTK"; else : > "$TMP/NOFACTK"; fi
 printf 'нет в черновике: %d' "$(wc -l < "$TMP/MISS")"; [ -s "$TMP/MISS" ] && { printf ' — '; list "$TMP/MISS"; } || echo
 printf 'нет в описи: %d' "$(wc -l < "$TMP/EXTRA")"; [ -s "$TMP/EXTRA" ] && { printf ' — '; list "$TMP/EXTRA"; } || echo
 printf 'факт в описи, пустой блок: %d' "$(wc -l < "$TMP/EMPTY")"; [ -s "$TMP/EMPTY" ] && { printf ' — '; list "$TMP/EMPTY"; } || echo
@@ -398,8 +408,8 @@ awk -F'\t' -v df="$TMP/declared" '
 printf 'блок у ключа «объявлено без реализации»: %d' "$(wc -l < "$TMP/DECL")"; [ -s "$TMP/DECL" ] && { printf ' — '; list "$TMP/DECL"; } || echo
 grep -v -E '^(объект|сообщение|ограничение) ' "$TMP/MISSRC" > "$TMP/ADD"
 grep -v -E '^(объект|сообщение|ограничение) ' "$TMP/NOSRCPAIR" > "$TMP/NOSRC"
-printf 'перечень добора: ключ описи с источником без блока %d, ключ с блоком без источника %d, факт в описи — блок пуст %d, один ключ дважды %d\n' \
-  "$(wc -l < "$TMP/ADD")" "$(wc -l < "$TMP/NOSRC")" "$(wc -l < "$TMP/EMPTY")" "$(wc -l < "$TMP/DUP")"
+printf 'перечень добора: ключ описи с источником без блока %d, ключ с блоком без источника %d, факт в описи — блок пуст %d, один ключ дважды %d, ни факта ни в описи, ни в блоке %d\n' \
+  "$(wc -l < "$TMP/ADD")" "$(wc -l < "$TMP/NOSRC")" "$(wc -l < "$TMP/EMPTY")" "$(wc -l < "$TMP/DUP")" "$(wc -l < "$TMP/NOFACTK")"
 if [ -n "${CHECK_LISTS:-}" ]; then
   L="ADD NOSRC EMPTY DUP nometh DECL"; [ -n "$PFX" ] && L="$L NOPFX"; [ -n "${CHECK_PLAN:-}" ] && L="$L MARKFILE"
   { for t in $L; do echo "## $(title "$t")"; cat "$TMP/$t"; echo; done; } > "$CHECK_LISTS" && echo "перечень добора целиком: $CHECK_LISTS"
@@ -552,6 +562,7 @@ CHECK_OWNER_PLAN="${CHECK_PLAN:-}" awk -F'\t' -v os="$(uname -s 2>/dev/null)" '
   function np(p) {
     gsub(/`/, "", p); gsub(/\\/, "/", p); gsub(/\/\/+/, "/", p)
     sub(/^[ \t]+/, "", p); sub(/[ \t]+$/, "", p); sub(/^\.\//, "", p); sub(/\/$/, "", p)
+    sub(/^(\.\.\.|…)\/*/, "", p); sub(/:[0-9]+(-[0-9]+)?$/, "", p); sub(/#L[0-9].*$/, "", p)
     if (os ~ /^(MINGW|MSYS|CYGWIN)/ && p ~ /^\/[A-Za-z]\//) p = toupper(substr(p, 2, 1)) ":" substr(p, 3)
     if (p ~ /^[A-Za-z]:/) p = toupper(substr(p, 1, 1)) substr(p, 2)
     while (sub(/\/\.(\/|$)/, "/", p)) ;
@@ -609,7 +620,7 @@ if [ -n "$FAIL" ]; then echo "ИСХОД: гейт не пройден — $FAIL
 elif [ "$ROUTE" = "В _pending" ]; then echo "ИСХОД: в _pending — гард"
 elif [ -n "$ROUTE" ]; then echo "ИСХОД: записать поверх"
 else echo "ИСХОД: записать"; fi
-{ for t in ADD NOSRC EMPTY DUP nometh NOPFX MARKFILE MISSED DECL PARTEMPTY; do awk -v t="$t" '{ print t "\t" $0 }' "$TMP/$t"; done; } > "$TMP/items"
+{ for t in ADD NOSRC EMPTY DUP nometh NOPFX MARKFILE MISSED DECL PARTEMPTY NOFACTK; do awk -v t="$t" '{ print t "\t" $0 }' "$TMP/$t"; done; } > "$TMP/items"
 awk -F'\t' -v parts="${CHECK_PARTS:+1}" -v oo="$TMP/own.opis" -v oc="$TMP/own.card" -v om="$TMP/missed.owners" '
   function nop(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
   function look(arr, k) { if (k in arr) return arr[k]; if (nop(k) in arr) return arr[nop(k)]; return "" }
@@ -641,7 +652,7 @@ if [ -s "$TMP/routed" ]; then
       else
         id="$a"; case "$a" in голова) id=head ;; "без хозяина") id=none ;; esac
         file="${CHECK_LISTS%.md}-$id.md"
-        { for t in ADD NOSRC EMPTY DUP nometh NOPFX MARKFILE MISSED DECL PARTEMPTY; do
+        { for t in ADD NOSRC EMPTY DUP nometh NOPFX MARKFILE MISSED DECL PARTEMPTY NOFACTK; do
             awk -F'\t' -v a="$a" -v t="$t" '$1 == a && $2 == t { print $3 }' "$TMP/routed" > "$TMP/one"
             [ -s "$TMP/one" ] && { echo "## $(title "$t")"; cat "$TMP/one"; echo; }
           done; } > "$file"
