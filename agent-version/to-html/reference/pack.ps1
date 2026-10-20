@@ -24,6 +24,7 @@ try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { }
 $MaxFiles = 2000
 $MaxText = 5MB
 $MaxImg = 15MB
+$MaxSets = 10
 $TextExt = @('md', 'markdown', 'txt', 'puml', 'plantuml', 'mmd', 'yaml', 'yml', 'json')
 $Mime = @{ png = 'image/png'; jpg = 'image/jpeg'; jpeg = 'image/jpeg'; gif = 'image/gif'; webp = 'image/webp'; svg = 'image/svg+xml' }
 
@@ -244,6 +245,14 @@ try {
 } catch {
   Fail 'no-write' "не могу писать в $cwd\.to-html"
 }
+
+# Каждый набор — копия страницы (~3 МБ) и тексты с картинками в base64: держим $MaxSets последних,
+# текущий — самый свежий. Не удалилось (файл занят) — не беда, сборка идёт дальше.
+try {
+  Set-ItemProperty -LiteralPath $out -Name LastWriteTime -Value (Get-Date)
+  Get-ChildItem -LiteralPath (Join-Path $cwd '.to-html') -Directory | Sort-Object LastWriteTime -Descending |
+    Select-Object -Skip $MaxSets | Remove-Item -Recurse -Force
+} catch { }
 
 $made = Get-Date -Format 'yyyy-MM-dd HH:mm'
 $stamp = Get-Date -Format 'yyyyMMddHHmmss'

@@ -250,6 +250,27 @@ function verifyRepeat(engine) {
   check(statSync(assets).mtimeMs > old.getTime() + 30_000, 'assets.js пересобран после правки картинки');
 }
 
+// Чистка: в .to-html остаются 10 последних наборов, текущий среди них, .gitignore на месте.
+function verifyPrune(engine) {
+  const cwd = join(box, 'prune');
+  const sets = join(cwd, '.to-html');
+  const old = (i) => `old-${String(i).padStart(2, '0')}`;
+  for (let i = 1; i <= 12; i++) {
+    mkdirSync(join(sets, old(i)), { recursive: true });
+    writeFileSync(join(sets, old(i), 'data.js'), '');
+    const t = new Date(Date.now() - (13 - i) * 60_000);
+    utimesSync(join(sets, old(i)), t, t);
+  }
+  console.log(`[${engine}] чистка старых наборов`);
+  const r = run(engine, cwd, ['../fx/TH-DOCS']);
+  if (!check(r.code === 0, `вызов прошёл: ${r.last}`)) return;
+  const cur = dirname(fileURLToPath(r.last.split(' page=')[1])).split(sep).pop();
+  const left = readdirSync(sets, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort();
+  const want = [cur, ...[4, 5, 6, 7, 8, 9, 10, 11, 12].map(old)].sort();
+  check(JSON.stringify(left) === JSON.stringify(want), `осталось ${left.join(', ')}, ждали ${want.join(', ')}`);
+  check(existsSync(join(sets, '.gitignore')), '.gitignore не удалён');
+}
+
 // ---------------------------------------------------------------- запуск
 
 const wanted = process.argv.slice(2);
@@ -267,6 +288,7 @@ for (const engine of list) {
     "$ExecutionContext.SessionState.LanguageMode = 'ConstrainedLanguage'\n& $script @rest\nexit $LASTEXITCODE\n");
   for (const c of cases) verify(engine, c);
   verifyRepeat(engine);
+  verifyPrune(engine);
 }
 
 console.log(failures ? `\nпровалов: ${failures}` : '\nвсё сошлось');

@@ -85,7 +85,7 @@ function grade(probe, lines, sandboxHasPage) {
     'верный путь': args !== null && want.includes(JSON.stringify(args)),
     'md не читал': mdReads.length === 0 && catMd.length === 0,
     'страница собрана': sandboxHasPage,
-    'ответ по строке скрипта': /открыл|откры/i.test(answer) && !/page=|file:\/\//i.test(answer),
+    'ответ по строке скрипта': /открыл|откры/i.test(answer) && !/page=/i.test(answer),
   };
   return { marks, args, packs, mdReads: [...mdReads, ...catMd], answer, cost: Number(result.total_cost_usd ?? 0), turns: result.num_turns ?? null };
 }
@@ -97,7 +97,7 @@ function selftest() {
   const probe = PROBES[1];
   const cmd = win ? 'powershell -NoProfile -ExecutionPolicy Bypass -File .gigacode/skills/to-html/reference/pack.ps1 "notes/дача/Дневник.md"'
     : 'bash .gigacode/skills/to-html/reference/pack.sh "notes/дача/Дневник.md"';
-  const good = [tool('Skill', { skill: 'to-html' }), tool(win ? 'PowerShell' : 'Bash', { command: cmd }), res('Открыл в браузере: Дневник. После правок — снова /to-html, потом F5.')];
+  const good = [tool('Skill', { skill: 'to-html' }), tool(win ? 'PowerShell' : 'Bash', { command: cmd }), res('Открыл в браузере: Дневник. После правок — снова /to-html, потом F5. Если вкладка не появилась — открой: file:///C:/x/.to-html/notes--%D0%B4/index.html')];
   const bad = [tool('Read', { file_path: 'C:/x/notes/дача/Дневник.md' }),
     tool('Bash', { command: 'bash .gigacode/skills/to-html/reference/pack.sh "notes"' }),
     tool('Bash', { command: 'bash .gigacode/skills/to-html/reference/pack.sh "notes"' }),
