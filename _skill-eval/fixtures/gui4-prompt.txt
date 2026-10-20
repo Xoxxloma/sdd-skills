@@ -1,2 +1,0 @@
-БТ готов: _skill-eval/fixtures/ARS-84/business_requirements.md
-Прочитай и скажи, что дальше.
