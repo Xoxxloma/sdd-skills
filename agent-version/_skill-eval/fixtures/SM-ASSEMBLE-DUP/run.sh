@@ -26,6 +26,11 @@ want 'События: потребляет sky.cloud-alert — блоки час
 want 'События: публикует на telescope.reservation.events (часть 02)'
 diff <(tr -d '\r' < "$HERE/expect.md") "$OUT/card.md" || bad=1
 diff <(tr -d '\r' < "$HERE/expect.opis.md") "$OUT/opis.md" || bad=1
+# Спецификацию план не разметил (строк о ней нет): она справочник, операция — части с обработчиком (02).
+mkdir "$OUT/nospec"; cp "$HERE/parts/"*.md "$OUT/nospec/"; tr -d '\r' < "$HERE/parts/plan.tsv" | grep -v 'openapi\.yaml' > "$OUT/nospec/plan.tsv"
+bash "$ASM" "$OUT/nospec" 2 2026-10-19 "$OUT/card3.md" "$OUT/opis3.md" > "$OUT/log3" || { cat "$OUT/log3"; exit 1; }
+grep -q -F 'Публичный контракт: GET /api/nights/free-count — блок части 02 (владелец по плану)' "$OUT/log3" \
+  || { echo "спецификация не размечена: владелец операции не часть с обработчиком (02)"; grep 'free-count' "$OUT/log3"; bad=1; }
 # Без плана владельца нет ни у кого: все дубли — объединение «плана нет».
 mkdir "$OUT/noplan"; cp "$HERE/parts/"*.md "$OUT/noplan/"
 bash "$ASM" "$OUT/noplan" 2 2026-10-19 "$OUT/card2.md" "$OUT/opis2.md" > "$OUT/log2" || { cat "$OUT/log2"; exit 1; }

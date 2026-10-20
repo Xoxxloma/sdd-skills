@@ -19,6 +19,7 @@
 #   SM_MONO_K=<целое>   подменить в снимке подстроку `K = <целое>` раздела «#### 3.5 Большой сервис»
 #                       (до следующего заголовка ###/####); подстрок не ровно одна — отказ раннера;
 #   SM_MONO_W=<число>   то же для `w = <число>`;
+#   SM_MONO_SCOUT_NOSPEC=1  в снимке разведчику запрещено размечать спецификации — ветка «спека не нарезана»;
 #   SM_MODEL (sonnet), SM_MONO_CONC (1) — параллельных прогонов, SM_MONO_TIMEOUT (7200 c), SM_MONO_SNAP;
 #   SM_MONO_DRY=1       собрать песочницы, снимок, подмену и промпты; claude не звать.
 # Снимок раунда снят с другой подменой — отказ (числа раунда иначе смешают два текста).
@@ -74,12 +75,21 @@ subst() {
   echo "подмена в снимке: $var = $val (раздел 3.5, строки $s–$e)"
 }
 SNAPREC="$ROUND/_skills/service-map"
-WANT_SUB="K=${SM_MONO_K:-как в тексте} w=${SM_MONO_W:-как в тексте}"
+WANT_SUB="K=${SM_MONO_K:-как в тексте} w=${SM_MONO_W:-как в тексте}${SM_MONO_SCOUT_NOSPEC:+ разведчик без спеки}"
+# SM_MONO_SCOUT_NOSPEC=1 — ветка «план не разметил спецификацию» (прод: разведчик не назвал строку спеки):
+# в снимке к брифу разведчика дописывается запрет размечать спецификации; остальное — как в тексте.
+nospec() {
+  local f="$SNAPREC/reference/brief-scout.md"
+  [ -f "$f" ] || { echo "ОТКАЗ: в снимке нет reference/brief-scout.md — запрещать разметку спеки негде" >&2; return 1; }
+  printf '%s\n' "" "Для этого прогона: спецификации API (openapi, swagger) не размечай — ни строки спеки, ни контроля по ней." >> "$f"
+  echo "подмена в снимке: разведчик без строки спеки (reference/brief-scout.md)"
+}
 if [ ! -f "$SNAPREC/SKILL.md" ]; then
   mkdir -p "$ROUND/_skills"; rm -rf "$SNAPREC"
   cp -r "$SRC" "$SNAPREC"
   { [ -z "${SM_MONO_K:-}" ] || subst "$SNAPREC/SKILL.md" K "$SM_MONO_K" '[0-9]+'; } \
     && { [ -z "${SM_MONO_W:-}" ] || subst "$SNAPREC/SKILL.md" w "$SM_MONO_W" '[0-9]+([.,][0-9]+)?'; } \
+    && { [ -z "${SM_MONO_SCOUT_NOSPEC:-}" ] || nospec; } \
     || { rm -rf "$ROUND/_skills"; exit 1; }
   echo "$WANT_SUB" > "$ROUND/_skills/_subst.txt"
   echo "снимок скилла снят: $SNAPREC ($(find "$SNAPREC" -type f | wc -l) файлов)"
