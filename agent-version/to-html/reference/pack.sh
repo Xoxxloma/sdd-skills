@@ -9,7 +9,8 @@
 #
 # Пишет <текущая папка>/.to-html/<набор>/: копию viewer/, data.js (тексты в base64), assets.js (картинки
 # в base64 — для экспорта) — и открывает index.html системной командой. Повторный вызов с тем же входом
-# пишет туда же: F5 в открытой вкладке показывает новое. --no-open — только пересобрать.
+# пишет туда же: F5 в открытой вкладке показывает новое. --no-open — только пересобрать. В .to-html/
+# остаются MAX_SETS последних наборов, старые удаляются.
 # TO_HTML_NO_OPEN=1 в окружении — не открывать браузер, вывод как обычно (проверки без экрана).
 #
 # Последняя строка вывода — только ASCII, её читает агент (русские строки выше бывают в чужой кодировке):
@@ -24,6 +25,7 @@ shopt -s nocasematch
 MAX_FILES=2000
 MAX_TEXT=$((5 * 1024 * 1024))
 MAX_IMG=$((15 * 1024 * 1024))
+MAX_SETS=10
 
 here="$(cd "$(dirname "$0")" && pwd -P)"
 viewer="$here/viewer"
@@ -224,6 +226,16 @@ out="$cwd/.to-html/$slug"
 mkdir -p "$out" 2>/dev/null && [ -w "$out" ] || fail no-write "не могу писать в $cwd/.to-html"
 [ -f "$cwd/.to-html/.gitignore" ] || printf '*\n' > "$cwd/.to-html/.gitignore"
 
+# Каждый набор — копия страницы (~3 МБ) и тексты с картинками в base64: держим MAX_SETS последних,
+# текущий — самый свежий. Не удалилось — не беда, сборка идёт дальше.
+touch "$out"
+n=0
+ls -1t "$cwd/.to-html" | while IFS= read -r d; do
+  [ -n "$d" ] && [ -d "$cwd/.to-html/$d" ] || continue
+  n=$((n + 1))
+  [ "$n" -gt "$MAX_SETS" ] && rm -rf "$cwd/.to-html/$d"
+done
+
 made="$(date '+%Y-%m-%d %H:%M')"
 stamp="$(date '+%Y%m%d%H%M%S')"
 
@@ -305,8 +317,13 @@ elif [ -z "${TO_HTML_NO_OPEN:-}" ]; then
   case "$(uname -s)" in
     Darwin) open "$page" ;;
     MINGW*|MSYS*|CYGWIN*) cmd.exe //c start "" "$(cygpath -w "$page")" ;;
-    *) if command -v xdg-open >/dev/null 2>&1; then xdg-open "$page" >/dev/null 2>&1 &
-       else printf 'открой в браузере: %s\n' "$page"; fi ;;
+    # setsid — своя сессия: агент, закрывая терминал после команды, не убьёт xdg-open, пока тот
+    # запускает браузер (иначе вкладка то появляется, то нет). Без & нельзя: xdg-open бывает ждёт
+    # закрытия браузера.
+    *) if ! command -v xdg-open >/dev/null 2>&1; then printf 'открой в браузере: %s\n' "$page"
+       elif command -v setsid >/dev/null 2>&1; then setsid xdg-open "$page" >/dev/null 2>&1 < /dev/null &
+       else nohup xdg-open "$page" >/dev/null 2>&1 < /dev/null &
+       fi ;;
   esac
 fi
 printf 'to-html: %s files=%s text=%s img=%s other=%s page=%s\n' "$status" "$total" "$n_text" "$n_img" "$n_other" "$(urlenc "$url")"
