@@ -66,3 +66,18 @@
 в её `openapi.yaml`) или по `_variant.txt` раунда с `--big-spec`. `bash test-spec.sh` проверяет и это
 дерево: 100 операций, 98 реализаций в семи контроллерах, нет аннотаций маршрутов, ключ ↔ спека ↔
 методы, каждый анкер — только в методе своей операции, контракт 218.
+
+## Вариант «владение по файлу»
+
+`bash make.sh <куда> --owners` (стенд держит дерево в `out/owners`) — то, на чём нарезка теряла ключи и двоила
+сущности:
+
+| Что | Где | Правда |
+|---|---|---|
+| ручки JAX-RS (`@Path` + `@GET`/`@PUT`), других пометок в папках нет; регистрирует их `v2/config/JerseyConfig.java` | `v2/inspectors/web/InspectorResource.java` (4), `v2/regions/web/RegionCatalogResource.java` (2) | в контракте все 6 |
+| общие сущности: лежат в папках ручек JAX-RS, их же возвращают ручки модулей | `InspectorEntity` ← `v2/checks/web/CheckAssigneeController.java`; `RegionEntity`, `OfficeEntity` ← `v2/findings/web/FindingRegionController.java` | по одному блоку на сущность |
+| поля из базового класса `@MappedSuperclass` (`id`, `createdAt`, `updatedAt`, `createdBy`) | `v2/common/persistence/AuditedEntity.java`; наследуют три общие сущности и `SanctionAppealEntity`, `TemplateVersionEntity`, `GroupMemberEntity` | в перечне полей каждой из шести |
+
+Правда классов: контракт **156** (148 + 6 JAX-RS + 2 ручки модулей), сущности **66** (60 + 6), задачи **10**, топики
+**12**. Грейдер — `grade-sm-mono.mjs`, фикстура `SM-MONO-SPEC-OWN`: строки «ручки без пометок разведчика», «поля из
+базового класса», «общие сущности» и «повторов» у сущностей.

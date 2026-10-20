@@ -4,42 +4,50 @@
 #   bash assemble.sh <папка частей> <S> <дата> <черновик-выход> <опись-выход>
 #
 # В папке: head.md (каркас карточки по шаблону: шапка, секции головы, в ключевых секциях — строка
-# `<!-- части -->`), part-01.md … part-<S>.md и part-NN.opis.md, при желании head.opis.md. Первая
-# строка каждого файла — `<!-- service-map: <голова|часть NN> <дата> -->`; номер части сверяется числом
-# (`часть 1` и `часть 01` — одна часть); файла нет, номер или дата чужие — отказ, ничего не пишется. В каждой секции с `<!-- части -->` блоки `###` и строки таблиц всех частей
-# сливаются: дубль ключа — один блок, строки тела без повторов; сортировка по ключу (контракт — по
-# пути, затем по глаголу; «События» — потребляет, затем публикует; «Бизнес-правила» — объекты,
-# сообщения, ограничения); заглушки частей (`—`, `не определено…`) остаются, только если блоков нет
-# ни у одной части. Опись — списки частей подряд, итоги `⟹` суммируются.
-# Заголовок блока в контракте, «Событиях», задачах и данных пишется ключом шаблона: без строки запроса,
-# аргументов операции, слов между направлением и топиком и пометки в скобках — два написания одного
-# ключа дают один блок.
-# Ключ контракта, записанный вызовом (`query night(id: ID!)`, `Dome.Close(Req)`), — тот же ключ, что без
-# скобок, если у другой части он стоит без скобок: один блок. У частей есть блоки в секции, которой в
-# каркасе головы нет или в ней нет метки, — отказ с именем виновного: молча блоки не выбрасываются.
-# Секцию, которую пишет голова («Зависит от», «Роли и доступ», «Бизнес-правила»), у части отбрасывает
-# со строкой в выводе.
+# `<!-- части -->`), part-01.md … part-<S>.md и part-NN.opis.md, при желании head.opis.md и plan.tsv
+# (план plan.sh). Первая строка каждого файла — `<!-- service-map: <голова|часть NN> <дата> -->`; номер
+# части сверяется числом (`часть 1` и `часть 01` — одна часть); файла нет, номер или дата чужие — отказ,
+# ничего не пишется. В каждой секции с `<!-- части -->` блоки `###` и строки таблиц всех частей сливаются;
+# сортировка по ключу (контракт — по пути, затем по глаголу; «События» — потребляет, затем публикует;
+# «Бизнес-правила» — объекты, сообщения, ограничения); заглушки частей (`—`, `не определено…`) остаются,
+# только если блоков нет ни у одной части. Опись — списки частей подряд, итоги `⟹` суммируются.
+# Ключ — по шаблону (keys.awk, общий с check.sh): заголовок блока в контракте, «Событиях», задачах и
+# данных пишется ключом — без строки запроса, аргументов операции, слов вокруг топика в бэктиках; два
+# написания одного ключа дают один блок. Заголовок, который к ключу не сводится, — как есть, строкой
+# «ключ не опознан». Ключ контракта, записанный вызовом (`Dome.Close(Req)`), — тот же ключ, что без
+# скобок, если у другой части он стоит без скобок: один блок.
+# Дубль ключа — блок части-владельца: её план отдал файл объявления ключа (первый файл источника в описях
+# частей, до « + »). Из других блоков дописываются строки `— ` и поля «Владеет данными» с именами, которых у
+# владельца нет; прочие строки `- ` отбрасываются. Владельца нет — плана нет, у ключа нет источника, файл у
+# нескольких частей, у владельца нет блока — блоки объединяются: заголовок, назначение и `сущности:`
+# первого, строки `- ` и `— ` всех без повторов; строка в выводе называет причину.
+# У частей есть блоки в секции, которой в каркасе головы нет или в ней нет метки, — отказ с именем
+# виновного: молча блоки не выбрасываются. Секцию, которую пишет голова («Зависит от», «Роли и доступ»,
+# «Бизнес-правила»), у части отбрасывает со строкой в выводе.
 set -u
 DIR="${1:?папка частей}"; S="${2:?число частей}"; DATE="${3:?дата}"; OUT="${4:?черновик}"; OPIS="${5:?опись}"
 export LC_ALL=C
 fail() { echo "ОТКАЗ: $*"; exit 3; }
+K_AWK="$(cat "$(dirname "$0")/keys.awk" 2>/dev/null)"
+[ -n "$K_AWK" ] || fail "нет $(dirname "$0")/keys.awk — скилл установлен не целиком"
 fresh() {  # fresh <файл> <кто> [<кто — регэксп>]
   [ -f "$1" ] || fail "нет файла $1"
   head -n1 "$1" | tr -d '\r' | grep -q "^<!-- service-map: ${3:-$2} $DATE -->" || fail "$1 — первая строка не «<!-- service-map: $2 $DATE -->» (чужой прогон?)"
 }
 fresh "$DIR/head.md" "голова"
-PARTS=""
+PARTS=""; POPIS=""
 for i in $(seq 1 "$S"); do
   n=$(printf '%02d' "$i")
   fresh "$DIR/part-$n.md" "часть $n" "часть 0*$i"; fresh "$DIR/part-$n.opis.md" "часть $n" "часть 0*$i"
-  PARTS="$PARTS $DIR/part-$n.md"
+  PARTS="$PARTS $DIR/part-$n.md"; POPIS="$POPIS $DIR/part-$n.opis.md"
 done
 [ -f "$DIR/head.opis.md" ] && fresh "$DIR/head.opis.md" "голова"
 TMP="$(mktemp -d 2>/dev/null || echo "/tmp/assemble.$$")"; mkdir -p "$TMP"; trap 'rm -rf "$TMP"' EXIT
+PLAN="$DIR/plan.tsv"; [ -s "$PLAN" ] || PLAN=""
 
-# 1. Записи частей: тип<TAB>секция<TAB>ключ-сортировки<TAB>ключ<TAB>текст (\001 вместо перевода строки).
+# 1. Записи частей: тип<TAB>секция<TAB>ключ-сортировки<TAB>ключ<TAB>текст (\001 вместо перевода строки)<TAB>часть.
 # shellcheck disable=SC2086
-awk '
+awk -v nokeyf="$TMP/nokey" "$K_AWK"'
   function norm(s,   v) {
     gsub(/`/, "", s); gsub(/«|»/, "", s); sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); gsub(/[ \t]+/, " ", s)
     v = s; sub(/ .*/, "", v)
@@ -59,21 +67,12 @@ awk '
     }
     return k
   }
-  # Ключ по шаблону, как бы его ни записала часть: у контракта — метод и путь без строки запроса либо
-  # тип операции и имя без аргументов; у «Событий» — направление и топик: текст в бэктиках, а без них —
-  # последнее слово после снятой пометки в скобках; слова между направлением и топиком в ключ не входят.
-  function canon(sec, h,   k, d, t) {
-    k = norm(h)
-    if (sec ~ /^Публичный контракт/) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) sub(/\?.*$/, "", k); else if (k ~ /^(query|mutation|subscription|rpc) /) sub(/[ ]*\(.*\)$/, "", k) }
-    if (sec ~ /^События/) {
-      d = k; sub(/ .*/, "", d)
-      if (d ~ /^(публикует|потребляет)$/ && k ~ / /) {
-        if (match(h, /`[^`]+`/)) t = substr(h, RSTART + 1, RLENGTH - 2)
-        else { t = k; sub(/[ ]*\([^)]*\)$/, "", t); sub(/.* /, "", t) }
-        k = d " " t
-      }
-    }
-    return k
+  function kcls(sec) {
+    if (sec ~ /^Публичный контракт/) return "контракт"
+    if (sec ~ /^События/) return "топики"
+    if (sec ~ /^Фоновые задачи/) return "задачи"
+    if (sec ~ /^Владеет данными/) return "сущности"
+    return ""
   }
   function header(sec, k,   d) {
     if (sec ~ /^События/ && k ~ /^(публикует|потребляет) /) { d = k; sub(/ .*/, "", d); return "### " d " `" substr(k, length(d) + 2) "`" }
@@ -97,11 +96,15 @@ awk '
   /^## / { flush(); sec = substr($0, 4); sub(/[ \t]+$/, "", sec); next }
   sec == "" { next }
   # Заголовок блока в контракте, «Событиях», задачах и данных пишется ключом; хвост « — …» после него
-  # становится строкой назначения, если её нет. У «Бизнес-правил» фраза после « — » — часть формы.
+  # становится строкой назначения, если её нет. Не сводится к ключу — заголовок как есть. У «Бизнес-правил»
+  # фраза после « — » — часть формы.
   /^### / {
     flush(); h = substr($0, 5); p = index(h, " — "); tl = ""; if (p > 0) { tl = substr(h, p + 5); h = substr(h, 1, p - 1) }
-    if (sec ~ /^(Публичный контракт|События|Фоновые задачи|Владеет данными)/) { key = canon(sec, h); txt = header(sec, key); tail = tl }
-    else { key = norm(h); txt = $0 }
+    c = kcls(sec)
+    if (c == "") { key = norm(h); txt = $0; next }
+    key = k_canon(c, h)
+    if (key != "") { txt = header(sec, key); tail = tl }
+    else { key = norm(h); txt = $0; print sec ": " key " (часть " pn ")" > nokeyf }
     next
   }
   key != "" {
@@ -117,13 +120,13 @@ awk '
   /^(—|не определено)/ { print "P\t" sec "\t\t\t" $0; next }
   END { flush() }
 ' $PARTS > "$TMP/rec.raw"
+: >> "$TMP/nokey"
 
 # 1а. Ключ контракта вызовом и он же без скобок — один ключ (точное совпадение старше: две перегрузки
 # с разными аргументами остаются двумя ключами).
-awk -F'\t' -v OFS='\t' -v NEAR="$TMP/near" '
-  function bare(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
+awk -F'\t' -v OFS='\t' -v NEAR="$TMP/near" "$K_AWK"'
   FNR == NR { if ($1 == "B") have[$2 SUBSEP $4] = 1; next }
-  $1 == "B" && $2 ~ /^Публичный (контракт|API)/ { b = bare($4); if (b != $4 && (($2 SUBSEP b) in have)) { print $2 ": " b " ~ " $4 >> NEAR; $4 = b; $3 = b } }
+  $1 == "B" && $2 ~ /^Публичный (контракт|API)/ { b = k_bare($4); if (b != $4 && (($2 SUBSEP b) in have)) { print $2 ": " b " ~ " $4 >> NEAR; $4 = b; $3 = b } }
   { print }
 ' "$TMP/rec.raw" "$TMP/rec.raw" > "$TMP/rec"
 : >> "$TMP/near"
@@ -148,85 +151,161 @@ u="$(grep '^PART	' "$TMP/unplaced" | head -n1)"
 
 sort -t"$(printf '\t')" -k1,1 -k2,2 -k3,3 -s "$TMP/rec" > "$TMP/rec.s"
 
-# 2. Слияние дублей. Блок без дубля выходит как есть. Дубль ключа — один блок: заголовок, назначение и
-# строка `сущности:` от первого; строки `- ` и `— ` всех блоков без повторов, сначала `- `, потом `— `,
-# как в шаблоне; строка с отступом едет со своей строкой. В «Владеет данными» перечень полей один:
-# первым идёт блок, у которого больше полей с типом, у остальных имя, которое уже есть, вычёркивается.
-awk -F'\t' '
+# 1в. Источники ключей по описям частей: часть<TAB>ключ<TAB>хвост строки после « — ».
+# shellcheck disable=SC2086
+awk "$K_AWK"'
+  FNR == 1 { pn = FILENAME; sub(/.*part-/, "", pn); sub(/\.opis\.md$/, "", pn); next }
+  { sub(/\r$/, "") }
+  /^[ \t]/ || /^(#|⟹|\(|>|-|```|<!--)/ || /^$/ { next }
+  { p = index($0, " — "); if (p == 0) next; h = substr($0, 1, p - 1)
+    if (h ~ /^(состояние|справочник|сообщение|ограничение|роль|Роль):/) next
+    print pn "\t" k_opis(h) "\t" substr($0, p + 5) }
+' $POPIS > "$TMP/src"
+
+# 2. Слияние дублей. Блок без дубля выходит как есть. Дубль ключа — блок владельца по плану; владельца
+# нет — объединение (см. шапку). Строка с отступом едет со своей строкой.
+CHECK_OWNER_PLAN="$PLAN" awk -F'\t' -v srcf="$TMP/src" -v S="$S" -v os="$(uname -s 2>/dev/null)" -v rep="$TMP/dups" "$K_AWK"'
   function units(txt, U,   n, L, i, m) {
     n = split(txt, L, "\001"); m = 0
     for (i = 2; i <= n; i++) if (m > 0 && L[i] ~ /^[ \t]/) U[m] = U[m] "\001" L[i]; else U[++m] = L[i]
     return m
   }
-  # Строка поля: перечень имён до «:» или « — » (в бэктиках с `?` и пометкой в скобках либо голые через
-  # запятую). Имена — в NM[1..], исходные куски — в IT[1..], остаток строки — в RST; не перечень — 0.
-  function fields(u,   s, p, q, n, i, t, nm) {
-    s = u; sub(/\001.*/, "", s); sub(/^- /, "", s)
-    p = index(s, ":"); q = index(s, " — "); if (q > 0 && (p == 0 || q < p)) p = q
-    RST = (p > 0) ? substr(s, p) : ""; TYPED = (p > 0 && substr(s, p, 1) == ":"); if (p > 0) s = substr(s, 1, p - 1)
-    n = split(s, IT, /[,\/]/)
+  # Путь — как в check.sh: без бэктиков, «.../», номера строки; Windows-диск — заглавной.
+  function np(p) {
+    gsub(/`/, "", p); gsub(/\\/, "/", p); gsub(/\/\/+/, "/", p)
+    sub(/^[ \t]+/, "", p); sub(/[ \t]+$/, "", p); sub(/^\.\//, "", p); sub(/\/$/, "", p)
+    sub(/^(\.\.\.|…)\/*/, "", p); sub(/:[0-9]+(-[0-9]+)?$/, "", p); sub(/#L[0-9].*$/, "", p)
+    if (os ~ /^(MINGW|MSYS|CYGWIN)/ && p ~ /^\/[A-Za-z]\//) p = toupper(substr(p, 2, 1)) ":" substr(p, 3)
+    if (p ~ /^[A-Za-z]:/) p = toupper(substr(p, 1, 1)) substr(p, 2)
+    return p
+  }
+  function abs(p) { return p ~ /^(\/|[A-Za-z]:)/ }
+  function same(p, q) { return p == q || (!abs(p) && length(q) > length(p) && substr(q, length(q) - length(p)) == "/" p) }
+  # Части плана, которым отдан файл f: точный файл старше папки, папка — ближайшая; список через запятую.
+  function own1(f,   p, q, depth, best, res) {
+    best = 0; res = ""
+    for (p in files) if (same(f, p)) { if (length(f) + 1 > best) { best = length(f) + 1; res = files[p] } else if (length(f) + 1 == best) res = res "," files[p] }
+    for (p in paths) {
+      q = f; depth = length(f) + 1
+      if (kinds[p] == "папки") { sub(/\/[^\/]+$/, "", q); depth = length(q) }
+      while (q != f || kinds[p] == "файлы") {
+        if (same(q, p)) { if (depth > best) { best = depth; res = paths[p] } else if (depth == best) res = res "," paths[p]; break }
+        if (kinds[p] != "папки" || q !~ /\//) break
+        sub(/\/[^\/]+$/, "", q); depth = length(q)
+      }
+    }
+    return res
+  }
+  # Владельцы по источнику строки описи: файл объявления — до первого « + » (дальше — обработчик в
+  # другом файле); каждый путь или имя файла в нём; в OW[часть] = 1.
+  function owners(src,   n, w, i, t, o, m, x, j) {
+    i = index(src, " + "); if (i > 0) src = substr(src, 1, i - 1)
+    gsub(/[,;()]/, " ", src); n = split(src, w, " ")
     for (i = 1; i <= n; i++) {
-      t = IT[i]; gsub(/^[ \t]+|[ \t]+$/, "", t); IT[i] = t
-      nm = t; sub(/[ \t]*\([^)]*\)$/, "", nm); gsub(/`/, "", nm); sub(/\?$/, "", nm)
-      if (nm !~ /^[A-Za-z_][A-Za-z0-9_]*$/) return 0
-      NM[i] = nm
+      t = w[i]; if (t !~ /\// && t !~ /\.[A-Za-z0-9]+(:[0-9]+)?$/) continue
+      o = own1(np(t)); if (o == "") continue
+      m = split(o, x, ","); for (j = 1; j <= m; j++) if (x[j] != "-" && x[j] != "") OW[x[j] + 0] = 1
+    }
+  }
+  # Строка поля «Владеет данными»: имена до «:» или « — » (в бэктиках, с `?` и пометкой в скобках, либо
+  # голые через запятую) — в FN[], исходные куски — в IT[], остаток строки с продолжениями — в RST; не
+  # перечень полей — 0.
+  function fnames(u,   t, p, q, n, i, x) {
+    t = u; i = index(t, "\001"); RST = (i > 0) ? substr(t, i) : ""; if (i > 0) t = substr(t, 1, i - 1); sub(/^- /, "", t)
+    p = index(t, ":"); q = index(t, " — "); if (q > 0 && (p == 0 || q < p)) p = q
+    if (p > 0) { RST = substr(t, p) RST; t = substr(t, 1, p - 1) }
+    n = split(t, IT, /[,\/]/)
+    for (i = 1; i <= n; i++) {
+      gsub(/^[ \t]+|[ \t]+$/, "", IT[i]); x = IT[i]
+      sub(/[ \t]*\([^)]*\)$/, "", x); gsub(/`/, "", x); sub(/\?$/, "", x)
+      if (x !~ /^[A-Za-z_][A-Za-z0-9_]*$/) return 0
+      FN[i] = x
     }
     return n
   }
-  function typed(txt,   m, U, i, c) { m = units(txt, U); c = 0; for (i = 1; i <= m; i++) if (U[i] ~ /^- / && fields(U[i]) && TYPED) c++; return c }
-  function take(txt, first,   m, U, i, u, n, j, keep, nk, tail) {
-    m = units(txt, U)
-    for (i = 1; i <= m; i++) {
-      u = U[i]
-      if (u ~ /^(- )?сущности:/) { if (!ent) { ent = 1; pre[++npre] = u }; continue }
-      if (u in have) continue
-      if (u ~ /^- /) {
-        n = (psec ~ /^Владеет данными/) ? fields(u) : 0
-        if (n && !first) {
-          keep = ""; nk = 0
-          for (j = 1; j <= n; j++) if (!(NM[j] in fld)) { keep = keep (nk++ ? ", " : "") IT[j] }
-          if (nk == 0) continue
-          if (nk < n) { j = index(u, "\001"); tail = j ? substr(u, j) : ""; u = "- " keep RST tail }
-        }
-        for (j = 1; j <= n; j++) fld[NM[j]] = 1
-        have[u] = 1; dash[++ndash] = u
-      } else if (u ~ /^— /) { have[u] = 1; sem[++nsem] = u }
-      else if (first) pre[++npre] = u
-    }
-  }
-  function out(   s, i, b, best, c) {
+  function srcof(a, k) { if ((a SUBSEP k) in src) return src[a, k]; if ((a SUBSEP k_bare(k)) in src) return src[a, k_bare(k)]; return "" }
+  function addu(u) { if (!(u in have)) { have[u] = 1; if (u ~ /^- /) dash[++ndash] = u; else if (u ~ /^— /) sem[++nsem] = u; else pre[++npre] = u } }
+  function out(   s, i, j, m, U, ob, ns, ni, who, why, nd, o, nown) {
     if (pk == "") return
     if (nb > 1) {
-      b = 1
-      if (psec ~ /^Владеет данными/) { best = -1; for (i = 1; i <= nb; i++) { c = typed(blk[i]); if (c > best) { best = c; b = i } } }
-      ent = 0; npre = ndash = nsem = 0; delete have; delete fld
-      s = blk[b]; sub(/\001.*/, "", s); take(blk[b], 1)
-      for (i = 1; i <= nb; i++) if (i != b) take(blk[i], 0)
-      for (i = 1; i <= npre; i++) s = s "\001" pre[i]
-      for (i = 1; i <= ndash; i++) s = s "\001" dash[i]
-      for (i = 1; i <= nsem; i++) s = s "\001" sem[i]
-      btxt = s
+      who = ""; for (i = 1; i <= nb; i++) who = who (i > 1 ? ", " : "") bpn[i]
+      delete OW; ns = 0
+      for (i = 1; i <= nb; i++) { s = srcof(bpn[i], pk); if (s != "") { ns++; owners(s) } }
+      ob = 0; ni = 0; nown = 0
+      for (o in OW) { nown++; for (i = 1; i <= nb; i++) if (bpn[i] + 0 == o + 0) { ni++; ob = i } }
+      why = ""
+      if (planok == 0) why = "плана нет"
+      else if (ns == 0) why = "у ключа нет источника в описях"
+      else if (ni > 1) why = "файл-источник у нескольких частей"
+      else if (ni == 0 && nown == 0 && rest != "") { for (i = 1; i <= nb; i++) if (bpn[i] + 0 == rest + 0) ob = i; if (!ob) why = "файл вне частей, у остатка блока нет" }
+      else if (ni == 0 && nown == 0) why = "файл-источник вне частей плана"
+      else if (ni == 0) { why = "владелец по плану —"; for (o in OW) why = why " " sprintf("%02d", o); why = why ", блока у него нет" }
+      delete have; npre = ndash = nsem = 0
+      if (why == "") {
+        delete known; delete OU; delete XD; delete XS; nx = nxs = 0
+        om = units(blk[ob], U)
+        for (j = 1; j <= om; j++) { have[U[j]] = 1; OU[j] = U[j]; if (U[j] ~ /^- / && psec ~ /^Владеет данными/) { c = fnames(U[j]); for (q = 1; q <= c; q++) known[FN[q]] = 1 } }
+        nd = 0; na = 0; who = ""
+        for (i = 1; i <= nb; i++) if (i != ob) {
+          who = who (who == "" ? "" : ", ") bpn[i]; m = units(blk[i], U)
+          for (j = 1; j <= m; j++) {
+            u = U[j]; if (u in have) continue
+            if (u ~ /^— /) { have[u] = 1; XS[++nxs] = u; continue }
+            if (u !~ /^- /) continue
+            c = (psec ~ /^Владеет данными/) ? fnames(u) : 0; keep = ""; nk = 0
+            for (q = 1; q <= c; q++) if (!(FN[q] in known)) { keep = keep (nk++ ? ", " : "") IT[q]; known[FN[q]] = 1 }
+            if (nk == 0) { nd++; continue }
+            if (nk < c) u = "- " keep RST
+            have[u] = 1; XD[++nx] = u; na++
+          }
+        }
+        # порядок шаблона: строки владельца без «— », новые поля, «— » владельца, «— » остальных
+        s = blk[ob]; sub(/\001.*/, "", s)
+        for (j = 1; j <= om; j++) if (OU[j] !~ /^— /) s = s "\001" OU[j]
+        for (j = 1; j <= nx; j++) s = s "\001" XD[j]
+        for (j = 1; j <= om; j++) if (OU[j] ~ /^— /) s = s "\001" OU[j]
+        for (j = 1; j <= nxs; j++) s = s "\001" XS[j]
+        print psec ": " pk " — блок части " bpn[ob] " (владелец по плану)" (na ? "; новых полей от " who " — строк " na : "") "; у " who " строк «- » отброшено " nd > rep
+        btxt = s
+      } else {
+        s = blk[1]; sub(/\001.*/, "", s); ent = 0
+        for (i = 1; i <= nb; i++) { m = units(blk[i], U); for (j = 1; j <= m; j++) { if (U[j] ~ /^(- )?сущности:/) { if (!ent) { ent = 1; pre[++npre] = U[j] }; continue } if (U[j] ~ /^(- |— )/ || i == 1) addu(U[j]) } }
+        for (i = 1; i <= npre; i++) s = s "\001" pre[i]
+        for (i = 1; i <= ndash; i++) s = s "\001" dash[i]
+        for (i = 1; i <= nsem; i++) s = s "\001" sem[i]
+        print psec ": " pk " — блоки частей " who " объединены, владельца нет: " why > rep
+        btxt = s
+      }
     }
     print psec "\t" btxt "\001"
     pk = ""
+  }
+  BEGIN {
+    while ((getline l < srcf) > 0) { split(l, x, "\t"); if (!((x[1] SUBSEP x[2]) in src)) src[x[1], x[2]] = x[3] }
+    plan = ENVIRON["CHECK_OWNER_PLAN"]; planok = 0; maxp = 0
+    if (plan != "") while ((getline l < plan) > 0) {
+      sub(/\r$/, "", l); split(l, r, "\t")
+      if (r[1] == "файл" && r[5] != "-" && r[5] != "") { p = np(r[2]); files[p] = (p in files) ? files[p] "," r[5] : r[5]; planok = 1 }
+      if (r[1] == "путь") { p = np(r[2]); paths[p] = (p in paths) ? paths[p] "," r[4] : r[4]; kinds[p] = r[3]; planok = 1; if (r[4] + 0 > maxp) maxp = r[4] + 0 }
+    }
+    rest = (planok && S + 0 > maxp) ? sprintf("%02d", S) : ""
   }
   {
     t = $1; sec = $2; k = $4; txt = $5
     if (t == "P") { ph[sec] = ph[sec] (ph[sec] == "" ? "" : "\001") txt; next }
     if (t == pt && sec == psec && k == pk) {
-      dup[sec] = dup[sec] (dup[sec] == "" ? "" : "; ") k
-      if (t == "B") blk[++nb] = txt
+      if (t == "B") { blk[++nb] = txt; bpn[nb] = $6 }
       next
     }
-    out(); pt = t; psec = sec; pk = k; btxt = txt; nb = 1; blk[1] = txt
+    out(); pt = t; psec = sec; pk = k; btxt = txt; nb = 1; blk[1] = txt; bpn[1] = $6
     has[sec] = 1
   }
   END {
     out()
     for (s in ph) if (!(s in has)) print s "\t" ph[s]
-    for (s in dup) print "#DUP\t" s ": " dup[s] > "/dev/stderr"
   }
-' "$TMP/rec.s" > "$TMP/merged" 2> "$TMP/dups"
+' "$TMP/rec.s" > "$TMP/merged"
+: >> "$TMP/dups"
 
 # 3. Каркас головы: строка `<!-- части -->` заменяется слитым содержимым своей секции.
 awk -F'\t' '
@@ -245,38 +324,50 @@ awk -F'\t' '
 # Между блоками ### — пустая строка, как в шаблоне.
 awk 'prev != "" && /^### / { print "" } { print; prev = $0 }' "$OUT.tmp" | cat -s > "$OUT"; rm -f "$OUT.tmp"
 
-# 4. Опись: списки подряд, итоги ⟹ суммируются по одинаковой форме строки. Строки «Бизнес-правил» частей
-# (`состояние:` … с подстроками, итог `⟹ состояний`) — сырьё головы: написала голова такие строки в свою
-# опись — в склеенную опись идут её строки, а не сырьё.
-RULES=0; [ -f "$DIR/head.opis.md" ] && grep -q -E '^(состояние|сообщение|ограничение):' "$DIR/head.opis.md" && RULES=1
-raw() {  # raw <файл> <0|1> — опись; 1 — без строк «Бизнес-правил»
-  tr -d '\r' < "$1" | awk -v drop="$2" '
-    drop == 1 && /^(состояние|справочник|сообщение|ограничение):/ { skip = 1; next }
-    skip && /^[ \t]/ { next }
-    { skip = 0 }
-    drop == 1 && /^⟹ состояний/ { next }
-    { print }'
-}
-{
-  for f in "$DIR/head.opis.md" "$DIR"/part-*.opis.md; do
-    [ -f "$f" ] || continue
-    d=$RULES; [ "$f" = "$DIR/head.opis.md" ] && d=0
-    raw "$f" "$d" | tail -n +2 | grep -v '^⟹'
-    echo
-  done
-  # echo после каждого файла: опись без перевода строки в конце иначе склеит свой итог с первой строкой следующей
-  for f in "$DIR/head.opis.md" "$DIR"/part-*.opis.md; do [ -f "$f" ] || continue; d=$RULES; [ "$f" = "$DIR/head.opis.md" ] && d=0; raw "$f" "$d"; echo; done | grep '^⟹' | awk '
-    { form = $0; gsub(/[0-9]+/, "#", form); n = 0; line = $0
-      while (match(line, /[0-9]+/)) { n++; sum[form, n] += substr(line, RSTART, RLENGTH); line = substr(line, RSTART + RLENGTH) }
-      if (!(form in seen)) { seen[form] = 1; order[++m] = form; cnt[form] = n } }
-    END { for (i = 1; i <= m; i++) { f = order[i]; s = ""; j = 0; rest = f
+# 4. Опись: списки головы и частей подряд, итоги ⟹ суммируются по одинаковой форме строки. Строки
+# «Бизнес-правил» (`состояние:`, `справочник:`, `сообщение:`, `ограничение:` с подстроками) — частей:
+# по ним check.sh сверяет блоки головы; строки головы и её `⟹ состояний` в склеенную опись не идут.
+# Строка правил, которую слово в слово повторила другая часть, — одна; подстроки повтора — под ней без
+# повторов. Строки с разными значениями остаются обе: сверка берёт значения всех.
+OF=""; [ -f "$DIR/head.opis.md" ] && OF="$DIR/head.opis.md"
+# shellcheck disable=SC2086
+awk '
+  function rname(l) { gsub(/`/, "", l); gsub(/[ \t]+/, " ", l); sub(/ $/, "", l); return l }
+  FNR == 1 { if (n > 0) out[++n] = ""; ishead = (FILENAME ~ /head\.opis\.md$/); cur = 0; dupr = 0; skip = 0; next }
+  { sub(/\r$/, "") }
+  /^⟹/ { if (!(ishead && $0 ~ /^⟹ состояний/)) tot[++nt] = $0; cur = 0; dupr = 0; next }
+  ishead && /^(состояние|справочник|сообщение|ограничение):/ { skip = 1; next }
+  skip && /^[ \t]/ { next }
+  { skip = 0 }
+  /^(состояние|справочник|сообщение|ограничение):/ {
+    nm = rname($0)
+    if (nm in first) { cur = first[nm]; dupr = 1; next }
+    out[++n] = $0; first[nm] = n; bend[n] = n; cur = n; dupr = 0; next
+  }
+  /^[ \t]/ {
+    if (dupr) { if (!((cur, $0) in hv)) { hv[cur, $0] = 1; addl[cur] = addl[cur] "\n" $0 }; next }
+    out[++n] = $0; if (cur) { bend[cur] = n; hv[cur, $0] = 1 }; next
+  }
+  { cur = 0; dupr = 0; out[++n] = $0 }
+  END {
+    for (r in bend) after[bend[r]] = r
+    for (i = 1; i <= n; i++) { print out[i]; if ((i in after) && addl[after[i]] != "") print substr(addl[after[i]], 2) }
+    print ""
+    for (i = 1; i <= nt; i++) {
+      form = tot[i]; gsub(/[0-9]+/, "#", form); c = 0; line = tot[i]
+      while (match(line, /[0-9]+/)) { c++; sum[form, c] += substr(line, RSTART, RLENGTH); line = substr(line, RSTART + RLENGTH) }
+      if (!(form in seen)) { seen[form] = 1; order[++m] = form }
+    }
+    for (i = 1; i <= m; i++) { f = order[i]; s = ""; j = 0; rest = f
       while ((p = index(rest, "#")) > 0) { j++; s = s substr(rest, 1, p - 1) sum[f, j]; rest = substr(rest, p + 1) }
-      print s rest } }'
-} > "$OPIS"
+      print s rest }
+  }
+' $OF $POPIS > "$OPIS"
 
 echo "собрано: $OUT"
 awk '/^## /{s=$0} /^### /{n[s]++} END{for (k in n) printf "  %s — блоков %d\n", k, n[k]}' "$OUT" | sort
-[ -s "$TMP/dups" ] && { echo "дубли ключей склеены:"; sed 's/^#DUP\t/  /' "$TMP/dups"; }
+[ -s "$TMP/dups" ] && { echo "дубли ключей склеены:"; sed 's/^/  /' "$TMP/dups"; }
 [ -s "$TMP/near" ] && { echo "из них один ключ вызовом и без скобок:"; sed 's/^/  /' "$TMP/near"; }
+[ -s "$TMP/nokey" ] && { echo "ключ не опознан — заголовок не по ключу шаблона, оставлен как есть:"; sort -u "$TMP/nokey" | sed 's/^/  /'; }
 grep '^DROP	' "$TMP/unplaced" | while IFS="$(printf '\t')" read -r _ s w; do echo "отброшено: секция «$s» у частей $w — её пишет голова"; done
 echo "опись: $OPIS ($(grep -c ' — ' "$OPIS") строк с источником)"

@@ -53,15 +53,19 @@ export function checkPlanTsv (out) {
   const rows = out.tsv.split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'))
   if (out.rc !== 0) { add('при отказе пуст', rows.length === 0, `строк ${rows.length}`); return res }
   const P = parsePlan(out.stdout)
-  const itog = {}; const parts = {}; const files = []; const paths = []
+  const itog = {}; const parts = {}; const files = []; const paths = []; const rest = []
   let bad = 0
   for (const r of rows) {
     if (r[0] === 'итог' && r.length === 3) itog[r[1]] = (itog[r[1]] ?? 0) + num(r[2])
     else if (r[0] === 'часть' && r.length === 4) (parts[r[1]] ??= {})[r[2]] = num(r[3])
     else if (r[0] === 'файл' && r.length === 5) files.push({ path: r[1], cl: r[2], n: num(r[3]), nn: r[4] })
     else if (r[0] === 'путь' && r.length === 4 && ['папки', 'файлы'].includes(r[2])) paths.push({ path: canon(r[1]), kind: r[2], nn: r[3] })
+    else if (r[0] === 'остаток' && r.length === 4 && ['папка', 'файлы'].includes(r[2])) rest.push(`${r[1]}\t${r[2] === 'файлы' ? 'файлы прямо в' : 'папка'}\t${r[3]}`)
     else bad++
   }
+  // пункты остатка = список остатка в stdout, номер — S+1; список не напечатан — строк нет
+  const wantRest = P.rest.map((x) => `${String(P.parts.length + 1).padStart(2, '0')}\t${x.kind}\t${x.path}`)
+  add('пункты остатка = список остатка stdout', JSON.stringify([...rest].sort()) === JSON.stringify([...wantRest].sort()), `файл ${rest.length}: ${rest.slice(0, 3).join(' ¦ ')}; stdout ${wantRest.length}: ${wantRest.slice(0, 3).join(' ¦ ')}`)
   add('строки по форме', bad === 0, `не по форме: ${bad}`)
   const want = (P.sverka ?? P.itog)?.ключ ?? {}
   if (P.outside === null) add('итог = итог плана по ключам', sameMap(itog, want), `файл ${fmtMap(itog)}; stdout ${fmtMap(want)}`)

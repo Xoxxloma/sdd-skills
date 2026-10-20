@@ -351,6 +351,9 @@ export function fmtTsv (res, countsText) {
     const nn = i < 0 ? '-' : String(i + 1).padStart(2, '0')
     for (const [c, n] of Object.entries(cls)) out.push(`файл\t${f}\t${c}\t${n}\t${nn}`)
   }
+  // пункты списка остатка, если список напечатан: остаток <S+1> <папка|файлы> <путь>
+  const rnn = String(res.parts.length + 1).padStart(2, '0')
+  for (const l of (res.mode === 'не нужна' ? null : restList(res)) ?? []) { const m =l.match(/^\s*(папка|файлы прямо в)\s+(.*?)\s*$/); if (m) out.push(`остаток\t${rnn}\t${m[1] === 'папка' ? 'папка' : 'файлы'}\t${m[2]}`) }
   return out.length ? out.join('\n') + '\n' : ''
 }
 

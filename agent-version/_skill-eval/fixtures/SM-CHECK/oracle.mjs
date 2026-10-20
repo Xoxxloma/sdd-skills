@@ -48,6 +48,46 @@ function headKey(h) {
   return norm(i < 0 ? h : h.slice(0, i));
 }
 
+// A11. Ключ по шаблону (card.template.md, «Ключи строк»; общий у check.sh и assemble.sh): контракт —
+// метод и путь без строки запроса (хвост после «?» без «/») либо тип операции и имя без аргументов;
+// топик — направление и текст в бэктиках, без них — единственное слово после направления; сущность и
+// задача — одно слово. Не сводится — '' (берётся как есть, «ключ не опознан»).
+const HTTPV = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /;
+export function kcanon(cls, h) {
+  const k = norm(h);
+  if (cls === 'контракт') {
+    if (HTTPV.test(k)) { const [v, p = ''] = k.split(' '); const kk = `${v} ${p}`; const m = kk.match(/\?[^/]*$/); return m ? kk.slice(0, m.index) : kk; } // путь — одно слово
+    if (/^(query|mutation|subscription|rpc) /.test(k)) return k.replace(/ *\(.*\)$/, '');
+    if (/^[A-Za-z_][A-Za-z0-9_.]*[./][A-Za-z_][A-Za-z0-9_]*(\(.*\))?$/.test(k)) return k;
+    return '';
+  }
+  if (cls === 'топики') {
+    const d = k.split(' ')[0];
+    if (!/^(публикует|потребляет)$/.test(d)) return '';
+    const t = h.match(/`[^`]+`/);
+    if (t) return d + ' ' + t[0].slice(1, -1);
+    const rest = k.slice(d.length + 1);
+    return rest !== '' && !rest.includes(' ') ? d + ' ' + rest : '';
+  }
+  if (cls === 'сущности' || cls === 'задачи') return k !== '' && !k.includes(' ') ? k : '';
+  return k;
+}
+// ключ строки описи и вызова «Потребляемых API»: класс — по виду строки
+export function kopis(h) {
+  const k = norm(h);
+  if (/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|query|mutation|subscription|rpc) /.test(k)) return kcanon('контракт', h) || k;
+  if (/^(публикует|потребляет) /.test(k)) return kcanon('топики', h) || k;
+  return k;
+}
+const CANON_SECTIONS = new Set(['Публичный контракт', 'Владеет данными', 'Фоновые задачи', 'События']);
+function blockKey(sec, cls, header) {
+  const i = header.indexOf(SEP);
+  const h = i < 0 ? header : header.slice(0, i);
+  if (!CANON_SECTIONS.has(sec)) return { key: norm(h), bad: false };
+  const k = kcanon(cls, h);
+  return k ? { key: k, bad: false } : { key: norm(h), bad: true };
+}
+
 function splitLines(text) {
   return String(text ?? '').replace(/^﻿/, '').split(/\r?\n/).map((l) => l.replace(/\r$/, ''));
 }
@@ -99,7 +139,7 @@ export function parseCard(text) {
     }
     if (line.startsWith('### ')) {
       const cls = BLOCK_SECTIONS[sec];
-      cur = cls ? { header: line.slice(4), body: false } : null;
+      cur = cls ? { header: line.slice(4), body: false, ...blockKey(sec, cls, line.slice(4)) } : null;
       if (cls) blocks[cls].push(cur);
       continue;
     }
@@ -123,7 +163,7 @@ export function parseCard(text) {
 function blockMap(list) {
   const m = new Map();
   for (const b of list) {
-    const k = headKey(b.header);
+    const k = b.key;
     m.set(k, (m.get(k) ?? false) || b.body);
   }
   return m;
@@ -145,7 +185,7 @@ function guardKeys(card) {
     'задачи': blockMap(card.blocks.задачи),
     'топики': blockMap(card.blocks.топики),
     'экраны': rowMap(card.tables.экраны, (c) => norm(c[0])),
-    'потребляемые API': rowMap(card.tables.api, (c) => norm(c[0]) + ' :: ' + norm(c[1] ?? '')),
+    'потребляемые API': rowMap(card.tables.api, (c) => norm(c[0]) + ' :: ' + kopis(c[1] ?? '')),
     'роли': rowMap(card.tables.роли, roleKey),
     'зависит от': rowMap(card.tables.зависит, (c) => norm(c[0])),
   };
@@ -191,7 +231,7 @@ export function parseOpis(text) {
       key = norm('ограничение ' + kt.slice('ограничение:'.length));
       kind = 'lim';
     } else {
-      key = norm(kt.replace(/^[Рр]оль:\s*/, '')); // «роль: OWNER» ↔ строка таблицы «OWNER»
+      key = kopis(kt.replace(/^[Рр]оль:\s*/, '')); // «роль: OWNER» ↔ строка таблицы «OWNER»; ключ по шаблону (A11)
     }
     if (!hasFile(line)) nofile.push(key);
     if (!keys.has(key)) keys.set(key, { kind, fact: false });
@@ -223,7 +263,7 @@ export function analyze(opisText, draftText, prevText) {
   }
 
   const cnt = (list) => [list.length, list.filter((b) => b.body).length, list.filter((b) => !b.body).length];
-  const topicDir = (b) => headKey(b.header).split(' ')[0];
+  const topicDir = (b) => b.key.split(' ')[0];
   const biz = d.blocks.бизнес.map((b) => bizKey(b.header));
   const draft = {
     'контракт': cnt(d.blocks.контракт),
@@ -253,32 +293,22 @@ export function analyze(opisText, draftText, prevText) {
     const e = idx.get(key);
     if (e.cls === cls && block) e.blocks.push(block);
   };
-  for (const b of d.blocks.контракт) add('контракт', headKey(b.header), b);
-  for (const b of d.blocks.топики) add('топики', headKey(b.header), b);
-  for (const b of d.blocks.задачи) add('задачи', headKey(b.header), b);
-  for (const b of d.blocks.сущности) add('сущности', headKey(b.header), b);
+  for (const b of d.blocks.контракт) add('контракт', b.key, b);
+  for (const b of d.blocks.топики) add('топики', b.key, b);
+  for (const b of d.blocks.задачи) add('задачи', b.key, b);
+  for (const b of d.blocks.сущности) add('сущности', b.key, b);
   for (const b of d.blocks.бизнес) add('бизнес', bizKey(b.header).key, b);
   for (const c of d.tables.экраны) add('экраны', norm(c[0]));
   for (const c of d.tables.роли) add('роли', roleKey(c));
-  for (const c of d.tables.api) add('потребляет', norm(c[1] ?? ''));
+  for (const c of d.tables.api) add('потребляет', kopis(c[1] ?? ''));
   for (const c of d.tables.зависит) add('зависит', norm(c[0]));
   for (const c of d.tables.состояние ?? []) add('состояние', norm(c[0]));
 
-  // Пара ключу описи: точная; иначе — без хвоста параметров запроса («…/filter?field=x» ↔ «…/filter»),
-  // и только среди ключей черновика, оставшихся без точной пары: «?action=list» и «?action=delete»
-  // не сливаются.
-  const noq = (k) => k.replace(/\?[A-Za-z_][^=?/ ]*=.*$/, '');
+  // Пара ключу описи: точная (строки запроса и аргументов в ключах обеих сторон уже нет, A11).
   const pair = new Map();
   const taken = new Set();
   for (const k of o.keys.keys()) if (idx.has(k)) { pair.set(k, k); taken.add(k); }
-  const free = new Map();
-  for (const k of idx.keys()) if (!taken.has(k) && !free.has(noq(k))) free.set(noq(k), k);
-  for (const k of o.keys.keys()) {
-    if (pair.has(k)) continue;
-    const dk = free.get(noq(k));
-    if (dk !== undefined && !taken.has(dk)) { pair.set(k, dk); taken.add(dk); }
-  }
-  // третий проход — ключ контракта без HTTP-глагола сводится без хвоста в скобках («query goal(id)», «Svc.Assign(Req)»)
+  // второй проход — ключ контракта без HTTP-глагола сводится без хвоста в скобках («Svc.Assign(Req)»)
   const HTTP = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /;
   const nop = (k) => (HTTP.test(k) || !/[^ (]\(.*\)$/.test(k) ? k : k.replace(/\(.*\)$/, '')); // хвост-вызов: скобка без пробела перед ней
   const freeP = new Map();
@@ -297,7 +327,13 @@ export function analyze(opisText, draftText, prevText) {
     const dk = freeO.get(bop(k));
     if (dk !== undefined && !taken.has(dk)) { pair.set(k, dk); taken.add(dk); }
   }
-  const dups = [...idx].filter(([k, e]) => e.cls === 'контракт' && nop(k) !== k && idx.get(nop(k))?.cls === 'контракт').length;
+  // один ключ двумя блоками: с хвостом в скобках и без либо тот же ключ дважды
+  const BLOCKC = new Set(['контракт', 'сущности', 'задачи', 'топики']);
+  const dupItems = [
+    ...[...idx].filter(([k, e]) => e.cls === 'контракт' && nop(k) !== k && idx.get(nop(k))?.cls === 'контракт').map(([k]) => [nop(k), k]),
+    ...[...idx].filter(([, e]) => BLOCKC.has(e.cls) && e.blocks.length > 1).map(([k]) => [k, k]),
+  ];
+  const dups = dupItems.length;
   const byClass = {};
   let missingInDraft = 0;
   let factEmpty = 0;
@@ -339,8 +375,9 @@ export function analyze(opisText, draftText, prevText) {
     ADD: [...o.keys].filter(([k, v]) => !pair.has(k) && v.kind === 'other' && !nofile.has(k)).map(([k]) => [k]),
     NOSRC: [...o.keys].filter(([k, v]) => pair.has(k) && v.kind === 'other' && nofile.has(k)).map(([k]) => [k]),
     EMPTY: emptyList.map((k) => [k]),
-    DUP: [...idx].filter(([k, e]) => e.cls === 'контракт' && nop(k) !== k && idx.get(nop(k))?.cls === 'контракт').map(([k]) => [nop(k), k]),
+    DUP: dupItems,
     nometh: [...classKeys.контракт].filter((k) => !METH.test(k)).map((k) => [k]),
+    NOKEY: [...new Set(['сущности', 'задачи', 'топики'].flatMap((c) => d.blocks[c].filter((b) => b.bad).map((b) => b.key)))].map((k) => [k]),
   };
   const sverka = {
     'добор': `${missSrc}/${pairNoSrc}/${factEmpty}/${dups}`,
@@ -512,9 +549,10 @@ function readEnv(envPath) {
   return env;
 }
 
-function opisSources(opisText) {
+function opisSources(opisText, roles = new Set()) {
   const tok = new Map();
   const declared = new Set();
+  const seen = new Set(); // A12: ключ × файл — один раз; строки «Бизнес-правил» и ролей ключей пометок не дают
   for (let raw of String(opisText).split(/\r?\n/)) {
     if (raw.startsWith('> объявлено без реализации: ')) {
       if (declared.has(raw)) continue;
@@ -524,11 +562,14 @@ function opisSources(opisText) {
     if (!raw || /^[ \t]/.test(raw) || /^(#|⟹|\(|>|-|```|<!--)/.test(raw)) continue;
     const i = raw.indexOf(SEP);
     if (i < 0) continue;
-    const seen = new Set();
+    const h = raw.slice(0, i);
+    if (/^(состояние|справочник|сообщение|ограничение|роль|Роль):/.test(h)) continue;
+    const key = kopis(h);
+    if (roles.has(key)) continue;
     for (let w of raw.slice(i + SEP.length).split(/[\s+,;]+/)) {
       w = w.replace(/[`()]/g, '').replace(/\\/g, '/').replace(/^\.\//, '');
       if (!/\//.test(w) && !/\.[A-Za-z0-9]+$/.test(w)) continue;
-      if (!seen.has(w)) { seen.add(w); tok.set(w, (tok.get(w) ?? 0) + 1); }
+      if (!seen.has(key + '\t' + w)) { seen.add(key + '\t' + w); tok.set(w, (tok.get(w) ?? 0) + 1); }
     }
   }
   return tok;
@@ -540,10 +581,10 @@ const nopK = (k) => (/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /.test(k) || !/[
 function keyCounts(cardText) {
   const d = parseCard(cardText);
   const sets = {
-    контракт: new Set(d.blocks.контракт.map((b) => headKey(b.header))),
-    сущности: new Set(d.blocks.сущности.map((b) => headKey(b.header))),
-    задачи: new Set(d.blocks.задачи.map((b) => headKey(b.header))),
-    топики: new Set(d.blocks.топики.map((b) => headKey(b.header))),
+    контракт: new Set(d.blocks.контракт.map((b) => b.key)),
+    сущности: new Set(d.blocks.сущности.map((b) => b.key)),
+    задачи: new Set(d.blocks.задачи.map((b) => b.key)),
+    топики: new Set(d.blocks.топики.map((b) => b.key)),
     экраны: new Set(d.tables.экраны.map((c) => norm(c[0])).filter((k) => k && k !== '—')),
   };
   const out = {};
@@ -561,12 +602,12 @@ function readParts(dir) {
     const a = m[1] ?? 'голова';
     const text = fs.readFileSync(path.join(dir, name), 'utf8');
     const d = parseCard(text);
-    for (const c of ['контракт', 'сущности', 'задачи', 'топики']) for (const b of d.blocks[c]) add(card, headKey(b.header), a);
+    for (const c of ['контракт', 'сущности', 'задачи', 'топики']) for (const b of d.blocks[c]) add(card, b.key, a);
     for (const b of d.blocks.бизнес) add(card, bizKey(b.header).key, a);
     for (const c of d.tables.экраны) add(card, norm(c[0]), a);
     for (const c of d.tables.роли) add(card, roleKey(c), a);
     if (m[1]) parts.set(a, keyCounts(text));
-    if (m[1]) for (const b of d.blocks.контракт) pbody.push({ a, key: headKey(b.header), body: b.body });
+    if (m[1]) for (const b of d.blocks.контракт) pbody.push({ a, key: b.key, body: b.body });
     const op = path.join(dir, name.replace(/\.md$/, '.opis.md'));
     if (fs.existsSync(op)) for (const k of parseOpis(fs.readFileSync(op, 'utf8')).keys.keys()) add(opis, k, a);
   }
@@ -578,7 +619,7 @@ function readParts(dir) {
 // склеенной карточке, идут ей в добор.
 function partEmptyItems(pbody, draftText) {
   const draftBody = new Map();
-  for (const b of parseCard(draftText).blocks.контракт) { const k = headKey(b.header); draftBody.set(k, (draftBody.get(k) ?? false) || b.body); }
+  for (const b of parseCard(draftText).blocks.контракт) { const k = b.key; draftBody.set(k, (draftBody.get(k) ?? false) || b.body); }
   const byPart = new Map();
   for (const r of pbody) { if (!byPart.has(r.a)) byPart.set(r.a, []); byPart.get(r.a).push(r); }
   const keys = new Set();
@@ -599,6 +640,66 @@ function declItems(opisTexts, contractKeys) {
     return same(norm(i < 0 ? s : s.slice(0, i)));
   }));
   return [...new Set(contractKeys.filter((k) => declared.has(same(k))))].sort().map((k) => [k]);
+}
+
+// A13. «Бизнес-правила» нарезанного сервиса пишет голова по описям частей: сущность строки `состояние:`
+// части — блок секции, каждое значение-токен — «`токен`» в этом блоке; хоть одно имя отправки строки
+// `сообщение:` («<кому>, <имена через запятую>» перед « — <файл>») — где-то в секции. Пропуск — добор головы.
+function rulesItems(dir, draftText) {
+  const tok = (s) => s.replace(/[`"«»]/g, '').replace(/^[ \t]+/, '').replace(/[ \t.,;:]+$/, '');
+  const ents = []; const vals = new Map(); const msgs = new Map();
+  for (const name of fs.readdirSync(dir).sort()) {
+    if (!/^part-.*\.opis\.md$/.test(name)) continue;
+    for (const line of splitLines(fs.readFileSync(path.join(dir, name), 'utf8'))) {
+      if (line.startsWith('состояние:')) {
+        let s = line.replace(/^состояние: */, ''); const p = s.indexOf(SEP); if (p >= 0) s = s.slice(0, p);
+        const e = tok(s.replace(/[. ].*/, '')); if (!e) continue;
+        if (!vals.has(e)) { vals.set(e, []); ents.push(e); }
+        if (!s.includes(' ')) continue;
+        for (const v of s.replace(/^[^ ]+ /, '').split('|')) { const t = tok(v); if (/^[A-Za-z0-9_]+$/.test(t) && !vals.get(e).includes(t)) vals.get(e).push(t); }
+      } else if (line.startsWith('сообщение:')) {
+        const P = line.split(SEP); if (P.length < 3) continue;
+        // «<кому>, <имена отправки через запятую>»: у каждого имени — последнее слово
+        const names = P[P.length - 2].split(', ').slice(1).map((q) => { const W = q.trim().split(/\s+/); return tok(W[W.length - 1] ?? ''); })
+          .filter((x) => /[A-Za-z]/.test(x) && !/[^A-Za-z0-9_.:/-]/.test(x));
+        const ns = names.join(' ');
+        if (ns && !msgs.has(ns)) msgs.set(ns, P[0].replace(/^сообщение: */, ''));
+      }
+    }
+  }
+  const body = new Map(); let all = ''; let inb = false; let bk = '';
+  for (const line of splitLines(draftText)) {
+    if (line.startsWith('## ')) { inb = line.startsWith('## Бизнес-правила'); bk = ''; continue; }
+    if (!inb) continue;
+    if (line.startsWith('### ')) { let h = line.slice(4); const p = h.indexOf(SEP); if (p >= 0) h = h.slice(0, p); bk = h.replace(/`/g, '').trim(); if (!body.has(bk)) body.set(bk, ''); }
+    all += ' ' + line;
+    if (bk) body.set(bk, body.get(bk) + ' ' + line);
+  }
+  const out = [];
+  for (const e of ents) {
+    if (!body.has(e)) { out.push([`объект ${e}: блока нет`]); continue; }
+    const miss = vals.get(e).filter((v) => !body.get(e).includes('`' + v + '`'));
+    if (miss.length) out.push([`объект ${e}: нет строк значений ${miss.join(', ')}`]);
+  }
+  for (const [ns, vid] of msgs) if (!ns.split(' ').some((x) => all.includes(x))) out.push([`сообщение ${vid} (${ns}): блока нет`]);
+  return out;
+}
+
+// A14. Остаток: пункт его списка в плане (строки «остаток <NN> <папка|файлы> <путь>») без строки
+// «> пройдено: <пункт> — …» в описи остатка (путь тот же либо хвост другого) — добор остатка.
+function restItems(planText, dir) {
+  const np = (p) => p.replace(/`/g, '').replace(/\\/g, '/').replace(/\/\/+/g, '/').trim().replace(/^\.\//, '').replace(/\/$/, '');
+  const tail = (p, q) => q.length > p.length && q.endsWith('/' + p);
+  const rows = String(planText).split(/\r?\n/).map((l) => l.split('\t')).filter((r) => r[0] === 'остаток');
+  if (!rows.length) return [];
+  const nn = rows[0][1];
+  const f = path.join(dir, `part-${nn}.opis.md`);
+  const done = fs.existsSync(f) ? splitLines(fs.readFileSync(f, 'utf8')).filter((l) => l.startsWith('> пройдено: ')).map((l) => {
+    let s = l.slice('> пройдено: '.length); const i = s.indexOf(SEP); if (i >= 0) s = s.slice(0, i);
+    return np(s.replace(/^(папка|файлы прямо в|файлы) +/, ''));
+  }) : [];
+  return rows.filter((r) => { const p = np(r[3]); return !done.some((d) => d === p || tail(d, p) || tail(p, d)); })
+    .map((r) => [`${r[2] === 'файлы' ? 'файлы прямо в' : 'папка'} ${np(r[3])} (остаток ${nn})`, nn]);
 }
 
 // Пометка не становится ключом описи. Владение — по файлу, затем по ближайшей папке плана;
@@ -634,7 +735,7 @@ function missedItems(planText, opisTexts) {
   });
 }
 
-function markers(planText, parts, cardKeys, opisText) {
+function markers(planText, parts, cardKeys, opisText, roles) {
   const rows = String(planText).split(/\r?\n/).filter(Boolean).map((l) => l.split('\t'));
   if (!rows.length) return { 'гейт': 'плана нет', 'классы': {}, _gate: '', _owners: [] };
   const want = new Map(); const pwant = new Map();
@@ -657,7 +758,7 @@ function markers(planText, parts, cardKeys, opisText) {
     verdict(label, `часть ${nn}, ${c} `, parts.get(nn)[c], e);
   }
   const gate = want.size === 0 && !(parts && pwant.size) ? 'пометок-ключей в плане нет — гейта нет' : (bad.length ? `НЕ ПРОЙДЕН — ${bad.join('; ')}` : 'пройден');
-  const tok = opisSources(opisText);
+  const tok = opisSources(opisText, roles);
   const deficit = []; const owners = [];
   for (const [f, { n, own }] of files) {
     let m = 0;
@@ -678,14 +779,14 @@ export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
   let noPfx = [];
   if (env.CHECK_PREFIX) {
     const p = '/' + env.CHECK_PREFIX.replace(/\/$/, '').replace(/^\//, '');
-    const keys = new Set(parseCard(rd(draftPath)).blocks.контракт.map((b) => headKey(b.header)));
+    const keys = new Set(parseCard(rd(draftPath)).blocks.контракт.map((b) => b.key));
     noPfx = [...keys].filter((k) => { const m = k.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) (\S+)/); return m && m[2] !== p && !m[2].startsWith(p + '/'); });
     res['черновик']['без префикса'] = noPfx.length;
   }
   let mk = null;
   if (env.CHECK_PLAN) {
     const planPath = rel(env.CHECK_PLAN);
-    mk = markers(fs.existsSync(planPath) ? rd(planPath) : '', P ? P.parts : null, res['черновик']['ключи'], rd(opisPath));
+    mk = markers(fs.existsSync(planPath) ? rd(planPath) : '', P ? P.parts : null, res['черновик']['ключи'], rd(opisPath), new Set(parseCard(rd(draftPath)).tables.роли.map(roleKey)));
     res['маркеры'] = { 'гейт': mk['гейт'], 'классы': mk['классы'], ...('файлов' in mk ? { 'файлов': mk['файлов'], 'дефицит': mk['дефицит'] } : {}) };
   }
   // исход: маркеры, доставка тела контракта, гард — и перечень добора по авторам
@@ -698,17 +799,20 @@ export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
   const route = res['маршрут'];
   const it = res._items;
   const ownerPlan = env.CHECK_PLAN && fs.existsSync(rel(env.CHECK_PLAN)) ? rd(rel(env.CHECK_PLAN)) : '';
-  const contractKeys = parseCard(rd(draftPath)).blocks.контракт.map((b) => headKey(b.header));
-  const lists = { ...it, NOPFX: noPfx.map((k) => [k]), MARKFILE: (mk?._owners ?? []).map((o) => [o]), MISSED: missedItems(ownerPlan, [rd(opisPath), ...(P?.notes ?? [])]), DECL: declItems([rd(opisPath), ...(P?.notes ?? [])], contractKeys), PARTEMPTY: P ? partEmptyItems(P.pbody, rd(draftPath)) : [] };
+  const contractKeys = parseCard(rd(draftPath)).blocks.контракт.map((b) => b.key);
+  const lists = { ...it, NOPFX: noPfx.map((k) => [k]), MARKFILE: (mk?._owners ?? []).map((o) => [o]), MISSED: missedItems(ownerPlan, [rd(opisPath), ...(P?.notes ?? [])]), DECL: declItems([rd(opisPath), ...(P?.notes ?? [])], contractKeys), PARTEMPTY: P ? partEmptyItems(P.pbody, rd(draftPath)) : [], RULES: P ? rulesItems(rel(env.CHECK_PARTS), rd(draftPath)) : [], REST: P && ownerPlan ? restItems(ownerPlan, rel(env.CHECK_PARTS)) : [] };
   const dobor = {};
   const look = (m, k) => m.get(k) ?? m.get(nopK(k)) ?? null;
   for (const [cat, list] of Object.entries(lists)) for (const item of list) {
     let A;
     if (cat === 'MISSED') A = new Set([item[1]]);
     else if (!P) A = new Set(['читающий']);
+    else if (cat === 'RULES') A = new Set(['голова']);
+    else if (cat === 'REST') A = new Set([item[1]]);
     else if (cat === 'MARKFILE') A = new Set([item[0]]);
     else if (cat === 'DUP') A = new Set([...(look(P.card, item[0]) ?? []), ...(look(P.card, item[1]) ?? [])]);
     else if (['ADD', 'NOSRC', 'EMPTY'].includes(cat)) A = look(P.opis, item[0]) ?? look(P.card, item[0]);
+    else if (cat === 'NOKEY') A = look(P.card, item[0]);
     else A = look(P.card, item[0]) ?? look(P.opis, item[0]);
     if (!A || !A.size) A = new Set(['без хозяина']);
     for (const a of A) { const l = /^\d+$/.test(a) ? `часть ${a}` : a; dobor[l] = (dobor[l] ?? 0) + 1; }

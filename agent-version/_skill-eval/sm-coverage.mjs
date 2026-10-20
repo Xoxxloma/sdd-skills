@@ -41,7 +41,7 @@ function fieldNames(l) {
   return items.every(t => /^[A-Za-z_]\w*$/.test(t)) ? items : [];
 }
 const pct = (a, b) => (b ? Math.round((100 * a) / b) + '%' : '—');
-const cards = files.map(f => fs.readFileSync(f, 'utf8').split('\n'));
+const cards = files.map(f => fs.readFileSync(f, 'utf8').split(/\r?\n/));
 const names = files.map((f, i) => `${i + 1}`);
 console.log(`карт ${files.length}, эталон — есть хотя бы в ${REF}: ` + files.map((f, i) => `${i + 1}=${f.split('/').pop()}`).join(', '));
 

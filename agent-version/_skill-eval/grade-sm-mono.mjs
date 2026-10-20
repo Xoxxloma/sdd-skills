@@ -42,6 +42,8 @@ const FIXT = {
   'SM-MONO-SPEC': { svc: 'casedesk', expect: { contract: 148, entities: 60, jobs: 10, topics: 12 } },
   // make.sh --big-spec: 100 операций спеки, 98 реализованы, у каждой факт-анкер из ключа; дерево — своё out/big-spec
   'SM-MONO-SPEC-BIG': { svc: 'casedesk', dir: 'SM-MONO-SPEC', out: join('out', 'big-spec'), variant: '--big-spec', key: 'big-spec-key.tsv', expect: { contract: 218, entities: 60, jobs: 10, topics: 12 } },
+  // make.sh --owners: ручки JAX-RS без пометок, общие сущности у ручек двух модулей, поля из базового класса
+  'SM-MONO-SPEC-OWN': { svc: 'casedesk', dir: 'SM-MONO-SPEC', out: join('out', 'owners'), variant: '--owners', shared: ['InspectorEntity', 'RegionEntity', 'OfficeEntity'], expect: { contract: 156, entities: 66, jobs: 10, topics: 12 } },
 }
 const fxDir = (fx) => FIXT[fx].dir || fx
 const CLASSES = ['contract', 'entities', 'jobs', 'topics']
@@ -74,7 +76,8 @@ const annoPath = (args) => {
 }
 
 export function extractTruth (tree) {
-  const T = { contract: new Map(), entities: new Map(), jobs: new Map(), topics: new Map(), ghost: { contract: new Map(), topics: new Map() } }
+  const T = { contract: new Map(), entities: new Map(), jobs: new Map(), topics: new Map(), ghost: { contract: new Map(), topics: new Map() }, inherited: new Map() }
+  const supers = new Map(); const ext = new Map()   // @MappedSuperclass → его поля; сущность → базовый класс
   // T[class]: каноничный ключ → { aliases: Set, dir?, file }
   const add = (cls, key, aliases, extra = {}) => {
     if (!T[cls].has(key)) T[cls].set(key, { aliases: new Set(), ...extra })
@@ -101,6 +104,18 @@ export function extractTruth (tree) {
       if (already) aliases.push(restKey(verb, normPath(prefix + '/' + p)))
       add('contract', restKey(verb, canonical), aliases, { file: rel })
     }
+    // REST JAX-RS: класс-уровневый @Path и @GET/@POST/… у метода, свой @Path метода — следующей строкой
+    const jp = head.match(/@Path\s*\(\s*"([^"]*)"\s*\)/)
+    if (jp) {
+      for (const m of body.matchAll(/@(GET|POST|PUT|PATCH|DELETE)\b(?:\s*@Path\s*\(\s*"([^"]*)"\s*\))?/g)) {
+        const k = restKey(m[1], normPath(jp[1] + '/' + (m[2] || '')))
+        add('contract', k, [k], { file: rel, jaxrs: true })
+      }
+    }
+    // поля базового класса — для счёта «поля из базового класса» (не класс ключей)
+    if (/@MappedSuperclass\b/.test(head) && className) supers.set(className, [...body.matchAll(/^\s+private\s+[\w<>,.?\s]+?\s+(\w+)\s*;/gm)].map((m) => m[1]))
+    const xm = body.match(/^(?:class)\s+\w+\s+extends\s+(\w+)/)
+    if (xm && className && /@Entity\b/.test(head)) ext.set(className, xm[1])
     // DGS — только корневые типы
     for (const m of body.matchAll(/@Dgs(Query|Mutation|Subscription)\b\s*(\(([^)]*)\))?[\s\S]*?\b(\w+)\s*\(/g)) {
       const fm = (m[3] || '').match(/field\s*=\s*"(\w+)"/)
@@ -127,6 +142,7 @@ export function extractTruth (tree) {
       add('jobs', className, [className.toLowerCase(), `${className}.${m[1]}`.toLowerCase(), `${className}#${m[1]}`.toLowerCase()], { file: rel, method: m[1] })
     }
   }
+  for (const [cls, sup] of ext) if (supers.has(sup)) T.inherited.set(cls, supers.get(sup))
   // REST из файла спецификации: реализованные операции — в правду, только объявленные — в призраки
   const spec = join(tree, 'src', 'main', 'resources', 'openapi.yaml')
   if (existsSync(spec)) {
@@ -198,6 +214,10 @@ function isBigTree (tree) {
   return loadKey(BIG).every((r) => ids.has(r.opid))
 }
 
+// дерево варианта --owners — по базовому классу аудита
+const OWN = 'SM-MONO-SPEC-OWN'
+const isOwnTree = (tree) => existsSync(join(tree, 'src', 'main', 'java', 'ru', 'kontrol', 'casedesk', 'v2', 'common', 'persistence', 'AuditedEntity.java'))
+
 function truthTree (fx, round) {
   const svc = FIXT[fx].svc
   const own = [join(HERE, 'fixtures', fxDir(fx), 'out', svc)]
@@ -209,7 +229,7 @@ function truthTree (fx, round) {
   }
   // вариант SM-MONO-SPEC — по дереву: базе не годится дерево большой спеки, и наоборот; большой спеке
   // сначала песочница — out/ на её раунд подменяют и возвращают обычным
-  const fits = (t) => existsSync(join(t, 'src')) && (fx === BIG ? isBigTree(t) : fx === 'SM-MONO-SPEC' ? !isBigTree(t) : true)
+  const fits = (t) => existsSync(join(t, 'src')) && (fx === BIG ? isBigTree(t) : fx === OWN ? isOwnTree(t) : fx === 'SM-MONO-SPEC' ? !isBigTree(t) && !isOwnTree(t) : true)
   return (fx === BIG ? [...sbx, ...own] : [...own, ...sbx]).find(fits) || null
 }
 
@@ -354,6 +374,37 @@ export function gradeFacts (text, key) {
   }
   return r
 }
+// ─── владение по файлу (вариант --owners): поля из базового класса, ручки без пометок, общие сущности ───
+function sectionBlocks (text, section) {
+  const blocks = []; let inSec = false; let cur = null
+  for (const l of text.split('\n')) {
+    if (/^#{1,3} /.test(l)) {
+      cur = null
+      if (/^## /.test(l)) inSec = l.slice(3).trim() === section
+      else if (/^# /.test(l)) inSec = false
+      else if (inSec) { cur = { head: l.slice(4).trim(), lines: [] }; blocks.push(cur) }
+      continue
+    }
+    if (cur) cur.lines.push(l)
+  }
+  return blocks
+}
+// поле базового класса засчитано, если его имя целым словом стоит в блоке своей сущности
+export function gradeOwners (text, truth, res) {
+  const blocks = sectionBlocks(text, SECTION.entities)
+  const of = (cls) => blocks.filter((b) => matchByToken(b.head, new Map([[cls, truth.T.entities.get(cls)]]), /[^A-Za-z0-9_.#]+/))
+  const inh = { total: 0, hit: 0, entities: truth.T.inherited.size, full: 0, miss: [] }
+  for (const [cls, fields] of truth.T.inherited) {
+    const body = of(cls).map((b) => b.lines.join('\n')).join('\n'); let n = 0
+    for (const f of fields) { inh.total++; if (body && hasWord(body, f)) { inh.hit++; n++ } else inh.miss.push(`${cls}.${f}`) }
+    if (n === fields.length) inh.full++
+  }
+  const jx = [...truth.T.contract].filter(([, v]) => v.jaxrs).map(([k]) => k)
+  const jxMiss = jx.filter((k) => res.contract.missing.includes(k))
+  const shared = (FIXT[truth.fx].shared || []).map((cls) => ({ cls, blocks: of(cls).length }))
+  return { inh, jaxrs: { total: jx.length, found: jx.length - jxMiss.length, miss: jxMiss }, shared }
+}
+
 // части: `.work/<сервис>/part-NN.md` песочницы, по возрастанию номера
 function partStats (dir, svc) {
   const d = join(dir, 'w', 'AI-SDD', 'services', '.work', svc)
@@ -418,7 +469,8 @@ export function gradeRun (dir, truth) {
   const blocks = cardOk ? blockStats(card) : null
   const parts = partStats(dir, truth.svc)
   const facts = cardOk && truth.key ? gradeFacts(card, truth.key) : null
-  return { name, measured: true, card: cardOk, keys, st, cost, dirt, bg, b5, b6, b7, blocks, parts, facts }
+  const owners = cardOk && truth.fx === OWN ? gradeOwners(card, truth, keys) : null
+  return { name, measured: true, card: cardOk, keys, st, cost, dirt, bg, b5, b6, b7, blocks, parts, facts, owners }
 }
 
 function detectFixture (round) {
@@ -427,8 +479,9 @@ function detectFixture (round) {
   // раннер вариантов не знает: большая спека — по дереву первой песочницы, без дерева — по _variant.txt
   const sb = join(round, 'sandbox')
   const tree = existsSync(sb) ? readdirSync(sb).sort().map((d) => join(sb, d, 'w', FIXT[fx].svc)).find((t) => existsSync(join(t, 'src'))) : null
-  if (tree) return isBigTree(tree) ? BIG : fx
-  return read(join(round, '_variant.txt')).includes(FIXT[BIG].variant) ? BIG : fx
+  if (tree) return isOwnTree(tree) ? OWN : isBigTree(tree) ? BIG : fx
+  const v = read(join(round, '_variant.txt'))
+  return v.includes(FIXT[OWN].variant) ? OWN : v.includes(FIXT[BIG].variant) ? BIG : fx
 }
 function detectBase (round) {
   const j = join(round, '_mono.json')
@@ -487,6 +540,12 @@ function report (R) {
       const f = r.facts
       L.push(`  факты спеки в блоках своих операций (анкер и код): ${f.hit} из ${f.total}; анкер без кода ${f.anchorNoCode}, анкер вне своего блока ${f.elsewhere}, анкера нет ${f.absent}, блока операции нет ${f.noBlock}${f.miss.length ? `  · ${f.miss.slice(0, 6).join('; ')}${f.miss.length > 6 ? ` …и ещё ${f.miss.length - 6}` : ''}` : ''}`)
     }
+    if (r.owners) {
+      const o = r.owners
+      L.push(`  ручки без пометок разведчика (JAX-RS): ${o.jaxrs.found} из ${o.jaxrs.total}${o.jaxrs.miss.length ? `  · нет: ${o.jaxrs.miss.join('; ')}` : ''}`)
+      L.push(`  поля из базового класса: ${o.inh.hit} из ${o.inh.total}, сущностей с полным перечнем ${o.inh.full} из ${o.inh.entities}${o.inh.miss.length ? `  · нет: ${o.inh.miss.slice(0, 8).join('; ')}${o.inh.miss.length > 8 ? ` …и ещё ${o.inh.miss.length - 8}` : ''}` : ''}`)
+      L.push(`  общие сущности, блоков на каждую (нужно по одному): ${o.shared.map((s) => `${s.cls} ${s.blocks}`).join(', ')}`)
+    }
     L.push(`  Б-5 ${r.b5 ? 'да' : 'НЕТ'} · Б-6 ${r.b6 ? 'да' : 'НЕТ'}${r.b7 == null ? '' : ` · Б-7 ${r.b7 ? 'да' : 'НЕТ'}`} · цена $${r.cost.toFixed(2)}`)
   }
   L.push('')
@@ -506,6 +565,11 @@ function report (R) {
   }, '; ')}`)
   L.push(`GraphQL без типа: ${each((r) => r.blocks.untyped)}`)
   if (R.factsTotal != null) L.push(`факты спеки в блоках своих операций (анкер и код): ${each((r) => `${r.facts.hit}/${r.facts.total}`)}`)
+  if (R.fx === OWN) {
+    L.push(`ручки без пометок разведчика (JAX-RS): ${each((r) => `${r.owners.jaxrs.found}/${r.owners.jaxrs.total}`)}`)
+    L.push(`поля из базового класса: ${each((r) => `${r.owners.inh.hit}/${r.owners.inh.total}`)}`)
+    L.push(`повторов сущностей (одна сущность двумя блоками): ${each((r) => r.keys.entities.dups.length)}; лишних блоков данных: ${each((r) => r.keys.entities.extras.length)}`)
+  }
   return L.join('\n')
 }
 const share = (b) => (b.blocks ? b.empty / b.blocks : 0)

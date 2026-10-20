@@ -36,6 +36,11 @@
 - `createdAt`, `version`
 — при отмене по погоде причина ставится автоматически
 
+### `Telescope`
+Телескоп обсерватории.
+- `id`: `uuid`
+- `mount`: `string`
+
 ### `ShiftLogEntry`
 Запись журнала.
 - `id`: `uuid`

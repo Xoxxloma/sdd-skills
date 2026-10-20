@@ -31,8 +31,6 @@ type: backend
 сущности: → не сущность, агрегат по `Reservation`
 - `telescopeId` (query, uuid, обязателен) — телескоп
 - закрытые по погоде ночи не считаются
-- ответ кэшируется на минуту
-  — продолжение строки с отступом
 
 ### `query night`
 Ночь наблюдений по идентификатору.
@@ -50,6 +48,10 @@ type: backend
 Событие по брони всем подписчикам.
 - ключ — идентификатор брони
 - шлётся из outbox отдельной задачей
+
+### публикует на telescope.reservation.events
+Изменение брони.
+- ключ — идентификатор брони
 - в тестовых средах топик другой
 
 ## Владеет данными
@@ -59,17 +61,16 @@ type: backend
 - `id`: `uuid`
 
 ### `Reservation`
-Бронь ночи.
-- `id`: `UUID`
-- `observerId`, `telescopeId`: `string?`
-- `night` (ссылка), `dome` (ссылка)
-- `status` (ReservationStatus), `statusChangedAt`: `offset-datetime?`
-- `version` (версия записи)
-- `cancelReason?`
+Бронь или заявка.
+- `id`: `uuid`
+- `observerId?`, `telescopeId?`: `string`
+- `night?` / `dome?` — к чему относится бронь
+- `status?`: перечисление, при создании `REQUESTED`
+- `statusChangedAt?`, `cancelReason?`
   — продолжение у частично нового поля
-- `createdAt`
-— отменённая по погоде бронь в очередь не возвращается
+- `createdAt`, `version`
 — при отмене по погоде причина ставится автоматически
+— отменённая по погоде бронь в очередь не возвращается
 
 ### `ShiftLogEntry`
 Запись журнала.
@@ -79,6 +80,12 @@ type: backend
 - `createdAt`, `updatedAt` проставляются автоматически
 - domeId, note
 — запись с пометкой оператора не удаляется
+
+### `Telescope`
+Телескоп.
+- `id`: `uuid`
+- `aperture`: `int`
+- `mount`: `string`
 
 ## Роли и доступ
 | Роль | Что может |

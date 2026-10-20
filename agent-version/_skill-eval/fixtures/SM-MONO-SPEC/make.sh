@@ -16,7 +16,9 @@
 # Правда: контракт 148 (120 базы + 28 реализованных операций спецификации), сущности 60, задачи 10,
 # топики 12. База собирается генератором SM-MONO-DGS как есть.
 #
-# Вызов:  ./make.sh <куда> [--with-client | --big-spec] → <куда>/casedesk/
+# Вызов:  ./make.sh <куда> [--with-client | --big-spec | --owners] → <куда>/casedesk/
+# --owners: ручки JAX-RS в папках без пометок, общие сущности у ручек двух модулей, поля из базового
+#   класса — раздел 5 ниже. Правда: контракт 156, сущности 66, задачи 10, топики 12.
 # --with-client: рядом лежит спека соседа с тем же operationId и клиентским генератором java.
 # --big-spec: в openapi.yaml 100 операций (98 реализованы в семи модулях, две архивные — без реализации),
 #   у каждой реализованной один факт в методе контроллера: условие → 403/404/409/422/423. Строки спеки
@@ -26,7 +28,7 @@
 set -eu
 OUT="${1:-./out}"
 VARIANT="${2:-}"
-case "$VARIANT" in ''|--with-client|--big-spec) ;; *) echo "неизвестный вариант: $VARIANT" >&2; exit 2 ;; esac
+case "$VARIANT" in ''|--with-client|--big-spec|--owners) ;; *) echo "неизвестный вариант: $VARIANT" >&2; exit 2 ;; esac
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE="$HERE/../SM-MONO-DGS/make.sh"
 [ -f "$BASE" ] || { echo "нет генератора базы: $BASE" >&2; exit 1; }
@@ -365,6 +367,256 @@ printf '%s\n' "package ru.kontrol.casedesk;" "" "import org.junit.jupiter.api.Te
               "import org.springframework.boot.test.context.SpringBootTest;" "" \
               "@SpringBootTest" "class CasedeskApplicationTests {" "" "  @Test" "  void contextLoads() {" "  }" "}" > "$TJ/CasedeskApplicationTests.java"
 
+# --- 5. владение по файлу (--owners): то, на чём нарезка теряла ключи и двоила сущности -------------
+#   а) ручки JAX-RS (`@Path` + `@GET`) в папках `v2/inspectors/web`, `v2/regions/web` — без других пометок;
+#      регистрирует их конфиг Jersey в `v2/config`. Маркеры Spring и спецификации их не видят;
+#   б) общие сущности `InspectorEntity`, `RegionEntity`, `OfficeEntity` лежат в этих же папках, а
+#      возвращают их ещё и ручки модулей `checks` и `findings` (Spring, с пометками);
+#   в) `AuditedEntity` (`@MappedSuperclass`, `v2/common/persistence`) даёт `id`, `createdAt`, `updatedAt`,
+#      `createdBy` трём общим сущностям и трём сущностям модулей (`sanctions`, `templates`, `groups`).
+#   Правда: контракт 156 (148 + 6 ручек JAX-RS + 2 ручки модулей), сущности 66 (60 + 6), задачи и топики — как в базе.
+if [ "$VARIANT" = --owners ]; then
+  P="ru.kontrol.casedesk.v2"
+  jfile() { mkdir -p "$(dirname "$1")"; cat > "$1"; }
+  jfile "$J/v2/common/persistence/AuditedEntity.java" <<EOF
+package $P.common.persistence;
+
+import java.time.OffsetDateTime;
+import javax.persistence.Column;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.MappedSuperclass;
+
+/** Общие поля журнала изменений: их наследуют сущности, которые ведут аудит. */
+@MappedSuperclass
+public abstract class AuditedEntity {
+
+  @Id
+  @GeneratedValue
+  private Long id;
+
+  @Column(name = "created_at", nullable = false, updatable = false)
+  private OffsetDateTime createdAt;
+
+  @Column(name = "updated_at")
+  private OffsetDateTime updatedAt;
+
+  @Column(name = "created_by", nullable = false, updatable = false)
+  private String createdBy;
+
+  public Long getId() {
+    return id;
+  }
+}
+EOF
+  # entity <модуль> <Класс> <таблица> <поле:тип>…
+  entity() {
+    local m="$1" cls="$2" tbl="$3"; shift 3
+    {
+      printf '%s\n' "package $P.$m.model.entity;" "" "import javax.persistence.Column;" "import javax.persistence.Entity;" \
+                    "import javax.persistence.Table;" "import lombok.Getter;" "import lombok.Setter;" \
+                    "import $P.common.persistence.AuditedEntity;" "" \
+                    "@Getter" "@Setter" "@Entity" "@Table(name = \"$tbl\", schema = \"casedesk\")" "public class $cls extends AuditedEntity {" ""
+      for f in "$@"; do printf '%s\n' "  @Column(name = \"${f%%:*}\")" "  private ${f#*:} ${f%%:*};" ""; done
+      printf '%s\n' "}"
+    } | jfile "$J/v2/$m/model/entity/$cls.java"
+  }
+  entity inspectors InspectorEntity cd_inspector "login:String" "fullName:String" "active:Boolean"
+  entity regions RegionEntity cd_region "code:String" "title:String"
+  entity regions OfficeEntity cd_office "regionCode:String" "address:String"
+  entity sanctions SanctionAppealEntity cd_sanction_appeal "reason:String" "decision:String"
+  entity templates TemplateVersionEntity cd_template_version "number:Integer" "body:String"
+  entity groups GroupMemberEntity cd_group_member "login:String" "memberRole:String"
+  for r in "inspectors:Inspector" "regions:Region" "regions:Office"; do
+    m="${r%%:*}"; e="${r#*:}"
+    jfile "$J/v2/$m/repository/${e}Repository.java" <<EOF
+package $P.$m.repository;
+
+import java.util.List;
+import org.springframework.data.jpa.repository.JpaRepository;
+import $P.$m.model.entity.${e}Entity;
+
+public interface ${e}Repository extends JpaRepository<${e}Entity, Long> {
+
+  List<${e}Entity> findAllByIdIn(List<Long> ids);
+}
+EOF
+  done
+  jfile "$J/v2/inspectors/web/InspectorResource.java" <<EOF
+package $P.inspectors.web;
+
+import java.util.List;
+import javax.ws.rs.GET;
+import javax.ws.rs.NotFoundException;
+import javax.ws.rs.PUT;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import org.springframework.stereotype.Component;
+import $P.inspectors.model.entity.InspectorEntity;
+import $P.inspectors.repository.InspectorRepository;
+
+@Component
+@Path("/api/desk/inspectors")
+@Produces("application/json")
+public class InspectorResource {
+
+  private final InspectorRepository inspectors;
+
+  public InspectorResource(InspectorRepository inspectors) {
+    this.inspectors = inspectors;
+  }
+
+  /** Список инспекторов; уволенные (active = false) не отдаются. */
+  @GET
+  public List<InspectorEntity> list(@QueryParam("login") String login) {
+    return inspectors.findAll().stream().filter(i -> Boolean.TRUE.equals(i.getActive())).toList();
+  }
+
+  @GET
+  @Path("/{id}")
+  public InspectorEntity get(@PathParam("id") Long id) {
+    return inspectors.findById(id).orElseThrow(() -> new NotFoundException("Инспектор не найден"));
+  }
+
+  /** Включить или выключить инспектора; выключенный пропадает из списков назначения. */
+  @PUT
+  @Path("/{id}/activity")
+  public InspectorEntity changeActivity(@PathParam("id") Long id, @QueryParam("active") boolean active) {
+    InspectorEntity i = get(id);
+    i.setActive(active);
+    return inspectors.save(i);
+  }
+
+  @GET
+  @Path("/by-ids/{ids}")
+  public List<InspectorEntity> byIds(@PathParam("ids") List<Long> ids) {
+    return inspectors.findAllByIdIn(ids);
+  }
+}
+EOF
+  jfile "$J/v2/regions/web/RegionCatalogResource.java" <<EOF
+package $P.regions.web;
+
+import java.util.List;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import org.springframework.stereotype.Component;
+import $P.regions.model.entity.OfficeEntity;
+import $P.regions.model.entity.RegionEntity;
+import $P.regions.repository.OfficeRepository;
+import $P.regions.repository.RegionRepository;
+
+@Component
+@Path("/api/desk/regions")
+@Produces("application/json")
+public class RegionCatalogResource {
+
+  private final RegionRepository regions;
+  private final OfficeRepository offices;
+
+  public RegionCatalogResource(RegionRepository regions, OfficeRepository offices) {
+    this.regions = regions;
+    this.offices = offices;
+  }
+
+  /** Справочник регионов, по коду. */
+  @GET
+  @Path("/catalog")
+  public List<RegionEntity> catalog() {
+    return regions.findAll();
+  }
+
+  @GET
+  @Path("/{code}/offices")
+  public List<OfficeEntity> offices(@PathParam("code") String code) {
+    return offices.findAll().stream().filter(o -> code.equals(o.getRegionCode())).toList();
+  }
+}
+EOF
+  jfile "$J/v2/config/JerseyConfig.java" <<EOF
+package $P.config;
+
+import org.glassfish.jersey.server.ResourceConfig;
+import org.springframework.context.annotation.Configuration;
+import $P.inspectors.web.InspectorResource;
+import $P.regions.web.RegionCatalogResource;
+
+@Configuration
+public class JerseyConfig extends ResourceConfig {
+
+  public JerseyConfig() {
+    register(InspectorResource.class);
+    register(RegionCatalogResource.class);
+  }
+}
+EOF
+  jfile "$J/v2/checks/web/CheckAssigneeController.java" <<EOF
+package $P.checks.web;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import $P.inspectors.model.entity.InspectorEntity;
+import $P.inspectors.repository.InspectorRepository;
+
+@RestController
+@RequestMapping("/api/desk/checks")
+public class CheckAssigneeController {
+
+  private final InspectorRepository inspectors;
+
+  public CheckAssigneeController(InspectorRepository inspectors) {
+    this.inspectors = inspectors;
+  }
+
+  /** Инспектор, назначенный на проверку; не назначен — 204. */
+  @GetMapping("/{id}/assignee")
+  public InspectorEntity assignee(@PathVariable Long id) {
+    return inspectors.findById(id).orElse(null);
+  }
+}
+EOF
+  jfile "$J/v2/findings/web/FindingRegionController.java" <<EOF
+package $P.findings.web;
+
+import java.util.List;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import $P.regions.model.entity.OfficeEntity;
+import $P.regions.model.entity.RegionEntity;
+import $P.regions.repository.OfficeRepository;
+import $P.regions.repository.RegionRepository;
+
+@RestController
+@RequestMapping("/api/desk/findings")
+public class FindingRegionController {
+
+  private final RegionRepository regions;
+  private final OfficeRepository offices;
+
+  public FindingRegionController(RegionRepository regions, OfficeRepository offices) {
+    this.regions = regions;
+    this.offices = offices;
+  }
+
+  /** Регион нарушения и его отделения. */
+  @GetMapping("/{id}/region")
+  public List<OfficeEntity> region(@PathVariable Long id) {
+    RegionEntity r = regions.findById(id).orElseThrow();
+    return offices.findAll().stream().filter(o -> r.getCode().equals(o.getRegionCode())).toList();
+  }
+}
+EOF
+  awk '{ print } /<dependencies>/ && !done { print "    <dependency>"; print "      <groupId>org.springframework.boot</groupId>"; print "      <artifactId>spring-boot-starter-jersey</artifactId>"; print "    </dependency>"; done = 1 }' "$R/pom.xml" > "$R/pom.xml.tmp" && mv "$R/pom.xml.tmp" "$R/pom.xml"
+fi
+
 # --- числа по собранному дереву --------------------------------------------------------------
 c() { grep -rhoE "$1" "$2" --include="${3:-*.java}" 2>/dev/null | wc -l | tr -d ' '; }
 ops=$(grep -cE '^      operationId:' "$RES/openapi.yaml")
@@ -374,8 +626,10 @@ echo "  java-файлов:                 $(find "$R/src/main" -name '*.java' |
 echo "  операций в openapi.yaml:     $ops, из них реализовано $impl, без реализации $((ops - impl))"
 echo "  REST по аннотациям:          $(c '@(Get|Post|Put|Patch|Delete)Mapping\(' "$R/src/main")"
 echo "  DGS корневых операций:       $(( $(c '@Dgs(Query|Mutation|Subscription)\b' "$R/src/main") + $(c '@DgsData\(parentType\s*=\s*"(Query|Mutation|Subscription)"' "$R/src/main") ))"
-echo "  контракт всего:              $(( impl + $(c '@(Get|Post|Put|Patch|Delete)Mapping\(' "$R/src/main") + $(c '@Dgs(Query|Mutation|Subscription)\b' "$R/src/main") + $(c '@DgsData\(parentType\s*=\s*"(Query|Mutation|Subscription)"' "$R/src/main") ))"
-[ "$VARIANT" != --with-client ] || echo "  операций клиентской спеки:   $(grep -cE '^      operationId:' "$RES/neighbour.yaml") (не контракт)"
+jx=$(grep -rhoE '^  @(GET|POST|PUT|PATCH|DELETE)$' "$R/src/main" --include='*.java' | wc -l | tr -d ' ')
+echo "  контракт всего:              $(( impl + jx +$(c '@(Get|Post|Put|Patch|Delete)Mapping\(' "$R/src/main") + $(c '@Dgs(Query|Mutation|Subscription)\b' "$R/src/main") + $(c '@DgsData\(parentType\s*=\s*"(Query|Mutation|Subscription)"' "$R/src/main") ))"
+[ "$VARIANT" != --owners ] || echo "  ручек JAX-RS:                $jx; сущностей с базовым классом: $(grep -rl 'extends AuditedEntity' "$J" | wc -l | tr -d ' ')"
+[ "$VARIANT" != --with-client ] || echo "  операций клиентской спеки:  $(grep -cE '^      operationId:' "$RES/neighbour.yaml") (не контракт)"
 [ "$VARIANT" != --big-spec ] || echo "  фактов-анкеров спеки:        $(printf '%s\n' "$ROWS" | awk -F'\t' 'NF { n++; k[$6]++ } END { printf "%d —", n; for (c = 400; c < 500; c++) if (c in k) printf " %d×%d", c, k[c] }') (ключ big-spec-key.tsv, в дерево не едет)"
 echo "  сущности / задачи:           $(c '@Entity\b' "$R/src/main") / $(c '@Scheduled\(' "$R/src/main")"
 echo "  топиков в боевом конфиге:    $(grep -coE 'kontrol\.[a-z]+\.[a-z]+\.v1' "$RES/application.yaml"); в тестовом: $(grep -coE 'kontrol\.[a-z]+\.[a-z]+\.v1' "$TR/application.yaml")"

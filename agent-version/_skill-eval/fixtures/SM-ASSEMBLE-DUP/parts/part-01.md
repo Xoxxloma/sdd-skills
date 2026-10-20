@@ -49,6 +49,11 @@
 - `version` (версия записи)
 — отменённая по погоде бронь в очередь не возвращается
 
+### `Telescope`
+Телескоп.
+- `id`: `uuid`
+- `aperture`: `int`
+
 ### `ShiftLogEntry`
 Запись журнала смен.
 - id, operatorId, domeId, note

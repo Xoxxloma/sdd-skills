@@ -30,7 +30,8 @@
 #   итог  <класс> <пометок ключ>                         — по сервису;
 #   часть <NN> <класс> <пометок ключ>                    — ожидание части;
 #   файл  <путь> <класс> <пометок ключ> <NN части | ->   — каждый файл с пометками `ключ`.
-#   путь  <путь части> <папки|файлы> <NN части>         — владение, включая файлы без пометок.
+#   путь  <путь части> <папки|файлы> <NN части>         — владение, включая файлы без пометок;
+#   остаток <NN остатка> <папка|файлы> <путь>           — пункт списка остатка, если список напечатан.
 # При отказе файл плана остаётся пустым.
 set -u
 COUNTS="${1:?counts.txt}"; K="${2:?K}"; W="${3:?w}"; ROOTS="${4:?корни через запятую}"; TSV="${5:-}"
@@ -188,6 +189,7 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
       else printf "путь\t%s\t%s\t%02d\n", p, partkind[p], partof[p] > f
     }
     for (i = 1; i <= n; i++) { p = fl[i]; for (c = 1; c <= ncl; c++) { cl = clist[c]; if (ck[p, cl] > 0) print "файл\t" p "\t" cl "\t" ck[p, cl] "\t" ((p in specparts) ? specparts[p] : partfor(p, rt[p])) > f } }
+    for (i = 1; i <= nrr; i++) printf "остаток\t%02d\t%s\t%s\n", np_ + 1, rrk[i], rrp[i] > f
     close(f)
   }
   # Делит узел dir: дети-папки с ключами пакуются подряд, тяжёлые — рекурсивно; свои файлы с ключами — подряд.
@@ -369,8 +371,8 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     if (nrem + nl > 60) { printf "частей %d; остаток — всё вне папок и файлов частей (пунктов больше 60 — список не печатается)\n", np_; tasks(1); dump(); exit 0 }
     sortlist(rl, nrem); sortlist(lo, nl)
     printf "частей %d; остаток — пунктов %d:\n", np_, nrem + nl
-    for (i = 1; i <= nrem; i++) print "  папка " rl[i]
-    for (i = 1; i <= nl; i++) print "  файлы прямо в " lo[i]
+    for (i = 1; i <= nrem; i++) { print "  папка " rl[i]; rrk[++nrr] = "папка"; rrp[nrr] = rl[i] }
+    for (i = 1; i <= nl; i++) { print "  файлы прямо в " lo[i]; rrk[++nrr] = "файлы"; rrp[nrr] = lo[i] }
     tasks(1)
     dump()
   }

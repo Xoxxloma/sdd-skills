@@ -34,10 +34,12 @@ command -v timeout > /dev/null || timeout() { local s="$1"; shift; perl -e 'alar
 SRC="${1:?папка скилла (SKILL.md и reference/)}"; ROUND="${2:?папка раунда}"; FX="${3:?фикстура: NRS-TAIL | SM-MONO-DGS}"; N="${4:-1}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; FIXROOT="$HERE/fixtures"; PROMPT="${SM_MONO_PROMPT:-$FIXROOT/SM-MONO-RUN/prompt-scan.md}"
 MODEL="${SM_MODEL:-sonnet}"; CONC="${SM_MONO_CONC:-1}"; TMO="${SM_MONO_TIMEOUT:-7200}"
+FXDIR="$FX"; FXSUB=out; FXARG=""
 case "$FX" in
   NRS-TAIL) SVC=cargonet ;;
   SM-MONO-DGS|SM-MONO-SPEC) SVC=casedesk ;;
-  *) echo "неизвестная фикстура: $FX (NRS-TAIL | SM-MONO-DGS | SM-MONO-SPEC)" >&2; exit 1 ;;
+  SM-MONO-SPEC-OWN) SVC=casedesk; FXDIR=SM-MONO-SPEC; FXSUB=out/owners; FXARG=--owners ;;   # make.sh --owners
+  *) echo "неизвестная фикстура: $FX (NRS-TAIL | SM-MONO-DGS | SM-MONO-SPEC | SM-MONO-SPEC-OWN)" >&2; exit 1 ;;
 esac
 [ -f "$SRC/SKILL.md" ] || { echo "нет $SRC/SKILL.md" >&2; exit 1; }
 [ -d "$SRC/reference" ] || { echo "нет $SRC/reference/ — снимок без скриптов лжёт" >&2; exit 1; }
@@ -50,10 +52,10 @@ mkdir -p "$ROUND"; ROUND="$(cd "$ROUND" && pwd)"
 OUT="$ROUND/sandbox"; mkdir -p "$OUT"
 
 # ─── дерево фикстуры ─────────────────────────────────────────────────────────────────────
-FXOUT="$FIXROOT/$FX/out"
+FXOUT="$FIXROOT/$FXDIR/$FXSUB"
 if [ ! -d "$FXOUT/$SVC/src" ]; then
   echo "собираю $FX: make.sh → $FXOUT"
-  bash "$FIXROOT/$FX/make.sh" "$FXOUT" > "$ROUND/_make-$FX.log" 2>&1 || { echo "make.sh $FX упал, см. $ROUND/_make-$FX.log" >&2; exit 1; }
+  bash "$FIXROOT/$FXDIR/make.sh" "$FXOUT" $FXARG > "$ROUND/_make-$FX.log" 2>&1 || { echo "make.sh $FX упал, см. $ROUND/_make-$FX.log" >&2; exit 1; }
 fi
 
 # ─── снимок скилла: один раз на раунд ────────────────────────────────────────────────────
@@ -114,7 +116,7 @@ seed() {  # seed <w>
   rm -rf "$w"; mkdir -p "$w"
   case "$FX" in
     NRS-TAIL) bash "$FIXROOT/NRS-TAIL/seed.sh" "$w" ;;
-    SM-MONO-DGS|SM-MONO-SPEC)
+    SM-MONO-DGS|SM-MONO-SPEC|SM-MONO-SPEC-OWN)
       cp -r "$FXOUT/casedesk" "$w/casedesk"
       mkdir -p "$w/AI-SDD/services"
       printf '%s\n' '# Слепок соседних сервисов. Этот файл ведёт человек.' 'services:' '  - name: casedesk' '    path: ../casedesk' '    type: backend' > "$w/AI-SDD/services/manifest.yaml"
