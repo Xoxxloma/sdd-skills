@@ -1,0 +1,38 @@
+// Глобальные имена, которые app.js получает из vendor/ и data.js. Версии — как в vendor/LICENSES.txt.
+import type MarkdownIt from "markdown-it";
+import type { PluginSimple } from "markdown-it";
+import type { DOMPurify } from "dompurify";
+import type { HLJSApi } from "highlight.js";
+import type { RenderRule } from "markdown-it/lib/renderer.mjs";
+import type Token from "markdown-it/lib/token.mjs";
+import type StateCore from "markdown-it/lib/rules_core/state_core.mjs";
+
+declare global {
+  /** правило рендера markdown-it — для JSDoc в app.js */
+  type MdRenderRule = RenderRule;
+  /** токен и состояние ядра markdown-it — для помощников правил в app.js */
+  type MdToken = Token;
+  type MdStateCore = StateCore;
+
+  /** то, чем app.js пользуется из mermaid 11 (vendor/mermaid.min.js, грузится лениво) */
+  interface MermaidApi {
+    initialize(config: Record<string, unknown>): void;
+    parse(text: string): Promise<unknown>;
+    render(id: string, text: string): Promise<{ svg: string }>;
+  }
+
+  interface Window {
+    markdownit: typeof MarkdownIt;
+    markdownitFootnote: PluginSimple;
+    DOMPurify: DOMPurify;
+    hljs: HLJSApi;
+    /** есть только после первой схемы на странице */
+    mermaid?: MermaidApi;
+    /** data.js — граница ввода: проверяется в app.js (isData) */
+    MDV_DATA?: unknown;
+    /** assets.js — граница ввода: проверяется в app.js (loadAssets) */
+    MDV_ASSETS?: unknown;
+  }
+}
+
+export {};
