@@ -40,7 +40,8 @@ case "$FX" in
   NRS-TAIL) SVC=cargonet ;;
   SM-MONO-DGS|SM-MONO-SPEC) SVC=casedesk ;;
   SM-MONO-SPEC-OWN) SVC=casedesk; FXDIR=SM-MONO-SPEC; FXSUB=out/owners; FXARG=--owners ;;   # make.sh --owners
-  *) echo "неизвестная фикстура: $FX (NRS-TAIL | SM-MONO-DGS | SM-MONO-SPEC | SM-MONO-SPEC-OWN)" >&2; exit 1 ;;
+  SM-MONO-SPEC-CROSS) SVC=casedesk; FXDIR=SM-MONO-SPEC; FXSUB=out/crosscut; FXARG=--crosscut ;;   # make.sh --crosscut
+  *) echo "неизвестная фикстура: $FX (NRS-TAIL | SM-MONO-DGS | SM-MONO-SPEC | SM-MONO-SPEC-OWN | SM-MONO-SPEC-CROSS)" >&2; exit 1 ;;
 esac
 [ -f "$SRC/SKILL.md" ] || { echo "нет $SRC/SKILL.md" >&2; exit 1; }
 [ -d "$SRC/reference" ] || { echo "нет $SRC/reference/ — снимок без скриптов лжёт" >&2; exit 1; }
@@ -126,7 +127,7 @@ seed() {  # seed <w>
   rm -rf "$w"; mkdir -p "$w"
   case "$FX" in
     NRS-TAIL) bash "$FIXROOT/NRS-TAIL/seed.sh" "$w" ;;
-    SM-MONO-DGS|SM-MONO-SPEC|SM-MONO-SPEC-OWN)
+    SM-MONO-DGS|SM-MONO-SPEC|SM-MONO-SPEC-OWN|SM-MONO-SPEC-CROSS)
       cp -r "$FXOUT/casedesk" "$w/casedesk"
       mkdir -p "$w/AI-SDD/services"
       printf '%s\n' '# Слепок соседних сервисов. Этот файл ведёт человек.' 'services:' '  - name: casedesk' '    path: ../casedesk' '    type: backend' > "$w/AI-SDD/services/manifest.yaml"

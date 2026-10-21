@@ -24,7 +24,13 @@
 # первого, строки `- ` и `— ` всех без повторов; строка в выводе называет причину.
 # У частей есть блоки в секции, которой в каркасе головы нет или в ней нет метки, — отказ с именем
 # виновного: молча блоки не выбрасываются. Секцию, которую пишет голова («Зависит от», «Роли и доступ»,
-# «Бизнес-правила»), у части отбрасывает со строкой в выводе.
+# «Бизнес-правила»), у части отбрасывает со строкой в выводе. Метка `<!-- части -->` в «Зависит от» у головы —
+# строки частей сливаются по имени: первая остаётся, остальные — строкой в выводе.
+# Строки-метки «Событий» (`- тело:`, `- ключ:`, `- когда:` …) у дубля: метки, которой у владельца нет, —
+# дописываются; «не определено» владельца заменяется значением другой части. Строки привязки (`доступ:`,
+# `меняет:`, `шлёт:`) — в блоке, хвост « — файл» снимается, `меняет: нет` и `шлёт: нет` в карточку не идут.
+# В описях частей есть строки свода (`доступ:`, `меняет:`, `шлёт:`, `перечисление:`) — в конце svod.sh: свод
+# в `<папка частей>/svod/`, строка `- когда:` у «публикует» дописывается в черновик.
 set -u
 DIR="${1:?папка частей}"; S="${2:?число частей}"; DATE="${3:?дата}"; OUT="${4:?черновик}"; OPIS="${5:?опись}"
 export LC_ALL=C
@@ -76,7 +82,7 @@ awk -v nokeyf="$TMP/nokey" -v tailf="$TMP/tails" "$K_AWK"'
     return ""
   }
   function header(sec, k,   d) {
-    if (sec ~ /^События/ && k ~ /^(публикует|потребляет) /) { d = k; sub(/ .*/, "", d); return "### " d " `" substr(k, length(d) + 2) "`" }
+    if (sec ~ /^События/ && k ~ /^(публикует|потребляет|транспорт) /) { d = k; sub(/ .*/, "", d); return "### " d " `" substr(k, length(d) + 2) "`" }
     return "### `" k "`"
   }
   function flush() {
@@ -111,8 +117,9 @@ awk -v nokeyf="$TMP/nokey" -v tailf="$TMP/tails" "$K_AWK"'
   key != "" {
     if (tail != "" && $0 !~ /^[ \t]*$/) { if ($0 ~ /^(- |— |сущности:)/) txt = txt "\001" tail; tail = "" }
     l = $0; if (sec ~ /^Публичный контракт/) sub(/^- сущности:/, "сущности:", l)
+    if (l ~ /^(меняет|шлёт):[ \t]*нет[ \t.]*$/) next   # «нет» живёт в описи, в карточке строки нет
     # Хвост « — <файл>[ + <файл>]» у строки факта — источник из описи, в карточке ему не место: факт остаётся.
-    if (kcls(sec) != "" && l ~ /^(- |— )/ && match(l, / — `?[A-Za-z0-9_.\/-]+\.(java|kts?|tsx?|jsx?|mjs|py|go|rb|php|cs|ya?ml|json|xml|sql|properties|graphqls?|proto)`?( \+ `?[A-Za-z0-9_.\/-]+`?)*[ \t]*$/)) {
+    if (kcls(sec) != "" && l ~ /^(- |— |доступ:|меняет:|шлёт:)/ && match(l, / — `?[A-Za-z0-9_.\/-]+\.(java|kts?|tsx?|jsx?|mjs|py|go|rb|php|cs|ya?ml|json|xml|sql|properties|graphqls?|proto)`?( \+ `?[A-Za-z0-9_.\/-]+`?)*[ \t]*$/)) {
       l = substr(l, 1, RSTART - 1); print sec ": " key " (часть " pn ")" > tailf
     }
     txt = txt "\001" l; next
@@ -256,15 +263,25 @@ CHECK_OWNER_PLAN="$PLAN" awk -F'\t' -v srcf="$TMP/src" -v S="$S" -v os="$(uname 
       else if (ni == 0) { why = "владелец по плану —"; for (o in OW) why = why " " sprintf("%02d", o); why = why ", блока у него нет" }
       delete have; npre = ndash = nsem = 0
       if (why == "") {
-        delete known; delete OU; delete XD; delete XS; nx = nxs = 0
+        delete known; delete OU; delete XD; delete XS; delete oslot; nx = nxs = 0
         om = units(blk[ob], U)
-        for (j = 1; j <= om; j++) { have[U[j]] = 1; OU[j] = U[j]; if (U[j] ~ /^- / && psec ~ /^Владеет данными/) { c = fnames(U[j]); for (q = 1; q <= c; q++) known[FN[q]] = 1 } }
+        for (j = 1; j <= om; j++) { have[U[j]] = 1; OU[j] = U[j]; if (U[j] ~ /^- / && psec ~ /^Владеет данными/) { c = fnames(U[j]); for (q = 1; q <= c; q++) known[FN[q]] = 1 }
+          if (psec ~ /^События/ && U[j] ~ slotre) { lb = U[j]; sub(/^- /, "", lb); sub(/:.*/, "", lb); oslot[lb] = j } }
         nd = 0; na = 0; who = ""
         for (i = 1; i <= nb; i++) if (i != ob) {
           who = who (who == "" ? "" : ", ") bpn[i]; m = units(blk[i], U)
           for (j = 1; j <= m; j++) {
             u = U[j]; if (u in have) continue
             if (u ~ /^— /) { have[u] = 1; XS[++nxs] = u; continue }
+            # Строка-метка «Событий» другой части: у владельца метки нет — дописывается; у владельца
+            # «не определено» — заменяется. Иначе отбрасывается, как любая строка «- ».
+            if (psec ~ /^События/ && u ~ slotre) {
+              lb = u; sub(/^- /, "", lb); sub(/:.*/, "", lb); have[u] = 1
+              if (!(lb in oslot)) { XD[++nx] = u; oslot[lb] = 0; na++ }
+              else if (oslot[lb] > 0 && OU[oslot[lb]] ~ /^- [^:]+:[ \t]*не определено/ && u !~ /^- [^:]+:[ \t]*не определено/) { OU[oslot[lb]] = u; na++ }
+              else nd++
+              continue
+            }
             if (u !~ /^- /) continue
             c = (psec ~ /^Владеет данными/) ? fnames(u) : 0; keep = ""; nk = 0
             for (q = 1; q <= c; q++) if (!(FN[q] in known)) { keep = keep (nk++ ? ", " : "") IT[q]; known[FN[q]] = 1 }
@@ -279,7 +296,7 @@ CHECK_OWNER_PLAN="$PLAN" awk -F'\t' -v srcf="$TMP/src" -v S="$S" -v os="$(uname 
         for (j = 1; j <= nx; j++) s = s "\001" XD[j]
         for (j = 1; j <= om; j++) if (OU[j] ~ /^— /) s = s "\001" OU[j]
         for (j = 1; j <= nxs; j++) s = s "\001" XS[j]
-        print psec ": " pk " — блок части " bpn[ob] " (владелец по плану)" (na ? "; новых полей от " who " — строк " na : "") "; у " who " строк «- » отброшено " nd > rep
+        print psec ": " pk " — блок части " bpn[ob] " (владелец по плану)" (na ? "; новых " (psec ~ /^События/ ? "строк-меток" : "полей") " от " who " — строк " na : "") "; у " who " строк «- » отброшено " nd > rep
         btxt = s
       } else {
         s = blk[1]; sub(/\001.*/, "", s); ent = 0
@@ -295,6 +312,7 @@ CHECK_OWNER_PLAN="$PLAN" awk -F'\t' -v srcf="$TMP/src" -v S="$S" -v os="$(uname 
     pk = ""
   }
   BEGIN {
+    slotre = "^- (тело|ключ|когда|гарантия|не шлётся|читает|группа|подтверждение|повтор|ошибка):"
     while ((getline l < srcf) > 0) { split(l, x, "\t"); if (!((x[1] SUBSEP x[2]) in src)) src[x[1], x[2]] = x[3] }
     plan = ENVIRON["CHECK_OWNER_PLAN"]; planok = 0; maxp = 0
     if (plan != "") while ((getline l < plan) > 0) {
@@ -309,6 +327,8 @@ CHECK_OWNER_PLAN="$PLAN" awk -F'\t' -v srcf="$TMP/src" -v S="$S" -v os="$(uname 
     if (t == "P") { ph[sec] = ph[sec] (ph[sec] == "" ? "" : "\001") txt; next }
     if (t == pt && sec == psec && k == pk) {
       if (t == "B") { blk[++nb] = txt; bpn[nb] = $6 }
+      # строка «Зависит от» того же имени у другой части — первая остаётся, остальные — в вывод
+      else if (t == "R" && sec ~ /^Зависит от/ && txt != btxt) print sec ": " k " — строка части " $6 " отброшена, оставлена строка части " bpn[1] > rep
       next
     }
     out(); pt = t; psec = sec; pk = k; btxt = txt; nb = 1; blk[1] = txt; bpn[1] = $6
@@ -378,6 +398,14 @@ awk '
   }
 ' $OF $POPIS > "$OPIS"
 
+# 5. Свод сквозных фактов — svod.sh в папку частей `svod/`, `- когда:` дописывается в черновик. Только если
+# в описях частей есть строки свода (`доступ:`, `меняет:`, `шлёт:`, `перечисление:`): иначе сводить нечего.
+SVOD_SH="$(dirname "$0")/svod.sh"
+# shellcheck disable=SC2086
+if [ -f "$SVOD_SH" ] && cat $POPIS | grep -q -E '^([ 	]+(доступ|меняет|шлёт):|перечисление:)'; then
+  SVOD_OUT="$(bash "$SVOD_SH" "$OPIS" "$OUT" "$DIR/svod" "${PLAN:-}" 2>&1)" || fail "свод не собрался: $SVOD_OUT"
+fi
+
 echo "собрано: $OUT"
 awk '/^## /{s=$0} /^### /{n[s]++} END{for (k in n) printf "  %s — блоков %d\n", k, n[k]}' "$OUT" | sort
 [ -s "$TMP/dups" ] && { echo "дубли ключей склеены:"; sed 's/^/  /' "$TMP/dups"; }
@@ -386,3 +414,4 @@ awk '/^## /{s=$0} /^### /{n[s]++} END{for (k in n) printf "  %s — блоков
 [ -s "$TMP/tails" ] && echo "хвост « — файл» снят у строк фактов: $(wc -l < "$TMP/tails" | tr -d ' ') — источник ключа живёт в описи"
 grep '^DROP	' "$TMP/unplaced" | while IFS="$(printf '\t')" read -r _ s w; do echo "отброшено: секция «$s» у частей $w — её пишет голова"; done
 echo "опись: $OPIS ($(grep -c ' — ' "$OPIS") строк с источником)"
+if [ -n "${SVOD_OUT:-}" ]; then echo "свод:"; printf '%s\n' "$SVOD_OUT" | sed 's/^/  /'; fi

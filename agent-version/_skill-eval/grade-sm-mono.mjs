@@ -44,6 +44,24 @@ const FIXT = {
   'SM-MONO-SPEC-BIG': { svc: 'casedesk', dir: 'SM-MONO-SPEC', out: join('out', 'big-spec'), variant: '--big-spec', key: 'big-spec-key.tsv', expect: { contract: 218, entities: 60, jobs: 10, topics: 12 } },
   // make.sh --owners: ручки JAX-RS без пометок, общие сущности у ручек двух модулей, поля из базового класса
   'SM-MONO-SPEC-OWN': { svc: 'casedesk', dir: 'SM-MONO-SPEC', out: join('out', 'owners'), variant: '--owners', shared: ['InspectorEntity', 'RegionEntity', 'OfficeEntity'], expect: { contract: 156, entities: 66, jobs: 10, topics: 12 } },
+  // make.sh --crosscut: роли, переходы и отправки в местах использования; правда сквозных фактов — ниже, по разделу 6 make.sh
+  'SM-MONO-SPEC-CROSS': {
+    svc: 'casedesk', dir: 'SM-MONO-SPEC', out: join('out', 'crosscut'), variant: '--crosscut', expect: { contract: 155, entities: 64, jobs: 12, topics: 15 },
+    cross: {
+      roles: ['PLANNER', 'INSPECTOR', 'SUPERVISOR', 'ADMIN', 'LEAD'],
+      access: {
+        'POST /api/inspections': ['PLANNER'], 'POST /api/inspections/{id}/start': ['INSPECTOR'],
+        'POST /api/inspections/{id}/pause': ['INSPECTOR', 'SUPERVISOR'], 'POST /api/inspections/{id}/cancel': ['SUPERVISOR'],
+        'POST /api/inspections/{id}/finish': ['LEAD|руковод'], 'GET /api/admin/inspections/stats': ['ADMIN'], 'GET /api/inspections/{id}': ['без проверки'],
+      },
+      state: { entity: 'InspectionEntity', values: ['PLANNED', 'STARTED', 'PAUSED', 'FINISHED', 'CANCELLED'] },
+      noBlock: ['InspectionHistoryEntity', 'InspectionMemberEntity'], refValues: ['LOW', 'HIGH'],
+      messages: ['kontrol.inspection.started.v1', 'kontrol.inspection.finished.v1', 'inspection-report'],
+      publish: ['kontrol.inspection.started.v1', 'kontrol.inspection.finished.v1'], consume: ['kontrol.inspection.halt.v1'],
+      when: { 'kontrol.inspection.started.v1': 'start', 'kontrol.inspection.finished.v1': 'finish' },
+      dep: 'registry-service', notDep: ['postgres', 'postgresql', 'kafka'],
+    },
+  },
 }
 const fxDir = (fx) => FIXT[fx].dir || fx
 const CLASSES = ['contract', 'entities', 'jobs', 'topics']
@@ -95,7 +113,8 @@ export function extractTruth (tree) {
     // REST
     const pm = head.match(/@RequestMapping\s*(?:\(([^)]*)\))?/)
     const prefix = pm ? annoPath(pm[1] ?? '') : ''
-    for (const m of body.matchAll(/@(Get|Post|Put|Patch|Delete)Mapping\b\s*(?:\(([^)]*)\))?/g)) {
+    // клиент к соседу (@FeignClient) — вызов наружу, а не ручка сервиса: в контракт не идёт
+    for (const m of (/@FeignClient\b/.test(head) ? [] : body.matchAll(/@(Get|Post|Put|Patch|Delete)Mapping\b\s*(?:\(([^)]*)\))?/g))) {
       const verb = m[1].toUpperCase(); const p = annoPath(m[2] ?? '')
       const nPre = prefix ? normPath(prefix) : ''; const nP = normPath(p || '/')
       const already = nPre && (nP === nPre || nP.startsWith(nPre + '/'))
@@ -217,6 +236,9 @@ function isBigTree (tree) {
 // дерево варианта --owners — по базовому классу аудита
 const OWN = 'SM-MONO-SPEC-OWN'
 const isOwnTree = (tree) => existsSync(join(tree, 'src', 'main', 'java', 'ru', 'kontrol', 'casedesk', 'v2', 'common', 'persistence', 'AuditedEntity.java'))
+// дерево варианта --crosscut — по сервису проверок на месте
+const CROSS = 'SM-MONO-SPEC-CROSS'
+const isCrossTree = (tree) => existsSync(join(tree, 'src', 'main', 'java', 'ru', 'kontrol', 'casedesk', 'v2', 'inspections', 'service', 'InspectionService.java'))
 
 function truthTree (fx, round) {
   const svc = FIXT[fx].svc
@@ -229,7 +251,7 @@ function truthTree (fx, round) {
   }
   // вариант SM-MONO-SPEC — по дереву: базе не годится дерево большой спеки, и наоборот; большой спеке
   // сначала песочница — out/ на её раунд подменяют и возвращают обычным
-  const fits = (t) => existsSync(join(t, 'src')) && (fx === BIG ? isBigTree(t) : fx === OWN ? isOwnTree(t) : fx === 'SM-MONO-SPEC' ? !isBigTree(t) && !isOwnTree(t) : true)
+  const fits = (t) => existsSync(join(t, 'src')) && (fx === BIG ? isBigTree(t) : fx === OWN ? isOwnTree(t) : fx === CROSS ? isCrossTree(t) : fx === 'SM-MONO-SPEC' ? !isBigTree(t) && !isOwnTree(t) && !isCrossTree(t) : true)
   return (fx === BIG ? [...sbx, ...own] : [...own, ...sbx]).find(fits) || null
 }
 
@@ -295,7 +317,8 @@ export function gradeCard (text, truth) {
   const heads = sectionHeads(text)
   const res = {}
   for (const c of CLASSES) {
-    const hs = heads[SECTION[c]] || []
+    // блок «транспорт» в «Событиях» — общая обвязка брокера (4.0.0), а не топик: в счёт ключей не идёт
+    const hs = (heads[SECTION[c]] || []).filter((h) => !(c === 'topics' && /^транспорт\b/.test(headCore(h))))
     const found = new Set(); const extras = []; const dups = []; const seenRaw = new Set(); const dirMismatch = []
     for (const h of hs) {
       const raw = headCore(h).toLowerCase()
@@ -405,6 +428,57 @@ export function gradeOwners (text, truth, res) {
   return { inh, jaxrs: { total: jx.length, found: jx.length - jxMiss.length, miss: jxMiss }, shared }
 }
 
+// ─── сквозные факты (вариант --crosscut): роли, доступ у ручек, переходы, сообщения, метки событий, соседи ───
+// Грейдится файл карточки. Роль — токен в первой колонке «Роли и доступ» (без бэктиков, `ROLE_` и области в
+// скобках, без учёта регистра); доступ — строка `доступ:` в блоке своей ручки содержит ожидаемое (через «|» —
+// любое из); значение состояния — токен в бэктиках в блоке сущности, и строка не «не определено»; сообщение —
+// заголовок `###` «Бизнес-правил» содержит токен; метки — строки `- <метка>:` в блоке «Событий».
+export function gradeCross (text, truth) {
+  const X = FIXT[truth.fx].cross
+  const low = (s) => s.toLowerCase()
+  const rows = (sec) => { const out = []; let inSec = false
+    for (const l of text.split('\n')) { if (/^## /.test(l)) { inSec = l.slice(3).trim() === sec; continue } if (inSec && /^\|/.test(l) && !/^\|[\s:|-]*$/.test(l)) out.push(l.split('|')[1].trim()) }
+    return out.slice(1) }   // первая строка — заголовок таблицы
+  const roleKeys = rows('Роли и доступ').map((c) => low(c.replace(/`/g, '').replace(/\s*\(.*$/, '').replace(/^role_/i, '').trim()))
+  const roles = { total: X.roles.length, found: X.roles.filter((r) => roleKeys.includes(low(r))).length, open: roleKeys.some((k) => /без входа/.test(k)), miss: X.roles.filter((r) => !roleKeys.includes(low(r))) }
+  const contract = sectionBlocks(text, SECTION.contract)
+  const keyOf = (h) => { const c = headCore(h); const m = c.match(/^(GET|POST|PUT|PATCH|DELETE)\s+(\S+)/i); return m ? restKey(m[1], m[2]) : low(c) }
+  const accessLine = (b) => (b.lines.find((l) => /^доступ:/.test(l)) || '')
+  const access = { total: 0, hit: 0, miss: [] }
+  for (const [k, want] of Object.entries(X.access)) {
+    access.total++
+    const kk = restKey(k.split(' ')[0], k.split(' ')[1]); const b = contract.find((x) => keyOf(x.head) === kk)
+    const line = b ? low(accessLine(b)) : ''
+    if (line && want.every((w) => w.split('|').some((alt) => line.includes(low(alt))))) access.hit++; else access.miss.push(`${k}${b ? (line ? ` («${line.slice(0, 60)}»)` : ' (строки нет)') : ' (блока нет)'}`)
+  }
+  const withAccess = contract.filter((b) => accessLine(b)).length
+  const br = sectionBlocks(text, 'Бизнес-правила')
+  const ent = br.find((b) => { const h = headCore(b.head); return h === X.state.entity || h === X.state.entity.replace(/Entity$/, '') })
+  const states = { total: X.state.values.length, hit: 0, miss: [], block: !!ent }
+  for (const v of X.state.values) {
+    const l = ent ? ent.lines.find((x) => x.includes('`' + v + '`')) : null
+    if (l && !/не определено/.test(l)) states.hit++; else states.miss.push(v + (l ? ' (не определено)' : ''))
+  }
+  const extraBlocks = br.filter((b) => X.noBlock.some((n) => [n, n.replace(/Entity$/, '')].includes(headCore(b.head)))).map((b) => headCore(b.head))
+  const refInObj = br.filter((b) => !/^сообщение/.test(headCore(b.head))).some((b) => X.refValues.some((v) => b.lines.join('\n').includes('`' + v + '`')))
+  const heads = br.map((b) => b.head)
+  const messages = { total: X.messages.length, found: X.messages.filter((m) => heads.some((h) => h.includes(m))).length, miss: X.messages.filter((m) => !heads.some((h) => h.includes(m))) }
+  const ev = sectionBlocks(text, SECTION.topics)
+  const evBlock = (dir, t) => ev.find((b) => headCore(b.head) === `${dir} ${t}`)
+  const PUB = ['тело', 'ключ', 'когда', 'гарантия', 'не шлётся']; const CON = ['читает', 'группа', 'подтверждение', 'повтор', 'ошибка']
+  const labels = (b) => new Set(b.lines.map((l) => (l.match(/^- ([^`:]+):/) || [])[1]).filter(Boolean).map((s) => s.trim()))
+  const slots = { total: 0, hit: 0, miss: [] }
+  for (const [dir, list, need] of [['публикует', X.publish, PUB], ['потребляет', X.consume, CON]]) for (const t of list) {
+    const b = evBlock(dir, t); const got = b ? labels(b) : new Set()
+    for (const s of need) { slots.total++; if (got.has(s)) slots.hit++; else slots.miss.push(`${dir} ${t}: ${s}`) }
+  }
+  const when = { total: 0, hit: 0, miss: [] }
+  for (const [t, w] of Object.entries(X.when)) { when.total++; const b = evBlock('публикует', t); const l = b ? b.lines.find((x) => /^- когда:/.test(x)) || '' : ''; if (l.includes(w)) when.hit++; else when.miss.push(t) }
+  const deps = rows('Зависит от').map((c) => low(c.replace(/`/g, '')))
+  const dep = { has: deps.some((d) => d.includes(X.dep)), infra: deps.filter((d) => X.notDep.some((n) => d === n || d.startsWith(n + ' '))) }
+  return { roles, access, withAccess, contractBlocks: contract.length, states, extraBlocks, refInObj, messages, slots, when, dep }
+}
+
 // части: `.work/<сервис>/part-NN.md` песочницы, по возрастанию номера
 function partStats (dir, svc) {
   const d = join(dir, 'w', 'AI-SDD', 'services', '.work', svc)
@@ -470,7 +544,8 @@ export function gradeRun (dir, truth) {
   const parts = partStats(dir, truth.svc)
   const facts = cardOk && truth.key ? gradeFacts(card, truth.key) : null
   const owners = cardOk && truth.fx === OWN ? gradeOwners(card, truth, keys) : null
-  return { name, measured: true, card: cardOk, keys, st, cost, dirt, bg, b5, b6, b7, blocks, parts, facts, owners }
+  const cross = cardOk && truth.fx === CROSS ? gradeCross(card, truth) : null
+  return { name, measured: true, card: cardOk, keys, st, cost, dirt, bg, b5, b6, b7, blocks, parts, facts, owners, cross }
 }
 
 function detectFixture (round) {
@@ -479,9 +554,9 @@ function detectFixture (round) {
   // раннер вариантов не знает: большая спека — по дереву первой песочницы, без дерева — по _variant.txt
   const sb = join(round, 'sandbox')
   const tree = existsSync(sb) ? readdirSync(sb).sort().map((d) => join(sb, d, 'w', FIXT[fx].svc)).find((t) => existsSync(join(t, 'src'))) : null
-  if (tree) return isOwnTree(tree) ? OWN : isBigTree(tree) ? BIG : fx
+  if (tree) return isCrossTree(tree) ? CROSS : isOwnTree(tree) ? OWN : isBigTree(tree) ? BIG : fx
   const v = read(join(round, '_variant.txt'))
-  return v.includes(FIXT[OWN].variant) ? OWN : v.includes(FIXT[BIG].variant) ? BIG : fx
+  return v.includes(FIXT[CROSS].variant) ? CROSS : v.includes(FIXT[OWN].variant) ? OWN : v.includes(FIXT[BIG].variant) ? BIG : fx
 }
 function detectBase (round) {
   const j = join(round, '_mono.json')
@@ -546,6 +621,14 @@ function report (R) {
       L.push(`  поля из базового класса: ${o.inh.hit} из ${o.inh.total}, сущностей с полным перечнем ${o.inh.full} из ${o.inh.entities}${o.inh.miss.length ? `  · нет: ${o.inh.miss.slice(0, 8).join('; ')}${o.inh.miss.length > 8 ? ` …и ещё ${o.inh.miss.length - 8}` : ''}` : ''}`)
       L.push(`  общие сущности, блоков на каждую (нужно по одному): ${o.shared.map((s) => `${s.cls} ${s.blocks}`).join(', ')}`)
     }
+    if (r.cross) {
+      const x = r.cross; const nm = (a) => (a.length ? `  · нет: ${a.join('; ')}` : '')
+      L.push(`  роли против правды: ${x.roles.found} из ${x.roles.total}, строка «без входа» ${x.roles.open ? 'есть' : 'НЕТ'}${nm(x.roles.miss)}`)
+      L.push(`  доступ у ручек проверок: ${x.access.hit} из ${x.access.total}${nm(x.access.miss)}; строка «доступ:» у ${x.withAccess} из ${x.contractBlocks} блоков контракта`)
+      L.push(`  значения статуса с переходом: ${x.states.hit} из ${x.states.total}${x.states.block ? '' : ' (блока сущности нет)'}${nm(x.states.miss)}; блоков копий и связок: ${x.extraBlocks.length}${x.extraBlocks.length ? ' (' + x.extraBlocks.join(', ') + ')' : ''}; справочник в блоке объекта: ${x.refInObj ? 'ДА' : 'нет'}`)
+      L.push(`  сообщения: ${x.messages.found} из ${x.messages.total}${nm(x.messages.miss)}; метки событий: ${x.slots.hit} из ${x.slots.total}${nm(x.slots.miss)}; «когда» с входом: ${x.when.hit} из ${x.when.total}`)
+      L.push(`  «Зависит от»: сосед ${x.dep.has ? 'есть' : 'НЕТ'}, инфраструктура в секции: ${x.dep.infra.length ? x.dep.infra.join(', ') : 'нет'}`)
+    }
     L.push(`  Б-5 ${r.b5 ? 'да' : 'НЕТ'} · Б-6 ${r.b6 ? 'да' : 'НЕТ'}${r.b7 == null ? '' : ` · Б-7 ${r.b7 ? 'да' : 'НЕТ'}`} · цена $${r.cost.toFixed(2)}`)
   }
   L.push('')
@@ -565,6 +648,10 @@ function report (R) {
   }, '; ')}`)
   L.push(`GraphQL без типа: ${each((r) => r.blocks.untyped)}`)
   if (R.factsTotal != null) L.push(`факты спеки в блоках своих операций (анкер и код): ${each((r) => `${r.facts.hit}/${r.facts.total}`)}`)
+  if (R.fx === CROSS) {
+    L.push(`роли: ${each((r) => `${r.cross.roles.found}/${r.cross.roles.total}${r.cross.roles.open ? '+без входа' : ''}`)}; доступ у ручек: ${each((r) => `${r.cross.access.hit}/${r.cross.access.total}`)}`)
+    L.push(`значения статуса с переходом: ${each((r) => `${r.cross.states.hit}/${r.cross.states.total}`)}; сообщения: ${each((r) => `${r.cross.messages.found}/${r.cross.messages.total}`)}; метки событий: ${each((r) => `${r.cross.slots.hit}/${r.cross.slots.total}`)}`)
+  }
   if (R.fx === OWN) {
     L.push(`ручки без пометок разведчика (JAX-RS): ${each((r) => `${r.owners.jaxrs.found}/${r.owners.jaxrs.total}`)}`)
     L.push(`поля из базового класса: ${each((r) => `${r.owners.inh.hit}/${r.owners.inh.total}`)}`)

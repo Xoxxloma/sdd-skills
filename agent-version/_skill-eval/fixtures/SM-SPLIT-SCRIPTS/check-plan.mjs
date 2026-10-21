@@ -56,13 +56,17 @@ export function checkPlanTsv (out) {
   const itog = {}; const parts = {}; const files = []; const paths = []; const rest = []
   let bad = 0
   for (const r of rows) {
+    // классы вне веса (клиенты, перечисления) — сверка, а не нарезка: в итог и части не идут
+    if ((r[0] === 'итог' && r.length === 3) || (r[0] === 'файл' && r.length === 5)) { if (['клиенты', 'перечисления'].includes(r[r[0] === 'итог' ? 1 : 2])) continue }
+    if (r[0] === 'корень' && r.length === 2 && r[1]) continue                                                                          // корни — для svod.sh
+    if (r[0] === 'шаблон' && r.length === 4 && r[2].includes('<ИМЯ>')) continue                                                         // шаблон разведчика — для svod.sh
     if (r[0] === 'итог' && r.length === 3) itog[r[1]] = (itog[r[1]] ?? 0) + num(r[2])
     else if (r[0] === 'часть' && r.length === 4) (parts[r[1]] ??= {})[r[2]] = num(r[3])
     else if (r[0] === 'файл' && r.length === 5) files.push({ path: r[1], cl: r[2], n: num(r[3]), nn: r[4] })
     else if (r[0] === 'путь' && r.length === 4 && ['папки', 'файлы'].includes(r[2])) paths.push({ path: canon(r[1]), kind: r[2], nn: r[3] })
     else if (r[0] === 'остаток' && r.length === 4 && ['папка', 'файлы'].includes(r[2])) rest.push(`${r[1]}\t${r[2] === 'файлы' ? 'файлы прямо в' : 'папка'}\t${r[3]}`)
     else if (r[0] === 'операция' && r.length === 6 && /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/.test(r[1]) && r[2].startsWith('/')) continue   // спецификация по дереву — сверяет SM-CHECK
-    else if (r[0] === 'топик' && r.length === 3 && r[1]) continue                                                                     // конфиг по дереву — сверяет SM-CHECK
+    else if (r[0] === 'топик' && (r.length === 3 || r.length === 4) && r[1]) continue                                                                    // конфиг по дереву — сверяет SM-CHECK
     else bad++
   }
   // пункты остатка = список остатка в stdout, номер — S+1; список не напечатан — строк нет

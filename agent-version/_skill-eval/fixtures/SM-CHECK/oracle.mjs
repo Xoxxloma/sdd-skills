@@ -483,7 +483,7 @@ export function candidates(text, names) {
   const nm = names ?? [];
   const r = {};
 
-  r['бр.заголовки'] = inSec(isBR).filter((v) => v.s.startsWith('### ') && !/^`[^`]+`/.test(v.s.slice(4)) && !v.s.slice(4).startsWith('сообщение «') && !v.s.slice(4).startsWith('ограничение «')).map((v) => v.n);
+  r['бр.заголовки'] = inSec(isBR).filter((v) => v.s.startsWith('### ') && !/^`[^`]+`/.test(v.s.slice(4)) && !/^сообщение [«`]/.test(v.s.slice(4))).map((v) => v.n);
   r['бр.код'] = inSec(isBR).filter((v) => hasCode(v.s)).map((v) => v.n);
   const roles = dataRows((s) => s === 'Роли и доступ').map((v) => {
     const c = v.c0.replace(/`/g, '');

@@ -81,3 +81,22 @@
 Правда классов: контракт **156** (148 + 6 JAX-RS + 2 ручки модулей), сущности **66** (60 + 6), задачи **10**, топики
 **12**. Грейдер — `grade-sm-mono.mjs`, фикстура `SM-MONO-SPEC-OWN`: строки «ручки без пометок разведчика», «поля из
 базового класса», «общие сущности» и «повторов» у сущностей.
+
+## Вариант «сквозные факты»
+
+`bash make.sh <куда> --crosscut` (стенд держит дерево в `out/crosscut`) — роли, переходы и отправки лежат там, где
+их используют, а не там, где объявлены (раздел 6 `make.sh`):
+
+| Что | Где | Правда |
+|---|---|---|
+| статус проверки `InspectionStatus` — пять значений | ставят `v2/inspections/service/InspectionService.java` (PLANNED, STARTED, PAUSED, FINISHED, CANCELLED), `v2/scheduling/InspectionTimeoutJob.java` (CANCELLED), `v2/integration/consumer/InspectionHaltProcessor.java` (PAUSED) | блок `InspectionEntity` в «Бизнес-правилах», строка на каждое значение, ни одно не «не определено» |
+| роли на ручках | `@PreAuthorize` в `v2/inspections/web/InspectionController.java`: PLANNER, INSPECTOR, SUPERVISOR | строки ролей и `доступ:` у ручек |
+| правило по шаблону пути | `v2/config/SecurityConfig.java`: `/api/admin/**` → ADMIN | роль ADMIN у `GET /api/admin/inspections/stats` |
+| роль внутри объекта | `InspectorRole.LEAD` в `v2/inspections/service/InspectionAccess.java` — завершить может руководитель проверки | строка роли LEAD, `доступ:` у `POST /api/inspections/{id}/finish` |
+| ручка без проверки | `GET /api/inspections/{id}` | строка «без входа» |
+| отправки | общий отправитель `InspectionEventPublisher.publishStarted` → `kontrol.inspection.started.v1`; outbox → `OutboxRelayJob` → `kontrol.inspection.finished.v1`; письмо `inspection-report` | блок-сообщение на каждую; метки у блоков «публикует» |
+| копия статуса и справочник | `InspectionHistoryEntity.status` (переписывается из проверки), `Urgency` (LOW, HIGH) | блоков в «Бизнес-правилах» нет |
+| клиент к соседу | `v2/inspections/client/RegistryClient.java` — `registry-service` | строка «Зависит от»; БД и брокера там нет |
+
+Правда классов: контракт **155** (148 + 7), сущности **64** (60 + 4), задачи **12** (10 + 2), топики **15** (12 + 3).
+Грейдер — `grade-sm-mono.mjs`, фикстура `SM-MONO-SPEC-CROSS`.

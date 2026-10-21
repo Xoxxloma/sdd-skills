@@ -16,7 +16,9 @@
 # Правда: контракт 148 (120 базы + 28 реализованных операций спецификации), сущности 60, задачи 10,
 # топики 12. База собирается генератором SM-MONO-DGS как есть.
 #
-# Вызов:  ./make.sh <куда> [--with-client | --big-spec | --owners] → <куда>/casedesk/
+# Вызов:  ./make.sh <куда> [--with-client | --big-spec | --owners | --crosscut] → <куда>/casedesk/
+# --crosscut: сквозные факты — роли, переходы и отправки в местах использования (раздел 6). Правда: контракт 155,
+#   сущности 64, задачи 12, топики 15; ключ сквозных фактов — в grade-sm-mono.mjs (SM-MONO-SPEC-CROSS).
 # --owners: ручки JAX-RS в папках без пометок, общие сущности у ручек двух модулей, поля из базового
 #   класса — раздел 5 ниже. Правда: контракт 156, сущности 66, задачи 10, топики 12.
 # --with-client: рядом лежит спека соседа с тем же operationId и клиентским генератором java.
@@ -28,7 +30,7 @@
 set -eu
 OUT="${1:-./out}"
 VARIANT="${2:-}"
-case "$VARIANT" in ''|--with-client|--big-spec|--owners) ;; *) echo "неизвестный вариант: $VARIANT" >&2; exit 2 ;; esac
+case "$VARIANT" in ''|--with-client|--big-spec|--owners|--crosscut) ;; *) echo "неизвестный вариант: $VARIANT" >&2; exit 2 ;; esac
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE="$HERE/../SM-MONO-DGS/make.sh"
 [ -f "$BASE" ] || { echo "нет генератора базы: $BASE" >&2; exit 1; }
@@ -615,6 +617,607 @@ public class FindingRegionController {
 }
 EOF
   awk '{ print } /<dependencies>/ && !done { print "    <dependency>"; print "      <groupId>org.springframework.boot</groupId>"; print "      <artifactId>spring-boot-starter-jersey</artifactId>"; print "    </dependency>"; done = 1 }' "$R/pom.xml" > "$R/pom.xml.tmp" && mv "$R/pom.xml.tmp" "$R/pom.xml"
+fi
+
+# --- 6. сквозные факты (--crosscut): роли, переходы и отправки лежат там, где их используют ----------
+#   Модуль «проверки на месте» (`v2/inspections`) и его следы в чужих пакетах:
+#   а) статус `InspectionStatus` (PLANNED, STARTED, PAUSED, FINISHED, CANCELLED) ставят сервис модуля,
+#      задача `v2/scheduling` (PAUSED → CANCELLED) и потребитель `v2/integration` (STARTED → PAUSED);
+#   б) роли: `@PreAuthorize` на ручках (PLANNER, INSPECTOR, SUPERVISOR), правило по шаблону пути
+#      `/api/admin/**` → ADMIN в `v2/config/SecurityConfig`, проверка «руководитель проверки» (роль
+#      участника `InspectorRole.LEAD`) в сервисном слое; одна ручка без проверки;
+#   в) отправки: событие «проверка начата» — общим отправителем `v2/integration/producer`; «проверка
+#      завершена» — строкой outbox, рассылает задача `v2/outbox`; письмо по шаблону `inspection-report`;
+#   г) копия статуса в журнале `InspectionHistoryEntity` (без переходов), справочник `Urgency` (имя без
+#      суффикса, без переходов), клиент к соседу `registry-service` (Feign), БД и брокер — не соседи.
+#   Правда: контракт 155 (148 + 7), сущности 64 (60 + 4), задачи 12 (10 + 2), топики 15 (12 + 3).
+if [ "$VARIANT" = --crosscut ]; then
+  P="ru.kontrol.casedesk.v2"
+  jfile() { mkdir -p "$(dirname "$1")"; cat > "$1"; }
+  I="$J/v2/inspections"
+  jfile "$I/model/InspectionStatus.java" <<EOF
+package $P.inspections.model;
+
+/** Ход проверки на месте. */
+public enum InspectionStatus {
+  PLANNED, STARTED, PAUSED, FINISHED, CANCELLED
+}
+EOF
+  jfile "$I/model/Urgency.java" <<EOF
+package $P.inspections.model;
+
+/** Срочность проверки — для сортировки списка. */
+public enum Urgency { LOW, HIGH }
+EOF
+  jfile "$I/model/InspectorRole.java" <<EOF
+package $P.inspections.model;
+
+/** Роль инспектора в составе конкретной проверки. */
+public enum InspectorRole {
+  LEAD,
+  MEMBER,
+  OBSERVER
+}
+EOF
+  jfile "$I/model/entity/InspectionEntity.java" <<EOF
+package $P.inspections.model.entity;
+
+import java.time.OffsetDateTime;
+import javax.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import $P.inspections.model.InspectionStatus;
+import $P.inspections.model.Urgency;
+
+@Getter
+@Setter
+@Entity
+@Table(name = "cd_inspection", schema = "casedesk")
+public class InspectionEntity {
+
+  @Id
+  @GeneratedValue
+  private Long id;
+
+  @Column(name = "title", nullable = false)
+  private String title;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "status", nullable = false)
+  private InspectionStatus status;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "urgency")
+  private Urgency urgency;
+
+  @Column(name = "started_at")
+  private OffsetDateTime startedAt;
+}
+EOF
+  jfile "$I/model/entity/InspectionMemberEntity.java" <<EOF
+package $P.inspections.model.entity;
+
+import javax.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import $P.inspections.model.InspectorRole;
+
+@Getter
+@Setter
+@Entity
+@Table(name = "cd_inspection_member", schema = "casedesk")
+public class InspectionMemberEntity {
+
+  @Id
+  @GeneratedValue
+  private Long id;
+
+  @Column(name = "inspection_id", nullable = false)
+  private Long inspectionId;
+
+  @Column(name = "login", nullable = false)
+  private String login;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "role", nullable = false)
+  private InspectorRole role;
+}
+EOF
+  jfile "$I/model/entity/InspectionHistoryEntity.java" <<EOF
+package $P.inspections.model.entity;
+
+import java.time.OffsetDateTime;
+import javax.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import $P.inspections.model.InspectionStatus;
+
+/** Журнал смены статусов: статус переписывается из проверки как есть. */
+@Getter
+@Setter
+@Entity
+@Table(name = "cd_inspection_history", schema = "casedesk")
+public class InspectionHistoryEntity {
+
+  @Id
+  @GeneratedValue
+  private Long id;
+
+  @Column(name = "inspection_id", nullable = false)
+  private Long inspectionId;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "status", nullable = false)
+  private InspectionStatus status;
+
+  @Column(name = "changed_at", nullable = false)
+  private OffsetDateTime changedAt;
+}
+EOF
+  for e in Inspection InspectionMember InspectionHistory; do
+    jfile "$I/repository/${e}Repository.java" <<EOF
+package $P.inspections.repository;
+
+import java.util.List;
+import org.springframework.data.jpa.repository.JpaRepository;
+import $P.inspections.model.entity.${e}Entity;
+
+public interface ${e}Repository extends JpaRepository<${e}Entity, Long> {
+
+  List<${e}Entity> findAllByOrderByIdDesc();
+}
+EOF
+  done
+  jfile "$I/service/InspectionAccess.java" <<EOF
+package $P.inspections.service;
+
+import org.springframework.stereotype.Component;
+import $P.inspections.model.InspectorRole;
+import $P.inspections.repository.InspectionMemberRepository;
+
+/** Кто в составе проверки может её завершить. */
+@Component
+public class InspectionAccess {
+
+  private final InspectionMemberRepository members;
+
+  public InspectionAccess(InspectionMemberRepository members) {
+    this.members = members;
+  }
+
+  public boolean isLead(String login, Long inspectionId) {
+    return members.findAll().stream()
+        .anyMatch(m -> m.getInspectionId().equals(inspectionId) && m.getLogin().equals(login) && m.getRole() == InspectorRole.LEAD);
+  }
+}
+EOF
+  jfile "$I/service/InspectionService.java" <<EOF
+package $P.inspections.service;
+
+import java.time.OffsetDateTime;
+import java.util.Map;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import $P.integration.producer.InspectionEventPublisher;
+import $P.inspections.model.InspectionStatus;
+import $P.inspections.model.Urgency;
+import $P.inspections.model.entity.InspectionEntity;
+import $P.inspections.model.entity.InspectionHistoryEntity;
+import $P.inspections.repository.InspectionHistoryRepository;
+import $P.inspections.repository.InspectionRepository;
+import $P.notifications.MailSender;
+import $P.outbox.model.OutboxRecordEntity;
+import $P.outbox.repository.OutboxRecordRepository;
+
+@Service
+public class InspectionService {
+
+  private final InspectionRepository inspections;
+  private final InspectionHistoryRepository history;
+  private final InspectionAccess access;
+  private final InspectionEventPublisher events;
+  private final OutboxRecordRepository outbox;
+  private final MailSender mail;
+
+  public InspectionService(InspectionRepository inspections, InspectionHistoryRepository history, InspectionAccess access,
+      InspectionEventPublisher events, OutboxRecordRepository outbox, MailSender mail) {
+    this.inspections = inspections;
+    this.history = history;
+    this.access = access;
+    this.events = events;
+    this.outbox = outbox;
+    this.mail = mail;
+  }
+
+  @Transactional
+  public InspectionEntity create(String title, Urgency urgency) {
+    InspectionEntity e = new InspectionEntity();
+    e.setTitle(title);
+    e.setUrgency(urgency);
+    e.setStatus(InspectionStatus.PLANNED);
+    return record(inspections.save(e));
+  }
+
+  @Transactional
+  public InspectionEntity start(Long id) {
+    InspectionEntity e = inspections.findById(id).orElseThrow();
+    if (e.getStatus() != InspectionStatus.PLANNED && e.getStatus() != InspectionStatus.PAUSED) {
+      throw new IllegalStateException("начать можно только запланированную или приостановленную проверку");
+    }
+    e.setStatus(InspectionStatus.STARTED);
+    e.setStartedAt(OffsetDateTime.now());
+    events.publishStarted(e);
+    return record(e);
+  }
+
+  @Transactional
+  public InspectionEntity pause(Long id) {
+    InspectionEntity e = inspections.findById(id).orElseThrow();
+    e.setStatus(InspectionStatus.PAUSED);
+    return record(e);
+  }
+
+  @Transactional
+  public InspectionEntity finish(Long id, String login) {
+    if (!access.isLead(login, id)) {
+      throw new AccessDeniedException("завершить проверку может только её руководитель");
+    }
+    InspectionEntity e = inspections.findById(id).orElseThrow();
+    e.setStatus(InspectionStatus.FINISHED);
+    outbox.save(new OutboxRecordEntity("inspection-finished", String.valueOf(e.getId()), e.getTitle()));
+    mail.sendTemplate("inspection-report", login, Map.of("title", e.getTitle()));
+    return record(e);
+  }
+
+  @Transactional
+  public InspectionEntity cancel(Long id) {
+    InspectionEntity e = inspections.findById(id).orElseThrow();
+    if (e.getStatus() == InspectionStatus.FINISHED) {
+      throw new IllegalStateException("завершённую проверку отменить нельзя");
+    }
+    e.setStatus(InspectionStatus.CANCELLED);
+    return record(e);
+  }
+
+  private InspectionEntity record(InspectionEntity e) {
+    InspectionHistoryEntity h = new InspectionHistoryEntity();
+    h.setInspectionId(e.getId());
+    h.setStatus(e.getStatus());
+    h.setChangedAt(OffsetDateTime.now());
+    history.save(h);
+    return e;
+  }
+}
+EOF
+  jfile "$I/web/InspectionController.java" <<EOF
+package $P.inspections.web;
+
+import java.security.Principal;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+import $P.inspections.model.Urgency;
+import $P.inspections.model.entity.InspectionEntity;
+import $P.inspections.repository.InspectionRepository;
+import $P.inspections.service.InspectionService;
+
+@RestController
+@RequestMapping("/api/inspections")
+public class InspectionController {
+
+  private final InspectionService service;
+  private final InspectionRepository inspections;
+
+  public InspectionController(InspectionService service, InspectionRepository inspections) {
+    this.service = service;
+    this.inspections = inspections;
+  }
+
+  /** Запланировать проверку. */
+  @PostMapping
+  @PreAuthorize("hasRole('PLANNER')")
+  public InspectionEntity create(@RequestParam String title, @RequestParam Urgency urgency) {
+    return service.create(title, urgency);
+  }
+
+  /** Карточка проверки — открыта всем. */
+  @GetMapping("/{id}")
+  public InspectionEntity get(@PathVariable Long id) {
+    return inspections.findById(id).orElseThrow();
+  }
+
+  /** Начать проверку. */
+  @PostMapping("/{id}/start")
+  @PreAuthorize("hasRole('INSPECTOR')")
+  public InspectionEntity start(@PathVariable Long id) {
+    return service.start(id);
+  }
+
+  /** Приостановить проверку. */
+  @PostMapping("/{id}/pause")
+  @PreAuthorize("hasAnyRole('INSPECTOR', 'SUPERVISOR')")
+  public InspectionEntity pause(@PathVariable Long id) {
+    return service.pause(id);
+  }
+
+  /** Завершить проверку. */
+  @PostMapping("/{id}/finish")
+  public InspectionEntity finish(@PathVariable Long id, Principal user) {
+    return service.finish(id, user.getName());
+  }
+
+  /** Отменить проверку. */
+  @PostMapping("/{id}/cancel")
+  @PreAuthorize("hasRole('SUPERVISOR')")
+  public InspectionEntity cancel(@PathVariable Long id) {
+    return service.cancel(id);
+  }
+}
+EOF
+  jfile "$I/web/InspectionAdminController.java" <<EOF
+package $P.inspections.web;
+
+import java.util.Map;
+import org.springframework.web.bind.annotation.*;
+import $P.inspections.repository.InspectionRepository;
+
+@RestController
+@RequestMapping("/api/admin/inspections")
+public class InspectionAdminController {
+
+  private final InspectionRepository inspections;
+
+  public InspectionAdminController(InspectionRepository inspections) {
+    this.inspections = inspections;
+  }
+
+  /** Сколько проверок всего. */
+  @GetMapping("/stats")
+  public Map<String, Long> stats() {
+    return Map.of("total", inspections.count());
+  }
+}
+EOF
+  jfile "$I/client/RegistryClient.java" <<EOF
+package $P.inspections.client;
+
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
+/** Реестр лиц: ФИО и организация инспектора по логину. */
+@FeignClient(name = "registry-service", url = "\${clients.registry.url}")
+public interface RegistryClient {
+
+  @GetMapping("/persons/{login}")
+  String person(@PathVariable("login") String login);
+}
+EOF
+  jfile "$J/v2/config/SecurityConfig.java" <<EOF
+package $P.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration
+@EnableMethodSecurity
+public class SecurityConfig {
+
+  @Bean
+  public SecurityFilterChain chain(HttpSecurity http) throws Exception {
+    http.authorizeHttpRequests(a -> a
+        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+        .anyRequest().permitAll());
+    return http.build();
+  }
+}
+EOF
+  jfile "$J/v2/integration/producer/InspectionEventPublisher.java" <<EOF
+package $P.integration.producer;
+
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+import reactor.kafka.sender.KafkaSender;
+import reactor.kafka.sender.SenderRecord;
+import $P.integration.config.KafkaTopicsProperties;
+import $P.inspections.model.entity.InspectionEntity;
+
+/** Отправитель событий о проверках. Ключ сообщения — номер проверки. */
+@Component
+public class InspectionEventPublisher {
+
+  private final KafkaSender<String, String> sender;
+  private final String startedTopic;
+
+  public InspectionEventPublisher(KafkaSender<String, String> sender, KafkaTopicsProperties props) {
+    this.sender = sender;
+    this.startedTopic = props.producer("inspection-started").getTopic();
+  }
+
+  public void publishStarted(InspectionEntity e) {
+    String body = "{\"inspectionId\":" + e.getId() + ",\"title\":\"" + e.getTitle() + "\",\"startedAt\":\"" + e.getStartedAt() + "\"}";
+    sender.send(Mono.just(SenderRecord.create(new ProducerRecord<>(startedTopic, String.valueOf(e.getId()), body), e.getId()))).subscribe();
+  }
+}
+EOF
+  jfile "$J/v2/integration/consumer/InspectionHaltProcessor.java" <<EOF
+package $P.integration.consumer;
+
+import org.springframework.stereotype.Component;
+import reactor.kafka.receiver.ReceiverOptions;
+import $P.integration.config.KafkaTopicsProperties;
+import $P.inspections.model.InspectionStatus;
+import $P.inspections.repository.InspectionRepository;
+
+/** Группа «inspection-halt»: внешний сигнал остановить идущую проверку. */
+@Component
+public class InspectionHaltProcessor extends BaseEventProcessor {
+
+  private final InspectionRepository inspections;
+
+  public InspectionHaltProcessor(KafkaTopicsProperties props, ReceiverOptions<String, String> base, InspectionRepository inspections) {
+    super(props.consumer("inspection-halt"), base);
+    this.inspections = inspections;
+  }
+
+  @Override
+  protected void handle(String topic, String payload) {
+    Long id = Long.valueOf(payload.trim());
+    inspections.findById(id).ifPresent(e -> {
+      if (e.getStatus() == InspectionStatus.STARTED) {
+        e.setStatus(InspectionStatus.PAUSED);
+        inspections.save(e);
+      }
+    });
+  }
+}
+EOF
+  jfile "$J/v2/scheduling/InspectionTimeoutJob.java" <<EOF
+package $P.scheduling;
+
+import java.time.OffsetDateTime;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import $P.inspections.model.InspectionStatus;
+import $P.inspections.repository.InspectionRepository;
+
+/** Приостановленная больше семи дней проверка отменяется. */
+@Component
+public class InspectionTimeoutJob {
+
+  private final InspectionRepository inspections;
+
+  public InspectionTimeoutJob(InspectionRepository inspections) {
+    this.inspections = inspections;
+  }
+
+  @Scheduled(cron = "0 0 2 * * *")
+  @Transactional
+  public void run() {
+    OffsetDateTime border = OffsetDateTime.now().minusDays(7);
+    inspections.findAll().stream()
+        .filter(e -> e.getStatus() == InspectionStatus.PAUSED && e.getStartedAt() != null && e.getStartedAt().isBefore(border))
+        .forEach(e -> e.setStatus(InspectionStatus.CANCELLED));
+  }
+}
+EOF
+  jfile "$J/v2/outbox/model/OutboxRecordEntity.java" <<EOF
+package $P.outbox.model;
+
+import java.time.OffsetDateTime;
+import javax.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/** Отложенная отправка: пишется в той же транзакции, что изменение, рассылается задачей. */
+@Getter
+@Setter
+@NoArgsConstructor
+@Entity
+@Table(name = "cd_outbox", schema = "casedesk")
+public class OutboxRecordEntity {
+
+  @Id
+  @GeneratedValue
+  private Long id;
+
+  @Column(name = "producer", nullable = false)
+  private String producer;
+
+  @Column(name = "message_key", nullable = false)
+  private String messageKey;
+
+  @Column(name = "payload", nullable = false)
+  private String payload;
+
+  @Column(name = "sent_at")
+  private OffsetDateTime sentAt;
+
+  public OutboxRecordEntity(String producer, String messageKey, String payload) {
+    this.producer = producer;
+    this.messageKey = messageKey;
+    this.payload = payload;
+  }
+}
+EOF
+  jfile "$J/v2/outbox/repository/OutboxRecordRepository.java" <<EOF
+package $P.outbox.repository;
+
+import java.util.List;
+import org.springframework.data.jpa.repository.JpaRepository;
+import $P.outbox.model.OutboxRecordEntity;
+
+public interface OutboxRecordRepository extends JpaRepository<OutboxRecordEntity, Long> {
+
+  List<OutboxRecordEntity> findTop100BySentAtIsNullOrderByIdAsc();
+}
+EOF
+  jfile "$J/v2/outbox/OutboxRelayJob.java" <<EOF
+package $P.outbox;
+
+import java.time.OffsetDateTime;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+import reactor.kafka.sender.KafkaSender;
+import reactor.kafka.sender.SenderRecord;
+import $P.integration.config.KafkaTopicsProperties;
+import $P.outbox.model.OutboxRecordEntity;
+import $P.outbox.repository.OutboxRecordRepository;
+
+/** Рассылка outbox: по сто строк раз в полминуты; строка помечается отправленной после ответа брокера. */
+@Component
+public class OutboxRelayJob {
+
+  private final OutboxRecordRepository outbox;
+  private final KafkaSender<String, String> sender;
+  private final KafkaTopicsProperties props;
+
+  public OutboxRelayJob(OutboxRecordRepository outbox, KafkaSender<String, String> sender, KafkaTopicsProperties props) {
+    this.outbox = outbox;
+    this.sender = sender;
+    this.props = props;
+  }
+
+  @Scheduled(fixedDelay = 30000)
+  public void run() {
+    for (OutboxRecordEntity r : outbox.findTop100BySentAtIsNullOrderByIdAsc()) {
+      String topic = props.producer(r.getProducer()).getTopic();
+      sender.send(Mono.just(SenderRecord.create(new ProducerRecord<>(topic, r.getMessageKey(), r.getPayload()), r.getId())))
+          .doOnComplete(() -> { r.setSentAt(OffsetDateTime.now()); outbox.save(r); })
+          .subscribe();
+    }
+  }
+}
+EOF
+  jfile "$J/v2/notifications/MailSender.java" <<EOF
+package $P.notifications;
+
+import java.util.Map;
+import org.springframework.stereotype.Component;
+
+/** Письма по шаблонам почтового шлюза. */
+@Component
+public class MailSender {
+
+  public void sendTemplate(String template, String login, Map<String, Object> params) {
+    // шлюз берёт адрес по логину; шаблон — имя письма в шлюзе
+  }
+}
+EOF
+  awk '
+    /^    producers:/ { print; inprod = 1; next }
+    inprod && /^logging:/ { print "      inspection-started:"; print "        topic: kontrol.inspection.started.v1"; print "      inspection-finished:"; print "        topic: kontrol.inspection.finished.v1"; inprod = 0 }
+    /^    consumers:/ { print; print "      inspection-halt:"; print "        group-id: casedesk-inspection"; print "        topics:"; print "          - kontrol.inspection.halt.v1"; next }
+    { print }
+    END { print "clients:"; print "  registry:"; print "    url: http://registry-service:8080" }' "$RES/application.yaml" > "$RES/application.yaml.tmp" && mv "$RES/application.yaml.tmp" "$RES/application.yaml"
 fi
 
 # --- числа по собранному дереву --------------------------------------------------------------

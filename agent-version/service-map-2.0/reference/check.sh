@@ -7,6 +7,9 @@
 #     «пометки файла ↔ ключи описи».
 #   CHECK_PARTS=<папка частей> — нарезанный сервис: гейт ещё и по каждой части, перечень добора по авторам.
 #   CHECK_PREFIX=<префикс> — общий префикс пути от разведчика: ключи REST без него — в перечень добора.
+#   CHECK_SVOD=<папка свода svod.sh> — сквозные факты (привязки, метки «Событий», места, свод против секций
+#     автора свода); у нарезанного по умолчанию `<папка частей>/svod`, если она есть. Свода нет — этих
+#     проверок нет.
 #
 # Печатает: состав черновика по секциям и ключи карточки по классам (для маркерного гейта); ключи
 # описи и строки без файла-источника; сверку «опись → черновик» поключево — справку и перечень
@@ -77,9 +80,12 @@ parse_card() {
   ' "$1"
 }
 
-# Ключи описи: «ключ<TAB>фактов<TAB>есть-файл<TAB>служебный». Ключ — строка без отступа с « — » (до него),
-# по шаблону, как у блока карточки (keys.awk); строки «состояние:/справочник:/сообщение:/ограничение:»
-# дают ключи «Бизнес-правил». Файл — и путём, и именем с номером строки (`name.ext:42`).
+# Ключи описи: «ключ<TAB>фактов<TAB>есть-файл<TAB>служебный<TAB>доступ<TAB>меняет<TAB>шлёт». Ключ — строка без
+# отступа с « — » (до него), по шаблону, как у блока карточки (keys.awk); строки
+# «состояние:/справочник:/сообщение:/ограничение:» дают ключи «Бизнес-правил», `зависит: <имя>` — строку
+# «Зависит от». Строки свода без отступа (`перечисление:`, `место:`, `правило доступа:`, `отправитель:`) —
+# не ключи: их сверяет svod.sh. Последние три поля — есть ли под ключом строки привязки. Файл — и путём, и
+# именем с номером строки (`name.ext:42`).
 parse_opis() {
   awk "$K_AWK"'
     function norm(s,   v) {
@@ -90,16 +96,18 @@ parse_opis() {
       if (s ~ /^(сообщение|ограничение) /) { gsub(/«|»/, "", s); gsub(/[ 	]+/, " ", s); sub(/[ 	]+$/, "", s) }
       return s
     }
-    function flush() { if (key != "") print key "\t" facts "\t" src "\t" svc; key = "" }
+    function flush() { if (key != "") print key "\t" facts "\t" src "\t" svc "\t" ba "\t" bm "\t" bs; key = "" }
     { sub(/\r$/, "") }
     /^[ \t]+/ {                                         # второй уровень
       if (key == "") next
       t = $0; sub(/^[ \t]+/, "", t)
       if (t ~ /^·/) facts++
       if (t ~ /^\(фактов нет/) svc = 1
+      if (t ~ /^доступ:/) ba = 1; if (t ~ /^меняет:/) bm = 1; if (t ~ /^шлёт:/) bs = 1
       next
     }
     /^(#|⟹|\(|>|-|```|<!--)/ || /^$/ { flush(); next }
+    /^(перечисление|место|правило доступа|отправитель):/ { flush(); next }
     {
       flush()
       line = $0; sub(/[ \t]+$/, "", line); p = index(line, " — ")
@@ -121,9 +129,9 @@ parse_opis() {
       } else if (head ~ /^ограничение:/) {
         h = head; sub(/^ограничение:[ ]*/, "", h); key = norm("ограничение " h)
       } else {
-        h = head; sub(/^(роль|Роль):[ ]*/, "", h); key = k_opis(h)   # «роль: OPERATOR» ↔ строка таблицы «OPERATOR»
+        h = head; sub(/^(роль|Роль|зависит):[ ]*/, "", h); key = k_opis(h)   # «роль: OPERATOR» ↔ строка таблицы «OPERATOR»
       }
-      facts = 0
+      facts = 0; ba = bm = bs = 0
     }
     END { flush() }
   ' "$1"
@@ -139,8 +147,8 @@ awk -F'\t' '
   FNR == NR { have[$1] = 1; next }
   { k = $1; b = bare(k); if (b != k && (b in have)) k = b
     if (!(k in f)) { order[++n] = k; f[k] = $2; s[k] = $3 } else if ($2 > f[k]) f[k] = $2
-    if ($4 == 1) v[k] = 1 }
-  END { for (i = 1; i <= n; i++) print order[i] "\t" f[order[i]] "\t" s[order[i]] "\t" (v[order[i]] + 0) }
+    if ($4 == 1) v[k] = 1; if ($5 == 1) ba[k] = 1; if ($6 == 1) bm[k] = 1; if ($7 == 1) bs[k] = 1 }
+  END { for (i = 1; i <= n; i++) { k = order[i]; print k "\t" f[k] "\t" s[k] "\t" (v[k] + 0) "\t" (ba[k] + 0) "\t" (bm[k] + 0) "\t" (bs[k] + 0) } }
 ' "$TMP/opis.raw" "$TMP/opis.raw" > "$TMP/opis"
 
 # Ключ блока «Бизнес-правил» в карточке приводится к ключу описи: `Имя` → «объект Имя»,
@@ -168,6 +176,13 @@ title() {  # title <вид пункта перечня добора> — заг�
     REST) echo 'пункт списка остатка без строки «> пройдено:» в описи — пройди пункт по брифу остатка и допиши строку описи `> пройдено: <пункт> — ключей N`' ;;
     RULES) echo 'строки «Бизнес-правил» описей частей, которых нет в секции — допиши по описям частей (`<описи частей>`) и коду: сущность — блоком, значение — строкой с токеном в бэктиках, имя сообщения — в бэктиках в строке его блока' ;;
     NOKEY) echo 'заголовок не сводится к ключу шаблона — запиши ключом: в «Событиях» направление и топик в бэктиках, у задачи и сущности имя как в коде; не ключ — убери блок из черновика и описи' ;;
+    BIND) echo 'вход без строк привязки — допиши под ключом описи по коду обработчика: у ручки `доступ:`, у ручки, потребителя и задачи `меняет:` и `шлёт:`; перехода или отправки нет — `меняет: нет`, `шлёт: нет`' ;;
+    SLOT) echo 'блок «Событий» без строки-метки — допиши строку по коду; факта в коде нет — `не определено: <где>`' ;;
+    ENUM) echo 'тип поля сущности объявлен перечислением, а строки «перечисление:» нет — допиши её по файлу объявления: `перечисление: <Тип> <V1> | <V2> — <файл>`' ;;
+    MESTO) echo 'значение перечисления или роли стоит в коде, а строки описи с этим файлом нет — открой строку и допиши под входом `меняет:`, `доступ:` или `шлёт:` либо строку `место: <Тип>.<ЗНАЧЕНИЕ> — <переход|проверка|отправка|чтение|сравнение> — <файл>:<строка>`' ;;
+    SENDER) echo 'публикуемый топик без отправки — найди, кто его шлёт: строка `шлёт:` у входа либо `отправитель: <метод> → <топик>` у общего отправителя' ;;
+    SVOD) echo 'строки свода, которых нет в секциях — допиши по `svod.md`: роль — строкой таблицы, значение — строкой с токеном в бэктиках в блоке сущности, отправка — блоком `сообщение`' ;;
+    INFRA) echo '«Зависит от» — инфраструктура из «Стека», а не сосед — убери строку из черновика и строку `зависит:` из описи' ;;
   esac
 }
 
@@ -202,6 +217,7 @@ awk -F'\t' '
 count_keys() {  # count_keys <разбор карточки> → строки «класс<TAB>число»
   awk -F'\t' '
     function nop(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
+    $1 == "топики" && $2 ~ /^транспорт / { next }    # общая обвязка брокера — не топик: маркерам не пара
     $1 ~ /^(контракт|сущности|задачи|топики|экраны)$/ { cl[++m] = $1; ky[m] = $2; have[$1 SUBSEP $2] = 1 }
     END {
       for (i = 1; i <= m; i++) {
@@ -288,7 +304,7 @@ if [ -n "${CHECK_PLAN:-}" ]; then
       BEGIN {
         while ((getline l < cardn) > 0) { split(l, a, "\t"); card[a[1]] = a[2] + 0 }
         while ((getline l < partn) > 0) { split(l, a, "\t"); pcard[a[1], a[2]] = a[3] + 0; haspart[a[1]] = 1 }
-        while ((getline l < dk) > 0) { split(l, a, "\t"); if (a[1] == "роли") role[a[2]] = 1 }
+        while ((getline l < dk) > 0) { split(l, a, "\t"); if (a[1] == "роли") role[a[2]] = 1; if (a[1] == "зависит") ndep++ }
       }
       function verdict(who, gw, c, g, e) {
         if (2 * g < e) { printf "маркеры %s%s: в карточке %d, пометок %d — НЕ ПРОЙДЕН: меньше половины\n", who, c, g, e; bad = bad (bad == "" ? "" : "; ") gw c " " g " из " e }
@@ -310,7 +326,7 @@ if [ -n "${CHECK_PLAN:-}" ]; then
       /^[ \t]/ || /^(#|⟹|\(|>|-|```|<!--)/ || /^$/ { next }
       {
         p = index($0, " — "); if (p == 0) next
-        h = substr($0, 1, p - 1); if (h ~ /^(состояние|справочник|сообщение|ограничение|роль|Роль):/) next
+        h = substr($0, 1, p - 1); if (h ~ /^(состояние|справочник|сообщение|ограничение|роль|Роль|перечисление|место|правило доступа|отправитель):/) next
         key = k_opis(h); if (key in role) next
         rest = substr($0, p + 5); gsub(/[+,;]/, " ", rest); n = split(rest, w, " ")
         for (i = 1; i <= n; i++) {
@@ -323,6 +339,8 @@ if [ -n "${CHECK_PLAN:-}" ]; then
       END {
         for (i = 1; i <= nc; i++) {
           c = cls[i]
+          # клиенты к соседям: один сосед — несколько клиентов, поэтому только справка; недобор ловит сверка по файлам
+          if (c == "клиенты") { printf "маркеры клиенты: строк «Зависит от» %d, пометок %d — справочно, не гейт\n", ndep, want[c]; continue }
           if (!(c in card)) { printf "маркеры %s: в карточке такого класса нет — сверки нет\n", c; continue }
           verdict("", "", c, card[c], want[c])
         }
@@ -417,8 +435,10 @@ printf 'блок у ключа «объявлено без реализации�
 # этом блоке; хоть одно имя отправки из строки `сообщение:` части («<кому>, <имена через запятую>» перед
 # файлом) — в секции.
 # Пропуск — добор головы.
+# Папка свода svod.sh (CHECK_SVOD; у нарезанного по умолчанию <папка частей>/svod) — ниже сквозные факты.
+SVD="${CHECK_SVOD:-}"; [ -z "$SVD" ] && [ -n "${CHECK_PARTS:-}" ] && [ -d "$CHECK_PARTS/svod" ] && SVD="$CHECK_PARTS/svod"
 : > "$TMP/RULES"
-if [ -n "${CHECK_PARTS:-}" ]; then
+if [ -n "${CHECK_PARTS:-}" ] && [ -z "$SVD" ]; then   # при своде правила пишет автор свода — сверка SVOD
   for o in "$CHECK_PARTS"/part-*.opis.md; do [ -f "$o" ] && { sed 's/\r$//' "$o"; echo; }; done > "$TMP/prules"
   awk '
     function tok(s) { gsub(/[`"«»]/, "", s); sub(/^[ \t]+/, "", s); sub(/[ \t.,;:]+$/, "", s); return s }
@@ -515,12 +535,73 @@ if [ "$BROKER" -gt 0 ] && [ "$NEV" -le 1 ] && [ ! -s "$TMP/TOPICS" ]; then
   printf 'брокер в «Стеке», а событий %d — слушатели и отправители не описаны\t%s\n' "$NEV" "$WHO_REST" > "$TMP/TOPICS"
 fi
 printf 'события против брокера и конфига — в добор: %d' "$(wc -l < "$TMP/TOPICS")"; [ -s "$TMP/TOPICS" ] && { printf ' — '; cut -f1 "$TMP/TOPICS"; } || echo
+# Сквозные факты — по своду svod.sh: папка свода CHECK_SVOD, у нарезанного по умолчанию `<папка частей>/svod`.
+# Свода нет — проверок ниже нет. Есть — пункты добора, запись они не останавливают:
+#  BIND — у входа описи нет строк привязки (ручка — `доступ:`, `меняет:`, `шлёт:`; потребитель и задача —
+#    `меняет:`, `шлёт:`; служебный — ничего) — автору ключа;
+#  SLOT — у блока «Событий» нет строки-метки (публикует: тело, ключ, когда, гарантия, не шлётся; потребляет:
+#    читает, группа, подтверждение, повтор, ошибка) — автору блока;
+#  ENUM, MESTO, SENDER — пункты svod.items: перечисление без строки и незакрытое место — хозяину файла
+#    (вне частей — остатку), публикуемый топик без отправки — автору блока;
+#  SVOD — секции автора свода против svod.keys: роль — строка таблицы, значение поля-состояния — токен в
+#    блоке сущности, токен отправки — блок `сообщение`; пока в секции заглушка `<!-- свод -->`, сверки нет;
+#  INFRA — строка «Зависит от», чьё имя стоит словом в «Стеке» (БД, брокер), — автору строки.
+for t in BIND SLOT SVOD SVF SENDER INFRA; do : > "$TMP/$t"; done; : > "$TMP/ENUM"; : > "$TMP/MESTO"
+if [ -n "$SVD" ] && [ -f "$SVD/svod.items" ]; then
+  echo "== СКВОЗНЫЕ ФАКТЫ (свод $SVD)"
+  awk -F'\t' '
+    function nop(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
+    FILENAME == ARGV[1] { if (!($2 in cl)) cl[$2] = $1; next }
+    $4 == 1 { next }
+    { k = $1; c = (k in cl) ? cl[k] : ((nop(k) in cl) ? cl[nop(k)] : ""); need = ""
+      if (c == "контракт") { if ($5 != 1) need = need ", доступ:"; if ($6 != 1) need = need ", меняет:"; if ($7 != 1) need = need ", шлёт:" }
+      else if ((c == "топики" && k ~ /^потребляет /) || c == "задачи") { if ($6 != 1) need = need ", меняет:"; if ($7 != 1) need = need ", шлёт:" }
+      if (need != "") print k " — нет строк " substr(need, 3) }' "$TMP/draft.k" "$TMP/opis" > "$TMP/BIND"
+  awk "$K_AWK"'
+    function done_(   n, i, R, miss) { if (key != "" && need != "") { miss = ""; n = split(need, R, "|"); for (i = 1; i <= n; i++) if (!(R[i] in got)) miss = miss ", " R[i] ":"; if (miss != "") print key " — нет строк " substr(miss, 3) }; key = ""; need = ""; delete got }
+    { sub(/\r$/, "") }
+    /^## / { done_(); ev = ($0 ~ /^## События/); next }
+    !ev { next }
+    /^### / { done_(); h = substr($0, 5); p = index(h, " — "); if (p > 0) h = substr(h, 1, p - 1); key = k_canon("топики", h)
+      need = (key ~ /^публикует /) ? "тело|ключ|когда|гарантия|не шлётся" : ((key ~ /^потребляет /) ? "читает|группа|подтверждение|повтор|ошибка" : ""); next }
+    key != "" && /^- [^`:]+:/ { s = substr($0, 3); sub(/:.*/, "", s); got[s] = 1 }
+    END { done_() }' "$DRAFT" > "$TMP/SLOT"
+  tr -d '\r' < "$SVD/svod.items" | awk -F'\t' '$1 == "ENUM" || $1 == "MESTO" { print $1 "\t" $2 }' > "$TMP/SVF"
+  awk -F'\t' '$1 == "ENUM" { print $2 }' "$TMP/SVF" > "$TMP/ENUM"; awk -F'\t' '$1 == "MESTO" { print $2 }' "$TMP/SVF" > "$TMP/MESTO"
+  tr -d '\r' < "$SVD/svod.items" | awk -F'\t' '$1 == "SENDER" { print $2 }' > "$TMP/SENDER"
+  if [ ! -f "$SVD/svod.keys" ]; then echo "ключей свода нет — сверки секций со сводом нет"
+  elif grep -q '^<!-- свод -->' "$DRAFT"; then echo "секции автора свода — заглушка: сверки со сводом нет"
+  else
+    tr -d '\r' < "$SVD/svod.keys" | awk -F'\t' -v dr="$DRAFT" '
+      BEGIN { while ((getline l < dr) > 0) { sub(/\r$/, "", l)
+          if (l ~ /^## /) { sec = l; bk = ""; continue }
+          if (sec ~ /^## Роли и доступ/ && l ~ /^\|/ && l !~ /^\|[ \t:|-]*$/) { split(l, c, "|"); r = c[2]; gsub(/`/, "", r); gsub(/^[ \t]+|[ \t]+$/, "", r); sub(/[ \t]*\(.*$/, "", r); role[r] = 1 }
+          if (sec ~ /^## Бизнес-правила/) {
+            if (l ~ /^### /) { h = substr(l, 5); p = index(h, " — "); if (p > 0) h = substr(h, 1, p - 1); gsub(/[`«»]/, "", h); gsub(/^[ \t]+|[ \t]+$/, "", h); bk = h; blk[bk] = 1; continue }
+            if (bk != "") body[bk] = body[bk] " " l } } }
+      $1 == "роль" { r = $2; sub(/[ \t]*\(.*$/, "", r); if (!(r in role)) print "роль " $2 " — нет строки в «Ролях и доступе»"; next }
+      $1 == "объект" { if (!($2 in blk)) { if (!($2 in nob)) { nob[$2] = 1; print "объект " $2 " — нет блока" }; next }
+                       if ($3 != "" && index(body[$2], "`" $3 "`") == 0) print "объект " $2 " — нет строки значения " $3; next }
+      $1 == "сообщение" { if (!(("сообщение " $2) in blk)) print "сообщение " $2 " — нет блока" }' > "$TMP/SVOD"
+  fi
+  awk -v dr="$DRAFT" 'BEGIN { while ((getline l < dr) > 0) { sub(/\r$/, "", l)
+      if (l ~ /^## /) { sec = l; continue }
+      if (sec ~ /^## Стек/ && l ~ /^\|/) { n = split(tolower(l), w, /[^a-z0-9]+/); for (i = 1; i <= n; i++) if (length(w[i]) > 2) st[w[i]] = 1 }
+      if (sec ~ /^## Зависит от/ && l ~ /^\|/ && l !~ /^\|[ \t:|-]*$/) { split(l, c, "|"); d = c[2]; gsub(/`/, "", d); gsub(/^[ \t]+|[ \t]+$/, "", d); if (d != "" && d != "—" && d !~ /Сервис или система/) dep[++nd] = d } }
+      for (i = 1; i <= nd; i++) if (tolower(dep[i]) in st) print dep[i] " — имя стоит в «Стеке»" }' > "$TMP/INFRA"
+  printf 'входов без строк привязки: %d' "$(wc -l < "$TMP/BIND")"; [ -s "$TMP/BIND" ] && { printf ' — '; list "$TMP/BIND"; } || echo
+  printf 'блоков «Событий» без строк-меток: %d' "$(wc -l < "$TMP/SLOT")"; [ -s "$TMP/SLOT" ] && { printf ' — '; list "$TMP/SLOT"; } || echo
+  printf 'перечислений без строки «перечисление:»: %d; мест без строки описи: %d; публикуемых топиков без отправки: %d\n' "$(wc -l < "$TMP/ENUM")" "$(wc -l < "$TMP/MESTO")" "$(wc -l < "$TMP/SENDER")"
+  printf 'свод против секций автора свода — нет в секциях: %d' "$(wc -l < "$TMP/SVOD")"; [ -s "$TMP/SVOD" ] && { printf ' — '; list "$TMP/SVOD"; } || echo
+  printf '«Зависит от» — инфраструктура из «Стека»: %d' "$(wc -l < "$TMP/INFRA")"; [ -s "$TMP/INFRA" ] && { printf ' — '; list "$TMP/INFRA"; } || echo
+fi
 grep -v -E '^(объект|сообщение|ограничение) ' "$TMP/MISSRC" > "$TMP/ADD"
 grep -v -E '^(объект|сообщение|ограничение) ' "$TMP/NOSRCPAIR" > "$TMP/NOSRC"
 printf 'перечень добора: ключ описи с источником без блока %d, ключ с блоком без источника %d, факт в описи — блок пуст %d, один ключ дважды %d\n' \
   "$(wc -l < "$TMP/ADD")" "$(wc -l < "$TMP/NOSRC")" "$(wc -l < "$TMP/EMPTY")" "$(wc -l < "$TMP/DUP")"
 if [ -n "${CHECK_LISTS:-}" ]; then
   L="ADD NOSRC EMPTY DUP nometh NOKEY DECL SPEC TOPICS"; [ -n "$PFX" ] && L="$L NOPFX"; [ -n "${CHECK_PLAN:-}" ] && L="$L MARKFILE"
+  [ -n "$SVD" ] && L="$L BIND SLOT ENUM MESTO SENDER INFRA"   # SVOD — в файл автора свода (ниже)
   { for t in $L; do echo "## $(title "$t")"; cut -f1 "$TMP/$t"; echo; done; } > "$CHECK_LISTS" && echo "перечень добора целиком: $CHECK_LISTS"
 fi
 printf 'опись по классам (класс — по паре в черновике): '
@@ -587,7 +668,7 @@ awk -v names="$TMP/mnames" -v man="$([ -s "$TMP/mnames" ] && echo "$MAN" || echo
     if (sec !~ /^Бизнес-правила/ && prevk != "" && k < prevk && !(sec in badord)) { badord[sec] = NR; ordn++ }
     prevk = k
     if (sec ~ /^Бизнес-правила/) {
-      if (line !~ /^### (`[^`]+`|сообщение «|ограничение «)/) add("br_hdr", line)
+      if (line !~ /^### (`[^`]+`|сообщение [«`])/) add("br_hdr", line)   # «ограничение» блоком не бывает
       inr = (line ~ /^### ограничение/); if (inr) { nr++; rh[nr] = line; rn[nr] = NR }
     }
     if (sec ~ /^Публичный (контракт|API)/ && tolower(key(line)) !~ /(health|metrics|ready|live|version|docs|swagger|openapi)/) { blk = line; blkn = NR }
@@ -667,6 +748,7 @@ fi
 { cat "$OPIS"; printf '\n'; if [ -n "${CHECK_PARTS:-}" ]; then
     for o in "$CHECK_PARTS"/part-*.opis.md "$CHECK_PARTS"/head.opis.md; do [ ! -f "$o" ] || { cat "$o"; printf '\n'; }; done
   fi; } | sed 's/\r$//' | awk '/^> пропущено частью: / { sub(/^> пропущено частью: /, ""); print }' | sort -u > "$TMP/MISSED"
+cat "$TMP/MISSED" "$TMP/ENUM" "$TMP/MESTO" > "$TMP/byfile"
 CHECK_OWNER_PLAN="${CHECK_PLAN:-}" awk -F'\t' -v os="$(uname -s 2>/dev/null)" '
   function np(p) {
     gsub(/`/, "", p); gsub(/\\/, "/", p); gsub(/\/\/+/, "/", p)
@@ -712,7 +794,7 @@ CHECK_OWNER_PLAN="${CHECK_PLAN:-}" awk -F'\t' -v os="$(uname -s 2>/dev/null)" '
     }
     if (owner == "" || conflict) owner = "без хозяина"
     print line "\t" owner
-  }' "$TMP/MISSED" > "$TMP/missed.owners"
+  }' "$TMP/byfile" > "$TMP/missed.owners"
 echo "== ИСХОД"
 MG="$(cat "$TMP/markgate" 2>/dev/null)"; [ -n "$MG" ] || MG="плана нет — сверки маркеров нет"
 echo "маркеры: $MG"
@@ -729,8 +811,14 @@ if [ -n "$FAIL" ]; then echo "ИСХОД: гейт не пройден — $FAIL
 elif [ "$ROUTE" = "В _pending" ]; then echo "ИСХОД: в _pending — гард"
 elif [ -n "$ROUTE" ]; then echo "ИСХОД: записать поверх"
 else echo "ИСХОД: записать"; fi
-{ for t in ADD NOSRC EMPTY DUP nometh NOKEY NOPFX MARKFILE MISSED DECL PARTEMPTY RULES REST SPEC TOPICS; do awk -v t="$t" '{ print t "\t" $0 }' "$TMP/$t"; done; } > "$TMP/items"
-awk -F'\t' -v parts="${CHECK_PARTS:+1}" -v oo="$TMP/own.opis" -v oc="$TMP/own.card" -v om="$TMP/missed.owners" '
+{ for t in ADD NOSRC EMPTY DUP nometh NOKEY NOPFX MARKFILE MISSED DECL PARTEMPTY RULES REST SPEC TOPICS BIND SLOT ENUM MESTO SENDER SVOD INFRA; do awk -v t="$t" '{ print t "\t" $0 }' "$TMP/$t"; done; } > "$TMP/items"
+# Остаток — номер после последней части плана, если его файлы есть: ему файлы вне частей (ENUM, MESTO).
+RNO=""
+if [ -n "${CHECK_PARTS:-}" ] && [ -n "${CHECK_PLAN:-}" ] && [ -s "$CHECK_PLAN" ]; then
+  RNO="$(tr -d '\r' < "$CHECK_PLAN" | awk -F'\t' '$1 == "часть" && $2 + 0 > m { m = $2 + 0 } END { printf "%02d", m + 1 }')"
+  [ -f "$CHECK_PARTS/part-$RNO.md" ] || RNO=""
+fi
+awk -F'\t' -v parts="${CHECK_PARTS:+1}" -v rno="$RNO" -v oo="$TMP/own.opis" -v oc="$TMP/own.card" -v om="$TMP/missed.owners" '
   function nop(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
   function look(arr, k) { if (k in arr) return arr[k]; if (nop(k) in arr) return arr[nop(k)]; return "" }
   BEGIN {
@@ -739,10 +827,14 @@ awk -F'\t' -v parts="${CHECK_PARTS:+1}" -v oo="$TMP/own.opis" -v oc="$TMP/own.ca
     while ((getline l < oc) > 0) { split(l, x, "\t"); if (!((x[1], x[2]) in sc)) { sc[x[1], x[2]] = 1; cp[x[1]] = cp[x[1]] (cp[x[1]] == "" ? "" : ",") x[2] } }
   }
   {
-    t = $1; k = $2
+    t = $1; k = $2; kk = k; sub(/ — .*/, "", kk)
     if (t == "MISSED") a = missed[k]
     else if (t == "SPEC" || t == "TOPICS") a = $3
+    else if (t == "SVOD") a = "свод"
     else if (!parts) a = "читающий"
+    else if (t == "ENUM" || t == "MESTO") { a = missed[k]; if ((a == "" || a == "без хозяина") && rno != "") a = rno }
+    else if (t == "BIND") { a = look(op, kk); if (a == "") a = look(cp, kk) }
+    else if (t == "SLOT" || t == "SENDER" || t == "INFRA") a = look(cp, kk)
     else if (t == "RULES") a = "голова"
     else if (t == "REST") { a = k; sub(/.*\(остаток /, "", a); sub(/\).*/, "", a) }
     else if (t == "MARKFILE") { a = k; sub(/.*\(часть /, "", a); sub(/\).*/, "", a) }
@@ -760,18 +852,18 @@ if [ -s "$TMP/routed" ]; then
     n=$(awk -F'\t' -v a="$a" '$1 == a' "$TMP/routed" | wc -l | tr -d ' ')
     # виды пунктов — в той же строке: строка ДОБОР видна в любом журнале, файл перечня — только в .work/
     kinds=$(awk -F'\t' -v a="$a" '
-      BEGIN { split("ADD нет блока|NOSRC нет источника|EMPTY пустой блок|DUP дубль|nometh без метода|NOKEY не ключ|NOPFX без префикса|MARKFILE ключей меньше пометок|MISSED пропущено частью|DECL блок при «объявлено без реализации»|PARTEMPTY блоки части без фактов|RULES правила частей|REST пункт остатка не пройден|SPEC операция спецификации|TOPICS топики", w, "|")
+      BEGIN { split("ADD нет блока|NOSRC нет источника|EMPTY пустой блок|DUP дубль|nometh без метода|NOKEY не ключ|NOPFX без префикса|MARKFILE ключей меньше пометок|MISSED пропущено частью|DECL блок при «объявлено без реализации»|PARTEMPTY блоки части без фактов|RULES правила частей|REST пункт остатка не пройден|SPEC операция спецификации|TOPICS топики|BIND без привязки|SLOT нет метки|ENUM перечисление без строки|MESTO место без строки|SENDER топик без отправки|SVOD строки свода|INFRA инфраструктура", w, "|")
         for (i in w) { k = w[i]; sub(/ .*/, "", k); v = w[i]; sub(/^[^ ]+ /, "", v); nm[k] = v } }
       $1 == a { if (!($2 in c)) o[++m] = $2; c[$2]++ }
       END { for (i = 1; i <= m; i++) printf "%s%s %d", (i > 1 ? ", " : ""), nm[o[i]], c[o[i]] }' "$TMP/routed")
-    label="$a"; case "$a" in [0-9]*) label="часть $a" ;; esac
+    label="$a"; case "$a" in [0-9]*) label="часть $a" ;; свод) label="автор свода" ;; esac
     file=""
     if [ -n "${CHECK_LISTS:-}" ]; then
-      if [ -z "${CHECK_PARTS:-}" ]; then file="$CHECK_LISTS"
+      if [ -z "${CHECK_PARTS:-}" ] && [ "$a" != свод ]; then file="$CHECK_LISTS"
       else
-        id="$a"; case "$a" in голова) id=head ;; "без хозяина") id=none ;; esac
+        id="$a"; case "$a" in голова) id=head ;; "без хозяина") id=none ;; свод) id=svod ;; esac
         file="${CHECK_LISTS%.md}-$id.md"
-        { for t in ADD NOSRC EMPTY DUP nometh NOKEY NOPFX MARKFILE MISSED DECL PARTEMPTY RULES REST SPEC TOPICS; do
+        { for t in ADD NOSRC EMPTY DUP nometh NOKEY NOPFX MARKFILE MISSED DECL PARTEMPTY RULES REST SPEC TOPICS BIND SLOT ENUM MESTO SENDER SVOD INFRA; do
             awk -F'\t' -v a="$a" -v t="$t" '$1 == a && $2 == t { print $3 }' "$TMP/routed" > "$TMP/one"
             [ -s "$TMP/one" ] && { echo "## $(title "$t")"; cat "$TMP/one"; echo; }
           done; } > "$file"

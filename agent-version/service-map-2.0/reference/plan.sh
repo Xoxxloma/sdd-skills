@@ -33,7 +33,12 @@
 #   путь  <путь части> <папки|файлы> <NN части>         — владение, включая файлы без пометок;
 #   остаток <NN остатка> <папка|файлы> <путь>           — пункт списка остатка, если список напечатан;
 #   операция <МЕТОД> <путь> <operationId> <спека> <NN | -> — операция спецификации на диске и её часть;
-#   топик <имя> <конфиг>                                — топик основного конфига.
+#   топик <имя> <конфиг> <ключ над ним>                — топик основного конфига и имя продюсера или группы;
+#   корень <путь>                                       — корень сервиса (места значений ищет svod.sh);
+#   шаблон <класс> <регэксп с <ИМЯ>> <маска>            — шаблон объявления от разведчика (вид `шаблон`).
+# Классы `клиенты` и `перечисления` в вес и в части не входят: их пометки — сверка, а не объём чтения.
+# У `клиенты` (`ключ`) — строки «итог» и «файл» (файл вне частей — остатку); у вида `шаблон` счёт — число
+# объявлений, справочно (счётчик ставит `\w+` на место `<ИМЯ>`), в план — строка «шаблон».
 # Спецификации (OpenAPI/Swagger в YAML) и основной конфиг скрипт находит сам, мимо разведчика; с карточкой
 # их сверяет check.sh. Разведчик не назвал ни одной спецификации, а на диске она есть — строка
 # «СПЕКА НЕ РАЗМЕЧЕНА: <файл> — операций N».
@@ -159,35 +164,39 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     }
     close(f); OPN[f] = n
   }
-  function topicadd(v, f,   n, i, x, t) {
+  # par — ключ конфига над `topic`/`topics` (имя продюсера или группы): по нему svod.sh сводит отправку к топику.
+  function topicadd(v, f, par,   n, i, x, t) {
     sub(/[ \t]+#.*$/, "", v); gsub(/^[\[ \t]+|[\] \t]+$/, "", v)
     n = split(v, x, /[ \t]*,[ \t]*/)
     for (i = 1; i <= n; i++) {
       t = x[i]; gsub(/["\047]/, "", t)
       if (t ~ /^\$\{/) { if (t !~ /:/) continue; sub(/^\$\{[^:]*:/, "", t); sub(/\}$/, "", t) }   # ${ключ:значение} — значение
-      if (t ~ /^[A-Za-z0-9._-]+$/ && t ~ /[A-Za-z]/ && !(t in tseen)) { tseen[t] = 1; tname[++ntp] = t; tfile[ntp] = f }
+      if (t ~ /^[A-Za-z0-9._-]+$/ && t ~ /[A-Za-z]/ && !(t in tseen)) { tseen[t] = 1; tname[++ntp] = t; tfile[ntp] = f; tpar[ntp] = par }
     }
   }
   # Топик — значение ключа `topic`/`topics` (`…-topic`, `….topics`): строкой, списком или картой под ним.
-  function topicsyaml(f,   ln, ind, key, v, intop, tind) {
-    intop = 0
+  function topicsyaml(f,   ln, ind, key, v, intop, tind, d, si, sk, par, tpr) {
+    intop = 0; d = 0
     while ((getline ln < f) > 0) {
       sub(/\r$/, "", ln); if (ln ~ /^[ \t]*(#|$)/) continue
-      if (ln ~ /^---/) { intop = 0; continue }
+      if (ln ~ /^---/) { intop = 0; d = 0; continue }
       match(ln, /^ */); ind = RLENGTH
-      if (intop && ind > tind) { v = ln; if (v ~ /^ *- /) sub(/^ *- */, "", v); else if (v ~ /^ *[^:]+:[ \t]*[^ \t]/) sub(/^[^:]*:[ \t]*/, "", v); else continue; topicadd(v, f); continue }
+      if (intop && ind > tind) { v = ln; if (v ~ /^ *- /) sub(/^ *- */, "", v); else if (v ~ /^ *[^:]+:[ \t]*[^ \t]/) sub(/^[^:]*:[ \t]*/, "", v); else continue; topicadd(v, f, tpr); continue }
       intop = 0
       if (ln !~ /^ *[A-Za-z0-9_.-]+:/) continue
       key = ln; sub(/^ */, "", key); sub(/:.*/, "", key); v = ln; sub(/^[^:]*:[ \t]*/, "", v)
-      if (tolower(key) ~ /(^|[-_.])topics?$/) { if (v == "") { intop = 1; tind = ind } else topicadd(v, f) }
+      while (d > 0 && si[d] >= ind) d--
+      par = (d > 0) ? sk[d] : ""; si[++d] = ind; sk[d] = key
+      if (tolower(key) ~ /(^|[-_.])topics?$/) { if (v == "") { intop = 1; tind = ind; tpr = par } else topicadd(v, f, par) }
     }
     close(f)
   }
-  function topicsprops(f,   ln, key, v) {
+  function topicsprops(f,   ln, key, v, par) {
     while ((getline ln < f) > 0) {
       sub(/\r$/, "", ln); if (ln ~ /^[ \t]*(#|!|$)/ || ln !~ /=/) continue
       key = ln; sub(/[ \t]*=.*/, "", key); v = ln; sub(/^[^=]*=[ \t]*/, "", v)
-      if (tolower(key) ~ /(^|[-_.])topics?$/) topicadd(v, f)
+      par = key; sub(/\.[^.]*$/, "", par); sub(/.*\./, "", par); if (par == key) par = ""
+      if (tolower(key) ~ /(^|[-_.])topics?$/) topicadd(v, f, par)
     }
     close(f)
   }
@@ -295,7 +304,12 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
         ow = po; for (c = 1; c <= np_; c++) if (sxf[c] == p && j >= sxs[c] && j <= sxe[c]) ow = sprintf("%02d", c)
         if (ow == "-" && np_ > 0) { if (!hdone) { handlers(); hdone = 1 }; k = tolower(OPI[p, j]); if ((k in hown) && hown[k] != "?") ow = hown[k] }
         printf "операция\t%s\t%s\t%s\t%s\t%s\n", OPM[p, j], OPP[p, j], OPI[p, j], p, ow > f } }
-    for (i = 1; i <= ntp; i++) printf "топик\t%s\t%s\n", tname[i], tfile[i] > f
+    for (i = 1; i <= ntp; i++) printf "топик\t%s\t%s\t%s\n", tname[i], tfile[i], tpar[i] > f
+    # Классы вне веса: итог и файлы (файл вне частей — остатку, если части есть); корни; шаблоны разведчика.
+    for (c = 1; c <= nwl; c++) { cl = wlist[c]; if (wtot[cl] > 0) print "итог\t" cl "\t" wtot[cl] > f }
+    for (i = 1; i <= nwkf; i++) for (c = 1; c <= nwl; c++) { p = wkf[i]; cl = wlist[c]; if ((p, cl) in wck) { o = partfor(p, rootof(p)); if (o == "-" && np_ > 0) o = sprintf("%02d", np_ + 1); print "файл\t" p "\t" cl "\t" wck[p, cl] "\t" o > f } }
+    for (i = 1; i <= nr; i++) print "корень\t" root[i] > f
+    for (i = 1; i <= ntpl; i++) print "шаблон\t" tplc[i] "\t" tplr[i] "\t" tplg[i] > f
     close(f)
   }
   # Делит узел dir: дети-папки с ключами пакуются подряд, тяжёлые — рекурсивно; свои файлы с ключами — подряд.
@@ -362,7 +376,13 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     cl = hp[1]; kind = hp[n]; gsub(/^[ \t]+|[ \t]+$/, "", cl); gsub(/^[ \t]+|[ \t]+$/, "", kind)
     sub(/[ \t]*\(.*$/, "", kind)                       # пометка счётчика: «ключ (без маски)» — всё равно ключ
     hdr++
-    if (n < 2 || cl == "" || (kind != "ключ" && kind != "ориентир")) { badh++; if (badh1 == "") badh1 = substr($0, 1, 160) }
+    if (n < 2 || cl == "" || (kind != "ключ" && kind != "ориентир" && kind != "шаблон")) { badh++; if (badh1 == "") badh1 = substr($0, 1, 160) }
+    # Класс вне веса: клиенты к соседям (`ключ`) и шаблон объявления перечислений (`шаблон`).
+    w1 = cl; sub(/[ \t].*$/, "", w1)
+    wl = (w1 == "клиенты" || w1 == "перечисления" || kind == "шаблон")
+    if (wl) { cl = w1; if (!(cl in wseen)) { wseen[cl] = 1; wlist[++nwl] = cl } }
+    if (kind == "шаблон") { rx = hp[2]; gsub(/^[ \t]+|[ \t]+$/, "", rx); gl = (n >= 4) ? hp[3] : ""; gsub(/^[ \t]+|[ \t]+$/, "", gl); tplc[++ntpl] = cl; tplr[ntpl] = rx; tplg[ntpl] = gl }
+    if (wl) next
     # строка спецификации разведчика: «класс :: регэксп :: маска :: <файл спецификации> :: ключ»
     if (n >= 5 && kind == "ключ") { sp = hp[n - 1]; gsub(/^[ \t]+|[ \t]+$/, "", sp); rx = hp[2]; gsub(/^[ \t]+|[ \t]+$/, "", rx); sp = full(sp); specre[sp] = rx; speccl[sp] = cl }
     if (!(cl in seencl)) { seencl[cl] = 1; clist[++ncl] = cl }
@@ -374,6 +394,7 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     cnt = line; sub(/.*:/, "", cnt); path = substr(line, 1, length(line) - length(cnt) - 1)
     path = full(path); cnt += 0
     if (cnt == 0) next
+    if (wl) { if (kind == "шаблон") wdecl[path] += cnt; else { wck[path, cl] += cnt; wpath[path] = 1 }; next }
     if (kind == "ключ") { ck[path, cl] += cnt; tot[cl] += cnt; fw[path] += cnt; fk[path] += cnt }
     else { co[path, cl] += cnt; orn[cl] += cnt; fw[path] += W * cnt }
     isfile[path] = 1
@@ -416,6 +437,13 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     line = "итог по классам: " sums(tot, ""); o = sums(orn, "")
     if (o != "") line = line " | ориентир: " o
     print line
+    # Классы вне веса — без тестов и путей вне корней; справочно, в вес и части не идут.
+    for (p in wpath) { best = rootof(p); if (best == "" || istest(substr(p, length(best) + 2))) continue; wkeep[p] = 1; wkf[++nwkf] = p; for (c = 1; c <= nwl; c++) { cl = wlist[c]; if ((p, cl) in wck) wtot[cl] += wck[p, cl] } }
+    sortlist(wkf, nwkf)
+    for (p in wdecl) { best = rootof(p); if (best == "" || istest(substr(p, length(best) + 2))) continue; ndecl += wdecl[p] }
+    if (nwl > 0) { line = ""; for (c = 1; c <= nwl; c++) { cl = wlist[c]; if (wtot[cl] > 0) line = line (line == "" ? "" : "; ") cl " " wtot[cl] }
+      if (ntpl > 0) line = line (line == "" ? "" : "; ") "шаблон перечислений — объявлений " ndecl + 0
+      print "вне веса (сверка, не нарезка): " line }
     if (outside > 0) printf "вне корней сервиса: вес %g — в план не вошло\n", outside
     if (tw > 0) {
       line = sums(tk, ""); o = sums(to, "ориентир ")
