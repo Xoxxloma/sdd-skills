@@ -61,6 +61,8 @@ export function checkPlanTsv (out) {
     else if (r[0] === 'файл' && r.length === 5) files.push({ path: r[1], cl: r[2], n: num(r[3]), nn: r[4] })
     else if (r[0] === 'путь' && r.length === 4 && ['папки', 'файлы'].includes(r[2])) paths.push({ path: canon(r[1]), kind: r[2], nn: r[3] })
     else if (r[0] === 'остаток' && r.length === 4 && ['папка', 'файлы'].includes(r[2])) rest.push(`${r[1]}\t${r[2] === 'файлы' ? 'файлы прямо в' : 'папка'}\t${r[3]}`)
+    else if (r[0] === 'операция' && r.length === 6 && /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/.test(r[1]) && r[2].startsWith('/')) continue   // спецификация по дереву — сверяет SM-CHECK
+    else if (r[0] === 'топик' && r.length === 3 && r[1]) continue                                                                     // конфиг по дереву — сверяет SM-CHECK
     else bad++
   }
   // пункты остатка = список остатка в stdout, номер — S+1; список не напечатан — строк нет

@@ -71,8 +71,10 @@ console.log('чаще выпадают: ' + [...missCnt].sort((a, b) => b[1] - a
 console.log('хуже всего: ' + worst.sort((a, b) => a[2] - b[2]).slice(0, 6).map(([e, n, m]) => `${e} ${Math.round(m * 100)}% из ${n}`).join('; '));
 
 console.log('\n== Роли');
-const roleKey = r => r.replace(/`/g, '').replace(/\s*\(.*$/, '').trim();
-const R = cards.map(L => new Set(section(L, 'Роли и доступ').filter(l => /^\|/.test(l) && !/^\|[\s:|-]*$/.test(l)).slice(1).map(l => roleKey(l.split('|')[1] || '')).filter(k => k && k !== '—')));
+// Ключ роли: без бэктиков и области в скобках, без префикса `ROLE_` (Spring пишет роль и так, и так), без
+// учёта регистра; склеенная ячейка («A / B», «A, B») — две роли; строка «не определено: …» — не роль.
+const roleKeys = r => r.replace(/`/g, '').split(/\s*[\/,]\s*/).map(x => x.replace(/\s*\(.*$/, '').trim().replace(/^ROLE_/i, '').toUpperCase()).filter(x => x && x !== '—' && !/^НЕ ОПРЕДЕЛЕНО/.test(x));
+const R = cards.map(L => new Set(section(L, 'Роли и доступ').filter(l => /^\|/.test(l) && !/^\|[\s:|-]*$/.test(l)).slice(1).flatMap(l => roleKeys(l.split('|')[1] || ''))));
 const rc = new Map(); R.forEach(s => s.forEach(k => rc.set(k, (rc.get(k) || 0) + 1)));
 const rref = [...rc].filter(([, c]) => c >= REF).map(([k]) => k);
 console.log(`в объединении ${rc.size}, эталон ${rref.length}; покрытие ${R.map(s => pct(rref.filter(k => s.has(k)).length, rref.length)).join(' / ')}; строк в карте ${R.map(s => s.size).join(' / ')}`);

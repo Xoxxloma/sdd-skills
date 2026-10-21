@@ -48,7 +48,7 @@ PLAN="$DIR/plan.tsv"; [ -s "$PLAN" ] || PLAN=""
 
 # 1. Записи частей: тип<TAB>секция<TAB>ключ-сортировки<TAB>ключ<TAB>текст (\001 вместо перевода строки)<TAB>часть.
 # shellcheck disable=SC2086
-awk -v nokeyf="$TMP/nokey" "$K_AWK"'
+awk -v nokeyf="$TMP/nokey" -v tailf="$TMP/tails" "$K_AWK"'
   function norm(s,   v) {
     gsub(/`/, "", s); gsub(/«|»/, "", s); sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); gsub(/[ \t]+/, " ", s)
     v = s; sub(/ .*/, "", v)
@@ -111,6 +111,10 @@ awk -v nokeyf="$TMP/nokey" "$K_AWK"'
   key != "" {
     if (tail != "" && $0 !~ /^[ \t]*$/) { if ($0 ~ /^(- |— |сущности:)/) txt = txt "\001" tail; tail = "" }
     l = $0; if (sec ~ /^Публичный контракт/) sub(/^- сущности:/, "сущности:", l)
+    # Хвост « — <файл>[ + <файл>]» у строки факта — источник из описи, в карточке ему не место: факт остаётся.
+    if (kcls(sec) != "" && l ~ /^(- |— )/ && match(l, / — `?[A-Za-z0-9_.\/-]+\.(java|kts?|tsx?|jsx?|mjs|py|go|rb|php|cs|ya?ml|json|xml|sql|properties|graphqls?|proto)`?( \+ `?[A-Za-z0-9_.\/-]+`?)*[ \t]*$/)) {
+      l = substr(l, 1, RSTART - 1); print sec ": " key " (часть " pn ")" > tailf
+    }
     txt = txt "\001" l; next
   }
   /^\|/ {
@@ -121,7 +125,7 @@ awk -v nokeyf="$TMP/nokey" "$K_AWK"'
   /^(—|не определено)/ { print "P\t" sec "\t\t\t" $0; next }
   END { flush() }
 ' $PARTS > "$TMP/rec.raw"
-: >> "$TMP/nokey"
+: >> "$TMP/nokey"; : >> "$TMP/tails"
 
 # 1а. Ключ контракта вызовом и он же без скобок — один ключ (точное совпадение старше: две перегрузки
 # с разными аргументами остаются двумя ключами).
@@ -379,5 +383,6 @@ awk '/^## /{s=$0} /^### /{n[s]++} END{for (k in n) printf "  %s — блоков
 [ -s "$TMP/dups" ] && { echo "дубли ключей склеены:"; sed 's/^/  /' "$TMP/dups"; }
 [ -s "$TMP/near" ] && { echo "из них один ключ вызовом и без скобок:"; sed 's/^/  /' "$TMP/near"; }
 [ -s "$TMP/nokey" ] && { echo "ключ не опознан — заголовок не по ключу шаблона, оставлен как есть:"; sort -u "$TMP/nokey" | sed 's/^/  /'; }
+[ -s "$TMP/tails" ] && echo "хвост « — файл» снят у строк фактов: $(wc -l < "$TMP/tails" | tr -d ' ') — источник ключа живёт в описи"
 grep '^DROP	' "$TMP/unplaced" | while IFS="$(printf '\t')" read -r _ s w; do echo "отброшено: секция «$s» у частей $w — её пишет голова"; done
 echo "опись: $OPIS ($(grep -c ' — ' "$OPIS") строк с источником)"

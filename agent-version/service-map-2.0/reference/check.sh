@@ -163,6 +163,8 @@ title() {  # title <вид пункта перечня добора> — заг�
     MISSED) echo 'пропущено частью — проверь ключ по источнику и допиши карточку и опись' ;;
     DECL) echo 'блок у ключа «объявлено без реализации» — обработчик есть: убери пометку; нет: убери блок' ;;
     PARTEMPTY) echo 'у части больше половины блоков контракта без фактов — допиши факты из кода в эти блоки; факта в коде нет — блок оставь, не выдумывай' ;;
+    SPEC) echo 'операция спецификации без блока в карточке — найди её обработчик по `operationId` и допиши блок и строку описи, метод и путь — из спецификации; обработчика нет — строка описи `> объявлено без реализации`' ;;
+    TOPICS) echo 'топики без блоков «Событий» — найди их слушатели и отправители и допиши блоки и строки описи; имя топика — из конфига, как в строке ниже' ;;
     REST) echo 'пункт списка остатка без строки «> пройдено:» в описи — пройди пункт по брифу остатка и допиши строку описи `> пройдено: <пункт> — ключей N`' ;;
     RULES) echo 'строки «Бизнес-правил» описей частей, которых нет в секции — допиши по описям частей (`<описи частей>`) и коду: сущность — блоком, значение — строкой с токеном в бэктиках, имя сообщения — в бэктиках в строке его блока' ;;
     NOKEY) echo 'заголовок не сводится к ключу шаблона — запиши ключом: в «Событиях» направление и топик в бэктиках, у задачи и сущности имя как в коде; не ключ — убери блок из черновика и описи' ;;
@@ -475,13 +477,51 @@ if [ -n "$RNN" ]; then
   ' "$CHECK_PLAN" "$RO" > "$TMP/REST"
   printf 'остаток — пунктов плана %d, без строки «пройдено» в его описи: %d' "$(awk -F'\t' '$1 == "остаток"' "$CHECK_PLAN" | wc -l | tr -d ' ')" "$(wc -l < "$TMP/REST")"; [ -s "$TMP/REST" ] && { printf ' — '; list "$TMP/REST"; } || echo
 fi
+# Список от кода, мимо разведчика — строки плана «операция» (спецификации на диске) и «топик» (основной
+# конфиг). Операции нет среди ключей карточки (путь — как в спецификации или за общим префиксом; объявленная
+# без реализации не в счёт) — добор части спецификации, а без неё — остатка. Топиков конфига в «Событиях»
+# меньше половины либо брокер в «Стеке» при одном событии или без них — добор остатка.
+: > "$TMP/SPEC"; : > "$TMP/TOPICS"
+NEV=$(awk -F'\t' '$1 == "топики"' "$TMP/draft.k" | wc -l | tr -d ' ')
+BROKER=$(awk '{ sub(/\r$/, "") } /^## /{ f = ($0 ~ /^## Стек/) ; next } f' "$DRAFT" | grep -c -i -E 'kafka|rabbit|nats|amqp|sqs|pub/?sub')
+WHO_REST="${RNN:-}"; [ -n "$WHO_REST" ] || { [ -n "${CHECK_PARTS:-}" ] && WHO_REST="без хозяина" || WHO_REST="читающий"; }
+if [ -n "${CHECK_PLAN:-}" ] && [ -s "$CHECK_PLAN" ]; then
+  awk -F'\t' -v pfx="$PFX" -v dk="$TMP/draft.k" -v df="$TMP/declared" -v rest="$WHO_REST" -v specf="$TMP/SPEC" -v topf="$TMP/TOPICS" "$K_AWK"'
+    function pn(p) { gsub(/\{[^}]*\}/, "{}", p); sub(/\/$/, "", p); return p }
+    function hk(k,   m, p) { m = k; sub(/ .*/, "", m); p = k; sub(/^[^ ]+ /, "", p); return m " " pn(p) }
+    BEGIN {
+      while ((getline l < dk) > 0) { split(l, a, "\t")
+        if (a[1] == "контракт" && a[2] ~ /^[A-Z]+ \//) have[hk(a[2])] = 1
+        if (a[1] == "топики") { t = a[2]; sub(/^[^ ]+ /, "", t); top[t] = 1 } }
+      while ((getline l < df) > 0) { k = k_opis(l); if (k ~ /^[A-Z]+ \//) decl[hk(k)] = 1 }
+    }
+    { sub(/\r$/, "") }
+    $1 == "операция" {
+      nop++; k = $2 " " pn($3); kp = $2 " " pn(pfx $3)
+      if ((k in have) || (kp in have) || (k in decl) || (kp in decl)) next
+      print $2 " " $3 " (" $4 ")\t" ($6 != "-" ? $6 : rest) > specf
+    }
+    $1 == "топик" { nt++; if ($2 in top) nh++; else miss = miss (miss == "" ? "" : ", ") $2 }
+    END {
+      if (nt > 0 && 2 * nh < nt) print "топики конфига без блоков «Событий»: есть " (nh + 0) " из " nt "; нет — " miss "\t" rest > topf
+      printf "%d\t%d\t%d\n", nop, nt, nh
+    }
+  ' "$CHECK_PLAN" > "$TMP/listcnt"
+  read -r NOP NT NH < "$TMP/listcnt"
+  printf 'операции спецификаций на диске против карточки: в спецификациях %d, блока нет %d' "$NOP" "$(wc -l < "$TMP/SPEC")"; [ -s "$TMP/SPEC" ] && { printf ' — '; cut -f1 "$TMP/SPEC" > "$TMP/spec1"; list "$TMP/spec1"; } || echo
+  printf 'топики основного конфига против «Событий»: в конфиге %d, в карточке из них %d\n' "$NT" "$NH"
+fi
+if [ "$BROKER" -gt 0 ] && [ "$NEV" -le 1 ] && [ ! -s "$TMP/TOPICS" ]; then
+  printf 'брокер в «Стеке», а событий %d — слушатели и отправители не описаны\t%s\n' "$NEV" "$WHO_REST" > "$TMP/TOPICS"
+fi
+printf 'события против брокера и конфига — в добор: %d' "$(wc -l < "$TMP/TOPICS")"; [ -s "$TMP/TOPICS" ] && { printf ' — '; cut -f1 "$TMP/TOPICS"; } || echo
 grep -v -E '^(объект|сообщение|ограничение) ' "$TMP/MISSRC" > "$TMP/ADD"
 grep -v -E '^(объект|сообщение|ограничение) ' "$TMP/NOSRCPAIR" > "$TMP/NOSRC"
 printf 'перечень добора: ключ описи с источником без блока %d, ключ с блоком без источника %d, факт в описи — блок пуст %d, один ключ дважды %d\n' \
   "$(wc -l < "$TMP/ADD")" "$(wc -l < "$TMP/NOSRC")" "$(wc -l < "$TMP/EMPTY")" "$(wc -l < "$TMP/DUP")"
 if [ -n "${CHECK_LISTS:-}" ]; then
-  L="ADD NOSRC EMPTY DUP nometh NOKEY DECL"; [ -n "$PFX" ] && L="$L NOPFX"; [ -n "${CHECK_PLAN:-}" ] && L="$L MARKFILE"
-  { for t in $L; do echo "## $(title "$t")"; cat "$TMP/$t"; echo; done; } > "$CHECK_LISTS" && echo "перечень добора целиком: $CHECK_LISTS"
+  L="ADD NOSRC EMPTY DUP nometh NOKEY DECL SPEC TOPICS"; [ -n "$PFX" ] && L="$L NOPFX"; [ -n "${CHECK_PLAN:-}" ] && L="$L MARKFILE"
+  { for t in $L; do echo "## $(title "$t")"; cut -f1 "$TMP/$t"; echo; done; } > "$CHECK_LISTS" && echo "перечень добора целиком: $CHECK_LISTS"
 fi
 printf 'опись по классам (класс — по паре в черновике): '
 grep "^CLS	" "$TMP/join" | cut -f2 | sort | uniq -c | awk '{n=$1; $1=""; sub(/^ /,""); printf "%s%s %d", (NR>1?", ":""), $0, n} END{print ""}'
@@ -689,7 +729,7 @@ if [ -n "$FAIL" ]; then echo "ИСХОД: гейт не пройден — $FAIL
 elif [ "$ROUTE" = "В _pending" ]; then echo "ИСХОД: в _pending — гард"
 elif [ -n "$ROUTE" ]; then echo "ИСХОД: записать поверх"
 else echo "ИСХОД: записать"; fi
-{ for t in ADD NOSRC EMPTY DUP nometh NOKEY NOPFX MARKFILE MISSED DECL PARTEMPTY RULES REST; do awk -v t="$t" '{ print t "\t" $0 }' "$TMP/$t"; done; } > "$TMP/items"
+{ for t in ADD NOSRC EMPTY DUP nometh NOKEY NOPFX MARKFILE MISSED DECL PARTEMPTY RULES REST SPEC TOPICS; do awk -v t="$t" '{ print t "\t" $0 }' "$TMP/$t"; done; } > "$TMP/items"
 awk -F'\t' -v parts="${CHECK_PARTS:+1}" -v oo="$TMP/own.opis" -v oc="$TMP/own.card" -v om="$TMP/missed.owners" '
   function nop(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
   function look(arr, k) { if (k in arr) return arr[k]; if (nop(k) in arr) return arr[nop(k)]; return "" }
@@ -701,6 +741,7 @@ awk -F'\t' -v parts="${CHECK_PARTS:+1}" -v oo="$TMP/own.opis" -v oc="$TMP/own.ca
   {
     t = $1; k = $2
     if (t == "MISSED") a = missed[k]
+    else if (t == "SPEC" || t == "TOPICS") a = $3
     else if (!parts) a = "читающий"
     else if (t == "RULES") a = "голова"
     else if (t == "REST") { a = k; sub(/.*\(остаток /, "", a); sub(/\).*/, "", a) }
@@ -724,7 +765,7 @@ if [ -s "$TMP/routed" ]; then
       else
         id="$a"; case "$a" in голова) id=head ;; "без хозяина") id=none ;; esac
         file="${CHECK_LISTS%.md}-$id.md"
-        { for t in ADD NOSRC EMPTY DUP nometh NOKEY NOPFX MARKFILE MISSED DECL PARTEMPTY RULES REST; do
+        { for t in ADD NOSRC EMPTY DUP nometh NOKEY NOPFX MARKFILE MISSED DECL PARTEMPTY RULES REST SPEC TOPICS; do
             awk -F'\t' -v a="$a" -v t="$t" '$1 == a && $2 == t { print $3 }' "$TMP/routed" > "$TMP/one"
             [ -s "$TMP/one" ] && { echo "## $(title "$t")"; cat "$TMP/one"; echo; }
           done; } > "$file"

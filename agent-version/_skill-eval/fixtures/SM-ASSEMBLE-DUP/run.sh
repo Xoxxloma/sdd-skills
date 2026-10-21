@@ -31,6 +31,13 @@ mkdir "$OUT/nospec"; cp "$HERE/parts/"*.md "$OUT/nospec/"; tr -d '\r' < "$HERE/p
 bash "$ASM" "$OUT/nospec" 2 2026-10-19 "$OUT/card3.md" "$OUT/opis3.md" > "$OUT/log3" || { cat "$OUT/log3"; exit 1; }
 grep -q -F 'Публичный контракт: GET /api/nights/free-count — блок части 02 (владелец по плану)' "$OUT/log3" \
   || { echo "спецификация не размечена: владелец операции не часть с обработчиком (02)"; grep 'free-count' "$OUT/log3"; bad=1; }
+# Хвост « — <файл>» у строки факта (и « + <файл>») снимается, факт остаётся: карточка та же, что без хвостов.
+mkdir "$OUT/tails"; cp "$HERE/parts/"*.md "$HERE/parts/plan.tsv" "$OUT/tails/"
+sed -i -e 's/^- `mount`: `string`/& — src\/telescope\/Telescope.java/' -e 's/^- `operatorId`: `uuid`/& — `src\/log\/ShiftLogEntry.kt`/' \
+  -e 's/^— запись с пометкой оператора не удаляется/& — src\/log\/ShiftLog.java + ShiftLogService.java/' "$OUT/tails/part-02.md"
+bash "$ASM" "$OUT/tails" 2 2026-10-19 "$OUT/card4.md" "$OUT/opis4.md" > "$OUT/log4" || { cat "$OUT/log4"; exit 1; }
+grep -q -F 'хвост « — файл» снят у строк фактов: 3' "$OUT/log4" || { echo "хвосты: нет строки о трёх снятых"; grep 'хвост' "$OUT/log4"; bad=1; }
+diff <(tr -d '\r' < "$HERE/expect.md") "$OUT/card4.md" || { echo "хвосты: карточка отличается от карточки без хвостов"; bad=1; }
 # Без плана владельца нет ни у кого: все дубли — объединение «плана нет».
 mkdir "$OUT/noplan"; cp "$HERE/parts/"*.md "$OUT/noplan/"
 bash "$ASM" "$OUT/noplan" 2 2026-10-19 "$OUT/card2.md" "$OUT/opis2.md" > "$OUT/log2" || { cat "$OUT/log2"; exit 1; }

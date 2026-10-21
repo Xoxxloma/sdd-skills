@@ -702,6 +702,39 @@ function restItems(planText, dir) {
     .map((r) => [`${r[2] === 'файлы' ? 'файлы прямо в' : 'папка'} ${np(r[3])} (остаток ${nn})`, nn]);
 }
 
+// A15. Список от кода (строки плана «операция», «топик»): операции нет среди ключей контракта карточки — путь
+// как в спецификации или за общим префиксом, параметры пути без имён, без хвостового «/»; объявленная без
+// реализации не в счёт — пункт части спецификации (6-я колонка), а без неё — остатка. Топиков конфига в
+// «Событиях» меньше половины — пункт остатка; брокер в «Стеке» при одном событии или без них и без того
+// пункта — тоже. Остатка нет — «без хозяина» у нарезанного, «читающий» у одиночного.
+function listItems(planText, draftText, opisTexts, prefix, sliced) {
+  const pn = (p) => p.replace(/\{[^}]*\}/g, '{}').replace(/\/$/, '');
+  const hk = (k) => { const [m, ...r] = k.split(' '); return `${m} ${pn(r.join(' '))}`; };
+  const rows = String(planText).split(/\r?\n/).map((l) => l.split('\t'));
+  const rnn = sliced ? (rows.find((r) => r[0] === 'остаток') ?? [])[1] : undefined;
+  const rest = rnn ?? (sliced ? 'без хозяина' : 'читающий');
+  const d = parseCard(draftText);
+  const have = new Set(d.blocks.контракт.map((b) => b.key).filter((k) => /^[A-Z]+ \//.test(k)).map(hk));
+  const top = new Set(d.blocks.топики.map((b) => b.key.replace(/^\S+ /, '')));
+  const NOTE = '> объявлено без реализации: ';
+  const decl = new Set(opisTexts.flatMap(splitLines).filter((l) => l.startsWith(NOTE)).map((l) => {
+    const s = l.slice(NOTE.length); const i = s.indexOf(SEP); return kopis(i < 0 ? s : s.slice(0, i));
+  }).filter((k) => /^[A-Z]+ \//.test(k)).map(hk));
+  const spec = []; let nt = 0; let nh = 0; const miss = [];
+  for (const r of rows) {
+    if (r[0] === 'операция') {
+      const k = `${r[1]} ${pn(r[2])}`; const kp = `${r[1]} ${pn((prefix || '') + r[2])}`;
+      if (!(have.has(k) || have.has(kp) || decl.has(k) || decl.has(kp))) spec.push([`${r[1]} ${r[2]} (${r[3]})`, r[5] !== '-' ? r[5] : rest]);
+    } else if (r[0] === 'топик') { nt++; if (top.has(r[1])) nh++; else miss.push(r[1]); }
+  }
+  const topics = [];
+  if (nt > 0 && 2 * nh < nt) topics.push([`топики конфига без блоков «Событий»: есть ${nh} из ${nt}; нет — ${miss.join(', ')}`, rest]);
+  let inStack = false; let broker = false;
+  for (const l of splitLines(draftText)) { if (l.startsWith('## ')) { inStack = l.startsWith('## Стек'); continue; } if (inStack && /kafka|rabbit|nats|amqp|sqs|pub\/?sub/i.test(l)) broker = true; }
+  if (broker && d.blocks.топики.length <= 1 && !topics.length) topics.push([`брокер в «Стеке», а событий ${d.blocks.топики.length}`, rest]);
+  return { SPEC: spec, TOPICS: topics };
+}
+
 // Пометка не становится ключом описи. Владение — по файлу, затем по ближайшей папке плана;
 // неоднозначный относительный хвост и отсутствие владельца дают «без хозяина».
 function missedItems(planText, opisTexts) {
@@ -800,12 +833,14 @@ export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
   const it = res._items;
   const ownerPlan = env.CHECK_PLAN && fs.existsSync(rel(env.CHECK_PLAN)) ? rd(rel(env.CHECK_PLAN)) : '';
   const contractKeys = parseCard(rd(draftPath)).blocks.контракт.map((b) => b.key);
-  const lists = { ...it, NOPFX: noPfx.map((k) => [k]), MARKFILE: (mk?._owners ?? []).map((o) => [o]), MISSED: missedItems(ownerPlan, [rd(opisPath), ...(P?.notes ?? [])]), DECL: declItems([rd(opisPath), ...(P?.notes ?? [])], contractKeys), PARTEMPTY: P ? partEmptyItems(P.pbody, rd(draftPath)) : [], RULES: P ? rulesItems(rel(env.CHECK_PARTS), rd(draftPath)) : [], REST: P && ownerPlan ? restItems(ownerPlan, rel(env.CHECK_PARTS)) : [] };
+  const lists = { ...it, NOPFX: noPfx.map((k) => [k]), MARKFILE: (mk?._owners ?? []).map((o) => [o]), MISSED: missedItems(ownerPlan, [rd(opisPath), ...(P?.notes ?? [])]), DECL: declItems([rd(opisPath), ...(P?.notes ?? [])], contractKeys), PARTEMPTY: P ? partEmptyItems(P.pbody, rd(draftPath)) : [], RULES: P ? rulesItems(rel(env.CHECK_PARTS), rd(draftPath)) : [], REST: P && ownerPlan ? restItems(ownerPlan, rel(env.CHECK_PARTS)) : [],
+    ...listItems(ownerPlan, rd(draftPath), [rd(opisPath), ...(P?.notes ?? [])], env.CHECK_PREFIX ? '/' + env.CHECK_PREFIX.replace(/\/$/, '').replace(/^\//, '') : '', !!P) };
   const dobor = {};
   const look = (m, k) => m.get(k) ?? m.get(nopK(k)) ?? null;
   for (const [cat, list] of Object.entries(lists)) for (const item of list) {
     let A;
     if (cat === 'MISSED') A = new Set([item[1]]);
+    else if (cat === 'SPEC' || cat === 'TOPICS') A = new Set([item[1]]);
     else if (!P) A = new Set(['читающий']);
     else if (cat === 'RULES') A = new Set(['голова']);
     else if (cat === 'REST') A = new Set([item[1]]);
