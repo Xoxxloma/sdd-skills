@@ -758,6 +758,12 @@ if [ -s "$TMP/routed" ]; then
   cut -f1 "$TMP/routed" | sort -u > "$TMP/authors"
   while IFS= read -r a; do
     n=$(awk -F'\t' -v a="$a" '$1 == a' "$TMP/routed" | wc -l | tr -d ' ')
+    # виды пунктов — в той же строке: строка ДОБОР видна в любом журнале, файл перечня — только в .work/
+    kinds=$(awk -F'\t' -v a="$a" '
+      BEGIN { split("ADD нет блока|NOSRC нет источника|EMPTY пустой блок|DUP дубль|nometh без метода|NOKEY не ключ|NOPFX без префикса|MARKFILE ключей меньше пометок|MISSED пропущено частью|DECL блок при «объявлено без реализации»|PARTEMPTY блоки части без фактов|RULES правила частей|REST пункт остатка не пройден|SPEC операция спецификации|TOPICS топики", w, "|")
+        for (i in w) { k = w[i]; sub(/ .*/, "", k); v = w[i]; sub(/^[^ ]+ /, "", v); nm[k] = v } }
+      $1 == a { if (!($2 in c)) o[++m] = $2; c[$2]++ }
+      END { for (i = 1; i <= m; i++) printf "%s%s %d", (i > 1 ? ", " : ""), nm[o[i]], c[o[i]] }' "$TMP/routed")
     label="$a"; case "$a" in [0-9]*) label="часть $a" ;; esac
     file=""
     if [ -n "${CHECK_LISTS:-}" ]; then
@@ -771,7 +777,7 @@ if [ -s "$TMP/routed" ]; then
           done; } > "$file"
       fi
     fi
-    echo "ДОБОР $label: $n${file:+ — $file}"
+    echo "ДОБОР $label: $n ($kinds)${file:+ — $file}"
   done < "$TMP/authors"
 else echo "ДОБОР: пусто"; fi
 if [ -n "${CHECK_LISTS:-}" ] && [ -z "${CHECK_PARTS:-}" ] && [ -s "$TMP/MISSED" ]; then
