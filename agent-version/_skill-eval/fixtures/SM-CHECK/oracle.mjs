@@ -63,7 +63,7 @@ export function kcanon(cls, h) {
   }
   if (cls === 'топики') {
     const d = k.split(' ')[0];
-    if (!/^(публикует|потребляет)$/.test(d)) return '';
+    if (!/^(публикует|потребляет|транспорт)$/.test(d)) return '';   // транспорт — общая обвязка брокера, как в keys.awk
     const t = h.match(/`[^`]+`/);
     if (t) return d + ' ' + t[0].slice(1, -1);
     const rest = k.slice(d.length + 1);
@@ -76,7 +76,7 @@ export function kcanon(cls, h) {
 export function kopis(h) {
   const k = norm(h);
   if (/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|query|mutation|subscription|rpc) /.test(k)) return kcanon('контракт', h) || k;
-  if (/^(публикует|потребляет) /.test(k)) return kcanon('топики', h) || k;
+  if (/^(публикует|потребляет|транспорт) /.test(k)) return kcanon('топики', h) || k;
   return k;
 }
 const CANON_SECTIONS = new Set(['Публичный контракт', 'Владеет данными', 'Фоновые задачи', 'События']);
@@ -735,6 +735,26 @@ function listItems(planText, draftText, opisTexts, prefix, sliced) {
   return { SPEC: spec, TOPICS: topics };
 }
 
+// A16. Форма «Событий» и «Зависит от»: блок публикации или потребления без строки-метки шаблона — пункт с
+// недостающими метками; строка «Зависит от», чьё имя (без регистра латиницы) стоит словом в «Стеке», — пункт.
+function formItems(draftText) {
+  const NEED = { 'публикует': ['тело', 'ключ', 'когда', 'гарантия', 'не шлётся'], 'потребляет': ['читает', 'группа', 'подтверждение', 'повтор', 'ошибка'] };
+  const slot = []; const st = new Set(); const dep = [];
+  let sec = ''; let key = ''; let got = new Set();
+  const done = () => { if (key) { const d = key.split(' ')[0]; const miss = NEED[d].filter((x) => !got.has(x)); if (miss.length) slot.push([`${key} — нет строк ${miss.map((x) => x + ':').join(', ')}`]); } key = ''; got = new Set(); };
+  for (const l of splitLines(draftText)) {
+    if (l.startsWith('## ')) { done(); sec = l.slice(3).trim(); continue; }
+    if (sec.startsWith('События')) {
+      if (l.startsWith('### ')) { done(); let h = l.slice(4); const p = h.indexOf(SEP); if (p >= 0) h = h.slice(0, p); const k = kcanon('топики', h); if (k) key = k; continue; }
+      const m = key && l.match(/^- ([^`:]+):/); if (m) got.add(m[1]);
+    }
+    if (sec.startsWith('Стек') && l.startsWith('|')) for (const w of l.replace(/[A-Z]/g, (c) => c.toLowerCase()).split(/[^a-z0-9]+/)) if (w.length > 2) st.add(w);
+    if (sec.startsWith('Зависит от') && l.startsWith('|') && !/^\|[ \t:|-]*$/.test(l)) { const d = (l.split('|')[1] ?? '').replace(/`/g, '').trim(); if (d && d !== '—' && !/Сервис или система/.test(d)) dep.push(d); }
+  }
+  done();
+  return { SLOT: slot, INFRA: dep.filter((d) => st.has(d.replace(/[A-Z]/g, (c) => c.toLowerCase()))).map((d) => [`${d} — имя стоит в «Стеке»`]) };
+}
+
 // Пометка не становится ключом описи. Владение — по файлу, затем по ближайшей папке плана;
 // неоднозначный относительный хвост и отсутствие владельца дают «без хозяина».
 function missedItems(planText, opisTexts) {
@@ -834,7 +854,7 @@ export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
   const ownerPlan = env.CHECK_PLAN && fs.existsSync(rel(env.CHECK_PLAN)) ? rd(rel(env.CHECK_PLAN)) : '';
   const contractKeys = parseCard(rd(draftPath)).blocks.контракт.map((b) => b.key);
   const lists = { ...it, NOPFX: noPfx.map((k) => [k]), MARKFILE: (mk?._owners ?? []).map((o) => [o]), MISSED: missedItems(ownerPlan, [rd(opisPath), ...(P?.notes ?? [])]), DECL: declItems([rd(opisPath), ...(P?.notes ?? [])], contractKeys), PARTEMPTY: P ? partEmptyItems(P.pbody, rd(draftPath)) : [], RULES: P ? rulesItems(rel(env.CHECK_PARTS), rd(draftPath)) : [], REST: P && ownerPlan ? restItems(ownerPlan, rel(env.CHECK_PARTS)) : [],
-    ...listItems(ownerPlan, rd(draftPath), [rd(opisPath), ...(P?.notes ?? [])], env.CHECK_PREFIX ? '/' + env.CHECK_PREFIX.replace(/\/$/, '').replace(/^\//, '') : '', !!P) };
+    ...listItems(ownerPlan, rd(draftPath), [rd(opisPath), ...(P?.notes ?? [])], env.CHECK_PREFIX ? '/' + env.CHECK_PREFIX.replace(/\/$/, '').replace(/^\//, '') : '', !!P), ...formItems(rd(draftPath)) };
   const dobor = {};
   const look = (m, k) => m.get(k) ?? m.get(nopK(k)) ?? null;
   for (const [cat, list] of Object.entries(lists)) for (const item of list) {
@@ -842,6 +862,7 @@ export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
     if (cat === 'MISSED') A = new Set([item[1]]);
     else if (cat === 'SPEC' || cat === 'TOPICS') A = new Set([item[1]]);
     else if (!P) A = new Set(['читающий']);
+    else if (cat === 'SLOT' || cat === 'INFRA') A = look(P.card, item[0].split(SEP)[0]);
     else if (cat === 'RULES') A = new Set(['голова']);
     else if (cat === 'REST') A = new Set([item[1]]);
     else if (cat === 'MARKFILE') A = new Set([item[0]]);

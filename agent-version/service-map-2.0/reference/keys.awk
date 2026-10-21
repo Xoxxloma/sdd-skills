@@ -42,5 +42,11 @@ function k_opis(h,   k, c) {
   if (k ~ /^(публикует|потребляет|транспорт) /) { c = k_canon("топики", h); return c == "" ? k : c }
   return k
 }
+# Регистр — только у латиницы. toupper/tolower gawk под Windows (локаль C) меняют и байты кириллицы, и строка
+# с ними после склейки обрывается: у текста карточки регистр меняют только эти две.
+function k_up(s,   r, i, c) { r = ""; for (i = 1; i <= length(s); i++) { c = substr(s, i, 1); r = r ((c >= "a" && c <= "z") ? toupper(c) : c) } return r }
+function k_low(s,   r, i, c) { r = ""; for (i = 1; i <= length(s); i++) { c = substr(s, i, 1); r = r ((c >= "A" && c <= "Z") ? tolower(c) : c) } return r }
+# Строка описи без отступа, которая не ключ, а факт: соседи, строки «Бизнес-правил», роли.
+function k_fact(h) { return h ~ /^(зависит|состояние|справочник|сообщение|ограничение|роль|Роль):/ }
 # Ключ контракта вызовом («query night(id)», «Dome.Close(Req)») без скобок; у HTTP — как есть.
 function k_bare(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
