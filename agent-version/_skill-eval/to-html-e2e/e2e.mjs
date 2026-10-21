@@ -91,6 +91,11 @@ const go = async (sel) => {
   await page.waitForTimeout(30);
 };
 const inView = (sel) => page.locator(sel).first().evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight; });
+// Развёрнутое — по окну: fixed внутри раздела с content-visibility считается от раздела.
+const fillsScreen = (sel) => page.locator(sel).first().evaluate((el) => {
+  const r = el.getBoundingClientRect();
+  return r.top >= 0 && r.left >= 0 && r.width >= innerWidth * 0.9 && r.height >= innerHeight * 0.9;
+});
 
 console.log('TH-DOCS — документация');
 await page.goto(urls.docs);
@@ -106,6 +111,9 @@ check(await page.locator('#toc a').count() >= 3, 'оглавление спра�
 check(await page.locator('.doc img[data-file="img/стенд.png"]').evaluate((i) => i.complete && i.naturalWidth > 0), 'картинка по пути видна');
 check(await page.locator('.code [data-copy] svg').count() > 0, 'у блока кода кнопка «Копировать» со значком');
 check(await page.locator('.table [data-expand] svg').count() > 0, 'у таблицы кнопка «Развернуть» со значком');
+await page.locator('.doc .table [data-expand]').first().click();
+check(await fillsScreen('.table.full'), 'развёрнутая таблица в разделе документа — на весь экран, а не на раздел');
+await page.keyboard.press('Escape');
 
 await go('.doc a:text("словарь")');
 check(await text('.doc h1') === 'Словарь', 'ссылка с якорем открывает файл');
@@ -152,6 +160,9 @@ await themeTo('dark');
 check(await darkSvg(), 'тёмная тема — схема перерисована тёмной');
 await themeTo('light');
 check(!(await darkSvg()), 'светлая — светлой');
+await page.locator('.doc [data-expand-fig]').first().click();
+check(await fillsScreen('.figure.full'), 'развёрнутая схема в разделе документа — на весь экран, а не на раздел');
+await page.keyboard.press('Escape');
 await go('#tree a[title="поток.mmd"]');
 await page.locator('.doc .diagram svg').first().waitFor({ timeout: 15000 });
 check(await page.locator('.doc .code').count() === 1, '.mmd — схема и её исходник');

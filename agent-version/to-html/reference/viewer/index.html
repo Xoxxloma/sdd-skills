@@ -113,6 +113,8 @@
   .bar-actions { position: relative; display: flex; gap: 8px; }
   .doc { width: 100%; max-width: 800px; margin: 0 auto; padding: 40px 48px 140px; }
   .sec { content-visibility: auto; contain-intrinsic-size: auto 900px; }
+  /* Раздел с content-visibility — рамка для fixed: развёрнутое внутри растягивалось бы на раздел, а не на окно. */
+  .sec:has(.full) { content-visibility: visible; }
 
   /* ============ Типографика документа ============ */
   .md > :first-child, .md .sec:first-child > :first-child { margin-top: 0; }
@@ -181,7 +183,8 @@
   .table td { padding: 8px 12px; border-top: 1px solid var(--line-2); vertical-align: top; }
   .table tr:first-child td { border-top: 0; }
   .table tbody tr:hover td { background: var(--hover); }
-  .table .expand { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; opacity: 0; background: var(--paper); }
+  /* z-index — поверх липкой шапки: th позже в разметке и иначе перекрывает кнопку. */
+  .table .expand { position: absolute; z-index: 2; top: 4px; right: 4px; width: 26px; height: 26px; opacity: 0; background: var(--paper); }
   .table:hover .expand, .table .expand:focus-visible { opacity: 1; }
   .table.full { position: fixed; inset: 16px; z-index: 45; box-shadow: var(--shadow); }
   .table.full .expand { opacity: 1; position: sticky; float: right; top: 4px; }
