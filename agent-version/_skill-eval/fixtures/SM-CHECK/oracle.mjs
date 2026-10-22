@@ -214,7 +214,7 @@ export function parseOpis(text) {
     }
     if (line.startsWith('<!--')) { cur = null; continue; } // строка свежести части — не ключ (A10)
     if (line.startsWith('#') || line.startsWith('(') || line.startsWith('>')) { cur = null; continue; } // «> пройдено: …» остатка — не ключ
-    if (line.startsWith('справочник:')) { cur = null; continue; }
+    if (line.startsWith('справочник:') || line.startsWith('зависит:')) { cur = null; continue; } // улики, не ключи
     const i = line.indexOf(SEP);
     if (i < 0 && line.trim().endsWith(':')) { cur = null; continue; } // подпись «Эндпоинты:» (A9)
     const kt = i < 0 ? line : line.slice(0, i);
@@ -862,7 +862,8 @@ export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
     if (cat === 'MISSED') A = new Set([item[1]]);
     else if (cat === 'SPEC' || cat === 'TOPICS') A = new Set([item[1]]);
     else if (!P) A = new Set(['читающий']);
-    else if (cat === 'SLOT' || cat === 'INFRA') A = look(P.card, item[0].split(SEP)[0]);
+    else if (cat === 'INFRA') A = new Set(['голова']);
+    else if (cat === 'SLOT') A = look(P.card, item[0].split(SEP)[0]);
     else if (cat === 'RULES') A = new Set(['голова']);
     else if (cat === 'REST') A = new Set([item[1]]);
     else if (cat === 'MARKFILE') A = new Set([item[0]]);

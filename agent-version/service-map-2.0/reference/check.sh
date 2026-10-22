@@ -85,8 +85,9 @@ parse_card() {
 
 # Ключи описи: «ключ<TAB>фактов<TAB>есть-файл<TAB>служебный». Ключ — строка без отступа с « — » (до него),
 # по шаблону, как у блока карточки (keys.awk); строки «состояние:/справочник:/сообщение:/ограничение:»
-# дают ключи «Бизнес-правил», `зависит: <имя>` — строку «Зависит от». Файл — и путём, и именем с номером
-# строки (`name.ext:42`).
+# дают ключи «Бизнес-правил». Строка `зависит:` — улика для «Зависит от», а не ключ: строку секции по
+# соседу пишет голова или читающий, а клиентов к соседу бывает несколько. Файл — и путём, и именем с
+# номером строки (`name.ext:42`).
 parse_opis() {
   awk "$K_AWK"'
     function norm(s,   v) {
@@ -107,6 +108,7 @@ parse_opis() {
       next
     }
     /^(#|⟹|\(|>|-|```|<!--)/ || /^$/ { flush(); next }
+    /^зависит:/ { flush(); next }
     {
       flush()
       line = $0; sub(/[ \t]+$/, "", line); p = index(line, " — ")
@@ -128,7 +130,7 @@ parse_opis() {
       } else if (head ~ /^ограничение:/) {
         h = head; sub(/^ограничение:[ ]*/, "", h); key = norm("ограничение " h)
       } else {
-        h = head; sub(/^(роль|Роль|зависит):[ ]*/, "", h); key = k_opis(h)   # «роль: OPERATOR» ↔ строка таблицы «OPERATOR»
+        h = head; sub(/^(роль|Роль):[ ]*/, "", h); key = k_opis(h)   # «роль: OPERATOR» ↔ строка таблицы «OPERATOR»
       }
       facts = 0
     }
@@ -782,7 +784,8 @@ awk -F'\t' -v parts="${CHECK_PARTS:+1}" -v oo="$TMP/own.opis" -v oc="$TMP/own.ca
     if (t == "MISSED") a = missed[k]
     else if (t == "SPEC" || t == "TOPICS") a = $3
     else if (!parts) a = "читающий"
-    else if (t == "SLOT" || t == "INFRA") a = look(cp, kk)
+    else if (t == "INFRA") a = "голова"
+    else if (t == "SLOT") a = look(cp, kk)
     else if (t == "RULES") a = "голова"
     else if (t == "REST") { a = k; sub(/.*\(остаток /, "", a); sub(/\).*/, "", a) }
     else if (t == "MARKFILE") { a = k; sub(/.*\(часть /, "", a); sub(/\).*/, "", a) }
