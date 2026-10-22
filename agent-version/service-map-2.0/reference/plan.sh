@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # plan.sh — план нарезки большого сервиса на части по счёту пометок ключей.
 #
-#   bash plan.sh <counts.txt> <K> <w> <корень>[,<корень>…] [<plan.tsv>]
+#   bash plan.sh <counts.txt> <K> <w> <корень>[,<корень>…] [<plan.tsv>] [<тип>]
+#
+# <тип> — `type` сервиса из манифеста. Форма по типу — keys.awk («Форма по типу»): класс, секции которого
+# у типа нет, отбрасывается при разборе счёта (строка «класс … у типа … секции нет»); тип, у которого не все
+# секции классов пишут части, не режется. Типа нет — классы все, нарезка по весу.
 #
 # counts.txt — вывод грепов по строкам разведчика, дословно, под заголовками:
 #   ## <класс> :: <ключ|ориентир>
@@ -38,12 +42,18 @@
 # входит: части он не образует, его файл вне частей — остатку.
 # Спецификации (OpenAPI/Swagger в YAML) и основной конфиг скрипт находит сам, мимо разведчика; с карточкой
 # их сверяет check.sh. Разведчик не назвал ни одной спецификации, а на диске она есть — строка
-# «СПЕКА НЕ РАЗМЕЧЕНА: <файл> — операций N».
+# «СПЕКА НЕ РАЗМЕЧЕНА: <файл> — операций N». Спека, которую разведчик назвал клиентской
+# (`## клиентская спека :: <файл>` — по ней генерируется клиент к соседу), не сверяется и не весит.
 # При отказе файл плана остаётся пустым.
 set -u
 COUNTS="${1:?counts.txt}"; K="${2:?K}"; W="${3:?w}"; ROOTS="${4:?корни через запятую}"; TSV="${5:-}"
+# Тип — как в манифесте, до пробела, `#` или кавычки; латиница — в нижний регистр.
+TYPE="$(printf '%s' "${6:-}" | sed "s/^[[:space:]\"']*//; s/[[:space:]#\"'].*\$//" | tr 'A-Z' 'a-z')"
 [ -f "$COUNTS" ] || { echo "НЕТ ФАЙЛА: $COUNTS"; exit 2; }
 [ -n "$TSV" ] && { : > "$TSV" 2>/dev/null || { echo "файл плана не пишется: $TSV" >&2; TSV=""; }; }
+# Без keys.awk плана нет: это не файл счётчика, а скилл, установленный не целиком (SKILL.md — сказать человеку).
+K_AWK="$(cat "$(dirname "$0")/keys.awk" 2>/dev/null)"
+[ -n "$K_AWK" ] || { echo "скилл установлен не целиком: нет $(dirname "$0")/keys.awk"; exit 2; }
 export LC_ALL=C
 
 # Файлы корней — для списка остатка и проверки путей счёта. Корня на диске нет — ни того, ни другого.
@@ -66,7 +76,7 @@ case ",$ROOTS" in *,[A-Za-z]:[\\/]*|*,\ [A-Za-z]:[\\/]*) WIN=1 ;; esac
 grep -q '^[A-Za-z]:[\\/]' "$COUNTS" 2>/dev/null && WIN=1
 
 # Корни — через окружение: `awk -v` разбирает в значении обратные слеши, и путь `C:\Users\…` портится.
-PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" PLAN_WORK="$(dirname "$COUNTS")" awk -v K="$K" -v W="$W" -v WIN="$WIN" '
+PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" PLAN_WORK="$(dirname "$COUNTS")" awk -v K="$K" -v W="$W" -v WIN="$WIN" -v TYPE="$TYPE" "$K_AWK"'
   # Путь к одному виду: прямые слеши, без хвостового слеша, диск `C:` в верхнем регистре; `/c/…` → `C:/…`;
   # двойные слеши схлопнуты, `/./` и `<папка>/../` раскрыты (ведущий собирает корень из `../<сервис>`).
   function np(p,   d) {
@@ -195,16 +205,19 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
   }
   # Обход дерева: спецификации и конфиги. Разведчик не назвал ни одной спецификации, а в дереве она есть —
   # строка «СПЕКА НЕ РАЗМЕЧЕНА» (ведущий повторяет разведчика, как при «узком маркере»). Назвал — сверяются
-  # только названные: остальные спеки, скорее всего, клиентские.
-  function discover(   f, r, rel, ln, k, isspec, named, i) {
+  # только названные: остальные спеки, скорее всего, клиентские. Названная клиентской — не сверяется никогда.
+  # Операции спеки — ключи контракта, топики конфига — ключи «Событий»: у типа без такой секции (keys.awk,
+  # «Форма по типу») их не ищут вовсе.
+  function discover(   f, r, rel, ln, k, isspec, named, i, wsp, wtp) {
     named = 0; for (f in specre) named++
+    wsp = k_typehas(TYPE, "контракт"); wtp = k_typehas(TYPE, "топики")
     while ((getline f < ENVIRON["PLAN_LIST"]) > 0) {
       sub(/\r$/, "", f); if (f == "") continue
       f = np(f); r = rootof(f); if (r == "") continue
       rel = substr(f, length(r) + 2); if (istest(rel) || rel ~ /^(target|build|dist)\//) continue
-      if (rel ~ /(^|\/)application\.ya?ml$/) topicsyaml(f)
-      else if (rel ~ /(^|\/)application\.properties$/) topicsprops(f)
-      if (rel ~ /\.ya?ml$/) {
+      if (wtp && rel ~ /(^|\/)application\.ya?ml$/) topicsyaml(f)
+      else if (wtp && rel ~ /(^|\/)application\.properties$/) topicsprops(f)
+      if (wsp && rel ~ /\.ya?ml$/) {
         isspec = 0; k = 0
         while (k < 40 && (getline ln < f) > 0) { k++; if (ln ~ /^(openapi|swagger):/) { isspec = 1; break } }
         close(f)
@@ -214,7 +227,8 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     close(ENVIRON["PLAN_LIST"])
     for (f in specre) { specparse(f); ospec[++nos] = f }
     if (!named) for (i = 1; i <= nds; i++) {
-      f = dspec[i]; specparse(f); if (OPN[f] == 0) continue
+      f = dspec[i]; if (f in clientspec) continue
+      specparse(f); if (OPN[f] == 0) continue
       ospec[++nos] = f
       printf "СПЕКА НЕ РАЗМЕЧЕНА: %s — операций %d, строки спецификации у разведчика нет\n", f, OPN[f]
     }
@@ -354,18 +368,27 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
   }
   # Контроль разведчика: «## контроль :: <класс> :: <файл> :: <число>» — не класс счёта.
   /^## контроль[ \t]*::/ {
-    h = substr($0, 4); n = split(h, hp, " :: "); cl = ""
+    h = substr($0, 4); n = split(h, hp, " :: "); cl = ""; skipcl = ""
     for (i = 1; i <= n; i++) { gsub(/^[ \t]+|[ \t]+$/, "", hp[i]); gsub(/[`"]/, "", hp[i]) }
-    if (n == 4 && hp[2] != "" && hp[4] ~ /^[0-9]+$/) { sub(/[ 	].*$/, "", hp[2]); ctlc[++nctl] = hp[2]; ctlr[nctl] = hp[3]; ctlf[nctl] = full(hp[3]); ctln[nctl] = hp[4] + 0 }
+    if (n == 4 && hp[2] != "" && hp[4] ~ /^[0-9]+$/) { sub(/[ 	].*$/, "", hp[2]); if (!k_typehas(TYPE, hp[2])) next; ctlc[++nctl] = hp[2]; ctlr[nctl] = hp[3]; ctlf[nctl] = full(hp[3]); ctln[nctl] = hp[4] + 0 }
     else { ctlbad++; if (ctlbad1 == "") ctlbad1 = substr($0, 1, 160) }
     next
   }
+  # Клиентская спека разведчика: «## клиентская спека :: <файл>» — не класс счёта; в сверку и вес не идёт.
+  /^## клиентская спека[ \t]*::/ {
+    h = substr($0, 4); n = split(h, hp, " :: "); cl = ""; skipcl = ""
+    sp = hp[n]; gsub(/^[ \t]+|[ \t]+$/, "", sp); gsub(/[`"]/, "", sp); if (sp != "") clientspec[full(sp)] = 1
+    next
+  }
   /^## / {
-    h = substr($0, 4); n = split(h, hp, " :: ")
+    h = substr($0, 4); n = split(h, hp, " :: "); skipcl = ""
     cl = hp[1]; kind = hp[n]; gsub(/^[ \t]+|[ \t]+$/, "", cl); gsub(/^[ \t]+|[ \t]+$/, "", kind)
     sub(/[ \t]*\(.*$/, "", kind)                       # пометка счётчика: «ключ (без маски)» — всё равно ключ
     hdr++
     if (n < 2 || cl == "" || (kind != "ключ" && kind != "ориентир")) { badh++; if (badh1 == "") badh1 = substr($0, 1, 160) }
+    # Класс, секции которого у типа нет (keys.awk, «Форма по типу»), — мимо итога, веса и плана, числом в вывод.
+    w1 = cl; sub(/[ \t].*$/, "", w1)
+    if (cl != "" && !k_typehas(TYPE, w1)) { skipcl = w1; if (!(w1 in dropn)) { dropo[++ndrop] = w1; dropn[w1] = 0 }; cl = ""; next }
     # Класс вне веса (`клиенты`): счёт тот же, что у остальных классов, только в вес нарезки он не идёт.
     w1 = cl; sub(/[ \t].*$/, "", w1); if (w1 == "клиенты") { cl = w1; nowt[cl] = 1 }
     # строка спецификации разведчика: «класс :: регэксп :: маска :: <файл спецификации> :: ключ»
@@ -373,6 +396,7 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     if (!(cl in seencl)) { seencl[cl] = 1; clist[++ncl] = cl }
     next
   }
+  skipcl != "" && /:[0-9]+[ \t]*$/ { c = $0; sub(/[ \t]+$/, "", c); sub(/.*:/, "", c); dropn[skipcl] += c; next }
   cl == "" { next }
   /:[0-9]+[ \t]*$/ {
     line = $0; sub(/[ \t]+$/, "", line)
@@ -422,6 +446,7 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     line = "итог по классам: " sums(tot, ""); o = sums(orn, "")
     if (o != "") line = line " | ориентир: " o
     print line
+    for (i = 1; i <= ndrop; i++) printf "класс %s: у типа %s секции нет — пометок %d, не считаются\n", dropo[i], TYPE, dropn[dropo[i]]
     # Вне веса — справочно: класс `клиенты` в итоге выше, но в вес и части не идёт.
     line = ""; for (cl in nowt) if (tot[cl] > 0) line = line (line == "" ? "" : "; ") cl " — в вес и нарезку не идёт"
     if (line != "") print "вне веса: " line
@@ -449,6 +474,7 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     }
     if (ctlbad > 0) printf "контроль не по форме «## контроль :: <класс> :: <файл> :: <число>»: %d; первый: %s\n", ctlbad, ctlbad1
     discover()
+    if (!k_typesplit(TYPE)) { printf "нарезка не нужна: тип %s не режется (вес %g)\n", TYPE, total; dump(); exit 0 }
     if (total <= K) { printf "нарезка не нужна: вес %g ≤ K=%g\n", total, K; dump(); exit 0 }
     if (ktotal == 0) { printf "нарезка не нужна: вес 0 ≤ K=%g по ключам (ориентир весит %g)\n", K, total; dump(); exit 0 }
     printf "вес сервиса %g при K=%g, w=%g\n", total, K, W

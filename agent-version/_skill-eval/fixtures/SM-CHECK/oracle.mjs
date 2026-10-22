@@ -77,6 +77,9 @@ export function kopis(h) {
   const k = norm(h);
   if (/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|query|mutation|subscription|rpc) /.test(k)) return kcanon('контракт', h) || k;
   if (/^(публикует|потребляет|транспорт) /.test(k)) return kcanon('топики', h) || k;
+  // вызов соседа: «<сервис> <вызов>» или «<сервис> :: <вызов>» — ключ «<сервис> :: <вызов>», как у строки карточки
+  const m = k.match(/^([^ :]+)(?: ::)? ((?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|query|mutation|subscription|rpc) .*)$/);
+  if (m) return `${m[1]} :: ${kopis(m[2])}`;
   return k;
 }
 const CANON_SECTIONS = new Set(['Публичный контракт', 'Владеет данными', 'Фоновые задачи', 'События']);
@@ -177,6 +180,23 @@ function bizKey(header) {
 
 export const GUARD_CLASSES = ['контракт', 'сущности', 'задачи', 'топики', 'экраны', 'потребляемые API', 'роли', 'зависит от'];
 
+// Сведённый ключ гарда (keys.awk k_role, k_dep, k_nopre) — второй проход, только для ключей без точной
+// пары: то же, записанное в двух сканах по-разному, — одна пара.
+const kRole = (k) => k.replace(/[ \t]*\(.*$/, '');
+export function kDep(k) {
+  let r = k.replace(/[ \t]*\(.*$/, '').replace(/([a-z0-9])([A-Z])/g, '$1-$2').replace(/[A-Z]/g, (c) => c.toLowerCase()).replace(/_/g, '-');
+  r = r.replace(/^clients?\./, '').replace(/^web-?client-?/, '');
+  while (/[.-](host|url|uri|endpoint|base-url)$/.test(r)) r = r.replace(/[.-](host|url|uri|endpoint|base-url)$/, '');
+  return r.replace(/-client$/, '');
+}
+const normPre = (pre) => { const p = (pre ?? '').replace(/\/+/g, '/').replace(/\/$/, '').replace(/^\//, ''); return p ? '/' + p : ''; };
+function kNoPre(k, pre) {
+  const m = k.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) (\/.*)$/);
+  const p = normPre(pre);
+  if (!m || !p) return k;
+  if (m[2] === p) return `${m[1]} /`;
+  return m[2].startsWith(p + '/') ? `${m[1]} ${m[2].slice(p.length)}` : k;
+}
 function guardKeys(card) {
   const rowMap = (rows, f) => new Map(rows.map((c) => [f(c), false]));
   return {
@@ -189,6 +209,36 @@ function guardKeys(card) {
     'роли': rowMap(card.tables.роли, roleKey),
     'зависит от': rowMap(card.tables.зависит, (c) => norm(c[0])),
   };
+}
+// Пары по классу в два прохода (check.sh gmatch): точный ключ, затем среди оставшихся — сведённый.
+function guardMatch(c, p, n, prefix) {
+  // путь контракта сводится только у черновика: прежняя карточка могла писаться без префикса, не наоборот
+  const gk = c === 'роли' ? kRole
+    : c === 'зависит от' ? (k) => kDep(k) || k
+    : c === 'контракт' && normPre(prefix) ? (k, side) => (side === 'd' ? kNoPre(k, prefix) : k) : null;
+  const P = [...p.keys()].sort(); const N = [...n.keys()].sort();
+  const mate = new Map(); const taken = new Set();
+  for (const k of P) if (n.has(k)) { mate.set(k, k); taken.add(k); }
+  if (gk) {
+    // в группе сведённого ключа пара — с наибольшим общим началом ключа (байты UTF-8, как в check.sh)
+    const lcp = (a, b) => { const x = Buffer.from(a), y = Buffer.from(b); let i = 0; while (i < x.length && i < y.length && x[i] === y[i]) i++; return i; };
+    const gp = new Map(); const gd = new Map();
+    for (const k of P) if (!mate.has(k)) { const x = gk(k, 'p'); if (!gp.has(x)) gp.set(x, []); gp.get(x).push(k); }
+    for (const k of N) if (!taken.has(k)) { const x = gk(k, 'd'); if (!gd.has(x)) gd.set(x, []); gd.get(x).push(k); }
+    for (const [x, ps] of gp) {
+      const ds = gd.get(x) ?? [];
+      for (;;) {
+        let best = -1; let bi; let bj;
+        for (const a of ps) { if (mate.has(a)) continue; for (const b of ds) { if (taken.has(b)) continue; const l = lcp(a, b); if (l > best) { best = l; bi = a; bj = b; } } }
+        if (best < 0) break;
+        mate.set(bi, bj); taken.add(bj);
+      }
+    }
+  }
+  const gone = P.filter((k) => !mate.has(k)).length;
+  const appeared = N.filter((k) => !taken.has(k)).length;
+  const emptied = P.filter((k) => mate.has(k) && p.get(k) && !n.get(mate.get(k))).length;
+  return [P.length, gone, appeared, emptied];
 }
 
 // ---------- опись ----------
@@ -254,7 +304,9 @@ function pathPrefix(p) {
 
 // ---------- всё вместе ----------
 
-export function analyze(opisText, draftText, prevText) {
+// opt.parts — нарезанный сервис (CHECK_PARTS): строки «Бизнес-правил» описи без блока сверяются с описями частей,
+// а не здесь («нет в черновике» их не считает); opt.prefix — общий префикс разведчика (CHECK_PREFIX) для ключа гарда.
+export function analyze(opisText, draftText, prevText, opt = {}) {
   const d = parseCard(draftText);
   const o = parseOpis(opisText);
   { // ключ описи вызовом при том же ключе без скобок — один ключ (после склейки частей бывают оба)
@@ -300,7 +352,9 @@ export function analyze(opisText, draftText, prevText) {
   for (const b of d.blocks.бизнес) add('бизнес', bizKey(b.header).key, b);
   for (const c of d.tables.экраны) add('экраны', norm(c[0]));
   for (const c of d.tables.роли) add('роли', roleKey(c));
-  for (const c of d.tables.api) add('потребляет', kopis(c[1] ?? ''));
+  // вызов соседа — ключ «<сервис> :: <вызов>» (как check.sh); строка описи с одним вызовом сводится к нему
+  const altApi = new Map();
+  for (const c of d.tables.api) { const full = `${norm(c[0])} :: ${kopis(c[1] ?? '')}`; add('потребляет', full); altApi.set(kopis(c[1] ?? ''), full); }
   for (const c of d.tables.зависит) add('зависит', norm(c[0]));
   for (const c of d.tables.состояние ?? []) add('состояние', norm(c[0]));
 
@@ -308,6 +362,7 @@ export function analyze(opisText, draftText, prevText) {
   const pair = new Map();
   const taken = new Set();
   for (const k of o.keys.keys()) if (idx.has(k)) { pair.set(k, k); taken.add(k); }
+  for (const k of o.keys.keys()) if (!pair.has(k) && altApi.has(k)) { pair.set(k, altApi.get(k)); taken.add(altApi.get(k)); }
   // второй проход — ключ контракта без HTTP-глагола сводится без хвоста в скобках («Svc.Assign(Req)»)
   const HTTP = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /;
   const nop = (k) => (HTTP.test(k) || !/[^ (]\(.*\)$/.test(k) ? k : k.replace(/\(.*\)$/, '')); // хвост-вызов: скобка без пробела перед ней
@@ -340,6 +395,7 @@ export function analyze(opisText, draftText, prevText) {
   const emptyList = [];
   for (const [k, v] of o.keys) {
     const e = pair.has(k) ? idx.get(pair.get(k)) : undefined;
+    if (!e && opt.parts && v.kind !== 'other') { byClass['«Бизнес-правила» — по описям частей'] = (byClass['«Бизнес-правила» — по описям частей'] ?? 0) + 1; continue; }
     if (!e) { missingInDraft++; byClass['без пары'] = (byClass['без пары'] ?? 0) + 1; continue; }
     byClass[e.cls] = (byClass[e.cls] ?? 0) + 1;
     if (v.fact && e.blocks.length > 0 && e.blocks.every((b) => !b.body)) { factEmpty++; emptyList.push(k); }
@@ -396,12 +452,7 @@ export function analyze(opisText, draftText, prevText) {
     const N = guardKeys(d);
     guard = {};
     for (const c of GUARD_CLASSES) {
-      const p = P[c];
-      const n = N[c];
-      const was = p.size;
-      const gone = [...p.keys()].filter((k) => !n.has(k)).length;
-      const appeared = [...n.keys()].filter((k) => !p.has(k)).length;
-      const emptied = [...p.keys()].filter((k) => n.has(k) && p.get(k) && !n.get(k)).length;
+      const [was, gone, appeared, emptied] = guardMatch(c, P[c], N[c], opt.prefix);
       guard[c] = [was, gone, appeared, emptied];
       if ((gone >= 3 && 3 * gone > was) || (emptied >= 3 && 3 * emptied > was)) fired.push(c);
     }
@@ -823,15 +874,15 @@ function markers(planText, parts, cardKeys, opisText, roles) {
 
 export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
   const rd = (p) => fs.readFileSync(p, 'utf8');
-  const res = analyze(rd(opisPath), rd(draftPath), prevPath ? rd(prevPath) : null);
+  const env = readEnv(envPath);
+  const res = analyze(rd(opisPath), rd(draftPath), prevPath ? rd(prevPath) : null, { parts: !!env.CHECK_PARTS, prefix: env.CHECK_PREFIX });
   const mp = findManifest(draftPath);
   res['кандидаты'] = candidates(rd(draftPath), mp ? manifestNames(rd(mp)) : null);
-  const env = readEnv(envPath);
   const rel = (v) => path.join(path.dirname(envPath), v);
   const P = env.CHECK_PARTS ? readParts(rel(env.CHECK_PARTS)) : null;
   let noPfx = [];
-  if (env.CHECK_PREFIX) {
-    const p = '/' + env.CHECK_PREFIX.replace(/\/$/, '').replace(/^\//, '');
+  const p = normPre(env.CHECK_PREFIX);
+  if (p) {
     const keys = new Set(parseCard(rd(draftPath)).blocks.контракт.map((b) => b.key));
     noPfx = [...keys].filter((k) => { const m = k.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) (\S+)/); return m && m[2] !== p && !m[2].startsWith(p + '/'); });
     res['черновик']['без префикса'] = noPfx.length;

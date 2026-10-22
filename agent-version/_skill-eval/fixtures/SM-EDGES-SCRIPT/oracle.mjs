@@ -105,7 +105,9 @@ export function edges(servicesDir, manifestPath, only = null) {
     let j = i + 1;
     while (j < lines.length && !lines[j].startsWith('## ')) j++;
     const block = [HEAD, '| Сервис | Что вызывает | Зачем |', '|---|---|---|', ...(list.length ? list : ['| — | | |']), ''];
-    const newText = lines.slice(0, i).join('') + block.map((l) => l + '\n').join('') + lines.slice(j).join('');
+    // концы строк секции — как у её заголовка в карточке (CRLF после выгрузки git на Windows), как в edges.sh
+    const eol = /\r\n$/.test(lines[i]) ? '\r\n' : '\n';
+    const newText = lines.slice(0, i).join('') + block.map((l) => l + eol).join('') + lines.slice(j).join('');
     cards[n] = { section: true, mirrors: list.length, skipped: skipped[n], lines: block, newText };
     M += list.length;
   }

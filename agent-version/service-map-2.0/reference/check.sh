@@ -35,19 +35,6 @@ parse_card() {
       if (s ~ /^(сообщение|ограничение) /) { gsub(/«|»/, "", s); gsub(/[ 	]+/, " ", s); sub(/[ 	]+$/, "", s) }
       return s
     }
-    function cls(sec) {
-      if (sec ~ /^## Публичный (контракт|API)/) return "контракт"
-      if (sec ~ /^## Владеет данными/) return "сущности"
-      if (sec ~ /^## Фоновые задачи/) return "задачи"
-      if (sec ~ /^## События/) return "топики"
-      if (sec ~ /^## Бизнес-правила/) return "бизнес"
-      if (sec ~ /^## Экраны/) return "экраны"
-      if (sec ~ /^## Роли и доступ/) return "роли"
-      if (sec ~ /^## Зависит от/) return "зависит"
-      if (sec ~ /^## Потребляемые API/) return "потребляет"
-      if (sec ~ /^## Состояние и данные/) return "состояние"   # фронт: что хранится — пара строкам описи
-      return ""
-    }
     function flush() { if (key != "") print c "\t" key "\t" body "\t" bad; key = ""; body = 0 }
     # Строка таблицы откладывается: за ней разделитель — это заголовок, иначе данные (части пишут строки
     # «Зависит от» и «Потребляемых API» без заголовка таблицы).
@@ -55,13 +42,13 @@ parse_card() {
       if (pend == "") return
       n = split(pend, cell, "|"); pend = ""
       k = norm(cell[2]); if (pc == "потребляет") k = k " :: " k_opis(cell[3])
-      if (pc == "роли") { p = index(k, " — "); if (p > 0) k = substr(k, 1, p - 1) }   # область в скобках — часть ключа
+      if (pc == "роли") { p = index(k, " — "); if (p > 0) k = substr(k, 1, p - 1) }   # область в скобках — часть ключа (гард сводит её, k_role)
       if (k == "" || k == "—" || k == "— :: ") return
       print pc "\t" k "\t0"
     }
     { sub(/\r$/, "") }
     !/^\|/ { rowout() }
-    /^## / { flush(); sec = $0; c = cls(sec); hdr = 0; next }
+    /^## / { flush(); sec = $0; c = k_cls(sec); hdr = 0; next }   # класс секции — keys.awk, «Форма по типу»
     /^### / {
       flush()
       if (c == "" || c == "экраны" || c == "роли" || c == "зависит" || c == "потребляет" || c == "состояние") next
@@ -176,7 +163,7 @@ DECL	блок при «объявлено без реализации»	блок
 PARTEMPTY	блоки части без фактов	у части больше половины блоков контракта без фактов — допиши факты из кода в эти блоки; факта в коде нет — блок оставь, не выдумывай
 RULES	правила частей	строки «Бизнес-правил» описей частей, которых нет в секции — допиши по описям частей (`<описи частей>`) и коду: сущность — блоком, значение — строкой с токеном в бэктиках, имя сообщения — в бэктиках в строке его блока
 REST	пункт остатка не пройден	пункт списка остатка без строки «> пройдено:» в описи — пройди пункт по брифу остатка и допиши строку описи `> пройдено: <пункт> — ключей N`
-SPEC	операция спецификации	операция спецификации без блока в карточке — найди её обработчик по `operationId` и допиши блок и строку описи, метод и путь — из спецификации; обработчика нет — строка описи `> объявлено без реализации`
+SPEC	операция спецификации	операция спецификации без блока в карточке — найди её обработчик по `operationId` — код, который принимает этот запрос (маппинг, реализация интерфейса API; вызов клиента к соседу — не обработчик), — и допиши блок и строку описи, метод и путь — из спецификации; обработчика нет — строка описи `> объявлено без реализации`
 TOPICS	топики	топики без блоков «Событий» — найди их слушатели и отправители и допиши блоки и строки описи; имя топика — из конфига, как в строке ниже
 SLOT	нет метки	блок «Событий» без строки-метки — допиши строку по коду; факта в коде нет — `не определено: <где>`
 INFRA	инфраструктура	«Зависит от» — инфраструктура из «Стека», а не сосед — убери строку из черновика и строку `зависит:` из описи
@@ -274,7 +261,7 @@ printf 'ключ не опознан — заголовок не по ключу
 # Общий префикс от разведчика стоит в каждом пути ключа REST; ключ без него — форма записи либо ручка
 # вне префикса, и тогда это видно по коду регистрации. Решает читающий по источнику, а не ты.
 : > "$TMP/NOPFX"
-PFX="${CHECK_PREFIX:-}"; PFX="${PFX%/}"; [ -z "$PFX" ] || PFX="/${PFX#/}"   # «api» из кода — тот же префикс, что «/api»
+PFX="$(printf '%s' "${CHECK_PREFIX:-}" | sed 's#//*#/#g; s#/$##')"; [ -z "$PFX" ] || PFX="/${PFX#/}"   # «api» из кода — тот же префикс, что «/api»; как k_nopre
 if [ -n "$PFX" ]; then
   awk -F'\t' -v p="$PFX" '$1 == "контракт" && $2 ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) / { s = $2; sub(/^[A-Z]+ /, "", s); if (s != p && index(s, p "/") != 1) print $2 }' \
     "$TMP/draft.k" | sort -u > "$TMP/NOPFX"
@@ -378,7 +365,7 @@ fi
 # строка описи без источника и без блока, ключ без единого факта и в описи, и в блоке — справка: последний
 # идёт человеку (Шаг 6).
 echo "== СВЕРКА ОПИСЬ → ЧЕРНОВИК"
-awk -F'\t' '
+awk -F'\t' -v parts="${CHECK_PARTS:+1}" '
   function nop(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
   function bop(k) { k = nop(k); sub(/^(query|mutation|subscription) /, "", k); return k }
   FILENAME == ARGV[1] { d[$2] = $3; cl[$2] = $1; dk[++nd] = $2; if (++rep[$1 SUBSEP $2] == 2 && $1 ~ /^(контракт|сущности|задачи|топики)$/) print "DUP\t" $2 " ~ " $2; if ($1 == "потребляет") { split($2, pp, " :: "); alt[pp[2]] = $2 }; next }
@@ -400,7 +387,7 @@ awk -F'\t' '
     for (j = 1; j <= nd; j++) { k = dk[j]; q = nop(k); if (cl[k] == "контракт" && q != k && (q in d) && cl[q] == "контракт") print "DUP\t" q " ~ " k }
     for (i = 1; i <= m; i++) {
       k = ok[i]; hit = oh[i]
-      if (hit == "") { print "MISS\t" k; if (sc[i] == 1) print "MISSRC\t" k; print "CLS\tбез пары"; continue }
+      if (hit == "") { print "MISS\t" k; if (sc[i] == 1) print "MISSRC\t" k; print "CLS\t" (parts != "" && k ~ /^(объект|сообщение|ограничение) / ? "«Бизнес-правила» — по описям частей" : "без пары"); continue }
       print "CLS\t" cl[hit]
       if (sc[i] == 0) print "NOSRCPAIR\t" k
       if (fc[i] > 0 && d[hit] == 0 && cl[hit] != "экраны" && cl[hit] != "роли" && cl[hit] != "зависит" && cl[hit] != "потребляет" && cl[hit] != "состояние") print "EMPTY\t" k
@@ -410,12 +397,18 @@ awk -F'\t' '
   }
 ' "$TMP/draft.k" "$TMP/opis" > "$TMP/join"
 for t in MISS MISSRC NOSRCPAIR EXTRA EMPTY DUP NOFACT; do grep "^$t	" "$TMP/join" | cut -f2- | sort > "$TMP/$t"; done
+# У нарезанного «Бизнес-правила» пишет голова: строки частей об одной отправке — один блок, поэтому строка
+# описи без своего блока — не пропуск; их сверка с описями частей ниже («против описей частей»). Блок без
+# строки описи («нет в описи») остаётся: так видно правило, которого нет ни у одной части.
+if [ -n "${CHECK_PARTS:-}" ]; then
+  grep -v -E '^(объект|сообщение|ограничение) ' "$TMP/MISS" > "$TMP/MISS.p"; mv "$TMP/MISS.p" "$TMP/MISS"
+fi
 printf 'нет в черновике: %d' "$(wc -l < "$TMP/MISS")"; [ -s "$TMP/MISS" ] && { printf ' — '; list "$TMP/MISS"; } || echo
 printf 'нет в описи: %d' "$(wc -l < "$TMP/EXTRA")"; [ -s "$TMP/EXTRA" ] && { printf ' — '; list "$TMP/EXTRA"; } || echo
 printf 'факт в описи, пустой блок: %d' "$(wc -l < "$TMP/EMPTY")"; [ -s "$TMP/EMPTY" ] && { printf ' — '; list "$TMP/EMPTY"; } || echo
 # «Бизнес-правила» сверяются своими проверками — в перечень ключей добора их строки не идут.
 bm=$(grep -c -E '^(объект|сообщение|ограничение) ' "$TMP/MISS"); be=$(grep -c '^бизнес: ' "$TMP/EXTRA")
-printf 'вне ключей — «Бизнес-правила»: нет в черновике %d, нет в описи %d\n' "$bm" "$be"
+[ -n "${CHECK_PARTS:-}" ] || printf 'вне ключей — «Бизнес-правила»: нет в черновике %d, нет в описи %d\n' "$bm" "$be"
 printf 'один ключ дважды — двумя блоками либо с хвостом в скобках и без: %d' "$(wc -l < "$TMP/DUP")"; [ -s "$TMP/DUP" ] && { printf ' — '; list "$TMP/DUP"; } || echo
 printf 'ключи без единого факта и в описи, и в карточке: %d' "$(wc -l < "$TMP/NOFACT")"; [ -s "$TMP/NOFACT" ] && { printf ' — '; list "$TMP/NOFACT"; } || echo
 # Блок контракта у ключа с пометкой «объявлено без реализации» — противоречие: обработчик есть — пометка
@@ -679,19 +672,60 @@ if [ -n "$PREV" ]; then
 echo "== ГАРД (прежняя $(basename "$PREV"))"
 parse_card "$PREV" > "$TMP/prev"
 ROUTE=ПОВЕРХ
+# Пары ключей прежней карточки и черновика по классу — в два прохода. Первый — ключ точно. Второй — только
+# среди оставшихся без пары, ключ сведён (keys.awk): роль — без области в скобках, сосед — без обвязки
+# клиента, путь контракта черновика — без общего префикса разведчика (прежняя карточка могла писаться без
+# него; обратное — другая ручка вне префикса, не то же). Так одно и то же, записанное в двух сканах
+# по-разному, потерей не считается, а разные ключи, сводимые к одному, не слипаются. Пары второго прохода
+# называются строкой «сведены». Повтор ключа — один ключ, тело — наибольшее.
+gmatch() {
+  awk -F'\t' -v c="$c" -v pre="${CHECK_PREFIX:-}" -v out="$TMP" "$K_AWK"'
+    function gk(k, side,   v) {
+      if (c == "роли") return k_role(k)
+      if (c == "зависит") { v = k_dep(k); return v == "" ? k : v }
+      if (c == "контракт" && pre != "") return side == "d" ? k_nopre(k, pre) : k
+      return ""
+    }
+    function isort(a, n,   i, j, t) { for (i = 2; i <= n; i++) { t = a[i]; for (j = i - 1; j > 0 && a[j] > t; j--) a[j + 1] = a[j]; a[j + 1] = t } }
+    function lcp(a, b,   i) { for (i = 1; i <= length(a) && substr(a, i, 1) == substr(b, i, 1); i++) ; return i - 1 }
+    $1 != c { next }
+    FILENAME == ARGV[1] { if (!($2 in pb)) { pk[++np] = $2; pb[$2] = 0 }; if ($3 > pb[$2]) pb[$2] = $3; next }
+    { if (!($2 in db)) { dk[++nd] = $2; db[$2] = 0 }; if ($3 > db[$2]) db[$2] = $3 }
+    END {
+      isort(pk, np); isort(dk, nd)
+      for (i = 1; i <= np; i++) if (pk[i] in db) { mate[pk[i]] = pk[i]; taken[pk[i]] = 1 }
+      # второй проход — по группам сведённого ключа; в группе пара — с наибольшим общим началом ключа
+      for (i = 1; i <= np; i++) if (!(pk[i] in mate) && (x = gk(pk[i], "p")) != "") gp[x, ++gpn[x]] = pk[i]
+      for (j = 1; j <= nd; j++) if (!(dk[j] in taken) && (x = gk(dk[j], "d")) != "") gd[x, ++gdn[x]] = dk[j]
+      for (x in gpn) {
+        if (!(x in gdn)) continue
+        while (1) {
+          best = -1
+          for (i = 1; i <= gpn[x]; i++) { a = gp[x, i]; if (a in mate) continue
+            for (j = 1; j <= gdn[x]; j++) { b = gd[x, j]; if (b in taken) continue
+              l = lcp(a, b); if (l > best) { best = l; bi = a; bj = b } } }
+          if (best < 0) break
+          mate[bi] = bj; taken[bj] = 1; print bi " → " bj > (out "/paired")
+        }
+      }
+      for (i = 1; i <= np; i++) { k = pk[i]
+        if (!(k in mate)) print k > (out "/gone")
+        else if (pb[k] > 0 && db[mate[k]] == 0) print k > (out "/emptied") }
+      for (j = 1; j <= nd; j++) if (!(dk[j] in taken)) print dk[j] > (out "/new")
+      print np + 0 > (out "/was")
+    }' "$TMP/prev" "$TMP/draft"
+}
 for c in контракт сущности задачи топики экраны потребляет роли зависит; do
-  awk -F'\t' -v c="$c" '$1==c {print $2 "\t" $3}' "$TMP/prev" | sort -u -t'	' -k1,1 > "$TMP/p.$c"
-  awk -F'\t' -v c="$c" '$1==c {print $2 "\t" $3}' "$TMP/draft" | sort -u -t'	' -k1,1 > "$TMP/d.$c"
-  was=$(wc -l < "$TMP/p.$c"); [ "$was" -eq 0 ] && [ ! -s "$TMP/d.$c" ] && continue
-  cut -f1 "$TMP/p.$c" > "$TMP/pk"; cut -f1 "$TMP/d.$c" > "$TMP/dk"
-  comm -23 "$TMP/pk" "$TMP/dk" > "$TMP/gone"; comm -13 "$TMP/pk" "$TMP/dk" > "$TMP/new"
-  join -t'	' "$TMP/p.$c" "$TMP/d.$c" | awk -F'\t' '$2 > 0 && $3 == 0 {print $1}' > "$TMP/emptied"
+  : > "$TMP/gone"; : > "$TMP/new"; : > "$TMP/emptied"; : > "$TMP/paired"
+  gmatch; was=$(cat "$TMP/was"); [ "$was" -eq 0 ] && [ ! -s "$TMP/new" ] && continue
+  sort -o "$TMP/paired" "$TMP/paired"
   g=$(wc -l < "$TMP/gone"); a=$(wc -l < "$TMP/new"); e=$(wc -l < "$TMP/emptied")
   name=$c; [ "$c" = зависит ] && name="зависит от"; [ "$c" = потребляет ] && name="потребляемые API"
   printf '%s: было %d, исчезло %d, появилось %d, опустело %d\n' "$name" "$was" "$g" "$a" "$e"
   [ "$g" -gt 0 ] && { printf '  исчезли: '; list "$TMP/gone"; }
   [ "$e" -gt 0 ] && { printf '  опустели: '; list "$TMP/emptied"; }
   [ "$a" -gt 0 ] && [ "$g" -gt 0 ] && { printf '  появились: '; list "$TMP/new"; }
+  [ -s "$TMP/paired" ] && { printf '  сведены (то же, записано иначе): '; list "$TMP/paired"; }
   if { [ "$g" -ge 3 ] && [ $((3 * g)) -gt "$was" ]; } || { [ "$e" -ge 3 ] && [ $((3 * e)) -gt "$was" ]; }; then
     ROUTE="В _pending"; echo "  ⇒ правило маршрута сработало на классе «$name»"
   fi

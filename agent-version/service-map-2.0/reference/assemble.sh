@@ -71,13 +71,7 @@ awk -v nokeyf="$TMP/nokey" -v tailf="$TMP/tails" "$K_AWK"'
     }
     return k
   }
-  function kcls(sec) {
-    if (sec ~ /^Публичный контракт/) return "контракт"
-    if (sec ~ /^События/) return "топики"
-    if (sec ~ /^Фоновые задачи/) return "задачи"
-    if (sec ~ /^Владеет данными/) return "сущности"
-    return ""
-  }
+  function kcls(sec,   c) { c = k_cls(sec); return (k_partsec(sec) && c != "потребляет") ? c : "" }   # класс блочной секции частей
   function header(sec, k,   d) {
     if (sec ~ /^События/ && k ~ /^(публикует|потребляет|транспорт) /) { d = k; sub(/ .*/, "", d); return "### " d " `" substr(k, length(d) + 2) "`" }
     return "### `" k "`"
@@ -145,12 +139,12 @@ awk -F'\t' -v OFS='\t' -v NEAR="$TMP/near" "$K_AWK"'
 # 1б. Каждой секции с блоками или строками частей нужна метка в каркасе головы.
 awk '{ sub(/\r$/, "") } /^## / { sec = substr($0, 4); sub(/[ \t]+$/, "", sec); print "H\t" sec; next }
      { l = $0; gsub(/^[ \t]+|[ \t]+$/, "", l); if (l == "<!-- части -->") print "M\t" sec }' "$DIR/head.md" > "$TMP/frame"
-awk -F'\t' '
+awk -F'\t' "$K_AWK"'
   FILENAME == ARGV[1] { if ($1 == "M") mark[$2] = 1; else hs[$2] = 1; next }
   ($1 == "B" || $1 == "R") && !($2 in mark) { if (!(($2 SUBSEP $6) in seen)) { seen[$2 SUBSEP $6] = 1; who[$2] = who[$2] (who[$2] == "" ? "" : ", ") $6 } }
   END {
     for (s in who) {
-      if (s ~ /^(Публичный (контракт|API)|Владеет данными|События|Фоновые задачи|Потребляемые API)/) print "HEAD\t" s "\t" who[s]
+      if (k_partsec(s)) print "HEAD\t" s "\t" who[s]
       else if (s in hs) print "DROP\t" s "\t" who[s]
       else print "PART\t" s "\t" who[s]
     }

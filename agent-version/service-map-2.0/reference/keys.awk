@@ -35,11 +35,17 @@ function k_canon(cls, h,   k, d, rest) {
   if (cls == "сущности" || cls == "задачи") return (k != "" && k !~ / /) ? k : ""
   return k
 }
-# Ключ строки описи: класс — по виду строки (у описи секций нет); не сводится — как есть.
-function k_opis(h,   k, c) {
+# Ключ строки описи: класс — по виду строки (у описи секций нет); не сводится — как есть. Вызов соседа
+# («Потребляемые API»: `<сервис> <вызов>` или `<сервис> :: <вызов>`) — тот же ключ, что у строки карточки:
+# `<сервис> :: <вызов>`.
+function k_opis(h,   k, c, s) {
   k = k_norm(h)
   if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|query|mutation|subscription|rpc) /) { c = k_canon("контракт", h); return c == "" ? k : c }
   if (k ~ /^(публикует|потребляет|транспорт) /) { c = k_canon("топики", h); return c == "" ? k : c }
+  if (k ~ /^[^ :]+( ::)? (GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|query|mutation|subscription|rpc) /) {
+    s = k; sub(/[ :].*$/, "", s); c = substr(k, length(s) + 1); sub(/^( ::)? /, "", c)
+    return s " :: " k_opis(c)
+  }
   return k
 }
 # Регистр — только у латиницы. toupper/tolower gawk под Windows (локаль C) меняют и байты кириллицы, и строка
@@ -50,3 +56,61 @@ function k_low(s,   r, i, c) { r = ""; for (i = 1; i <= length(s); i++) { c = su
 function k_fact(h) { return h ~ /^(зависит|состояние|справочник|сообщение|ограничение|роль|Роль):/ }
 # Ключ контракта вызовом («query night(id)», «Dome.Close(Req)») без скобок; у HTTP — как есть.
 function k_bare(k) { if (k ~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) /) return k; if (k ~ /[^ (]\(.*\)$/) sub(/\(.*\)$/, "", k); return k }
+# Форма по типу — как таблица порядка секций шаблона (card.template.md; сверяет проба SM-PLAN-TYPES).
+# Секция → класс пометок разведчика; у типа — его секции классов; секции частей — те, что пишут части
+# нарезки (brief-part.md) и склеивает assemble.sh. Тип режется, только если все его секции классов —
+# секции частей. Тип неизвестен — всё как у любого: классы все, нарезка по весу.
+function k_cls(sec) {
+  sub(/^## +/, "", sec)
+  if (sec ~ /^Публичный (контракт|API)/) return "контракт"
+  if (sec ~ /^Владеет данными/) return "сущности"
+  if (sec ~ /^Фоновые задачи/) return "задачи"
+  if (sec ~ /^События/) return "топики"
+  if (sec ~ /^Экраны/) return "экраны"
+  if (sec ~ /^Бизнес-правила/) return "бизнес"
+  if (sec ~ /^Роли и доступ/) return "роли"
+  if (sec ~ /^Зависит от/) return "зависит"
+  if (sec ~ /^Потребляемые API/) return "потребляет"
+  if (sec ~ /^Состояние и данные/) return "состояние"
+  return ""
+}
+function k_partsec(sec) { sub(/^## +/, "", sec); return sec ~ /^(Публичный контракт|Владеет данными|События|Фоновые задачи|Потребляемые API)/ }
+function k_typesecs(t) {
+  if (t == "backend") return "Публичный контракт|События|Фоновые задачи|Владеет данными"
+  if (t == "frontend") return "Экраны|Потребляемые API|Состояние и данные"
+  if (t == "fullstack") return "Публичный контракт|События|Фоновые задачи|Владеет данными|Экраны|Потребляемые API|Состояние и данные"
+  if (t == "lib") return "Публичный API"
+  return ""
+}
+function k_typehas(t, c,   s, n, i) {
+  if (c == "клиенты" || k_typesecs(t) == "") return 1
+  n = split(k_typesecs(t), s, "|"); for (i = 1; i <= n; i++) if (k_cls(s[i]) == c) return 1
+  return 0
+}
+function k_typesplit(t,   s, n, i) {
+  n = split(k_typesecs(t), s, "|"); for (i = 1; i <= n; i++) if (!k_partsec(s[i])) return 0
+  return 1
+}
+# Сведённый ключ гарда — для второго прохода сверки, только среди ключей без точной пары: то же, записанное
+# в двух сканах по-разному, сводится к одному. Роль — имя без области в скобках.
+function k_role(k) { sub(/[ \t]*\(.*$/, "", k); return k }
+# Сосед — без пояснения в скобках и без обвязки клиента, как в правиле имени шаблона («Как в коде»):
+# `client.skycam-legacy.host`, `SKYCAM_LEGACY_URL`, `SkycamLegacyClient` → `skycam-legacy`.
+function k_dep(k,   r, i, c, p) {
+  sub(/[ \t]*\(.*$/, "", k); r = ""; p = ""
+  for (i = 1; i <= length(k); i++) { c = substr(k, i, 1); if (c >= "A" && c <= "Z" && ((p >= "a" && p <= "z") || (p >= "0" && p <= "9"))) r = r "-"; r = r c; p = c }
+  r = k_low(r); gsub(/_/, "-", r)
+  sub(/^clients?\./, "", r); sub(/^web-?client-?/, "", r)   # `client-portal` — имя соседа, его не трогаем
+  while (sub(/[.-](host|url|uri|endpoint|base-url)$/, "", r)) ;
+  sub(/-client$/, "", r)
+  return r
+}
+# Путь контракта — без общего префикса приложения: «GET /api/nights» при префиксе `api` → «GET /nights».
+function k_nopre(k, pre,   v, p) {
+  if (k !~ /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) \//) return k
+  p = pre; gsub(/\/+/, "/", p); sub(/\/$/, "", p); if (p !~ /^\//) p = "/" p; if (p == "/") return k
+  v = k; sub(/ .*/, "", v); k = substr(k, length(v) + 2)
+  if (k == p) return v " /"
+  if (substr(k, 1, length(p) + 1) == p "/") return v " " substr(k, length(p) + 1)
+  return v " " k
+}
