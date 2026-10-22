@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url'
 import { sectionByTitle } from './br-lib.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const EPIC = join('AI-SDD', 'docs', 'PSS-40')
+const EPIC = join('AI-SDD', 'coddoc', 'PSS-40')
 const KIDS = ['PSS-41', 'PSS-42']
 const SECTIONS = [['1.4', /как\s+сейчас/i], ['3.4', /внешн\S*\s+зависим/i], ['4.3', /бизнес[- ]?данн/i]]
 const RE_INHERITED = /^\s*унаследовано из эпика\s+`?PSS-40`?\.?\s*$/im

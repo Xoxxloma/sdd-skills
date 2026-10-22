@@ -17,16 +17,16 @@
 
 | N | Скилл | Вызов | Ответы аналитика | Конец стадии | Выход |
 |---|---|---|---|---|---|
-| 1 | `meeting-intake` | `stage-1-prompt.txt` | `stage-1-turn2.txt` на каждый ход | появился `docs/…/meeting-2026-10-14….points….md` | список + разбор в `docs/_inbox/` |
+| 1 | `meeting-intake` | `stage-1-prompt.txt` | `stage-1-turn2.txt` на каждый ход | появился `coddoc/…/meeting-2026-10-14….points….md` | список + разбор в `coddoc/_inbox/` |
 | 2 | `analyst-notebook` | `stage-2-prompt.txt` с `{{POINTS}}` | двойник `stage-2-twin-card.md` (`twin-objector.md`) | в ноуте строка `> исходник:` со списком или `### N · встреча` | новая запись ноута |
 | 3 | `analyst-notebook` | `stage-3-prompt.txt` | `stage-3-turn2.txt` на каждый ход | появился `notes/<тема>/notebook-<дата>.points.md` | выгрузка |
-| 4 | `notes-to-intent` | `stage-4-prompt.txt` с `{{LIST}}` | двойник `stage-4-twin-card.md` (`twin-objector.md`) | появился `docs/…/notebook-…-(bt\|spec).md` | вход |
+| 4 | `notes-to-intent` | `stage-4-prompt.txt` с `{{LIST}}` | двойник `stage-4-twin-card.md` (`twin-objector.md`) | появился `coddoc/…/notebook-…-(bt\|spec).md` | вход |
 
 Потолки ходов — как у одиночных проб тех же скиллов: 20, 5, 3, 10.
 
 | Плейсхолдер | Глоб от корня песочницы | Ждём |
 |---|---|---|
-| `{{POINTS}}` | `docs/*/meeting-2026-10-14*.points.md` | `docs/_inbox/meeting-2026-10-14.points.md` |
+| `{{POINTS}}` | `coddoc/*/meeting-2026-10-14*.points.md` | `coddoc/_inbox/meeting-2026-10-14.points.md` |
 | `{{LIST}}` | `notes/заявки-на-ремонт-в-общежитии/notebook-*.points.md` | `notes/заявки-на-ремонт-в-общежитии/notebook-<дата прогона>.points.md` |
 
 Конец стадии 2 — не `S2_DONE_VAR=POINTS`: путь списка уже стоит в разборе стадии 1 (`> Список:`), и стадия
@@ -40,6 +40,6 @@
 
 ## Что смотреть
 
-Итоговый вход — `docs/_inbox/notebook-<дата прогона>-bt.md`. Ожидания по стадиям, факты итога, стыки форм и
+Итоговый вход — `coddoc/_inbox/notebook-<дата прогона>-bt.md`. Ожидания по стадиям, факты итога, стыки форм и
 ловушки — `expected.md`. Проверка — по файлам всех стадий (`run-<i>/stage-<k>/run-1/`): красное на стадии N
 называет стадию.

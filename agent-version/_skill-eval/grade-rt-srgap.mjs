@@ -108,37 +108,37 @@ function selftest () {
   const ck = (n, got, want) => { const ok = got === want; if (!ok) bad++; console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${n}: ${got} (ожидалось ${want})`) }
   const ev = (name, input, parent = null) => JSON.stringify({ type: 'assistant', parent_tool_use_id: parent, message: { content: [{ type: 'tool_use', name, input }] } })
   const lead = [
-    ev('Skill', { skill: 'spec-readiness', args: 'C:/sb/docs/PSS-2210/technical_specification.md' }),
-    ev('Agent', { prompt: 'Прочитай таблицу следствий по пути C:/sb/.claude/skills/spec-readiness/reference/probe-backend.md и разбери по ней файл C:/sb/docs/PSS-2210/technical_specification.md.' }),
+    ev('Skill', { skill: 'spec-readiness', args: 'C:/sb/coddoc/PSS-2210/technical_specification.md' }),
+    ev('Agent', { prompt: 'Прочитай таблицу следствий по пути C:/sb/.claude/skills/spec-readiness/reference/probe-backend.md и разбери по ней файл C:/sb/coddoc/PSS-2210/technical_specification.md.' }),
     ev('Agent', { prompt: 'probe-frontend.md … technical_specification.md' }),
     ev('Agent', { prompt: 'probe-contract.md … technical_specification.md' }),
     ev('Agent', { prompt: 'probe-verify.md … technical_specification.md' }),
   ]
   // Чтение спеки ролью — работа роли, ведущему не засчитывается.
-  const sub = ev('Read', { file_path: 'C:/sb/docs/PSS-2210/technical_specification.md' }, 'toolu_role1')
+  const sub = ev('Read', { file_path: 'C:/sb/coddoc/PSS-2210/technical_specification.md' }, 'toolu_role1')
   const m = measureTurn(leadCalls([...lead, sub].join('\n')))
   ck('ролей поднято', m.agents, 4)
   ck('чтение роли — НЕ чтение ведущего', m.specReads, 0)
   ck('записей нет', m.writes, 0)
   ck('services не утекли', m.servicesLeak, 0)
   const dirty = measureTurn(leadCalls([...lead,
-    ev('Read', { file_path: 'C:/sb/docs/PSS-2210/technical_specification.md' }),
-    ev('Bash', { command: 'cat docs/PSS-2210/technical_specification.md' }),
+    ev('Read', { file_path: 'C:/sb/coddoc/PSS-2210/technical_specification.md' }),
+    ev('Bash', { command: 'cat coddoc/PSS-2210/technical_specification.md' }),
     ev('Write', { file_path: 'C:/sb/readiness.md', content: 'x' }),
     ev('Agent', { prompt: 'Сверь со services/auth.md и technical_specification.md' }),
   ].join('\n')))
   ck('ведущий читал спеку — оба способа', dirty.specReads, 2)
   ck('запись ведущего видна', dirty.writes, 1)
   ck('утечка services видна', dirty.servicesLeak, 1)
-  ck('Glob по спеке — НЕ чтение', measureTurn(leadCalls(ev('Bash', { command: 'ls docs/PSS-2210/technical_specification.md' }))).specReads, 0)
+  ck('Glob по спеке — НЕ чтение', measureTurn(leadCalls(ev('Bash', { command: 'ls coddoc/PSS-2210/technical_specification.md' }))).specReads, 0)
   // Ход проверки и узел после отчёта — по файлам хода.
   const sb = join(tmpdir(), 'rt-srgap-selftest')
   rmSync(sb, { recursive: true, force: true })
   mkdirSync(sb, { recursive: true })
-  writeFileSync(join(sb, 'stream.jsonl'), ev('Skill', { skill: 'technical-spec-doc', args: 'docs/PSS-2210/business_requirements.md' }))
+  writeFileSync(join(sb, 'stream.jsonl'), ev('Skill', { skill: 'technical-spec-doc', args: 'coddoc/PSS-2210/business_requirements.md' }))
   writeFileSync(join(sb, 'answer-01.md'), 'Спека записана.\n1. Проверить спеку\n2. Доработать спеку\n3. Разбить на этапы\n4. Начать другую задачу')
   writeFileSync(join(sb, 'stream-02.jsonl'), lead.join('\n'))
-  writeFileSync(join(sb, 'answer-02.md'), 'спека: docs/PSS-2210/technical_specification.md\nвопросов задано: 9 · осталось: 5\n\nЧто дальше?\n1. Проверить спеку\n2. Доработать спеку\n3. Разбить на этапы\n4. Начать другую задачу')
+  writeFileSync(join(sb, 'answer-02.md'), 'спека: coddoc/PSS-2210/technical_specification.md\nвопросов задано: 9 · осталось: 5\n\nЧто дальше?\n1. Проверить спеку\n2. Доработать спеку\n3. Разбить на этапы\n4. Начать другую задачу')
   const g = gradeRun(sb)
   ck('проверка в ходе 2', g.turn, 2)
   ck('узел после отчёта', g.nodeAfter, true)

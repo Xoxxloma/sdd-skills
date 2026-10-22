@@ -1,5 +1,5 @@
 context/conventions.md
-docs/ACS-208/business_requirements.md
+coddoc/ACS-208/business_requirements.md
 q-prompt.txt
 README.md
 services/idm.md

@@ -75,8 +75,8 @@ FE portal-web, владелец команда портала. Бэкенд и �
 Синхронность, кэш/TTL, опрос/обновление, таймауты и нагрузка неизменны.
 Остальные решения — явно подтверждённое содержание документа-источника.
 `
-const sourcePath = 'docs/UA-410/change_request.md'
-const specPath = 'docs/UA-410/technical_specification.md'
+const sourcePath = 'coddoc/UA-410/change_request.md'
+const specPath = 'coddoc/UA-410/technical_specification.md'
 const request = `Явный флаг от analyst-workspace: мелкая правка. Документ сверху: ${sourcePath}.\n${answers}`
 add('ua-label', { [sourcePath]: baseSource }, request, { target: specPath, kind: 'write' })
 const timeout = baseSource.replace('текст кнопки', 'таймаут отправки')
@@ -110,8 +110,8 @@ approved, созданные с 1 по 5 октября 2026. Пересчёт �
 ## Приложения
 Приложений нет.
 `
-add('ua-damaged', { 'docs/UA-410/bug_report.md': damaged }, `Явный флаг багфикса от analyst-workspace.
-Документ сверху docs/UA-410/bug_report.md. Это ПРОДОЛЖЕНИЕ: на заданные вопросы подтверждаю
+add('ua-damaged', { 'coddoc/UA-410/bug_report.md': damaged }, `Явный флаг багфикса от analyst-workspace.
+Документ сверху coddoc/UA-410/bug_report.md. Это ПРОДОЛЖЕНИЕ: на заданные вопросы подтверждаю
 все границы из репорта. Данные испорчены: нужен именно указанный пересчёт старых заявок.
 Схему не меняем. Откат кода не отменяет уже исправленные суммы; это допустимо. Ключ UA-410.
 `, { target: specPath, kind: 'write' })
@@ -137,7 +137,7 @@ FR-1: нажать новую кнопку — виден дословный т�
 ## Приложения
 Приложений нет.
 `
-add('ua-feature', { 'docs/UA-410/business_requirements.md': feature }, `Документ сверху docs/UA-410/business_requirements.md, обычный режим.
+add('ua-feature', { 'coddoc/UA-410/business_requirements.md': feature }, `Документ сверху coddoc/UA-410/business_requirements.md, обычный режим.
 ${answers} Вместо изменения текста делаем новый локальный диалог по БТ. Локальные состояния
 и открытие/закрытие спроектируй по подтверждённому поведению; фокус и закрытие по БТ.
 `, { target: specPath, kind: 'write' })
@@ -207,7 +207,7 @@ for (const [id, spec, expect] of [
   ['ua-review-open', clean.replace('Не применимо: доступ и его проверка не меняются.', '❓ TBD: требуется подтвердить доступ'), ['11: open item struck', '6/10: open status']]
 ]) {
   const inputs = { [sourcePath]: baseSource, [specPath]: spec }
-  if (id === 'ua-review-reliability') inputs['docs/UA-410/business_requirements.md'] = readFileSync(join(import.meta.dirname, 'fixtures/TS-CONV/docs/ARS-201/business_requirements.md'), 'utf8').replaceAll('ARS-201', 'UA-410')
+  if (id === 'ua-review-reliability') inputs['coddoc/UA-410/business_requirements.md'] = readFileSync(join(import.meta.dirname, 'fixtures/TS-CONV/coddoc/ARS-201/business_requirements.md'), 'utf8').replaceAll('ARS-201', 'UA-410')
   add(id, inputs, reviewPrompt, { skill: join(snap, 'spec-review/SKILL.md'), target: specPath, kind: 'review', expected: expect })
 }
 
@@ -228,12 +228,12 @@ for (const [id, fixture, p, second] of registry) {
   if (!existsSync(join(dir, p))) throw new Error('Нет входа ' + fixture + '/' + p)
   const work = join(round, id, 'run-01')
   mkdirSync(work, { recursive: true })
-  for (const e of readdirSync(dir, { withFileTypes: true })) if (e.isDirectory() && ['docs','services','context'].includes(e.name)) cpSync(join(dir, e.name), join(work, e.name), { recursive: true })
+  for (const e of readdirSync(dir, { withFileTypes: true })) if (e.isDirectory() && ['coddoc','services','context'].includes(e.name)) cpSync(join(dir, e.name), join(work, e.name), { recursive: true })
   const prompt = readFileSync(join(dir, p), 'utf8')
   writeFileSync(join(work, 'prompt.txt'), prompt)
   if (second) writeFileSync(join(work, 'turn2.txt'), readFileSync(join(dir, second), 'utf8'))
   writeFileSync(join(work, 'INPUT-HASHES.json'), JSON.stringify(files(work), null, 2) + '\n')
-  const taskPath = prompt.match(/docs\/[A-Za-z0-9_-]+\/(?:business_requirements|bug_report|technical_specification)\.md/)?.[0]
+  const taskPath = prompt.match(/coddoc\/[A-Za-z0-9_-]+\/(?:business_requirements|bug_report|technical_specification)\.md/)?.[0]
   const target = id.startsWith('bfg-') ? null : taskPath?.replace(/[^/]+$/, 'technical_specification.md')
   if (id.startsWith('bfg-')) writeFileSync(join(work, '_seeded.txt'), files(work).filter(f => f.path.endsWith('.md')).map(f => f.path).join('\n') + '\n')
   manifest.push({ id, work, target, skill: join(snap, id.startsWith('rv-') ? 'spec-review/SKILL.md' : 'technical-spec-doc/SKILL.md'),

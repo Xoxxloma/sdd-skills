@@ -1,6 +1,6 @@
 ---
 name: technical-spec-doc
-version: 1.4.1
+version: 1.5.0
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
 description: 'Turns a confirmed business-requirements doc (БТ/BRD/SRS) into ONE Russian Markdown technical spec (technical_specification.md, saved next to the БТ), organized around INTERACTIONS — the new and changed contracts crossing service or FE/BE boundaries — so a frontend agent and a backend agent code against the same contracts and meet without after-the-fact stitching. There is no code to read: NEW things are designed fully (path, schema, JSON example); anything about an EXISTING service is written only as the analyst confirmed it — inventing an endpoint of a service you cannot see is the worst failure of this skill. Requires a ready БТ (or, by orchestrator flag, a bug report, a change request or an epic-БТ for foundation node #0): given only a brief or an idea it refuses and asks for the business requirements. Use when the БТ is ready and a dev spec is needed.'
@@ -200,7 +200,7 @@ Also capture the **directory of the БТ file** (the spec is saved there, Step 4
 task number** — normally the name of that folder, else the БТ filename/title/header (`ARS-123`,
 «Задача №…»). The candidate only pre-fills the question in Step 3; it is never assumed.
 
-Children live **inside** their parent's folder (`docs/<EPIC-KEY>/<CHILD-KEY>/`), so if the folder
+Children live **inside** their parent's folder (`coddoc/<EPIC-KEY>/<CHILD-KEY>/`), so if the folder
 you were pointed at contains sub-folders with their own business-requirements docs, you were handed
 an **epic**, not a leaf node. Don't pick a child yourself and don't spec the epic — ask which node
 to write. The folder-name derivation still works unchanged for a leaf: the child's folder is named

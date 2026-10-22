@@ -13,7 +13,7 @@
 import { readFileSync } from 'node:fs'
 
 const KEY = readFileSync(new URL('./fixtures/SR-VERIFY/KEY.md', import.meta.url), 'utf8')
-const SPEC = readFileSync(new URL('./fixtures/SR-VERIFY/docs/PSS-2210/technical_specification.md', import.meta.url), 'utf8')
+const SPEC = readFileSync(new URL('./fixtures/SR-VERIFY/coddoc/PSS-2210/technical_specification.md', import.meta.url), 'utf8')
 const skel = s => s.replace(/\s+/g, '').replace(/[«»"„“”`|]/g, '').toLowerCase()
 const spec = skel(SPEC)
 

@@ -1,8 +1,8 @@
 # REC-FINISH — встреча по памяти: пересказ в ответе на Шаг 0, дата не названа, «давай закончим» посреди раундов
 
 Скилл `meeting-recall`, проба `rec-finish` (`PLAN-LOOP-HARDEN.md`, Н13; баги 6, 7, 11). Двойник аналитика:
-`_skill-eval/twin-analyst.md` + `twin-card.md`. Засев пустой (`seed/docs/.keep`): ключ `ATL-63` двойник назовёт сам,
-документа задачи нет — протокол ложится в `docs/ATL-63/`.
+`_skill-eval/twin-analyst.md` + `twin-card.md`. Засев пустой (`seed/coddoc/.keep`): ключ `ATL-63` двойник назовёт сам,
+документа задачи нет — протокол ложится в `coddoc/ATL-63/`.
 
 Как было на встрече (только грейдеру и человеку; двойник этого не видит):
 - 11 октября 2026, ателье на Литейном;
@@ -37,7 +37,7 @@
 
 Строка пробы для `run-ctx-v2.sh` (рядом с `rec-inline`; имя `rec-finish` добавить и в список `*)`):
 
-    rec-finish) FIXTURE=REC-FINISH; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+    rec-finish) FIXTURE=REC-FINISH; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=18; IDLE_MAX=18; DONE_RE='/coddoc/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
 
 Промпт двойника править не нужно: дата «на днях», пересказ в ответе на Шаг 0 и «давай закончим» — в карточке, как у
 RECALL-INLINE. Риск: вторую тему двойник считает сам, по вопросам с префиксом «<тема>: ». Сольёт агент темы в один

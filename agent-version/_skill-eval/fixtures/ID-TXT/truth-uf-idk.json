@@ -1,6 +1,6 @@
 {
   "key": "VSL-23",
-  "source": "docs/VSL-23/client-process.txt",
+  "source": "coddoc/VSL-23/client-process.txt",
   "nodes": [
     {"id": "d2", "fr": 1, "kind": "decision", "stems": ["найд"]},
     {"id": "s4", "fr": 1, "kind": "step", "stems": ["выда"]},

@@ -6,7 +6,7 @@
 //
 // Критерии — fixtures/MR-NEW/README.md и fixtures/MR-CHG/README.md (записаны до прогона; здесь только
 // переведены в проверки, номер проверки = номер критерия). Грейдится ФАЙЛ: вход
-// `docs/<KEY>/meeting-2026-10-14-bt.md` и разбор рядом; документ задачи из засева — байт в байт.
+// `coddoc/<KEY>/meeting-2026-10-14-bt.md` и разбор рядом; документ задачи из засева — байт в байт.
 // Вне критериев, предупреждениями: протокол тронут, цитаты разбора не сходятся с протоколом (±2), лишние файлы.
 //
 // ОДИНОЧНЫЙ РЕЖИМ — АРХИВ, ПУТЬ 1.x. `node grade-mr.mjs <каталог> --fx …` грейдил вход meeting-intake 1.x из протокола
@@ -24,9 +24,9 @@ const lf = (s) => s.replace(/\r\n/g, '\n')
 const read = (p) => lf(readFileSync(p, 'utf8'))
 const RE_API_FAILURE = /API Error|Request not allowed|Please run \/login|Credit balance|rate limit|session limit|usage limit/i
 
-const PROTO_NEW = 'docs/FIT-412/meeting-2026-10-14.recall.md'
-const PROTO_CHG = 'docs/MED-77/meeting-2026-10-14.recall.md'
-const BT_CHG = 'docs/MED-77/business_requirements.md'
+const PROTO_NEW = 'coddoc/FIT-412/meeting-2026-10-14.recall.md'
+const PROTO_CHG = 'coddoc/MED-77/meeting-2026-10-14.recall.md'
+const BT_CHG = 'coddoc/MED-77/business_requirements.md'
 
 // Регулярки — литералы; граница слова для кириллицы — `(^|[^а-яё])`, `\b` в JS только ASCII. Новые — через `w()`.
 const w = (stem, flags = 'i') => new RegExp('(^|[^а-яёa-z])' + stem, flags)
@@ -52,16 +52,16 @@ export const FX = {
   NEW: {
     seed: { [PROTO_NEW]: `fixtures/MR-NEW/seed/${PROTO_NEW}` },
     proto: PROTO_NEW,
-    inputRel: 'docs/FIT-412/meeting-2026-10-14-bt.md',
-    razborRel: 'docs/FIT-412/meeting-2026-10-14.razbor.md',
+    inputRel: 'coddoc/FIT-412/meeting-2026-10-14-bt.md',
+    razborRel: 'coddoc/FIT-412/meeting-2026-10-14.razbor.md',
     criteria: 8,
   },
   CHG: {
     seed: { [PROTO_CHG]: `fixtures/MR-CHG/seed/${PROTO_CHG}`, [BT_CHG]: `fixtures/MR-CHG/seed/${BT_CHG}` },
     proto: PROTO_CHG,
     doc: BT_CHG,
-    inputRel: 'docs/MED-77/meeting-2026-10-14-bt.md',
-    razborRel: 'docs/MED-77/meeting-2026-10-14.razbor.md',
+    inputRel: 'coddoc/MED-77/meeting-2026-10-14-bt.md',
+    razborRel: 'coddoc/MED-77/meeting-2026-10-14.razbor.md',
     criteria: 7,
   },
 }
@@ -319,7 +319,7 @@ const GOOD = {
     input: `# Встреча 2026-10-14: Правки отмены записи
 
 > Задача: MED-77 · цель: правки БТ
-> Документ: docs/MED-77/business_requirements.md
+> Документ: coddoc/MED-77/business_requirements.md
 > Встреча: 2026-10-14 · решали: заказчик — Зайцева О.
 
 ## Решено

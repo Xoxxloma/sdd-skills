@@ -4,8 +4,8 @@
 //   node grade-minb.mjs <каталог проб> --fx IN|OUT|REC|ANS|SAME
 //   node grade-minb.mjs --selftest
 //
-// Грейдится ФАЙЛ в песочнице, а не отчёт. IN — вход `docs/PVZ-318/notebook-<дата>-bt.md` по анкерам
-// fixtures/MI-NB-IN/expected.md; ANS — вход `docs/RET-214/notebook-<дата>-bt.md` из ноута с `отвечает на:`
+// Грейдится ФАЙЛ в песочнице, а не отчёт. IN — вход `coddoc/PVZ-318/notebook-<дата>-bt.md` по анкерам
+// fixtures/MI-NB-IN/expected.md; ANS — вход `coddoc/RET-214/notebook-<дата>-bt.md` из ноута с `отвечает на:`
 // (fixtures/MI-NB-ANS/expected.md); OUT, REC и SAME — новая запись в конце ноута по
 // fixtures/MI-NB-{OUT,REC,SAME}/expected.md. Разбор — каждая цитата сверяется со строкой источника ±2 (ноут,
 // расшифровка или протокол), как в grade-meet.mjs; у каждой строки `цитаты:` — текст в кавычках (Шаг 8). Ответы
@@ -27,8 +27,8 @@ const NB = 'notes/посылки-от-частных-лиц/notebook.md'
 const NB_REC = 'notes/отмена-записи/notebook.md'
 const NB_ANS = 'notes/возврат-товара-без-чека/notebook.md'
 const CALL = 'calls/2026-10-10-pvz-kak-seychas.txt'
-const BT77 = 'docs/MED-77/business_requirements.md'
-const REC77 = 'docs/MED-77/meeting-2026-10-14.recall.md'
+const BT77 = 'coddoc/MED-77/business_requirements.md'
+const REC77 = 'coddoc/MED-77/meeting-2026-10-14.recall.md'
 
 // Граница слова для кириллицы — `(^|[^а-яё])`: `\b` в JS только ASCII. Новые регулярки по кириллице — через `w()`.
 const w = (stem, flags = 'i') => new RegExp('(^|[^а-яёa-z])' + stem, flags)
@@ -80,24 +80,24 @@ export const FX = {
     kind: 'input',
     seed: { [NB]: `fixtures/MI-NB-IN/seed/${NB}` },
     source: `fixtures/MI-NB-IN/seed/${NB}`,
-    inputRe: /^docs\/PVZ-318\/notebook-(\d{4}-\d\d-\d\d)-bt\.md$/,
-    razborRe: /^docs\/PVZ-318\/notebook-(\d{4}-\d\d-\d\d)\.razbor\.md$/,
+    inputRe: /^coddoc\/PVZ-318\/notebook-(\d{4}-\d\d-\d\d)-bt\.md$/,
+    razborRe: /^coddoc\/PVZ-318\/notebook-(\d{4}-\d\d-\d\d)\.razbor\.md$/,
     razborHeading: /^#{2,3} Во вход/m,
     minQuotes: 6,
     keyAsk: 'warn',
-    inputName: 'docs/PVZ-318/notebook-<дата>-bt.md',
+    inputName: 'coddoc/PVZ-318/notebook-<дата>-bt.md',
   },
   // 1.1.0: `отвечает на:` в ноуте на входе закрывает открытый вопрос (fixtures/MI-NB-ANS/expected.md).
   ANS: {
     kind: 'input',
     seed: { [NB_ANS]: `fixtures/MI-NB-ANS/seed/${NB_ANS}` },
     source: `fixtures/MI-NB-ANS/seed/${NB_ANS}`,
-    inputRe: /^docs\/RET-214\/notebook-(\d{4}-\d\d-\d\d)-bt\.md$/,
-    razborRe: /^docs\/RET-214\/notebook-(\d{4}-\d\d-\d\d)\.razbor\.md$/,
+    inputRe: /^coddoc\/RET-214\/notebook-(\d{4}-\d\d-\d\d)-bt\.md$/,
+    razborRe: /^coddoc\/RET-214\/notebook-(\d{4}-\d\d-\d\d)\.razbor\.md$/,
     razborHeading: /^#{2,3} Во вход/m,
     minQuotes: 5,
     keyAsk: 'warn',
-    inputName: 'docs/RET-214/notebook-<дата>-bt.md',
+    inputName: 'coddoc/RET-214/notebook-<дата>-bt.md',
     gradeInput: (text, razbor) => gradeInputANS(text, razbor),
   },
   OUT: {
@@ -583,7 +583,7 @@ export function gradeRun (dir, fx) {
     if (razbors.length !== 1) red.push(razbors.length ? `разборов в папке ноута ${razbors.length}` : 'нет разбора в папке ноута')
     if (strayRazbors.length) red.push('разбор не в папке ноута: ' + strayRazbors.join(', '))
     if (inputs.length) red.push('записан вход: ' + inputs.join(', '))
-    if (fx.noDocs && (existsSync(join(dir, 'docs')) || files.some((f) => f.startsWith('docs/')))) red.push('создана папка docs/')
+    if (fx.noDocs && (existsSync(join(dir, 'coddoc')) || files.some((f) => f.startsWith('coddoc/')))) red.push('создана папка coddoc/')
     mine = [fx.notebook, ...razbors, ...strayRazbors, ...inputs]
     if (RE_NO_DECISIONS.test(dialog)) info.push('в ответах «решений нет»')
   }
@@ -614,7 +614,7 @@ const DATE = '2026-10-15'
 const ETALON = {
   IN: {
     files: {
-      [`docs/PVZ-318/notebook-${DATE}-bt.md`]: `# Ноут посылки от частных лиц в пунктах выдачи на ${DATE}
+      [`coddoc/PVZ-318/notebook-${DATE}-bt.md`]: `# Ноут посылки от частных лиц в пунктах выдачи на ${DATE}
 
 > Задача: PVZ-318 · цель: новый БТ
 > Документ: нет
@@ -636,12 +636,12 @@ const ETALON = {
 - Машина забирает отправления из пункта раз в день, вечером, после 19:00 — со слов Савченко Д.
 - Весы есть примерно в 400 пунктах из 1200 — со слов Орловой Е.
 `,
-      [`docs/PVZ-318/notebook-${DATE}.razbor.md`]: `# Разбор ноута на ${DATE}: посылки от частных лиц в пунктах выдачи
+      [`coddoc/PVZ-318/notebook-${DATE}.razbor.md`]: `# Разбор ноута на ${DATE}: посылки от частных лиц в пунктах выдачи
 
 > Источник: ${NB}
 > Тема: строки L1–L43; итогов нет
 > Документы задачи: нет
-> Вход: docs/PVZ-318/notebook-${DATE}-bt.md
+> Вход: coddoc/PVZ-318/notebook-${DATE}-bt.md
 
 ## Во вход notebook-${DATE}-bt.md
 #1 сведение · БТ · как сейчас
@@ -808,7 +808,7 @@ const ETALON = {
   },
   ANS: {
     files: {
-      [`docs/RET-214/notebook-${DATE}-bt.md`]: `# Ноут возврат товара без чека на ${DATE}
+      [`coddoc/RET-214/notebook-${DATE}-bt.md`]: `# Ноут возврат товара без чека на ${DATE}
 
 > Задача: RET-214 · цель: правка работающего
 > Документ: нет
@@ -827,12 +827,12 @@ const ETALON = {
 - Касса показывает историю покупок по карте лояльности за последний год — со слов Дёмина К.
 - Возвраты без чека бухгалтерия хочет видеть отдельной строкой в дневном отчёте — со слов Гариповой Л.
 `,
-      [`docs/RET-214/notebook-${DATE}.razbor.md`]: `# Разбор ноута на ${DATE}: возврат товара без чека
+      [`coddoc/RET-214/notebook-${DATE}.razbor.md`]: `# Разбор ноута на ${DATE}: возврат товара без чека
 
 > Источник: ${NB_ANS}
 > Тема: строки L1–L36; итогов нет
 > Документы задачи: нет
-> Вход: docs/RET-214/notebook-${DATE}-bt.md
+> Вход: coddoc/RET-214/notebook-${DATE}-bt.md
 
 ## Во вход notebook-${DATE}-bt.md
 #1 сведение · БТ · как сейчас
@@ -876,7 +876,7 @@ function selftest () {
     const et = ETALON[name]
     const sb = buildSandbox(fx, et)
     const edit = (rel, f) => { const p = join(sb, rel); const old = read(p); writeFileSync(p, f(old)); return () => writeFileSync(p, old) }
-    // Откат удаляет и опустевшие папки: пустая `docs/` после отката — уже «создана папка docs/».
+    // Откат удаляет и опустевшие папки: пустая `coddoc/` после отката — уже «создана папка coddoc/».
     const unput = (rel) => {
       rmSync(join(sb, rel))
       const parts = rel.split('/').slice(0, -1)
@@ -951,7 +951,7 @@ function selftest () {
         ck('цель «правка работающего» — красный', with_(edit(inp, (t) => t.replace('цель: новый БТ', 'цель: правка работающего')), () => g().pass), false)
         ck('«**цель:** новый БТ» — засчитано', with_(edit(inp, (t) => t.replace('цель: новый БТ', '**цель:** новый БТ')), () => g().pass), true)
         ck('вход -spec вместо -bt — красный', with_(move(inp, inp.replace('-bt.md', '-spec.md')), () => g().pass), false)
-        ck('вход в docs/_inbox — красный', with_(move(inp, `docs/_inbox/notebook-${DATE}-bt.md`), () => g().pass), false)
+        ck('вход в coddoc/_inbox — красный', with_(move(inp, `coddoc/_inbox/notebook-${DATE}-bt.md`), () => g().pass), false)
         ck('выбор темы спрошен — красный', with_(edit('answer-01.md', () => 'Темы с решениями:\n1. Посылки\n2. Весы\n**Какую тему разбираем?**'), () => g().pass), false)
         ck('«тема одна» — не вопрос темы', with_(edit('answer-01.md', () => 'Тема одна — ноут целиком, без вопроса.'), () => g().pass), true)
         ck('дата разбора другая — предупреждение', with_(move(raz, raz.replace(DATE, '2026-10-16')), () => { const x = g(); return `${x.pass}/${x.warn.some((w) => /дата/.test(w))}` }), 'true/true')
@@ -987,7 +987,7 @@ function selftest () {
         ck('цель «новый БТ» — не проверяется', with_(edit(inp, (t) => t.replace('цель: правка работающего', 'цель: новый БТ')), () => g().pass), true)
         ck('№ во входе — красный', with_(addTo('Решено', 'Отвечает на 2026-10-07 №1.'), () => g().pass), false)
         ck('вход -spec вместо -bt — красный', with_(move(inp, inp.replace('-bt.md', '-spec.md')), () => g().pass), false)
-        ck('вход в docs/_inbox — красный', with_(move(inp, `docs/_inbox/notebook-${DATE}-bt.md`), () => g().pass), false)
+        ck('вход в coddoc/_inbox — красный', with_(move(inp, `coddoc/_inbox/notebook-${DATE}-bt.md`), () => g().pass), false)
         ck('выбор темы спрошен — красный', with_(edit('answer-01.md', () => 'Темы с решениями:\n1. Возврат\n2. Акт\n**Какую тему разбираем?**'), () => g().pass), false)
         // Ревью 1.1.0: обратный ответ не засчитывается, тот же ответ другими словами засчитывается.
         const pass = (from, to) => edit(inp, (t) => t.replace(from, to))
@@ -1012,7 +1012,7 @@ function selftest () {
         ck('запись без новой даты — красный', with_(nbEdit((t) => t.replace(new RegExp(`\\n## ${DATE}\\n`), '\n')), () => g().pass), false)
         ck('запись без «— /meeting-intake» — красный', with_(nbEdit((t) => t.replace(' — /meeting-intake', '')), () => g().pass), false)
         ck('якорь L22 в пункте — красный', with_(addItem('- [открыто] Что-то ещё (L22) — ждёт: Ким С.'), () => g().pass), false)
-        ck('разбор не в папке ноута — красный', with_(move(raz, `docs/_inbox/${raz.split('/').pop()}`), () => g().pass), false)
+        ck('разбор не в папке ноута — красный', with_(move(raz, `coddoc/_inbox/${raz.split('/').pop()}`), () => g().pass), false)
         ck('записан вход -bt — красный', with_(put('notes/x/meeting-2026-10-14-bt.md', 'x'), () => g().pass), false)
         ck('нет «> разбор:» — предупреждение', with_(nbEdit((t) => t.replace(/^> разбор:.*\n/m, '')), () => { const x = g(); return `${x.pass}/${x.warn.some((w) => /разбор:/.test(w))}` }), 'true/true')
         // Ревью 1.1.0: ход-стоп на «решений нет» — без записи и без вопроса; реплика стенда доводит до записи и прячет стоп.
@@ -1038,7 +1038,7 @@ function selftest () {
           ck('сведение без «со слов» не считается', with_(nbEdit((t) => t.replace(/^- \[сведение\] (Приём|Возвратов).*\n/gm, '').replace(/лента 58 мм — со слов Гаврилова О. П./, 'лента 58 мм')), () => g().pass), false)
           ck('[открыто] с «ждёт: —» — красный', with_(nbEdit((t) => t.replace(/ждёт: Тихонова А\. \(региональный управляющий\)/, 'ждёт: —').replace('ждёт: техподдержка точек', 'ждёт: —')), () => g().pass), false)
           ck('«ждет:» без ё — засчитано', with_(nbEdit((t) => t.replace('ждёт: Тихонова', 'ждет: Тихонова').replace('ждёт: техподдержка', 'ждет: техподдержка')), () => g().pass), true)
-          ck('создана docs/ — красный', with_(put('docs/.keep', ''), () => g().pass), false)
+          ck('создана coddoc/ — красный', with_(put('coddoc/.keep', ''), () => g().pass), false)
           ck('расшифровка тронута — красный', with_(edit(CALL, (t) => t + 'x\n'), () => g().pass), false)
           ck('«решений нет» в ответах — заметка', with_(edit('answer-01.md', () => 'Аналитических решений на встрече нет, но есть сведения.'), () => { const x = g(); return `${x.pass}/${x.info.length}` }), 'true/1')
           ck('запись дописана без пустой строки в конце засева', with_(nbEdit((t) => t.replace(/\n\n## 2026-10-15/, '\n## 2026-10-15')), () => g().pass), true)
@@ -1080,7 +1080,7 @@ function selftest () {
           ck('пуш [решено] «(не уверен)» — без предупреждения', with_(addItem('- [решено] К SMS добавили пуш (со слов аналитика, не уверен) — решил: не помню'), () => g().warn.some((w) => /пуш/.test(w))), false)
           ck('лимит 3 — предупреждение', with_(addItem('- [решено] Лимит — 3 отмены в месяц — решил: Зайцева О.'), () => { const x = g(); return `${x.pass}/${x.warn.some((w) => /лимит/.test(w))}` }), 'true/true')
           ck('протокол тронут — красный', with_(edit(REC77, (t) => t.replace('Моя мысль.', 'Звучало на встрече.')), () => g().pass), false)
-          ck('вход docs/MED-77 — красный', with_(put('docs/MED-77/meeting-2026-10-14-bt.md', 'x'), () => g().pass), false)
+          ck('вход coddoc/MED-77 — красный', with_(put('coddoc/MED-77/meeting-2026-10-14-bt.md', 'x'), () => g().pass), false)
         }
       }
     } finally { rmSync(sb, { recursive: true, force: true }) }

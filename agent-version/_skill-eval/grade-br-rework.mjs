@@ -11,7 +11,7 @@ import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const REL = 'docs/RMS-5102/business_requirements.md'
+const REL = 'coddoc/RMS-5102/business_requirements.md'
 // `fileURLToPath`, а не `.pathname`: на Windows `.pathname` даёт `/C:/…`, и `join` склеивал
 // `C:\C:\…` — грейдер падал на первом же чтении засева (2026-10-02).
 const HERE = fileURLToPath(new URL('.', import.meta.url))
@@ -83,7 +83,7 @@ function selftest () {
   const g = gradeDoc(good, 'Поправил два места, статус прежний.', [])
   ck('правка на месте — зелёный', g.pass, true)
   ck('правка на месте — текст цел', g.kept > 0.99, true)
-  ck('новый файл рядом — красный', gradeDoc(good, '', ['docs/RMS-5102/business_requirements_v2.md']).pass, false)
+  ck('новый файл рядом — красный', gradeDoc(good, '', ['coddoc/RMS-5102/business_requirements_v2.md']).pass, false)
   const rewritten = good.split('\n').map((l) => (l.startsWith('#') || l.startsWith('>') || !l.trim()) ? l : l + ' ').join('\n').replace(/ {1}$/gm, ' — уточнено')
   ck('переписан целиком — пойман', gradeDoc(rewritten, '', []).rewritten, true)
   ck('тронута §4.5 — поймано', gradeDoc(good.replace('Не применимо: один деливербл.', 'Не применимо: деливербл один.'), '', []).s45, false)
@@ -109,7 +109,7 @@ for (const n of runs) {
   measured++
   const p = join(dir, REL)
   const text = existsSync(p) ? lf(readFileSync(p, 'utf8')) : null
-  const others = existsSync(join(dir, 'docs')) ? listMd(join(dir, 'docs'), dir).filter((f) => f !== REL) : []
+  const others = existsSync(join(dir, 'coddoc')) ? listMd(join(dir, 'coddoc'), dir).filter((f) => f !== REL) : []
   const r = gradeDoc(text, ans, others)
   if (Q) r.pass = r.passQ
   if (r.pass) green++

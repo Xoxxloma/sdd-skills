@@ -8,11 +8,11 @@
 //   node grade-status.mjs --selftest
 //
 // Плечо — `<раунд>/<проба>/`, песочницы `run-N/`. `--q` — вопросная проба; без флага включается сам, если имя плеча
-// кончается на `-q`. Фикстура — по ключу задачи в песочнице (`docs/EMP-1207/` → TS-VAC, `docs/ACS-208/` → TS-ACC),
+// кончается на `-q`. Фикстура — по ключу задачи в песочнице (`coddoc/EMP-1207/` → TS-VAC, `coddoc/ACS-208/` → TS-ACC),
 // иначе по имени плеча; `--fixture=` перекрывает оба.
 //
 // ЧТО СЧИТАЕТСЯ (записывающие пробы), по прогону, потом сводкой по плечу:
-//   1. Спека в `docs/<KEY>/technical_specification.md` — да/нет. Нет — что в ответе (вопросы, спека текстом, фантом,
+//   1. Спека в `coddoc/<KEY>/technical_specification.md` — да/нет. Нет — что в ответе (вопросы, спека текстом, фантом,
 //      отказ, пусто); по содержанию такой прогон не грейдится.
 //   2. «Статус готовности» и его согласие с законным исходом README (TS-VAC — «Готово к разработке»; «Требуются
 //      уточнения (N)» законно только при N = числу пунктов; TS-ACC — «Требуются уточнения (N≥1)»).
@@ -1156,7 +1156,7 @@ function unmeasured(dir, audit) {
 
 function fixtureOf(dir, argFx, armName) {
   if (argFx) return argFx
-  const docs = join(dir, 'docs')
+  const docs = join(dir, 'coddoc')
   if (existsSync(docs)) for (const k of readdirSync(docs)) if (KEY2FX[k]) return KEY2FX[k]
   if (/ts-vac/i.test(armName)) return 'TS-VAC'
   if (/ts-acc/i.test(armName)) return 'TS-ACC'
@@ -1165,9 +1165,9 @@ function fixtureOf(dir, argFx, armName) {
 
 /** Спека в папке задачи и мимо неё. */
 function findSpecs(dir, key) {
-  const p = join(dir, 'docs', key, 'technical_specification.md')
-  const spec = existsSync(p) ? { path: `docs/${key}/technical_specification.md`, text: readFileSync(p, 'utf8') } : null
-  const stray = walk(dir).filter((r) => /technical_specification\.md$/i.test(r) && r !== `docs/${key}/technical_specification.md`)
+  const p = join(dir, 'coddoc', key, 'technical_specification.md')
+  const spec = existsSync(p) ? { path: `coddoc/${key}/technical_specification.md`, text: readFileSync(p, 'utf8') } : null
+  const stray = walk(dir).filter((r) => /technical_specification\.md$/i.test(r) && r !== `coddoc/${key}/technical_specification.md`)
   return { spec, stray }
 }
 
@@ -1575,7 +1575,7 @@ function selftest() {
   // Ответ без спеки.
   ok('ответ: пусто', answerCategory('  ') === 'пусто')
   ok('ответ: вопросы', /^вопросы \(2\)$/.test(answerCategory('Годится?\nА так?')))
-  ok('ответ: фантом', /ФАНТОМ/.test(answerCategory('Спека записана в docs/EMP-1207/technical_specification.md, статус готов.')))
+  ok('ответ: фантом', /ФАНТОМ/.test(answerCategory('Спека записана в coddoc/EMP-1207/technical_specification.md, статус готов.')))
   ok('ответ: спека текстом', answerCategory('# Техническая спецификация: отпуск\n> Задача: EMP-1207') === 'спека текстом в ответе')
   ok('ответ: отказ', answerCategory('Не могу написать спеку: документ не найден.') === 'отказ')
 
@@ -1623,7 +1623,7 @@ function mainSpec(root, argFx) {
   for (const row of rows) {
     if (!row.measured) { console.log(`${row.r}  НЕ ИЗМЕРЕНО — ${row.why}`); continue }
     if (!row.written) {
-      console.log(`${row.r}  спека: НЕТ в docs/${fx.key}/ — ${row.category}${row.stray.length ? `; мимо папки: ${row.stray.join(', ')}` : ''}`)
+      console.log(`${row.r}  спека: НЕТ в coddoc/${fx.key}/ — ${row.category}${row.stray.length ? `; мимо папки: ${row.stray.join(', ')}` : ''}`)
       continue
     }
     const g = row.g
@@ -1671,7 +1671,7 @@ function mainSpec(root, argFx) {
   const N = w.length
   console.log(`\nСВОДКА ${arm} (${fxName}): измерено ${m.length} из ${rows.length}` +
     (m.length < rows.length ? ` (не измерено: ${rows.filter((r) => !r.measured).map((r) => `${r.r} — ${r.why}`).join('; ')})` : ''))
-  console.log(`  ${pct(N, m.length)}\tспека записана в docs/${fx?.key ?? '?'}/`)
+  console.log(`  ${pct(N, m.length)}\tспека записана в coddoc/${fx?.key ?? '?'}/`)
   const cats = {}
   for (const r of m.filter((x) => !x.written)) { const c = r.category.replace(/\s*\(\d+\)$/, ''); cats[c] = (cats[c] ?? 0) + 1 }
   for (const [c, n] of Object.entries(cats)) console.log(`  ${pct(n, m.length)}\tспеки нет — ${c}`)

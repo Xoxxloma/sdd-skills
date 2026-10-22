@@ -70,7 +70,7 @@ IDLE_MAX=""
 MEET_ENV=""
 # Папка скилла (пусто → `agent-version/<скилл>`, как было). Задаётся пробой скилла, который лежит вне набора.
 SKILL_DIR=""
-# Конец диалога по содержимому `docs/` (пусто → как было) и карточка двойника аналитика в фикстуре (пусто → реплики
+# Конец диалога по содержимому `coddoc/` (пусто → как было) и карточка двойника аналитика в фикстуре (пусто → реплики
 # из файлов, как было). Пробам `meeting-recall`: протокол создаётся на первом ходу, а ответ зависит от вопроса.
 DONE_GREP=""
 TWIN_CARD=""
@@ -97,45 +97,45 @@ case "$PROBE" in
   # на все ходы и нейтральная («согласен с рекомендацией»): цель, условные пункты и сводка — каждый вопрос
   # скилла с рекомендацией первой. Диалог кончается, когда во вход записан файл. Грейдер —
   # `grade-meet.mjs --fx VAC|ACC`, ожидания — `fixtures/MEET-*/expected.md`.
-  meet-vac)  FIXTURE=MEET-VAC;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
-  meet-acc)  FIXTURE=MEET-ACC;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-vac)  FIXTURE=MEET-VAC;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-acc)  FIXTURE=MEET-ACC;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
   # Стык встреча → петля (2026-10-14): скилл петли получает документ задачи и эталонный вход
   # meeting-intake и сообщение «по итогам встречи». Меряется, как он разбирает вход и что спрашивает.
   jm-br-vac)  FIXTURE=JM-BR-VAC;  PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; MEET_ENV=1 ;;
   jm-br-long) FIXTURE=JM-BR-LONG; PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; MEET_ENV=1 ;;
-  jm-ts-acc)  FIXTURE=JM-TS-ACC;  PROMPT_FILE=w-prompt.txt; SKILL=technical-spec-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=4; IDLE_MAX=4; DONE_RE='/docs/.*/technical_specification\.md$'; MEET_ENV=1 ;;
+  jm-ts-acc)  FIXTURE=JM-TS-ACC;  PROMPT_FILE=w-prompt.txt; SKILL=technical-spec-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=4; IDLE_MAX=4; DONE_RE='/coddoc/.*/technical_specification\.md$'; MEET_ENV=1 ;;
   # Длинная встреча (660 строк, 52 минуты): карта в три окна, тема > 400 строк — разбор кусками.
-  meet-long) FIXTURE=MEET-LONG; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-long) FIXTURE=MEET-LONG; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
   # Фичу обсуждают с нуля: документов задачи нет, ключ только в чате (MEET-NEW, цель — новый БТ).
   # Вторая встреча по готовой спеке (MEET-REW, цель — правки спеки): в папке уже лежит вход прошлой
   # встречи, поэтому конец диалога — по дате этой встречи, а не по любому входу.
-  meet-new)  FIXTURE=MEET-NEW;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-new)  FIXTURE=MEET-NEW;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
   # Правки поверх записанного БТ + последнее слово после итогов внутри чужой темы (MEET-CHG); правка работающего,
   # расшифровка VTT, дата из имени файла (MEET-CR). Ключ у обеих — в строке вызова.
-  meet-chg)  FIXTURE=MEET-CHG;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
-  meet-cr)   FIXTURE=MEET-CR;   PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
-  meet-rew)  FIXTURE=MEET-REW;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-2026-10-14[^/]*\.points\.md$'; MEET_ENV=1 ;;
-  # Созвон-расспрос без решений (перенос MI-NB-OUT): ключа нет — список в docs/_inbox/; ждём сведения и открытые вопросы.
-  meet-out)  FIXTURE=MEET-OUT;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-chg)  FIXTURE=MEET-CHG;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-cr)   FIXTURE=MEET-CR;   PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-rew)  FIXTURE=MEET-REW;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-2026-10-14[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  # Созвон-расспрос без решений (перенос MI-NB-OUT): ключа нет — список в coddoc/_inbox/; ждём сведения и открытые вопросы.
+  meet-out)  FIXTURE=MEET-OUT;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
   # Стык для этих двух: новый БТ только по входу встречи; доработка готовой спеки по входу второй встречи
   # (спека уже лежит — конец диалога по файлу не ловится, только потолок).
-  jm-br-new)  FIXTURE=JM-BR-NEW;  PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=4; IDLE_MAX=4; DONE_RE='/docs/.*/business_requirements\.md$'; MEET_ENV=1 ;;
+  jm-br-new)  FIXTURE=JM-BR-NEW;  PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=4; IDLE_MAX=4; DONE_RE='/coddoc/.*/business_requirements\.md$'; MEET_ENV=1 ;;
   jm-ts-rew)  FIXTURE=JM-TS-REW;  PROMPT_FILE=w-prompt.txt; SKILL=technical-spec-doc; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; MEET_ENV=1 ;;
   # ── `meeting-recall`: встреча по памяти → протокол (2026-10-14) ───────────────────────────────
   # За аналитика отвечает двойник: `twin-analyst.md` + `twin-card.md` фикстуры. Конец — в протоколе
   # появился раздел «Уточнить у участников». Грейдер `grade-recall.mjs --fx NEW|CHG`.
   # meeting-recall 1.2.0 (разбор темы): раунд длиннее — потолок ходов 30 (был 18), у rec-deep — 34.
-  rec-new) FIXTURE=RECALL-NEW; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=30; IDLE_MAX=30; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
-  rec-chg) FIXTURE=RECALL-CHG; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=30; IDLE_MAX=30; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  rec-new) FIXTURE=RECALL-NEW; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=30; IDLE_MAX=30; DONE_RE='/coddoc/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  rec-chg) FIXTURE=RECALL-CHG; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=30; IDLE_MAX=30; DONE_RE='/coddoc/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
   # Стык «протокол по памяти → meeting-intake»: засев — зелёный протокол `meeting-recall` (r2-new run-3, r2-chg run-2).
-  # Пересказ в строке вызова, ключа нет (протокол — в docs/_inbox/), аналитик просит закончить посреди раундов.
-  rec-inline) FIXTURE=RECALL-INLINE; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=30; IDLE_MAX=30; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  # Пересказ в строке вызова, ключа нет (протокол — в coddoc/_inbox/), аналитик просит закончить посреди раундов.
+  rec-inline) FIXTURE=RECALL-INLINE; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=30; IDLE_MAX=30; DONE_RE='/coddoc/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
   # Встреча RECALL-NEW и пять фактов, которые двойник называет только на прямой вопрос разбора (свой промпт двойника —
   # общий `twin-analyst.md` не трогаем). Грейдер `grade-recall.mjs --fx DEEP`: скрытое в итоге, ловушки «а если».
-  rec-deep) FIXTURE=RECALL-DEEP; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=34; IDLE_MAX=34; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-analyst-deep.md; MEET_ENV=1 ;;
+  rec-deep) FIXTURE=RECALL-DEEP; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=34; IDLE_MAX=34; DONE_RE='/coddoc/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-analyst-deep.md; MEET_ENV=1 ;;
   # Та же встреча RECALL-DEEP, двойник отвечает как человек: на сообщение из трёх и больше вопросов — только на первые два
   # (twin-analyst-human.md). Анкета из многих строк не выигрывает за счёт послушного двойника. Грейдер — `--fx DEEP`.
-  rec-deep-h) FIXTURE=RECALL-DEEP; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=34; IDLE_MAX=34; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-analyst-human.md; MEET_ENV=1 ;;
+  rec-deep-h) FIXTURE=RECALL-DEEP; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=34; IDLE_MAX=34; DONE_RE='/coddoc/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-analyst-human.md; MEET_ENV=1 ;;
   # analyst-notebook 1.0.0 и meeting-intake 1.1.0 (план product/plans/notebook.md): запись в ноут, сборка выкладки,
   # ноут на входе и цель «в ноут». Ноут лежит в `notes/` — конец по содержимому смотрит и туда (`RT_DONE_GREP`).
   nb-new)     FIXTURE=NB-NEW;     PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/notebook\.md$'; MEET_ENV=1 ;;
@@ -388,15 +388,15 @@ case "$PROBE" in
   br-data-file) FIXTURE=BR-DATA-FILE;  PROMPT_FILE=file-prompt.txt;     SKILL=business-requirements-doc; SEED_SUB=seed ;;
   br-deps-yes)  FIXTURE=BR-DEPS;       PROMPT_FILE=deps-yes-prompt.txt; SKILL=business-requirements-doc ;;
   br-deps-no)   FIXTURE=BR-DEPS;       PROMPT_FILE=deps-no-prompt.txt;  SKILL=business-requirements-doc ;;
-  # Эпик лежит НЕ в `docs/<KEY>/`, а в спек-репе `AI-SDD/docs/PSS-40/`; в корне песочницы при этом
-  # есть настоящая `docs/` с документацией продукта. Меряется якорь пути: дети обязаны лечь ВНУТРЬ
+  # Эпик лежит НЕ в `coddoc/<KEY>/`, а в спек-репе `AI-SDD/coddoc/PSS-40/`; в корне песочницы при этом
+  # есть настоящая `coddoc/` с документацией продукта. Меряется якорь пути: дети обязаны лечь ВНУТРЬ
   # папки эпика. Второе плечо — тот же эпик ВСТАВЛЕН ТЕКСТОМ и на диске отсутствует: гейт обязан
   # отказать, а не резать по сообщению. Засевы разные, поэтому `SEED_SUB`.
   td-path-w)  FIXTURE=TD-PATH; PROMPT_FILE=w-prompt.txt;     SKILL=task-decomposition-doc; SEED_SUB=seed ;;
   td-gate)    FIXTURE=TD-PATH; PROMPT_FILE=paste-prompt.txt; SKILL=task-decomposition-doc; SEED_SUB=seed-paste ;;
   # Раскладка, принесённая с живой работы: ключ эпика `T-T-M-1.2` НЕ матчит regex гейта, у детей
-  # ключи настоящие (AAA-1..4), а рядом под `docs/` лежит обычная задача `OPS-77` — то есть
-  # шаблон «ключ задачи → своя папка под docs/» прогон видит на диске. Красный исход отсюда и
+  # ключи настоящие (AAA-1..4), а рядом под `coddoc/` лежит обычная задача `OPS-77` — то есть
+  # шаблон «ключ задачи → своя папка под coddoc/» прогон видит на диске. Красный исход отсюда и
   # приехал: дети легли СИБЛИНГАМИ папки эпика.
   td-alias)   FIXTURE=TD-PATH; PROMPT_FILE=alias-prompt.txt; SKILL=task-decomposition-doc; SEED_SUB=seed-alias ;;
   # Тот же эпик, что `td-path-w`, но БТ и реплика аналитика — в словах 5.35 («части», не «слайсы»). Меряется
@@ -423,7 +423,7 @@ case "$PROBE" in
   # Одно дерево, шесть плеч (как `CD-TXT` и `BR-ROLES`). Отличие плеч — только сообщение
   # аналитика; окружение у всех одно, поэтому числа сравнимы между собой.
   #
-  # В дереве лежит `docs/ARS-102/` — спека вкладки расчёта ГБР на карточке инцидента. Для
+  # В дереве лежит `coddoc/ARS-102/` — спека вкладки расчёта ГБР на карточке инцидента. Для
   # `bg-role-w` это ЯКОРЬ: ожидаемое поведение там записано (§4.4, §5.3), и скилл обязан
   # сослаться путём и разделом. Для `bg-flick-w` и `bg-form-w` это ЛОВУШКА: их дефекты живут на
   # других экранах, и приписанный им `ARS-102` — нарушение. Одно дерево ловит оба провала.
@@ -456,7 +456,7 @@ case "$PROBE" in
 
   # ── спека на багфикс: режим `technical-spec-doc` по баг-репорту ───────────────────────────
   # Флаг багфикса изображён промптом — проводник про багфикс ещё не знает (шаг 8 плана). Дерево
-  # своё, а не `BG-INC`: там `bg-flick-w` сама пишет в `docs/ARS-312/`, и готовый репорт в
+  # своё, а не `BG-INC`: там `bg-flick-w` сама пишет в `coddoc/ARS-312/`, и готовый репорт в
   # песочнице дал бы ей найти собственный выход засеянным.
   bf-spec)     FIXTURE=BF-SPEC; PROMPT_FILE=spec-prompt.txt; SKILL=technical-spec-doc ;;
 
@@ -574,7 +574,7 @@ case "$PROBE" in
   # Пачка релиза — основной путь архивации: несколько ключей, один скан, история карточек.
   arbatch)   FIXTURE=AR-BATCH;  PROMPT_FILE=ar-prompt.txt;    SKILL=archive-spec; TURN2_FILE=ar-turn2.txt; STUBS_SUB=stubs ;;
   rv-bug-src)   FIXTURE=RV-BUG; PROMPT_FILE=src-prompt.txt;  SKILL=spec-review ;;
-  # ── `sdd-quality-audit`: баллы БТ и спек по папке docs/ из восьми фич ────────────────────────
+  # ── `sdd-quality-audit`: баллы БТ и спек по папке coddoc/ из восьми фич ────────────────────────
   # Хорошая, та же в старом шаблоне, частичная, «протыканная», багфикс, эпик с фундаментом. Отчёт —
   # файл `sdd-quality-report.md` в корне песочницы; грейдер `grade-sq.mjs`, эталон — `fixtures/SQ-AUDIT/README.md`.
   # Скилл живёт вне набора аналитика — в корне репозитория, поэтому путь к нему задан явно.
@@ -582,14 +582,14 @@ case "$PROBE" in
 
   # ── `notes-to-intent` 1.0.0: готовый список пунктов → вход для БТ или спеки (2026-10-15). Засев — документы задачи
   # и список `*.points.md`; реплика одна на все ходы. Грейдер — `grade-ni.mjs --fx <FX>`, ожидания — fixtures/NI-*/README.md.
-  ni-vac)     FIXTURE=NI-VAC;     PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-07-(bt|spec)\.md$'; MEET_ENV=1 ;;
-  ni-acc)     FIXTURE=NI-ACC;     PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-09-(bt|spec)\.md$'; MEET_ENV=1 ;;
-  ni-new)     FIXTURE=NI-NEW;     PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-08-(bt|spec)\.md$'; MEET_ENV=1 ;;
-  ni-chg)     FIXTURE=NI-CHG;     PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-15-(bt|spec)\.md$'; MEET_ENV=1 ;;
-  ni-cr)      FIXTURE=NI-CR;      PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-16-(bt|spec)\.md$'; MEET_ENV=1 ;;
-  ni-rew)     FIXTURE=NI-REW;     PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-14-(bt|spec)\.md$'; MEET_ENV=1 ;;
-  ni-mr-new)  FIXTURE=NI-MR-NEW;  PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-14-(bt|spec)\.md$'; MEET_ENV=1 ;;
-  ni-mr-chg)  FIXTURE=NI-MR-CHG;  PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-14-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-vac)     FIXTURE=NI-VAC;     PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/coddoc/.*/meeting-2026-10-07-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-acc)     FIXTURE=NI-ACC;     PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/coddoc/.*/meeting-2026-10-09-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-new)     FIXTURE=NI-NEW;     PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/coddoc/.*/meeting-2026-10-08-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-chg)     FIXTURE=NI-CHG;     PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/coddoc/.*/meeting-2026-10-15-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-cr)      FIXTURE=NI-CR;      PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/coddoc/.*/meeting-2026-10-16-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-rew)     FIXTURE=NI-REW;     PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/coddoc/.*/meeting-2026-10-14-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-mr-new)  FIXTURE=NI-MR-NEW;  PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/coddoc/.*/meeting-2026-10-14-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  ni-mr-chg)  FIXTURE=NI-MR-CHG;  PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/coddoc/.*/meeting-2026-10-14-(bt|spec)\.md$'; MEET_ENV=1 ;;
   ni-nb-in)   FIXTURE=NI-NB-IN;   PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/notebook-2026-10-15-(bt|spec)\.md$'; MEET_ENV=1 ;;
   ni-nb-ans)  FIXTURE=NI-NB-ANS;  PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/notebook-2026-10-15-(bt|spec)\.md$'; MEET_ENV=1 ;;
   ni-nb-pick) FIXTURE=NI-NB-PICK; PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/notebook-2026-10-15-(bt|spec)\.md$'; MEET_ENV=1 ;;
@@ -606,16 +606,20 @@ case "$PROBE" in
   # ── Срез 1.1 петли (PLAN-LOOP-HARDEN, 2026-10-16): пробы на стыки, ветки исправления, живые входы ───────────────────
   # `twin-objector.md` — двойник, который отвечает по карточке и возражает там, где она велит; `w-turn2.txt` при нём —
   # заглушка: без файла реплики пул не крутит ходы.
-  meet-workshop) FIXTURE=MEET-WORKSHOP; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
-  meet-nonames) FIXTURE=MEET-NONAMES; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
-  meet-notes) FIXTURE=MEET-NOTES; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
-  meet-sameday) FIXTURE=MEET-SAMEDAY; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-2026-10-19-2\.points\.md$'; DONE_GREP='^> Встреча:.*14:[0-5][0-9]'; MEET_ENV=1 ;;
-  meet-twin)  FIXTURE=MEET-TWIN;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-objector.md; MEET_ENV=1 ;;
-  rec-finish) FIXTURE=REC-FINISH; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=30; IDLE_MAX=30; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
-  rec-cont)   FIXTURE=REC-CONT;   PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=24; IDLE_MAX=24; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
-  ni-spec-bt) FIXTURE=NI-SPEC-BT; PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/docs/.*/meeting-2026-10-13-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  meet-workshop) FIXTURE=MEET-WORKSHOP; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-nonames) FIXTURE=MEET-NONAMES; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-notes) FIXTURE=MEET-NOTES; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-sameday) FIXTURE=MEET-SAMEDAY; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-2026-10-19-2\.points\.md$'; DONE_GREP='^> Встреча:.*14:[0-5][0-9]'; MEET_ENV=1 ;;
+  meet-twin)  FIXTURE=MEET-TWIN;  PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-[^/]*\.points\.md$'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-objector.md; MEET_ENV=1 ;;
+  rec-finish) FIXTURE=REC-FINISH; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=30; IDLE_MAX=30; DONE_RE='/coddoc/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  rec-cont)   FIXTURE=REC-CONT;   PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=24; IDLE_MAX=24; DONE_RE='/coddoc/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+  ni-spec-bt) FIXTURE=NI-SPEC-BT; PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/coddoc/.*/meeting-2026-10-13-(bt|spec)\.md$'; MEET_ENV=1 ;;
   ni-nb-repeat) FIXTURE=NI-NB-REPEAT; PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/notebook-2026-10-14-(spec|2-bt|bt-2|2-spec)\.md$'; MEET_ENV=1 ;;
-  ni-twin)    FIXTURE=NI-TWIN;    PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=12; IDLE_MAX=12; DONE_RE='/docs/.*/meeting-2026-10-12-(bt|spec)\.md$'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-objector.md; MEET_ENV=1 ;;
+  ni-twin)    FIXTURE=NI-TWIN;    PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=12; IDLE_MAX=12; DONE_RE='/coddoc/.*/meeting-2026-10-12-(bt|spec)\.md$'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-objector.md; MEET_ENV=1 ;;
+  # ── Папка задач `coddoc/` (CHANGELOG 5.71): рядом лежит старая `docs/` с чужими задачами — ищут, читают и пишут
+  # в `coddoc/`. DONE_RE без папки: вход, записанный в `docs/`, тоже кончает диалог — грейдер `grade-legacy.mjs`.
+  cd-legacy-ni) FIXTURE=CD-LEGACY; PROMPT_FILE=ni-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=ni-turn2.txt; TURNS_CAP=10; IDLE_MAX=10; DONE_RE='/notebook-2026-10-14-(bt|spec)\.md$'; MEET_ENV=1 ;;
+  cd-legacy-br) FIXTURE=CD-LEGACY; PROMPT_FILE=br-prompt.txt; SKILL=business-requirements-doc; SEED_SUB=seed ;;
   nb-big-export) FIXTURE=NB-BIG; PROMPT_FILE=w-prompt-export.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2-export.txt; TURNS_CAP=3; IDLE_MAX=3; DONE_RE='/notes/[^/]+/notebook-20[0-9][0-9]-[0-9][0-9]-[0-9][0-9](-2)?\.points\.md$'; MEET_ENV=1 ;;
   nb-big-view)   FIXTURE=NB-BIG; PROMPT_FILE=w-prompt-view.txt;   SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2-view.txt;   TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/[^/]*-20[0-9][0-9]-[0-9][0-9]-[0-9][0-9](-2)?\.md$'; MEET_ENV=1 ;;
   nb-twin)    FIXTURE=NB-TWIN;    PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=6; IDLE_MAX=6; DONE_GREP='получател'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-objector.md; MEET_ENV=1 ;;
@@ -637,8 +641,8 @@ case "$PROBE" in
   nb-fix-inplace) FIXTURE=NB-FIX-INPLACE; PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='№1\.3 ?‖ ?замен(е|ё)н'; MEET_ENV=1 ;;
   nb-fix-noref)   FIXTURE=NB-FIX-NOREF;   PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='№1\.2 ?‖ ?замен(е|ё)н'; MEET_ENV=1 ;;
   # Р5: список встречи без находок — запись без вопроса (реплика не согласие); со спором — вопрос остаётся.
-  nb-pts-plain)   FIXTURE=NB-PTS-PLAIN;   PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; IDLE_MAX=3; DONE_GREP='исходник: docs/_inbox/meeting-2026-10-18'; MEET_ENV=1 ;;
-  nb-pts-spor)    FIXTURE=NB-PTS-SPOR;    PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='исходник: docs/_inbox/meeting-2026-10-18'; MEET_ENV=1 ;;
+  nb-pts-plain)   FIXTURE=NB-PTS-PLAIN;   PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; IDLE_MAX=3; DONE_GREP='исходник: coddoc/_inbox/meeting-2026-10-18'; MEET_ENV=1 ;;
+  nb-pts-spor)    FIXTURE=NB-PTS-SPOR;    PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='исходник: coddoc/_inbox/meeting-2026-10-18'; MEET_ENV=1 ;;
   # Ф1–Ф5 (шаг 5): сторона спора, тот же предмет — другой вопрос, обновлённое сведение, ответ с предметом, граница.
   nb-spor-side)   FIXTURE=NB-SPOR-SIDE;   PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=2; IDLE_MAX=2; MEET_ENV=1 ;;
   nb-same-stem)   FIXTURE=NB-SAME-STEM;   PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='оплаты на кассе'; MEET_ENV=1 ;;
@@ -646,8 +650,8 @@ case "$PROBE" in
   nb-ans-subj)    FIXTURE=NB-ANS-SUBJ;    PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='№1\.4 ?‖ ?закрыт'; MEET_ENV=1 ;;
   nb-scope)       FIXTURE=NB-SCOPE;       PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='не входит:'; MEET_ENV=1 ;;
   # Р6–Р8 (шаг 6): роли из шапки списка в шапку ноута, старая встреча принята позже, новый ноут без «цель:».
-  nb-pts-roles)   FIXTURE=NB-PTS-ROLES;   PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; IDLE_MAX=3; DONE_GREP='исходник: docs/_inbox/meeting-2026-10-18'; MEET_ENV=1 ;;
-  nb-late-event)  FIXTURE=NB-LATE-EVENT;  PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='исходник: docs/_inbox/meeting-2026-10-12'; MEET_ENV=1 ;;
+  nb-pts-roles)   FIXTURE=NB-PTS-ROLES;   PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; IDLE_MAX=3; DONE_GREP='исходник: coddoc/_inbox/meeting-2026-10-18'; MEET_ENV=1 ;;
+  nb-late-event)  FIXTURE=NB-LATE-EVENT;  PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='исходник: coddoc/_inbox/meeting-2026-10-12'; MEET_ENV=1 ;;
   nb-no-goal)     FIXTURE=NB-NO-GOAL;     PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/notebook\.md$'; MEET_ENV=1 ;;
   *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk bt-uf-mmd bt-uf-puml bt-uf-idk bt-uf-y pt-sh-mmd pt-sh-idk pt-sh-no pt-uf-puml pt-uf-idk pt-raw pt-nb tx-sh-mmd tx-sh-idk tx-uf-puml pt-junk pt-prose ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q sq-audit meet-vac meet-acc meet-long meet-new meet-rew meet-chg meet-cr jm-br-vac jm-br-long jm-br-new jm-ts-acc jm-ts-rew rec-new rec-chg rec-inline nb-new nb-thought nb-contra nb-noauth nb-file nb-view-api nb-view-chat nb-dispute nb-answer nb-ask nb-long nb-view-part meet-out ni-vac ni-acc ni-new ni-chg ni-cr ni-rew ni-mr-new ni-mr-chg ni-nb-in ni-nb-ans ni-nb-pick nb-pts-in nb-pts-new nb-pts-rec nb-export nb-export-since nb-route nb-desc-one nb-desc-two nb-auto nb-ans-repl nb-stale nb-prefix nb-reingest nb-handedit nb-chain-export nb-chain-ask nb-huge-export nb-fix-author nb-fix-drop nb-fix-wrong nb-fix-inplace nb-fix-noref nb-pts-plain nb-pts-spor nb-spor-side nb-same-stem nb-fact-upd nb-ans-subj nb-scope nb-pts-roles nb-late-event nb-no-goal"; exit 1 ;;
 esac
@@ -757,7 +761,7 @@ fi
 # ЗАСЕВ ЛЕЖИТ ВНЕ РЕПОЗИТОРИЯ, И ЭТО НЕ ГИГИЕНА, А ИЗОЛЯЦИЯ.
 #
 # Пока засев лежал в папке раунда (`<раунд>/_seed/<проба>`), он был соседом песочниц и выглядел
-# как ещё один рабочий репозиторий: та же `docs/<KEY>/business_requirements.md`, тот же
+# как ещё один рабочий репозиторий: та же `coddoc/<KEY>/business_requirements.md`, тот же
 # `context/`. Прогон, промахнувшийся мимо своей директории, писал спеку туда — и ВСЕ последующие
 # прогоны плеча копировали её себе засевом. Проба «записал ли скилл файл» отвечала «да» сама
 # себе; поймано 2026-08-14 на `_pilot-wrapper` и `loop-r1c/ts-live` — там спека стоит в
@@ -839,7 +843,7 @@ mkdir -p "$ROUND/$PROBE"
   echo "потолок ходов: ${RT_MAX_TURNS:-8}"
   [ -n "$DONE_RE" ] && echo "конец диалога по файлу: $DONE_RE"
   [ -n "$IDLE_MAX" ] && echo "пустых ходов подряд: $IDLE_MAX"
-  [ -n "$DONE_GREP" ] && echo "конец диалога по содержимому docs/: $DONE_GREP"
+  [ -n "$DONE_GREP" ] && echo "конец диалога по содержимому coddoc/: $DONE_GREP"
   [ -n "$TWIN_CARD" ] && echo "двойник аналитика: $TWIN_CARD, промпт ${TWIN_PROMPT:-twin-analyst.md}, модель ${RT_TWIN_MODEL:-sonnet}"
   echo "прогонов: $N, параллельность: $CONC"
 } > "$ROUND/$PROBE/_settings.txt"
@@ -849,7 +853,7 @@ bash "$POOL" "$SNAP" "$PROMPT" "$ROUND/$PROBE" "$N" "$CONC" "$SEED" "$STUBS_DIR"
 # ─── Караул фикстуры ────────────────────────────────────────────────────────────────────────
 # Запрет в промпте изоляцией НЕ является. Замер 2026-08-14, плечо `ts-conv`: прогон получил
 # песочницу рабочей директорией — и записал спеку по АБСОЛЮТНОМУ пути в саму фикстуру
-# (`fixtures/TS-CONV/docs/ARS-201/technical_specification.md`). Инцидент того же класса, что
+# (`fixtures/TS-CONV/coddoc/ARS-201/technical_specification.md`). Инцидент того же класса, что
 # описан в `PROBES.md` правилом №2, и цена та же: следующий прогон засеялся бы уже готовой
 # спекой, а «написал сам» стало бы неотличимо от «прочитал написанное».
 #

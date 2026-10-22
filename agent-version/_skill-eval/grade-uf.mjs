@@ -321,8 +321,8 @@ export function sourceLine(answer, holes) {
 export function gradeRun(runDir, probe) {
   const p = PROBES[probe];
   const truth = JSON.parse(read(join(FIX, p.truth)));
-  const btRel = `docs/${truth.key}/business_requirements.md`;
-  const want = `docs/${truth.key}/user_flow.${p.format === 'puml' ? 'puml' : 'md'}`;
+  const btRel = `coddoc/${truth.key}/business_requirements.md`;
+  const want = `coddoc/${truth.key}/user_flow.${p.format === 'puml' ? 'puml' : 'md'}`;
   const fixFiles = new Set(listFiles(FIX));
   const made = listFiles(runDir).filter((f) => !fixFiles.has(f) && !JUNK.test(f.split('/').pop()));
   const r = {};
@@ -523,7 +523,7 @@ stop
   check("ID-BT: эталоны Mermaid и PlantUML по truth-s и truth-idk — У2–У4 зелёные", [[MMD_S, "mmd", ts], [PUML_S, "puml", ts], [MMD_I, "mmd", ti], [PUML_I, "puml", ti]]
     .every(([t, f, tr]) => reds(gradeGraph(t, f, tr)) === ""));
   check("ID-BT: схема с ответами против истины «не знаю» → У3, У4; слова эталона — из FR и реплики", reds(gradeGraph(MMD_S, "mmd", ti)) === "У3,У4"
-    && foreignWords(gradeGraph(MMD_S, "mmd", ts).graph, frTexts(read(join(FIX, "docs/LND-47/business_requirements.md"))), read(join(FIX, "s-turn2.txt"))).length === 0);
+    && foreignWords(gradeGraph(MMD_S, "mmd", ts).graph, frTexts(read(join(FIX, "coddoc/LND-47/business_requirements.md"))), read(join(FIX, "s-turn2.txt"))).length === 0);
   // Р1 и прогон целиком — на песочнице с фикстурой-заглушкой не собираются: проверяются на пилоте (`--round`).
   console.log(ok ? 'SELFTEST OK' : 'SELFTEST FAILED');
   process.exit(ok ? 0 : 1);

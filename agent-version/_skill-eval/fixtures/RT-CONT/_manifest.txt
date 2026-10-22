@@ -1,7 +1,7 @@
 cont-prompt.txt
-docs/ARS-102/business_requirements.md
-docs/ARS-102/technical_specification.md
-docs/ARS-312/bug_report.md
+coddoc/ARS-102/business_requirements.md
+coddoc/ARS-102/technical_specification.md
+coddoc/ARS-312/bug_report.md
 expected.md
 prebaked/bug_report.md
 prebaked/technical_specification.md

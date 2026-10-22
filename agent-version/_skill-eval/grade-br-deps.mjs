@@ -19,7 +19,7 @@ import { readdirSync, statSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { read, turn, apiFailed, section, sectionByTitle } from './br-lib.mjs'
 
-const REL = 'docs/CNT-88/business_requirements.md'
+const REL = 'coddoc/CNT-88/business_requirements.md'
 export const RE_DATE = /\b\d{1,2}\.\d{1,2}(\.\d{2,4})?\b|(?<!\p{L})до\s+\d|(?<!\p{L})к\s+\d{1,2}(?!\d)|\b20\d\d\b|недел|квартал|(?<!\p{L})срок\p{L}*\s*[:—-]\s*(?=\S)(?!(не|нет)(?!\p{L}))/iu
 const RE_DEP = /подтвержд/i
 // Зависимость в §3.3: ожидание от команды, а не слово «подтверждение» (шлюз законно «присылает подтверждение оплаты»).

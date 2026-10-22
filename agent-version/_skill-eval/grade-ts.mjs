@@ -4,7 +4,7 @@
 // а аналитик отвечает «не знаю, код не читаю». Спека обязана оставить это к валидации.
 //
 // Запуск: node grade-ts.mjs <runRoot>
-//   runRoot содержит conv/run-N/work/docs/ARS-201/technical_specification.md
+//   runRoot содержит conv/run-N/work/coddoc/ARS-201/technical_specification.md
 
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -69,14 +69,14 @@ export function confirmedMarks(spec) {
 const STATUS_NEEDS = /Требуются уточнения\s*\((\d+)\)/;
 const STATUS_DONE = /Готово к разработке/;
 
-// Спеку ищем по дереву docs/, а не по зашитому ключу: фикстуры разных форм
+// Спеку ищем по дереву coddoc/, а не по зашитому ключу: фикстуры разных форм
 // используют разные ключи задач (ARS-201, SMSEC-410).
 function findSpec(work) {
-  const docs = join(work, 'docs');
+  const docs = join(work, 'coddoc');
   if (!existsSync(docs)) return null;
   for (const key of readdirSync(docs)) {
     const p = join(docs, key, 'technical_specification.md');
-    if (existsSync(p)) return { path: `docs/${key}/technical_specification.md`, text: readFileSync(p, 'utf8') };
+    if (existsSync(p)) return { path: `coddoc/${key}/technical_specification.md`, text: readFileSync(p, 'utf8') };
   }
   return null;
 }
@@ -96,14 +96,14 @@ function walk(dir, base = dir, acc = []) {
  *
  * ДЕФЕКТ ГРЕЙДЕРА, найденный 2026-08-14 разбором раунда `context`: три прогона из тридцати
  * (ts-conv run-07, ts-conv2 run-09) записали `technical_specification.md` в КОРЕНЬ песочницы
- * мимо `docs/<KEY>/`, и грейдер напечатал «файла нет» — то есть тот же текст, что и для
+ * мимо `coddoc/<KEY>/`, и грейдер напечатал «файла нет» — то есть тот же текст, что и для
  * прогона, не написавшего ничего (ts-conv2 run-06). Это разные дефекты с разной ценой:
  * первый — промах по пути (содержание есть и его надо грейдить), второй — отказ.
  */
 function findStraySpec(work) {
   for (const rel of walk(work)) {
     if (!rel.endsWith('technical_specification.md')) continue;
-    if (rel.startsWith('docs/')) continue;
+    if (rel.startsWith('coddoc/')) continue;
     return { path: rel, text: readFileSync(join(work, rel), 'utf8') };
   }
   return null;
@@ -266,7 +266,7 @@ function grade(dir) {
     /(роль|рол[еия]|админист|диспетчер|оператор|права)/i.test(l) &&
     /(отказ|запрещ|не вправе|нет доступа|\b403\b)/i.test(l));
   const btText = (() => {
-    const docs = join(work, 'docs');
+    const docs = join(work, 'coddoc');
     if (!existsSync(docs)) return '';
     for (const key of readdirSync(docs)) {
       const p = join(docs, key, 'business_requirements.md');
@@ -337,7 +337,7 @@ function grade(dir) {
   // 8/10 до 0/6. Дефект был не в скилле и не в раннере, а в том, что список файлов стенда
   // выписан в репе ЧЕТЫРЕЖДЫ: здесь, в `grade-bg.mjs`, в `grade-cdoc.mjs` и в исключениях
   // засева `run-ctx.sh`/`run-ctl.sh`. Заводишь новый файл стенда — правь все четыре.
-  const HARNESS_ROOT = ['docs', 'services', 'context', 'answer.md', 'stream.jsonl'];
+  const HARNESS_ROOT = ['coddoc', 'services', 'context', 'answer.md', 'stream.jsonl'];
   const strayRoot = readdirSync(work).filter(
     (n) => !HARNESS_ROOT.includes(n) && !n.startsWith('_'));
   add('Лишних файлов в корне задачи не создано', strayRoot.length === 0,
@@ -435,7 +435,7 @@ function unmeasured(dir) {
  * ❓, а ❓ блокирует запись), первое — ложь артефакта, и она дороже всего остального в петле:
  * аналитик уходит с путём, по которому ничего нет.
  */
-const RE_CLAIMS_WRITTEN = /(спек[аи]|спецификаци[ияю]|документ)[^.\n]{0,60}(записан|готов|создан|сохранён|сохранен)|(файл|путь)\s*:?\s*`?[^`\n]{0,20}docs\//i;
+const RE_CLAIMS_WRITTEN = /(спек[аи]|спецификаци[ияю]|документ)[^.\n]{0,60}(записан|готов|создан|сохранён|сохранен)|(файл|путь)\s*:?\s*`?[^`\n]{0,20}coddoc\//i;
 
 /**
  * ПЕРЕСПРАШИВАНИЕ ЗАКРЫТОГО ГЕЙТА — вопрос про то, что аналитик уже сказал в этой сессии.

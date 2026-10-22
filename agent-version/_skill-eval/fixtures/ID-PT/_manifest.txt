@@ -1,6 +1,6 @@
-docs/ADP-41/interaction_diagram.md
-docs/ADP-41/meeting-2026-10-08.points.md
-docs/ADP-41/technical_specification.md
+coddoc/ADP-41/interaction_diagram.md
+coddoc/ADP-41/meeting-2026-10-08.points.md
+coddoc/ADP-41/technical_specification.md
 idk-turn2.txt
 nb-prompt.txt
 notes/пристройство-животных/notebook.md

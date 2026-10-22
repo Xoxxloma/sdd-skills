@@ -7,9 +7,9 @@
 ## Вход
 
 ```
-docs/RMS-4021/technical_specification.md   спека, чистая по всем 11 пунктам чек-листа,
+coddoc/RMS-4021/technical_specification.md   спека, чистая по всем 11 пунктам чек-листа,
                                            и с ТРЕМЯ промахами против context/conventions.md
-docs/RMS-4021/business_requirements.md     источник (FR-1, FR-2) — из RV-CLEAN, не тронут
+coddoc/RMS-4021/business_requirements.md     источник (FR-1, FR-2) — из RV-CLEAN, не тронут
 context/conventions.md                     те же правила, что в TS-CTX
 ```
 

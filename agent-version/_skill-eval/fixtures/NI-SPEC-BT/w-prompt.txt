@@ -1,1 +1,1 @@
-/notes-to-intent docs/FRM-614/meeting-2026-10-13.points.md
+/notes-to-intent coddoc/FRM-614/meeting-2026-10-13.points.md

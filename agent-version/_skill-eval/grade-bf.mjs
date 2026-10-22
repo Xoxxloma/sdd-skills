@@ -4,7 +4,7 @@
 //   node grade-bf.mjs <каталог с песочницами>
 //   node grade-bf.mjs --selftest
 //
-// ЧТО ГРЕЙДИТСЯ. Записанный файл `docs/ARS-312/technical_specification.md`, а не отчёт.
+// ЧТО ГРЕЙДИТСЯ. Записанный файл `coddoc/ARS-312/technical_specification.md`, а не отчёт.
 //
 // ПОБЕГ ИЗ ПЕСОЧНИЦЫ — «НЕ ИЗМЕРЕНО», А НЕ «ПРОВАЛЕНО». Прогон, записавший спеку по абсолютному
 // пути в фикстуру, снаружи выглядит как «файла нет»; засчитать это отказом скилла — соврать в обе
@@ -81,7 +81,7 @@ export function gradeRun (dir) {
   // а не догадка. Она старше эвристики ниже и снимает вопрос «побег или фантом» целиком.
   if (existsSync(join(dir, '_escaped.txt'))) { r.measured = false; r.why = 'побег из песочницы (метка check-escape)'; return r }
 
-  const spec = join(dir, 'docs/ARS-312/technical_specification.md')
+  const spec = join(dir, 'coddoc/ARS-312/technical_specification.md')
   r.wrote = existsSync(spec)
 
   if (!r.wrote) {
@@ -115,7 +115,7 @@ export function gradeRun (dir) {
   // Отдельный, более тяжёлый исход: раздела нет вовсе, секция схлопнута. Пункт 11 приёмки
   // краснит и за это — «секции нет вовсе — тоже нарушение».
   r.no32 = !/^###\s*3\.2\./m.test(headings)
-  r.extraDocs = existsSync(join(dir, 'docs/ARS-312/business_requirements.md'))
+  r.extraDocs = existsSync(join(dir, 'coddoc/ARS-312/business_requirements.md'))
 
   r.pass = r.typeBugfix && r.srcReport && !r.blamedARS102 && r.hasFR && r.bounds &&
     r.dataAnswered && r.statusSpec && !r.statusReportVocab && !r.invented && !r.extraDocs
@@ -133,7 +133,7 @@ const REF_OK = `# Техническая спецификация: устран�
 Багфикс, только фронт.
 
 ### 1.3. Связь с бизнес-требованиями
-docs/ARS-312/bug_report.md — FR-1.
+coddoc/ARS-312/bug_report.md — FR-1.
 
 ## 2. Взаимодействия
 Не применимо: контракт не меняется.
@@ -180,7 +180,7 @@ function selftest () {
   ck('данные: «не портятся»', RE_DATA_ANSWERED.test('🔵 Данные не портятся. Бэк отдаёт корректную геометрию зоны.'), true)
   ck('данные: «пересчёт данных не требуется»', RE_DATA_ANSWERED.test('Не применимо: баг ничего не портит в базе, пересчёт данных не требуется.'), true)
   ck('данные: пустая §3.2 не проходит', RE_DATA_ANSWERED.test('### 3.2. Данные и хранение\nНовых сущностей нет.'), false)
-  ck('побег: отчёт утверждает запись', RE_CLAIMS_WROTE.test('**Спецификация готова:** `docs/ARS-312/technical_specification.md`'), true)
+  ck('побег: отчёт утверждает запись', RE_CLAIMS_WROTE.test('**Спецификация готова:** `coddoc/ARS-312/technical_specification.md`'), true)
   console.log(bad === 0 ? '\nсамопроверка: ok' : `\nсамопроверка: ПРОВАЛОВ ${bad}`)
   return bad === 0
 }

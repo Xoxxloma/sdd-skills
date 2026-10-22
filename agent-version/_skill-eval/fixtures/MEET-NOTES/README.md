@@ -7,7 +7,7 @@
 `verify.md:32–33`) коды, имена полей, латиница и числа конспекта остаются как набраны.
 
 Наблюдать на базовом замере: `FRZ-14` / `FRZ-30` похожи на ключ задачи (`map.md:15`) — вернёт ли карта их ключом
-(тогда `> Задача: FRZ-14` и `docs/FRZ-14/`; в `expected.md` это стык, не красное).
+(тогда `> Задача: FRZ-14` и `coddoc/FRZ-14/`; в `expected.md` это стык, не красное).
 
 **Домен** — бассейн, заморозка абонементов. Требований нет, ключа задачи нет, документов нет.
 
@@ -27,5 +27,5 @@
 Строка раннера — уже в `run-ctx-v2.sh`:
 
 ```
-  meet-notes) FIXTURE=MEET-NOTES; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-notes) FIXTURE=MEET-NOTES; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
 ```

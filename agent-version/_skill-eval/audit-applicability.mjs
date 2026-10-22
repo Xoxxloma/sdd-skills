@@ -20,7 +20,7 @@ const rows = manifest.map(r => {
   const resultPath = join(r.work, 'RESULT.json')
   const result = existsSync(resultPath) ? JSON.parse(readFileSync(resultPath, 'utf8')) : null
   const seeds = JSON.parse(readFileSync(join(r.work, 'INPUT-HASHES.json'), 'utf8'))
-  const editableSeed = r.kind === 'refine' ? r.target : ['ts-fix','ts-fix-yes'].includes(r.id) ? 'docs/PSS-2210/technical_specification.md' : null
+  const editableSeed = r.kind === 'refine' ? r.target : ['ts-fix','ts-fix-yes'].includes(r.id) ? 'coddoc/PSS-2210/technical_specification.md' : null
   const changedInputs = seeds.filter(f => f.path !== editableSeed && hash(join(r.work, f.path)) !== f.sha256).map(f => f.path)
   const text = r.target && existsSync(join(r.work, r.target)) ? readFileSync(join(r.work, r.target), 'utf8') : null
   const answer = existsSync(join(r.work, 'answer.md')) ? readFileSync(join(r.work, 'answer.md'), 'utf8') : null

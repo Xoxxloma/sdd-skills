@@ -195,7 +195,7 @@ export function gradeRun(runDir, probe) {
   const pre = p.pre ?? 'п';
   const fixFiles = new Set(listFiles(fix));
   const made = listFiles(runDir).filter((f) => !fixFiles.has(f) && !JUNK.test(f.split('/').pop()));
-  const kept = [...fixFiles].filter((f) => /^(docs|notes)\//.test(f)).every((f) => read(join(runDir, f)) === read(join(fix, f)));
+  const kept = [...fixFiles].filter((f) => /^(coddoc|notes)\//.test(f)).every((f) => read(join(runDir, f)) === read(join(fix, f)));
   const r = {};
   if (p.kind === 'route') {
     const a = lastAnswer(runDir) ?? '';
@@ -281,7 +281,7 @@ function selftest() {
   let ok = true;
   const check = (name, cond) => { console.log(`${cond ? 'ok  ' : 'FAIL'} ${name}`); if (!cond) ok = false; };
   const T = {
-    list: 'docs/X-1/meeting-2026-01-01.points.md',
+    list: 'coddoc/X-1/meeting-2026-01-01.points.md',
     participants: [['Касса'], ['Сервис чеков', 'сервис чеков'], ['ОФД']],
     arrows: [{ from: 'Касса', to: 'Сервис чеков', kind: 'req', id: 3, token: 'POST /checks' }, { from: 'Сервис чеков', to: 'ОФД', kind: 'event', id: 1, token: null }],
     ordered: true, asks: { order: true, open: [4], dir: [5], same: ['Сервис чеков', 'check-service'] }, holes: [4, 5], glued: true,
@@ -313,18 +313,18 @@ function selftest() {
     && sourceLine('в источник стоит внести: п.10: A → B', { holes: [10], notHoles: [5], glued: false })
     && !sourceLine('в источник стоит внести: п.5: не рисовать; п.10: A → B', { holes: [10], notHoles: [5], glued: false }));
   check('текст: имя файла (файл, `*.points.md`, чат), номера непустых строк, подпись `стр.N`, кривые строки',
-    diagramFile('docs/K-1/notes.txt', 'short', 'mmd', true) === 'docs/K-1/notes.draft.interaction_diagram.md'
-    && diagramFile('docs/K-1/sync.points.md', 'short', 'mmd', true) === 'docs/K-1/sync.draft.interaction_diagram.md' && diagramFile(null, 'uf', 'puml') === 'draft-*.user_flow.puml'
+    diagramFile('coddoc/K-1/notes.txt', 'short', 'mmd', true) === 'coddoc/K-1/notes.draft.interaction_diagram.md'
+    && diagramFile('coddoc/K-1/sync.points.md', 'short', 'mmd', true) === 'coddoc/K-1/sync.draft.interaction_diagram.md' && diagramFile(null, 'uf', 'puml') === 'draft-*.user_flow.puml'
     && fits('draft-*.user_flow.puml', 'draft-2026-10-18.user_flow.puml') && fits('draft-*.user_flow.puml', 'draft-2026-10-18-2.user_flow.puml')
-    && !fits('draft-*.user_flow.puml', 'draft.user_flow.puml') && !fits('draft-*.user_flow.puml', 'docs/draft-2026-10-18.user_flow.puml')
-    && fits('docs/a.md', 'docs/a.md')
+    && !fits('draft-*.user_flow.puml', 'draft.user_flow.puml') && !fits('draft-*.user_flow.puml', 'coddoc/draft-2026-10-18.user_flow.puml')
+    && fits('coddoc/a.md', 'coddoc/a.md')
     && textLines('A\n\n  \nB отдаёт C\n')[2] === 'B отдаёт C' && parseLabel('стр.3 · `POST /x`', 'стр')?.token === 'POST /x' && parseLabel('п.3', 'стр') === null
     && reds(gradeShort(MMD.replace(/п\.(\d)/g, 'стр.$1'), T, 'стр')) === '' && reds(gradeShort(MMD, T, 'стр')).startsWith('К4')
     && junkNamed('«Курьер потом звонит клиенту»: не на схеме — не пункт списка\nп.5 «Сайт шлёт SMS»: не на схеме — вид «идея» не распознан', ['Курьер потом звонит', { id: 5, word: 'идея' }])
     && !junkNamed('п.1 «…»: A → B', ['Курьер потом звонит']) && !junkNamed('п.15 — идея', [{ id: 5, word: 'идея' }]));
   check('М1: «мысли: 2»', thoughtsLine('не на схеме: п.3 — нет действия; мысли: 2', 2) && thoughtsLine('мысль, набросок: 2', 2) && !thoughtsLine('мысли: 12', 2));
   check('имя файла и пункты списка', diagramFile('notes/a/notebook-2026-01-01.points.md', 'uf', 'puml') === 'notes/a/notebook-2026-01-01.user_flow.puml'
-    && diagramFile(T.list, 'short', 'mmd') === 'docs/X-1/meeting-2026-01-01.interaction_diagram.md'
+    && diagramFile(T.list, 'short', 'mmd') === 'coddoc/X-1/meeting-2026-01-01.interaction_diagram.md'
     && points('# Пункты: x\n> Задача: —\n\n- [решено] a — решил: Б · L3\n- [мысль] b · L9')[2] === '[мысль] b · L9');
   const U = { nodes: [{ id: 's1', fr: 2, kind: 'step', stems: ['выбир'] }, { id: 'd1', fr: 3, kind: 'decision', stems: ['оплат'] }, { id: 's2', fr: 3, kind: 'step', stems: ['отмен'] }],
     edges: [['start', 's1'], ['s1', 'd1'], ['d1', 'end'], ['d1', 's2'], ['s2', 'end']] };

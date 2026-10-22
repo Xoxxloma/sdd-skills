@@ -7,7 +7,7 @@
 ## Дерево
 
 ```
-docs/
+coddoc/
   SHP-11/technical_specification.md   <- в пачке: orders-api (вызов + поле), shop-web (кнопка)
   SHP-12/technical_specification.md   <- в пачке: orders-api (лимит §5.1, выгрузка CSV — скан «не найдено»)
   SHP-14/technical_specification.md   <- НЕ в пачке, черновик: не трогать

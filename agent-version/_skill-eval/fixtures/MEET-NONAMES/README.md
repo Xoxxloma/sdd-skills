@@ -21,5 +21,5 @@
 Строка раннера — уже в `run-ctx-v2.sh`:
 
 ```
-  meet-nonames) FIXTURE=MEET-NONAMES; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
+  meet-nonames) FIXTURE=MEET-NONAMES; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-[^/]*\.points\.md$'; MEET_ENV=1 ;;
 ```

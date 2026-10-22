@@ -261,7 +261,7 @@ function checkChain ({ run, F, W }) {
   // Стадия 1 — список встречи.
   let ptsRel = null; let branch = false
   if (has(1)) {
-    ptsRel = newFiles(run, 1, CHAIN).find((f) => /^docs\/[^/]+\/meeting-2026-10-14[^/]*\.points\.md$/.test(f)) || null
+    ptsRel = newFiles(run, 1, CHAIN).find((f) => /^coddoc\/[^/]+\/meeting-2026-10-14[^/]*\.points\.md$/.test(f)) || null
     if (!ptsRel) F('б', 1, 'файл', 'список встречи не записан')
     else {
       const t = read(join(s(1), ptsRel))
@@ -331,7 +331,7 @@ function checkChain ({ run, F, W }) {
 
   // Стадия 4 — вход, итог цепочки.
   if (has(4)) {
-    const inRel = newFiles(run, 4, CHAIN).find((f) => /^docs\/[^/]+\/notebook-[^/]*-(bt|spec)\.md$/.test(f))
+    const inRel = newFiles(run, 4, CHAIN).find((f) => /^coddoc\/[^/]+\/notebook-[^/]*-(bt|spec)\.md$/.test(f))
     if (!inRel) { F('б', 4, 'файл', 'вход не записан'); return }
     const inp = read(join(s(4), inRel))
     const er = expRel || files(s(4)).find((f) => /^notes\/[^/]+\/notebook-[^/]*\.points\.md$/.test(f)) || ''
@@ -421,7 +421,7 @@ function checkTwice ({ run, F, W }) {
   // Стадия 1 — протокол по памяти и его список.
   if (has(1)) {
     const nf = newFiles(run, 1, TWICE)
-    recRel = nf.find((f) => /^docs\/[^/]+\/meeting-[^/]*\.points\.md$/.test(f)) || null
+    recRel = nf.find((f) => /^coddoc\/[^/]+\/meeting-[^/]*\.points\.md$/.test(f)) || null
     const protRel = nf.find((f) => /\.recall\.md$/.test(f))
     if (!protRel) F('б', 1, 'файл', 'протокол *.recall.md не записан')
     if (!recRel) F('б', 1, 'файл', 'список протокола не записан')
@@ -457,8 +457,8 @@ function checkTwice ({ run, F, W }) {
   let meetRel = null
   if (has(2)) {
     const nf = newFiles(run, 2, TWICE)
-    meetRel = nf.find((f) => /^docs\/[^/]+\/meeting-2026-10-15[^/]*\.points\.md$/.test(f)) || null
-    const odd = nf.find((f) => /^docs\/[^/]+\/meeting-2026-10-15[^/]*points[^/]*\.md$/.test(f) && f !== meetRel)
+    meetRel = nf.find((f) => /^coddoc\/[^/]+\/meeting-2026-10-15[^/]*\.points\.md$/.test(f)) || null
+    const odd = nf.find((f) => /^coddoc\/[^/]+\/meeting-2026-10-15[^/]*points[^/]*\.md$/.test(f) && f !== meetRel)
     if (!meetRel) F('б', 2, 'файл', odd ? `список встречи «${odd}» — имя не на .points.md, ноут его не примет (баг 5)` : 'список встречи не записан')
     else {
       const t = read(join(s(2), meetRel))
@@ -484,7 +484,7 @@ function checkTwice ({ run, F, W }) {
       const nb = read(join(s(3), nbRel))
       const its = items(nb)
       if (!its.length) F('б', 3, 'файл', 'в ноуте нет пунктов')
-      const rl = recRel || files(s(3)).find((f) => /^docs\/[^/]+\/meeting-[^/]*\.points\.md$/.test(f) && isRecallList(readIf(join(s(3), f))))
+      const rl = recRel || files(s(3)).find((f) => /^coddoc\/[^/]+\/meeting-[^/]*\.points\.md$/.test(f) && isRecallList(readIf(join(s(3), f))))
       const rt = rl ? readIf(join(s(3), rl)) : ''
       const recallDecidedFive = items(rt).some((l) => kindOf(l) === 'решено' && RE_FIVE.test(N(l)))
       const src = [rt, promptOf(run, 3, TWICE), turnOf(3, TWICE), replies(s(3))]
@@ -504,7 +504,7 @@ function checkTwice ({ run, F, W }) {
     const nb4 = rel ? readIf(join(s(4), rel)) : ''
     const neu = addedItems(nb3, nb4)
     if (!neu.length) F('б', 4, 'файл', 'в ноут ничего не записано')
-    const ml = meetRel || files(s(4)).find((f) => /^docs\/[^/]+\/meeting-2026-10-15[^/]*\.points\.md$/.test(f) && !isRecallList(readIf(join(s(4), f))))
+    const ml = meetRel || files(s(4)).find((f) => /^coddoc\/[^/]+\/meeting-2026-10-15[^/]*\.points\.md$/.test(f) && !isRecallList(readIf(join(s(4), f))))
     const src = [ml ? readIf(join(s(4), ml)) : '', nb3, promptOf(run, 4, TWICE), turnOf(4, TWICE), replies(s(4))]
     for (const l of neu) {
       ground(F, 4, 'запись ноута', l, src)
@@ -559,10 +559,10 @@ function checkTwice ({ run, F, W }) {
 function explainTwice (run, k) {
   if (k < 3) return ''
   const s1 = stageDir(run, 1)
-  const rec = files(s1).find((f) => /^docs\/[^/]+\/meeting-[^/]*\.points\.md$/.test(f) && isRecallList(readIf(join(s1, f))))
+  const rec = files(s1).find((f) => /^coddoc\/[^/]+\/meeting-[^/]*\.points\.md$/.test(f) && isRecallList(readIf(join(s1, f))))
   if (!rec) return ' — причина: стадия 1 не записала список протокола (стадия 2 заняла его имя), это не баг 5'
   const s2 = stageDir(run, 2)
-  if (files(s2).some((f) => /^docs\/[^/]+\/meeting-2026-10-15\.points-[^/]*\.md$/.test(f))) return ' — причина: имя списка встречи не на .points.md (баг 5)'
+  if (files(s2).some((f) => /^coddoc\/[^/]+\/meeting-2026-10-15\.points-[^/]*\.md$/.test(f))) return ' — причина: имя списка встречи не на .points.md (баг 5)'
   return ''
 }
 

@@ -37,7 +37,7 @@ export const FX = {
     // Первым — документ задачи: самопроверка берёт по нему папку входа. Расшифровка — чтобы правку засева
     // в песочнице было видно.
     seed: {
-      'docs/EMP-1207/business_requirements.md': 'fixtures/MEET-VAC/seed/docs/EMP-1207/business_requirements.md',
+      'coddoc/EMP-1207/business_requirements.md': 'fixtures/MEET-VAC/seed/coddoc/EMP-1207/business_requirements.md',
       'meeting-2026-10-07.txt': 'fixtures/MEET-VAC/seed/meeting-2026-10-07.txt',
     },
     etalon: { input: 'fixtures/MEET-VAC/etalon/meeting-2026-10-07-bt.md', razbor: 'fixtures/MEET-VAC/etalon/meeting-2026-10-07.razbor.md' },
@@ -75,7 +75,7 @@ export const FX = {
     kind: 'spec',
     transcript: 'fixtures/MEET-ACC/seed/meeting-2026-10-09.txt',
     seed: {
-      'docs/ACS-208/business_requirements.md': 'fixtures/MEET-ACC/seed/docs/ACS-208/business_requirements.md',
+      'coddoc/ACS-208/business_requirements.md': 'fixtures/MEET-ACC/seed/coddoc/ACS-208/business_requirements.md',
       'meeting-2026-10-09.txt': 'fixtures/MEET-ACC/seed/meeting-2026-10-09.txt',
     },
     etalon: { input: 'fixtures/MEET-ACC/etalon/meeting-2026-10-09-spec.md', razbor: 'fixtures/MEET-ACC/etalon/meeting-2026-10-09.razbor.md' },
@@ -123,7 +123,7 @@ export const FX = {
     kind: 'bt',
     transcript: 'fixtures/MEET-LONG/seed/meeting-2026-10-12.txt',
     seed: {
-      'docs/PSS-2210/business_requirements.md': 'fixtures/MEET-LONG/seed/docs/PSS-2210/business_requirements.md',
+      'coddoc/PSS-2210/business_requirements.md': 'fixtures/MEET-LONG/seed/coddoc/PSS-2210/business_requirements.md',
       'meeting-2026-10-12.txt': 'fixtures/MEET-LONG/seed/meeting-2026-10-12.txt',
     },
     etalon: { input: 'fixtures/MEET-LONG/etalon/meeting-2026-10-12-bt.md', razbor: 'fixtures/MEET-LONG/etalon/meeting-2026-10-12.razbor.md' },
@@ -161,7 +161,7 @@ export const FX = {
     key: 'HRS-311',
     kind: 'bt',
     // Документа задачи нет — папку входа самопроверка берёт отсюда, а не из засева.
-    folder: 'docs/HRS-311',
+    folder: 'coddoc/HRS-311',
     transcript: 'fixtures/MEET-NEW/seed/meeting-2026-10-08.txt',
     seed: { 'meeting-2026-10-08.txt': 'fixtures/MEET-NEW/seed/meeting-2026-10-08.txt' },
     etalon: { input: 'fixtures/MEET-NEW/etalon/meeting-2026-10-08-bt.md', razbor: 'fixtures/MEET-NEW/etalon/meeting-2026-10-08.razbor.md' },
@@ -204,10 +204,10 @@ export const FX = {
     kind: 'spec',
     transcript: 'fixtures/MEET-REW/seed/meeting-2026-10-14.txt',
     seed: {
-      'docs/ACS-208/technical_specification.md': 'fixtures/MEET-REW/seed/docs/ACS-208/technical_specification.md',
-      'docs/ACS-208/business_requirements.md': 'fixtures/MEET-REW/seed/docs/ACS-208/business_requirements.md',
+      'coddoc/ACS-208/technical_specification.md': 'fixtures/MEET-REW/seed/coddoc/ACS-208/technical_specification.md',
+      'coddoc/ACS-208/business_requirements.md': 'fixtures/MEET-REW/seed/coddoc/ACS-208/business_requirements.md',
       // Вход прошлой встречи лежит в папке: он не новый вход и не лишний файл.
-      'docs/ACS-208/meeting-2026-10-09-spec.md': 'fixtures/MEET-REW/seed/docs/ACS-208/meeting-2026-10-09-spec.md',
+      'coddoc/ACS-208/meeting-2026-10-09-spec.md': 'fixtures/MEET-REW/seed/coddoc/ACS-208/meeting-2026-10-09-spec.md',
       'meeting-2026-10-14.txt': 'fixtures/MEET-REW/seed/meeting-2026-10-14.txt',
     },
     etalon: { input: 'fixtures/MEET-REW/etalon/meeting-2026-10-14-spec.md', razbor: 'fixtures/MEET-REW/etalon/meeting-2026-10-14.razbor.md' },
@@ -248,7 +248,7 @@ export const FX = {
     kind: 'bt',
     transcript: 'fixtures/MEET-CHG/seed/meeting-2026-10-15.txt',
     seed: {
-      'docs/EMP-1207/business_requirements.md': 'fixtures/MEET-CHG/seed/docs/EMP-1207/business_requirements.md',
+      'coddoc/EMP-1207/business_requirements.md': 'fixtures/MEET-CHG/seed/coddoc/EMP-1207/business_requirements.md',
       'meeting-2026-10-15.txt': 'fixtures/MEET-CHG/seed/meeting-2026-10-15.txt',
     },
     etalon: { input: 'fixtures/MEET-CHG/etalon/meeting-2026-10-15-bt.md', razbor: 'fixtures/MEET-CHG/etalon/meeting-2026-10-15.razbor.md' },
@@ -277,7 +277,7 @@ export const FX = {
   CR: {
     key: 'SUP-412',
     kind: 'bt',
-    folder: 'docs/SUP-412',
+    folder: 'coddoc/SUP-412',
     transcript: 'fixtures/MEET-CR/seed/support-sync-2026-10-16.vtt',
     seed: { 'support-sync-2026-10-16.vtt': 'fixtures/MEET-CR/seed/support-sync-2026-10-16.vtt' },
     etalon: { input: 'fixtures/MEET-CR/etalon/meeting-2026-10-16-bt.md', razbor: 'fixtures/MEET-CR/etalon/meeting-2026-10-16.razbor.md' },
@@ -468,8 +468,8 @@ export function gradeRun (dir, fx) {
   const r = {}
   const seeded = existsSync(join(dir, '_seeded.txt')) ? new Set(read(join(dir, '_seeded.txt')).split('\n').filter(Boolean)) : new Set()
   const files = listFiles(dir)
-  const want = new RegExp(`^docs/(.+/)?${fx.key}/meeting-[^/]+-${fx.kind}\\.md$`)
-  const razborRe = new RegExp(`^docs/(.+/)?${fx.key}/meeting-[^/]+\\.razbor\\.md$`)
+  const want = new RegExp(`^coddoc/(.+/)?${fx.key}/meeting-[^/]+-${fx.kind}\\.md$`)
+  const razborRe = new RegExp(`^coddoc/(.+/)?${fx.key}/meeting-[^/]+\\.razbor\\.md$`)
   // Вход и разбор прошлой встречи из засева — не результат прогона.
   const inputs = files.filter((f) => want.test(f) && !(f in fx.seed))
   const razbors = files.filter((f) => razborRe.test(f) && !(f in fx.seed))
@@ -717,7 +717,7 @@ const PT = {
   // Созвон-расспрос без решений: fixtures/MEET-OUT/expected.md (перенос MI-NB-OUT на 2.0.0).
   OUT: {
     key: null,
-    folder: 'docs/_inbox',
+    folder: 'coddoc/_inbox',
     transcript: 'fixtures/MEET-OUT/seed/calls/2026-10-10-pvz-kak-seychas.txt',
     seed: { 'calls/2026-10-10-pvz-kak-seychas.txt': 'fixtures/MEET-OUT/seed/calls/2026-10-10-pvz-kak-seychas.txt' },
     etalon: { points: 'fixtures/MEET-OUT/etalon-2/meeting-2026-10-10.points.md', razbor: 'fixtures/MEET-OUT/etalon-2/meeting-2026-10-10.razbor.md' },
@@ -770,21 +770,21 @@ const PT = {
       { id: 'delivery', either: true, d: 'сроки доставки заказов (L59–L62)', re: /доставк|по\s+заказам/i }, // «Это сроки по заказам, не по возвратам» — r8 run-1
     ],
   },
-  // Вторая встреча за день (Н4, баг 5): в docs/_inbox/ уже лежат список и разбор другой встречи той же даты (ломбард).
+  // Вторая встреча за день (Н4, баг 5): в coddoc/_inbox/ уже лежат список и разбор другой встречи той же даты (ломбард).
   // fixtures/MEET-SAMEDAY/expected.md. Эталон — синтетический прогон selftest/loop/meet-synth/SAMEDAY/.
   SAMEDAY: {
     key: null,
-    folder: 'docs/_inbox',
+    folder: 'coddoc/_inbox',
     transcript: 'fixtures/MEET-SAMEDAY/seed/vstrecha-2026-10-19.txt',
     seed: {
       'vstrecha-2026-10-19.txt': 'fixtures/MEET-SAMEDAY/seed/vstrecha-2026-10-19.txt',
-      'docs/_inbox/meeting-2026-10-19.points.md': 'fixtures/MEET-SAMEDAY/seed/docs/_inbox/meeting-2026-10-19.points.md',
-      'docs/_inbox/meeting-2026-10-19.razbor.md': 'fixtures/MEET-SAMEDAY/seed/docs/_inbox/meeting-2026-10-19.razbor.md',
+      'coddoc/_inbox/meeting-2026-10-19.points.md': 'fixtures/MEET-SAMEDAY/seed/coddoc/_inbox/meeting-2026-10-19.points.md',
+      'coddoc/_inbox/meeting-2026-10-19.razbor.md': 'fixtures/MEET-SAMEDAY/seed/coddoc/_inbox/meeting-2026-10-19.razbor.md',
     },
     // Засев — байт в байт (sha256 из expected.md): перезапись, дописывание, правка `> Список:` — красный на любой версии.
     seedSha: {
-      'docs/_inbox/meeting-2026-10-19.points.md': '39a419d09f485e3782c5d06a040a6c221cf7f19017d0bc5942b60d5c040f02bc',
-      'docs/_inbox/meeting-2026-10-19.razbor.md': 'e9931728607a392540c361dfcaaf87857dad7a03c55d812bd9cd0083c041bf64',
+      'coddoc/_inbox/meeting-2026-10-19.points.md': '39a419d09f485e3782c5d06a040a6c221cf7f19017d0bc5942b60d5c040f02bc',
+      'coddoc/_inbox/meeting-2026-10-19.razbor.md': 'e9931728607a392540c361dfcaaf87857dad7a03c55d812bd9cd0083c041bf64',
     },
     etalon: { points: 'selftest/loop/meet-synth/SAMEDAY/meeting-2026-10-19-2.points.md', razbor: 'selftest/loop/meet-synth/SAMEDAY/meeting-2026-10-19-2.razbor.md' },
     // Место `-2` — по правке E5; на 2.0.0 `.points-2.md`, `.points.md-2` — проявление бага 5, не ложь.
@@ -832,7 +832,7 @@ const PT = {
   // fixtures/MEET-TWIN/expected.md. Эталон — синтетический прогон selftest/loop/meet-synth/TWIN/.
   TWIN: {
     key: null,
-    folder: 'docs/_inbox',
+    folder: 'coddoc/_inbox',
     transcript: 'fixtures/MEET-TWIN/seed/vstrecha-2026-10-20.txt',
     seed: { 'vstrecha-2026-10-20.txt': 'fixtures/MEET-TWIN/seed/vstrecha-2026-10-20.txt' },
     etalon: {
@@ -899,7 +899,7 @@ const PT = {
   // fixtures/MEET-WORKSHOP/expected.md. Эталон — синтетический прогон selftest/loop/meet-synth/WORKSHOP/.
   WORKSHOP: {
     key: null,
-    folder: 'docs/_inbox',
+    folder: 'coddoc/_inbox',
     transcript: 'fixtures/MEET-WORKSHOP/seed/calls/2026-10-05-priyom-maketov.txt',
     seed: { 'calls/2026-10-05-priyom-maketov.txt': 'fixtures/MEET-WORKSHOP/seed/calls/2026-10-05-priyom-maketov.txt' },
     etalon: { points: 'selftest/loop/meet-synth/WORKSHOP/meeting-2026-10-05.points.md', razbor: 'selftest/loop/meet-synth/WORKSHOP/meeting-2026-10-05.razbor.md' },
@@ -957,7 +957,7 @@ const PT = {
   // Эталон — синтетический прогон selftest/loop/meet-synth/NONAMES/.
   NONAMES: {
     key: null,
-    folder: 'docs/_inbox',
+    folder: 'coddoc/_inbox',
     transcript: 'fixtures/MEET-NONAMES/seed/2026-10-06-moyka-onlain-zapis.srt',
     seed: { '2026-10-06-moyka-onlain-zapis.srt': 'fixtures/MEET-NONAMES/seed/2026-10-06-moyka-onlain-zapis.srt' },
     etalon: { points: 'selftest/loop/meet-synth/NONAMES/meeting-2026-10-06.points.md', razbor: 'selftest/loop/meet-synth/NONAMES/meeting-2026-10-06.razbor.md' },
@@ -1029,12 +1029,12 @@ const PT = {
   // отдельной строкой «по правке». Эталон — синтетический прогон selftest/loop/meet-synth/NOTES/.
   NOTES: {
     key: null,
-    folder: 'docs/_inbox',
+    folder: 'coddoc/_inbox',
     transcript: 'fixtures/MEET-NOTES/seed/konspekt-zamorozka.txt',
     seed: { 'konspekt-zamorozka.txt': 'fixtures/MEET-NOTES/seed/konspekt-zamorozka.txt' },
     etalon: { points: 'selftest/loop/meet-synth/NOTES/meeting-2026-10-02.points.md', razbor: 'selftest/loop/meet-synth/NOTES/meeting-2026-10-02.razbor.md' },
     keyAsk: true,
-    // FRZ-14 / FRZ-30 похожи на ключ (map.md:15): `> Задача: FRZ-14` и папка docs/FRZ-14/ — стык, не красное.
+    // FRZ-14 / FRZ-30 похожи на ключ (map.md:15): `> Задача: FRZ-14` и папка coddoc/FRZ-14/ — стык, не красное.
     altKeys: ['FRZ-14', 'FRZ-30'],
     // «Решили:» без имени (L27): `решил: —` — стык, не ложь.
     deciderDash: true,
@@ -1702,7 +1702,7 @@ function runReplies (dir) {
 
 function ptCtx (fx) {
   const raw = readFileSync(join(HERE, fx.transcript), 'utf8')
-  const docs = Object.entries(fx.seed).filter(([rel]) => rel.startsWith('docs/')).map(([, src]) => read(join(HERE, src)))
+  const docs = Object.entries(fx.seed).filter(([rel]) => rel.startsWith('coddoc/')).map(([, src]) => read(join(HERE, src)))
   const tRaw = lf(raw).replace(/^\uFEFF/, '').split('\n')
   return {
     tRaw,
@@ -1730,9 +1730,9 @@ function ptCtx (fx) {
         ...ends.flatMap((m) => [`${m[2]}:${m[3]}`, `${m[1]}:${String(Number(m[2]) + 1).padStart(2, '0')}`])].join(' ')
     })(),
     speakers: [...new Set(tRaw.map(speakerOf).filter(Boolean))],
-    docs: Object.entries(fx.seed).filter(([rel]) => rel.startsWith('docs/') && TASK_DOC.test(rel)).map(([, src]) => read(join(HERE, src))),
+    docs: Object.entries(fx.seed).filter(([rel]) => rel.startsWith('coddoc/') && TASK_DOC.test(rel)).map(([, src]) => read(join(HERE, src))),
     // Все файлы папки задачи из засева (с входом прошлой встречи) — для шапки: роль оттуда не ложь, предупреждение.
-    seedDocs: Object.entries(fx.seed).filter(([rel]) => rel.startsWith('docs/')).map(([, src]) => read(join(HERE, src))),
+    seedDocs: Object.entries(fx.seed).filter(([rel]) => rel.startsWith('coddoc/')).map(([, src]) => read(join(HERE, src))),
     analyst: fixtureReplies(fx),
     corpus: [lf(raw), ...docs, fx.key || ''].join('\n').toLowerCase(),
   }
@@ -1742,7 +1742,7 @@ export function gradeRunPt (dir, fx) {
   const r = {}
   const seeded = existsSync(join(dir, '_seeded.txt')) ? new Set(read(join(dir, '_seeded.txt')).split('\n').filter(Boolean)) : new Set()
   const files = listFiles(dir)
-  const where = fx.key ? `^docs/(.+/)?${esc(fx.key)}/` : fx.altKeys ? `^(${esc(fx.folder)}|docs/(.+/)?(${fx.altKeys.map(esc).join('|')}))/` : `^${esc(fx.folder)}/`
+  const where = fx.key ? `^coddoc/(.+/)?${esc(fx.key)}/` : fx.altKeys ? `^(${esc(fx.folder)}|coddoc/(.+/)?(${fx.altKeys.map(esc).join('|')}))/` : `^${esc(fx.folder)}/`
   // `anyDash` (MEET-SAMEDAY): `-2` в любом месте имени — тоже список и разбор (баг 5 текущей версии — не ложь); место
   // `-2` по правке E5 сверяется отдельной строкой «по правке».
   const listRe = new RegExp(where + (fx.anyDash ? 'meeting-[^/]*\\.points[^/]*$' : 'meeting-[^/]+\\.points\\.md$'))
@@ -1905,7 +1905,7 @@ function selftest () {
       ck('лишний файл в корне — пойман', gradeRun(sandbox, fx).extra.includes('notes.md'), true)
       rmSync(join(sandbox, 'notes.md'))
       const ev = (input, sub) => JSON.stringify({ type: 'assistant', parent_tool_use_id: sub ? 'toolu_1' : null, message: { content: [{ type: 'tool_use', id: 'x', name: 'Read', input }] } })
-      writeFileSync(join(sandbox, 'stream.jsonl'), ev({ file_path: 'C:/sb/docs/' + fx.key + '/business_requirements.md' }, false) + '\n')
+      writeFileSync(join(sandbox, 'stream.jsonl'), ev({ file_path: 'C:/sb/coddoc/' + fx.key + '/business_requirements.md' }, false) + '\n')
       ck('чтение документа задачи — законно', gradeRun(sandbox, fx).forbiddenReads.length, 0)
       writeFileSync(join(sandbox, 'stream-02.jsonl'), ev({ file_path: 'C:\\sb\\services\\idm.md' }, true) + '\n')
       ck('субагент читал services/ — пойман', gradeRun(sandbox, fx).forbiddenReads.length, 1)
@@ -2027,8 +2027,8 @@ function selftest () {
       const sandbox2 = mkdtempSync(join(tmpdir(), 'grade-meet-'))
       try {
         for (const [rel, src] of Object.entries(fx.seed)) { mkdirSync(join(sandbox2, rel, '..'), { recursive: true }); writeFileSync(join(sandbox2, rel), read(join(HERE, src))) }
-        writeFileSync(join(sandbox2, 'docs/ACS-208', fx.etalon.input.split('/').pop()), inp)
-        writeFileSync(join(sandbox2, 'docs/ACS-208', fx.etalon.razbor.split('/').pop()), raz)
+        writeFileSync(join(sandbox2, 'coddoc/ACS-208', fx.etalon.input.split('/').pop()), inp)
+        writeFileSync(join(sandbox2, 'coddoc/ACS-208', fx.etalon.razbor.split('/').pop()), raz)
         ck('вход прошлой встречи из засева — не второй вход', gradeRun(sandbox2, fx).pass, true)
       } finally { rmSync(sandbox2, { recursive: true, force: true }) }
     } else {
@@ -2173,7 +2173,7 @@ function selftestPoints () {
     // Песочница.
     const sandbox = mkdtempSync(join(tmpdir(), 'grade-meet-pt-'))
     try {
-      const folder = fx.folder || (Object.keys(fx.seed).find((k) => k.startsWith('docs/')) || '').replace(/\/[^/]+$/, '')
+      const folder = fx.folder || (Object.keys(fx.seed).find((k) => k.startsWith('coddoc/')) || '').replace(/\/[^/]+$/, '')
       const base = fx.etalon.points.split('/').pop().replace(/\.points\.md$/, '')
       const put = (rel, text) => { mkdirSync(join(sandbox, rel, '..'), { recursive: true }); writeFileSync(join(sandbox, rel), text) }
       for (const [rel, src] of Object.entries(fx.seed)) put(rel, read(join(HERE, src)))
@@ -2193,7 +2193,7 @@ function selftestPoints () {
       rmSync(join(sandbox, folder, `${base}-bt.md`))
       rmSync(join(sandbox, folder, `${base}.points.md`))
       ck('списка нет — красный', `${run().lists}/${run().pass}`, '0/false')
-      const other = fx.key ? 'docs/_inbox' : 'docs/ABC-1'
+      const other = fx.key ? 'coddoc/_inbox' : 'coddoc/ABC-1'
       put(`${other}/${base}.points.md`, pts)
       ck('список не в той папке — красный', run().pass, false)
       rmSync(join(sandbox, other), { recursive: true, force: true })
@@ -2371,8 +2371,8 @@ function selftestPoints () {
       try {
         const put = (rel, text) => { mkdirSync(join(sbx, rel, '..'), { recursive: true }); writeFileSync(join(sbx, rel), text) }
         for (const [rel, src] of Object.entries(fx.seed)) put(rel, read(join(HERE, src)))
-        put('docs/EMP-1207/meeting-2026-10-15.points.md', withTrips)
-        put('docs/EMP-1207/meeting-2026-10-15.razbor.md', raz)
+        put('coddoc/EMP-1207/meeting-2026-10-15.points.md', withTrips)
+        put('coddoc/EMP-1207/meeting-2026-10-15.razbor.md', raz)
         put('answer-01.md', R3_ANSWER)
         const a = gradeRunPt(sbx, fx)
         // Побочное без вопроса — отдельная строка отчёта, исход прогона не красит (ревью оценщиков 2026-10-16).

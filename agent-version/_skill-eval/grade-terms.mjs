@@ -87,7 +87,7 @@ function gradeBt (doc, answer, mode) {
 }
 
 function gradeTd (dir, answer) {
-  const base = join(dir, 'AI-SDD', 'docs', 'PSS-40')
+  const base = join(dir, 'AI-SDD', 'coddoc', 'PSS-40')
   const kids = ['PSS-41', 'PSS-42'].map((k) => read(join(base, k, 'business_requirements.md')))
   const index = read(join(base, 'decomposition.md')) || ''
   const c = {}
@@ -134,7 +134,7 @@ const mode = (process.argv.find((a) => a.startsWith('--case=')) || '').slice(7)
 if (!arg || !existsSync(arg) || !['cut', 'one', 'td'].includes(mode)) {
   console.error('usage: node grade-terms.mjs <каталог плеча> --case=cut|one|td'); process.exit(1)
 }
-const REL = { cut: 'docs/ARS-180/business_requirements.md', one: 'docs/LIB-208/business_requirements.md' }[mode]
+const REL = { cut: 'coddoc/ARS-180/business_requirements.md', one: 'coddoc/LIB-208/business_requirements.md' }[mode]
 const runs = readdirSync(arg).filter((n) => /^run-\d+$/.test(n) && statSync(join(arg, n)).isDirectory()).sort()
 console.log(`\ngrade-terms --case=${mode}, ${arg}`)
 const tally = {}; let measured = 0; let green = 0

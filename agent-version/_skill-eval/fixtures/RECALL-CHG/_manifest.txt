@@ -1,5 +1,5 @@
 README.md
-seed/docs/MED-77/business_requirements.md
+seed/coddoc/MED-77/business_requirements.md
 twin-card.md
 w-prompt.txt
 w-turn2.txt

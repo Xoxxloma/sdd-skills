@@ -85,9 +85,9 @@ const VTT_FILES = /sklad\.vtt|reglament\.pdf/
 // ---------- 1.2.0: список пунктов, выгрузка, маршрут ----------
 
 const NB_REC = 'notes/отмена-записи/notebook.md'
-const LIST_IN = 'docs/_inbox/meeting-2026-10-13.points.md'
-const LIST_NEW = 'docs/_inbox/meeting-2026-10-12.points.md'
-const LIST_REC = 'docs/MED-77/meeting-2026-10-14.points.md'
+const LIST_IN = 'coddoc/_inbox/meeting-2026-10-13.points.md'
+const LIST_NEW = 'coddoc/_inbox/meeting-2026-10-12.points.md'
+const LIST_REC = 'coddoc/MED-77/meeting-2026-10-14.points.md'
 const NB_ROOM = 'notes/бронирование-переговорных/notebook.md'
 const ROUTE_VTT = 'calls/2026-10-13-vozvraty.vtt'
 const ROUTE_VTT_RE = /2026-10-13-vozvraty\.vtt/
@@ -2060,7 +2060,7 @@ function goodSpec (name) {
     const [money, act, check, launch] = listOf(LIST_IN)
     const its = [money + '; вместо: 2026-10-08 №1.2 · 2026-10-14 №1.1', act + '; отвечает на: 2026-10-09 №1.2 · 2026-10-14 №1.2',
       check + ' · 2026-10-14 №1.3', launch + ' · 2026-10-14 №1.4']
-    const entry = '## 2026-10-14\n\n### 1 · встреча 2026-10-13: возврат товара без чека\n' + its.join('\n') + '\n> исходник: docs/_inbox/meeting-2026-10-13.points.md\n'
+    const entry = '## 2026-10-14\n\n### 1 · встреча 2026-10-13: возврат товара без чека\n' + its.join('\n') + '\n> исходник: coddoc/_inbox/meeting-2026-10-13.points.md\n'
     const a1 = 'Пункт 1 заменяет решение той же Соколовой М. 2026-10-08 №1 «Возврат только на карту, с которой платили»; пункт 2 отвечает на открытый вопрос 2026-10-09 №1.\n' +
       ask(its.map((l, i) => `${i + 1}. ${l.slice(2)}`).join('\n'))
     return { seed, files: { [NB_RET]: appendTo(entry, [[OLD_CARD, 'заменён: 2026-10-14 №1.1'], [OLD_Q_LINE, 'закрыт: 2026-10-14 №1.2']]) }, answers: [a1, `Записал: ${NB_RET}, 2026-10-14 №1. Замена: п.1 вместо 2026-10-08 №1.2; ответ: п.2 на 2026-10-09 №1.2.\n`],
@@ -2069,7 +2069,7 @@ function goodSpec (name) {
   if (name === 'PTS-NEW') {
     const head = '---\nтема: бронирование переговорных\nключ: —\nцель: —\n---\n# Ноут: бронирование переговорных\n\n'
     const its = listOf(LIST_NEW)
-    const entry = '## 2026-10-14\n\n### 1 · встреча 2026-10-12: бронирование переговорных\n' + its.join('\n') + '\n> исходник: docs/_inbox/meeting-2026-10-12.points.md\n'
+    const entry = '## 2026-10-14\n\n### 1 · встреча 2026-10-12: бронирование переговорных\n' + its.join('\n') + '\n> исходник: coddoc/_inbox/meeting-2026-10-12.points.md\n'
     const a1 = `Ноутов нет — заведу новый. Пишу в ноут «бронирование переговорных» (${NB_ROOM}), 2026-10-14 №1, встреча 2026-10-12:\n` +
       its.map((l, i) => `${i + 1}. ${l.slice(2)}`).join('\n') + '\nЗаписать так или поправить?\n'
     return { seed, nb: NB_ROOM, files: { [NB_ROOM]: head + entry }, answers: [a1, `Записал: ${NB_ROOM}, 2026-10-14 №1.\n`],
@@ -2077,7 +2077,7 @@ function goodSpec (name) {
   }
   if (name === 'PTS-REC') {
     const its = listOf(LIST_REC)
-    const entry = '## 2026-10-14\n\n### 1 · встреча по памяти 2026-10-14: отмена записи, правки по итогам пилота\n' + its.join('\n') + '\n> исходник: docs/MED-77/meeting-2026-10-14.points.md\n'
+    const entry = '## 2026-10-14\n\n### 1 · встреча по памяти 2026-10-14: отмена записи, правки по итогам пилота\n' + its.join('\n') + '\n> исходник: coddoc/MED-77/meeting-2026-10-14.points.md\n'
     // 2.3.0 (Р5): сверка ничего не нашла — запись на ходу 1, отчёт вместо вопроса.
     const a1 = `Записал в ноут «отмена записи пациентом после пилота» (${NB_REC}), 2026-10-14 №1, встреча по памяти 2026-10-14:\n` +
       its.map((l, i) => `${i + 1}. ${l.slice(2)}`).join('\n') + '\nСовпадений с прошлыми записями нет.\n'
@@ -2255,7 +2255,7 @@ const ansEdit = (k, f) => (s) => { s.answers[k] = f(s.answers[k]); return s }
 const viewEdit = (from, to) => (s) => { s.files[s.view] = sub(s.files[s.view], from, to); return s }
 
 const COMMON_BAD = [
-  { id: 'files', d: 'лишний файл в docs/', f: addFile('docs/RET-1/business_requirements.md') },
+  { id: 'files', d: 'лишний файл в coddoc/', f: addFile('coddoc/RET-1/business_requirements.md') },
   { id: 'kinds', d: 'вид [факт]', f: nbInsertItem('- [факт] проверить с кассой') },
   { id: 'decidedBy', d: '[решено] без «решил:»', f: nbInsertItem('- [решено] Обмен вместо возврата') },
   { id: 'invented', d: 'число не из текста', f: nbInsertItem('- [сведение] Отказов было 52 — со слов аналитика') },
@@ -2560,8 +2560,8 @@ const BAD = {
     { id: 'asIs', d: 'пункт списка потерян', f: nbEdit('- [решено] Возврат без чека запускаем сразу во всех магазинах сети, без пилота — решил: Соколова М. · 2026-10-14 №1.4\n', '') },
     { id: 'asIs', d: 'хвост автора потерян', f: nbEdit('сразу после операции — со слов Дёмин К.', 'сразу после операции') },
     { id: 'noLineRef', d: '« · L39» перенесена в ноут', f: nbEdit('сразу после операции — со слов Дёмин К. · 2026-10-14 №1.3\n', 'сразу после операции — со слов Дёмин К. · L39 · 2026-10-14 №1.3\n') },
-    { id: 'sourceList', d: 'нет «> исходник:»', f: nbEdit('> исходник: docs/_inbox/meeting-2026-10-13.points.md\n', '> встреча 2026-10-13\n') },
-    { id: 'sourceList', d: 'путь мимо списка', f: nbEdit('> исходник: docs/_inbox/meeting-2026-10-13.points.md', '> исходник: docs/_inbox/meeting-2026-10-12.points.md') },
+    { id: 'sourceList', d: 'нет «> исходник:»', f: nbEdit('> исходник: coddoc/_inbox/meeting-2026-10-13.points.md\n', '> встреча 2026-10-13\n') },
+    { id: 'sourceList', d: 'путь мимо списка', f: nbEdit('> исходник: coddoc/_inbox/meeting-2026-10-13.points.md', '> исходник: coddoc/_inbox/meeting-2026-10-12.points.md') },
     { id: 'replaced', d: 'без «вместо:»', f: nbEdit('; вместо: 2026-10-08 №1.2', '') },
     { id: 'answered', d: 'без «отвечает на:»', f: nbEdit('; отвечает на: 2026-10-09 №1.2', '') },
     { id: 'replaced', d: 'заменён другой пункт той же записи', f: nbEdit('вместо: 2026-10-08 №1.2', 'вместо: 2026-10-08 №1.1') },
@@ -2581,7 +2581,7 @@ const BAD = {
     { id: 'asIs', d: 'пункт списка потерян', f: nbEdit('- [сведение] В офисе 12 переговорных, из них 3 большие — со слов Белова К.\n', '') },
     { id: 'asIs', d: 'вид пункта изменён', f: nbEdit('- [открыто] Снимать ли бронь', '- [решено] Снимать ли бронь') },
     { id: 'noLineRef', d: '« · L7» перенесена в ноут', f: nbEdit('бывают двойные брони — со слов Белова К.', 'бывают двойные брони — со слов Белова К. · L7') },
-    { id: 'sourceList', d: 'нет «> исходник:»', f: nbEdit('> исходник: docs/_inbox/meeting-2026-10-12.points.md\n', '') },
+    { id: 'sourceList', d: 'нет «> исходник:»', f: nbEdit('> исходник: coddoc/_inbox/meeting-2026-10-12.points.md\n', '') },
     { id: 'noLinks', d: '«отвечает на:» в новом ноуте', f: nbEdit('— ждёт: АХО', '— ждёт: АХО; отвечает на: 2026-10-12 №1 «Сейчас переговорные»') },
     { id: 'files', d: 'список изменён', f: (s) => { s.files[LIST_NEW] = s.seed[LIST_NEW].replace(/ · L\d+/g, ''); return s } },
   ],
@@ -2592,12 +2592,12 @@ const BAD = {
     { id: 'listHead', d: '«встреча» вместо «встреча по памяти»', f: nbEdit('### 1 · встреча по памяти 2026-10-14:', '### 1 · встреча 2026-10-14:') },
     { id: 'asIs', d: '«(по памяти, не уверен)» потеряно', f: nbEdit('К SMS добавили пуш? (по памяти, не уверен) — ждёт: —', 'К SMS добавили пуш — ждёт: —') },
     { id: 'noLineRef', d: '« · L57» перенесена в ноут', f: nbEdit('(по памяти, не уверен) — ждёт: —\n', '(по памяти, не уверен) — ждёт: — · L57\n') },
-    { id: 'sourceList', d: 'исходник — протокол, а не список', f: nbEdit('> исходник: docs/MED-77/meeting-2026-10-14.points.md', '> исходник: docs/MED-77/meeting-2026-10-14.recall.md') },
+    { id: 'sourceList', d: 'исходник — протокол, а не список', f: nbEdit('> исходник: coddoc/MED-77/meeting-2026-10-14.points.md', '> исходник: coddoc/MED-77/meeting-2026-10-14.recall.md') },
     { id: 'noLinks', d: 'ДМС «отвечает» на вопрос регистратуры', f: nbEdit('— ждёт: Ким Сергей', '— ждёт: Ким Сергей; отвечает на: 2026-10-09 №1 «Нужно ли регистратору видеть»') },
     { id: 'decided12', d: '12 часов — открытым', f: nbEdit('- [решено] Отмена за 12 часов вместо 24 — решил: Зайцева Ольга', '- [открыто] Отмена за 12 часов вместо 24? — ждёт: Зайцева Ольга') },
     { id: 'thoughtKept', d: 'мысль стала решением', f: nbEdit('- [мысль] Предупреждение пациенту об оставшейся отмене', '- [решено] Предупреждение пациенту об оставшейся отмене — решил: Зайцева Ольга') },
     { id: 'thoughtKept', d: 'мысль стала открытым вопросом', f: nbEdit('- [мысль] Предупреждение пациенту об оставшейся отмене', '- [открыто] Предупреждать ли пациента об оставшейся отмене — ждёт: —') },
-    { id: 'files', d: 'протокол изменён', f: (s) => { s.files['docs/MED-77/meeting-2026-10-14.recall.md'] = s.seed['docs/MED-77/meeting-2026-10-14.recall.md'] + '\n'; return s } },
+    { id: 'files', d: 'протокол изменён', f: (s) => { s.files['coddoc/MED-77/meeting-2026-10-14.recall.md'] = s.seed['coddoc/MED-77/meeting-2026-10-14.recall.md'] + '\n'; return s } },
   ],
   EXPORT: [
     ...exportBad('2026-10-07'),
@@ -2614,7 +2614,7 @@ const BAD = {
   ],
   ROUTE: [
     { id: 'files', d: 'файл создан: исходник в sources/', f: addFile('notes/возврат-товара-без-чека/sources/2026-10-14-1.md', 'x') },
-    { id: 'files', d: 'список написан самим ноутом', f: addFile('docs/_inbox/meeting-2026-10-13.points.md', '# Пункты: возврат\n') },
+    { id: 'files', d: 'список написан самим ноутом', f: addFile('coddoc/_inbox/meeting-2026-10-13.points.md', '# Пункты: возврат\n') },
     { id: 'files', d: 'Write в потоке', f: (s) => { s.streams[0].push(ev('Write', { file_path: SB + 'notes/x.md', content: '…' })); return s } },
     { id: 'files', d: 'vtt изменён', f: (s) => { s.files[ROUTE_VTT] = s.seed[ROUTE_VTT] + '\nNOTE разобрано\n'; return s } },
     { id: 'notebook', d: 'запись в ноуте', f: (s) => { s.files[NB_RET] = s.seed[NB_RET] + '\n## 2026-10-14\n\n### 1 · файл calls/2026-10-13-vozvraty.vtt\n'; return s } },
@@ -2754,7 +2754,7 @@ function exportBad (first) {
     { id: 'notebook', d: 'ноут дописан', f: (s) => { s.files[NB_RET] = s.seed[NB_RET] + '\n## 2026-10-14\n'; return s } },
     { id: 'notebook', d: 'ноут переписан в CRLF', f: (s) => { s.files[NB_RET] = s.seed[NB_RET].replace(/\n/g, '\r\n'); return s } },
     { id: 'ptsFile', d: 'имя не notebook-<дата>.points.md', f: mv('notes/возврат-товара-без-чека/пункты-2026-10-14.md') },
-    { id: 'ptsFile', d: 'список не в папке ноута', f: mv('docs/_inbox/notebook-2026-10-14.points.md') },
+    { id: 'ptsFile', d: 'список не в папке ноута', f: mv('coddoc/_inbox/notebook-2026-10-14.points.md') },
     { id: 'ptsFile', d: 'дата засева в имени', f: mv('notes/возврат-товара-без-чека/notebook-2026-10-09.points.md') },
     { id: 'checked', d: 'проверки субагентом нет', f: (s) => { s.streams[0] = s.streams[0].filter((e) => !e.includes('"name":"Agent"')); return s } },
     { id: 'ptsHead', d: 'нет «# Пункты:»', f: viewEdit('# Пункты: возврат товара без чека\n', '') },
@@ -2957,8 +2957,8 @@ const OK_VARIANTS = {
   ],
   // ---- 1.2.0 ----
   'PTS-IN': [
-    { d: 'путь к списку от папки ноута', f: nbEdit('> исходник: docs/_inbox/', '> исходник: ../../docs/_inbox/') },
-    { d: 'путь к списку в обратных кавычках', f: nbEdit('> исходник: docs/_inbox/meeting-2026-10-13.points.md', '> исходник: `docs/_inbox/meeting-2026-10-13.points.md`') },
+    { d: 'путь к списку от папки ноута', f: nbEdit('> исходник: coddoc/_inbox/', '> исходник: ../../coddoc/_inbox/') },
+    { d: 'путь к списку в обратных кавычках', f: nbEdit('> исходник: coddoc/_inbox/meeting-2026-10-13.points.md', '> исходник: `coddoc/_inbox/meeting-2026-10-13.points.md`') },
     { d: '«решила: Гарипова Л.», «со слов Дёмина К.»', f: (s) => nbEdit('решил: Гарипова Л.', 'решила: Гарипова Л.')(nbEdit('сразу после операции — со слов Дёмин К.', 'сразу после операции — со слов Дёмина К.')(s)) },
     { d: 'дата встречи «13.10»', f: nbEdit('### 1 · встреча 2026-10-13:', '### 1 · встреча 13.10:') },
     { d: 'дата встречи «13 октября»', f: nbEdit('### 1 · встреча 2026-10-13:', '### 1 · встреча 13 октября:') },
@@ -2971,11 +2971,11 @@ const OK_VARIANTS = {
   'PTS-NEW': [
     { d: 'папка не из темы — предупреждение', warn: /папка ноута не из темы/, f: (s) => { const t = s.files[NB_ROOM]; delete s.files[NB_ROOM]; s.nb = 'notes/переговорные/notebook.md'; s.files[s.nb] = t; return s } },
     { d: 'новый ноут с BOM', f: (s) => { s.files[NB_ROOM] = '﻿' + s.files[NB_ROOM]; return s } },
-    { d: 'ссылка на список markdown', f: nbEdit('> исходник: docs/_inbox/meeting-2026-10-12.points.md', '> исходник: [meeting-2026-10-12.points.md](docs/_inbox/meeting-2026-10-12.points.md)') },
+    { d: 'ссылка на список markdown', f: nbEdit('> исходник: coddoc/_inbox/meeting-2026-10-12.points.md', '> исходник: [meeting-2026-10-12.points.md](coddoc/_inbox/meeting-2026-10-12.points.md)') },
   ],
   'PTS-REC': [
     { d: 'дата встречи «14.10.2026»', f: nbEdit('### 1 · встреча по памяти 2026-10-14:', '### 1 · встреча по памяти 14.10.2026:') },
-    { d: 'протокол прочитан — предупреждение', warn: /протокол по памяти прочитан/, f: (s) => { s.streams[0].push(ev('Read', { file_path: SB + 'docs/MED-77/meeting-2026-10-14.recall.md' })); return s } },
+    { d: 'протокол прочитан — предупреждение', warn: /протокол по памяти прочитан/, f: (s) => { s.streams[0].push(ev('Read', { file_path: SB + 'coddoc/MED-77/meeting-2026-10-14.recall.md' })); return s } },
     { d: '«решила: Зайцева Ольга»', f: nbEdit('вместо 24 — решил: Зайцева Ольга', 'вместо 24 — решила: Зайцева Ольга') },
   ],
   EXPORT: [
@@ -3148,21 +3148,21 @@ function fixtureSanity (ck) {
   // ---- 1.2.0 ----
   const listIts = (n, rel) => S(n)[rel].split('\n').filter((l) => /^- \[/.test(l))
   const listHeadOk = (n, rel) => { const t = S(n)[rel].split('\n'); return /^# Пункты: \S/.test(t[0]) && /^> Источник: \S/.test(t[1]) && /^> Задача: \S/.test(t[2]) && /^> Встреча: \d{4}-\d{2}-\d{2} /.test(t[3]) }
-  // Конец диалога стенда — `points.md` в docs/ или notes/ (grep по содержимому): засев его не содержит.
-  const mentionsPts = (n) => Object.entries(S(n)).some(([f, t]) => /^(docs|notes)\//.test(f) && /points\.md/.test(t))
+  // Конец диалога стенда — `points.md` в coddoc/ или notes/ (grep по содержимому): засев его не содержит.
+  const mentionsPts = (n) => Object.entries(S(n)).some(([f, t]) => /^(coddoc|notes)\//.test(f) && /points\.md/.test(t))
   ck('PTS-IN: ноут = засев CONTRA', S('PTS-IN')[NB_RET] === N('CONTRA'), true)
   ck('PTS-IN: шапка списка по форме output.md', listHeadOk('PTS-IN', LIST_IN), true)
   ck('PTS-IN: пунктов 4, у каждого « · L<n>»', listIts('PTS-IN', LIST_IN).filter((l) => L_TAIL.test(l)).length, 4)
-  ck('PTS-IN: «points.md» в docs/ и notes/ засева нет', mentionsPts('PTS-IN'), false)
+  ck('PTS-IN: «points.md» в coddoc/ и notes/ засева нет', mentionsPts('PTS-IN'), false)
   ck('PTS-IN: старый пункт про карту и вопрос про акт в засеве', S('PTS-IN')[NB_RET].includes(OLD_CARD) && S('PTS-IN')[NB_RET].includes(`- [открыто] ${OLD_Q_ACT} — ждёт: Гарипова Л.`), true)
   ck('PTS-NEW: notes/ в засеве нет', Object.keys(S('PTS-NEW')).some((f) => /^notes\//.test(f)), false)
   ck('PTS-NEW: шапка списка по форме, «> Задача: —»', listHeadOk('PTS-NEW', LIST_NEW) && /^> Задача: —$/m.test(S('PTS-NEW')[LIST_NEW]), true)
   ck('PTS-REC: шапка списка по форме, «по памяти аналитика»', listHeadOk('PTS-REC', LIST_REC) && /по памяти аналитика$/m.test(S('PTS-REC')[LIST_REC]), true)
-  ck('PTS-REC: «points.md» в docs/ и notes/ засева нет', mentionsPts('PTS-REC'), false)
+  ck('PTS-REC: «points.md» в coddoc/ и notes/ засева нет', mentionsPts('PTS-REC'), false)
   ck('PTS-REC: в ноуте нет [решено] и связей — менять нечего', /^- \[решено\]|вместо:|отвечает на:/m.test(S('PTS-REC')[NB_REC]), false)
   ck('PTS-REC: [мысль] в списке одна — о предупреждении', listIts('PTS-REC', LIST_REC).filter((l) => kindOf(l) === 'мысль').map((l) => w('предупрежд').test(l)).join(), 'true')
   // «Моя мысль» — строка `Аналитик:`, предмет — в вопросе над ней (meeting-recall 1.1.0, Шаг 5).
-  ck('PTS-REC: «L<n>» списка — строки протокола о том же', listIts('PTS-REC', LIST_REC).every((l) => { const n = Number(l.match(/L(\d+)$/)[1]); const pl = S('PTS-REC')['docs/MED-77/meeting-2026-10-14.recall.md'].split('\n').slice(n - 2, n).join(' '); return sim(core(l), pl) > 0 }), true)
+  ck('PTS-REC: «L<n>» списка — строки протокола о том же', listIts('PTS-REC', LIST_REC).every((l) => { const n = Number(l.match(/L(\d+)$/)[1]); const pl = S('PTS-REC')['coddoc/MED-77/meeting-2026-10-14.recall.md'].split('\n').slice(n - 2, n).join(' '); return sim(core(l), pl) > 0 }), true)
   const ex = activeOf(S('EXPORT')[NB_RET])
   ck('EXPORT: действующих 10, заменён 1, закрыт 1', `${ex.active.length}/${ex.replaced.length}/${ex.closed.length}`, '10/1/1')
   ck('EXPORT: заменён «Возврат только на карту»', (ex.replaced[0] || {}).text.startsWith(OLD_CARD_TEXT), true)

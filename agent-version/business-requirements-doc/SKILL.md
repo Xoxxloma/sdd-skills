@@ -1,6 +1,6 @@
 ---
 name: business-requirements-doc
-version: 1.3.1
+version: 1.4.0
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
 description: 'Gathers business requirements and writes ONE Markdown spec (BRD→SRS) in Russian. It MAY read the repo as evidence, but nothing enters the spec on your own authority: before writing, every gate is either stated by the user themselves or put to the user and answered, and only what the user explicitly leaves open becomes TBD. The mandatory first question is the linked Jira/SberTrack task key (SMSEC-1234); without it the spec is not written. Before writing it also decides the business cut (§4.5) — several separate deliveries (поставки) → it proposes the split into parts (части); one delivery → it says so explicitly («не применимо: причина») — and puts that proposal to the user in the handoff. Use whenever someone wants to write a ТЗ / BRD / SRS, formalize a request, or describe a task, feature, change, or integration for developers.'
@@ -475,7 +475,7 @@ gates** and their status. Use exactly one marker per gate:
 вместо него.
 
 **Путь к файлу называй только после того, как запись прошла.** «Спеку записал по пути
-`docs/…`» в ответе, когда инструмент записи не вызывался, — ложь в отчёте: следующая стадия
+`coddoc/…`» в ответе, когда инструмент записи не вызывался, — ложь в отчёте: следующая стадия
 петли пойдёт по этому пути и ничего не найдёт.
 
 **Разбиение на части (§4.5) в реестр НЕ идёт — оно не гейт.** Реестр блокирует запись при
@@ -574,13 +574,13 @@ Write ONE `.md` using the template, in Russian, with **only confirmed content**:
 
 FR-* нумеруются в §4.1, и у каждого — свой критерий в §4.2 под тем же номером.
 
-Save it as one new Markdown file in a **task-scoped folder under `docs/`**:
+Save it as one new Markdown file in a **task-scoped folder under `coddoc/`**:
 
-- **Путь:** `docs/<TASK-KEY>/business_requirements.md`, где `<TASK-KEY>` —
-  ключ задачи из Gate 0 (например `docs/SMSEC-1234/business_requirements.md`).
-- Создай подпапку `docs/<TASK-KEY>/`, если её ещё нет. Имя файла строго
+- **Путь:** `coddoc/<TASK-KEY>/business_requirements.md`, где `<TASK-KEY>` —
+  ключ задачи из Gate 0 (например `coddoc/SMSEC-1234/business_requirements.md`).
+- Создай подпапку `coddoc/<TASK-KEY>/`, если её ещё нет. Имя файла строго
   `business_requirements.md`.
-- **`docs/` — от корня рабочего репозитория, не от текущей директории.** Если `docs/` рядом
+- **`coddoc/` — от корня рабочего репозитория, не от текущей директории.** Если `coddoc/` рядом
   не видно, а корень неочевиден — спроси, куда класть, одним коротким вопросом. Угаданный путь
   тем и плох, что файл вроде бы записан, а следующая стадия его не найдёт.
 - Ключ уже провалидирован в Gate 0 (`^[A-Z][A-Z0-9]+-\d+$`), поэтому подставляется в
@@ -649,7 +649,7 @@ Save it as one new Markdown file in a **task-scoped folder under `docs/`**:
    у каждого FR-* есть критерий приёмки «Дано–Когда–Тогда» или `TBD` по явному отказу. Критерий не из
    слов пользователя и
    не из подтверждённой им гипотезы — не дописывай: как п.7 — вопрос, затем правка файла по ответу.
-5. На выходе ровно один `.md` по пути `docs/<TASK-KEY>/business_requirements.md`
+5. На выходе ровно один `.md` по пути `coddoc/<TASK-KEY>/business_requirements.md`
    (ключ = Gate 0); никакие существующие файлы репозитория не изменены; никаких других
    файлов, планов или кода не создано. Правка собственного файла по замечанию аналитика
    (Step 6) сюда не относится — это по-прежнему один файл, и он твой.
