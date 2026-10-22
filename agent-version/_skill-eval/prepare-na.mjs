@@ -153,12 +153,12 @@ if (arm === 'review') {
   ]
   const manifest = variants.map((v, i) => {
     const work = join(round, 'review', `run-${String(i + 1).padStart(2, '0')}`)
-    const docs = join(work, 'docs/NA-410')
+    const docs = join(work, 'coddoc/NA-410')
     if (existsSync(work)) throw new Error('Проба приёмки уже существует')
     mkdirSync(docs, { recursive: true })
     writeFileSync(join(docs, 'technical_specification.md'), v.text)
     writeFileSync(join(docs, 'change_request.md'), change)
-    return { name: v.name, work, target: 'docs/NA-410/technical_specification.md', source: 'docs/NA-410/change_request.md',
+    return { name: v.name, work, target: 'coddoc/NA-410/technical_specification.md', source: 'coddoc/NA-410/change_request.md',
       checklist: join(snapshot, 'spec-review/reference/checklist-spec.md'), expected: v.expected }
   })
   writeFileSync(join(round, 'review-manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
@@ -174,23 +174,23 @@ for (let i = 0; i < cases.length; i++) {
   mkdirSync(work, { recursive: true })
   let prompt, target
   if (scenario === 'bug') {
-    cpSync(join(import.meta.dirname, 'fixtures/BF-SPEC/docs/ARS-312'), join(work, 'docs/ARS-312'), { recursive: true })
+    cpSync(join(import.meta.dirname, 'fixtures/BF-SPEC/coddoc/ARS-312'), join(work, 'coddoc/ARS-312'), { recursive: true })
     prompt = readFileSync(join(import.meta.dirname, 'fixtures/BF-SPEC/spec-prompt.txt'), 'utf8')
-    target = 'docs/ARS-312/technical_specification.md'
+    target = 'coddoc/ARS-312/technical_specification.md'
   } else {
     const key = scenario === 'feature' ? 'NA-420' : 'NA-410'
-    const docs = join(work, 'docs', key)
+    const docs = join(work, 'coddoc', key)
     mkdirSync(docs, { recursive: true })
     const source = scenario === 'feature' ? 'business_requirements.md' : 'change_request.md'
     writeFileSync(join(docs, source), scenario === 'feature' ? feature : change)
-    prompt = `Документ сверху: docs/${key}/${source}. ${scenario === 'feature' ? 'Обычный режим по БТ.' : 'Явный флаг от analyst-workspace: режим мелкой правки.'}\n\n${answered}`
+    prompt = `Документ сверху: coddoc/${key}/${source}. ${scenario === 'feature' ? 'Обычный режим по БТ.' : 'Явный флаг от analyst-workspace: режим мелкой правки.'}\n\n${answered}`
     if (scenario === 'feature') prompt += '\nЛокальный диалог без сети: закрыт/открыт. Открываем синхронно, ожидание и таймауты не возникают; нет числовых значений, пустого ответа, ошибок источника и 403. Фокус и закрытие — по БТ. Новую локальную UI-логику проектируй по этим решениям.'
     if (scenario === 'change') prompt += '\nМеняется только текст кнопки, новых состояний UI нет.'
     if (scenario === 'refine') {
       writeFileSync(join(docs, 'technical_specification.md'), seed)
-      prompt = `Явный флаг от analyst-workspace: мелкая правка. Доработай существующую docs/${key}/technical_specification.md по change_request.md; это проход доработки, первоначальное интервью закончено.\nОтвет аналитика: для выката переименования теперь согласован фиче-флаг approvalButtonLabel в portal-web. Значение false оставляет «Сохранить», true — «Отправить на согласование». Флаг локальный, задаётся сборкой FE, изначально true; переключает команда портала. Откат — предыдущий FE-бандл. Остальные подтверждённые решения прежние. Подними редакцию и пересчитай статус.`
+      prompt = `Явный флаг от analyst-workspace: мелкая правка. Доработай существующую coddoc/${key}/technical_specification.md по change_request.md; это проход доработки, первоначальное интервью закончено.\nОтвет аналитика: для выката переименования теперь согласован фиче-флаг approvalButtonLabel в portal-web. Значение false оставляет «Сохранить», true — «Отправить на согласование». Флаг локальный, задаётся сборкой FE, изначально true; переключает команда портала. Откат — предыдущий FE-бандл. Остальные подтверждённые решения прежние. Подними редакцию и пересчитай статус.`
     }
-    target = `docs/${key}/technical_specification.md`
+    target = `coddoc/${key}/technical_specification.md`
   }
   writeFileSync(join(work, 'prompt.txt'), prompt)
   manifest.push({ arm, scenario, work, skill: join(snapshot, 'technical-spec-doc/SKILL.md'), target })

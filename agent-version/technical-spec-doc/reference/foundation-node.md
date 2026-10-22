@@ -67,12 +67,12 @@
      фундамент ляжет в её корень, где дети его по пути не найдут;
   5. **назови собранный путь в ответе** и пиши именно по нему.
 
-  Пример: эпик-БТ `docs/ARS-100/business_requirements.md` → пишем в
-  `docs/ARS-100/_foundation/technical_specification.md`.
+  Пример: эпик-БТ `coddoc/ARS-100/business_requirements.md` → пишем в
+  `coddoc/ARS-100/_foundation/technical_specification.md`.
 
   ❌ `_foundation/technical_specification.md` — строка проводника подставлена как есть.
   ❌ `<рабочая-копия>/_foundation/technical_specification.md` — папка эпика потеряна.
-  ✅ `docs/ARS-100/_foundation/technical_specification.md` — ключ эпика на месте.
+  ✅ `coddoc/ARS-100/_foundation/technical_specification.md` — ключ эпика на месте.
 
   `_foundation/` встаёт на одном уровне с детскими папками, НЕ внутрь какой-то из них: #0 не
   принадлежит ни одному ребёнку. **Не перезатирай** спеку эпика/ребёнка.

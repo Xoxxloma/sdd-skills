@@ -2,7 +2,7 @@
 
 Скилл `meeting-recall`, проба `rec-cont` (`PLAN-LOOP-HARDEN.md`, Н13 — часть «продолжение по `*.recall.md`»). Двойник
 аналитика: `_skill-eval/twin-analyst.md` + `twin-card.md`. Засев — протокол, брошенный посреди Шага 3:
-`seed/docs/ATL-58/meeting-2026-10-05.recall.md`. Шапка, заметки, пересказ, подтверждённые темы, раунд по одной теме из
+`seed/coddoc/ATL-58/meeting-2026-10-05.recall.md`. Шапка, заметки, пересказ, подтверждённые темы, раунд по одной теме из
 двух; итога нет. Документа задачи нет (`документ: нет`).
 
 Как было на встрече (только грейдеру и человеку; двойник этого не видит):
@@ -30,7 +30,7 @@
 
 Строка пробы для `run-ctx-v2.sh` (рядом с `rec-inline`; имя `rec-cont` добавить и в список `*)`):
 
-    rec-cont) FIXTURE=REC-CONT; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=12; IDLE_MAX=12; DONE_RE='/docs/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
+    rec-cont) FIXTURE=REC-CONT; PROMPT_FILE=w-prompt.txt; SKILL=meeting-recall; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=12; IDLE_MAX=12; DONE_RE='/coddoc/(.*/)?meeting-[^/]*\.points\.md$'; DONE_GREP='^# Пункты:'; TWIN_CARD=twin-card.md; MEET_ENV=1 ;;
 
 Промпт двойника править не нужно. Двойник видит только текущий диалог, прошлой сессии у него нет — карточка говорит,
 что он уже рассказал встречу и ответил про мерки, и как отвечать на повтор («Я же это уже говорил:» и то же).

@@ -1,6 +1,6 @@
 {
   "key": "VSL-23",
-  "source": "docs/VSL-23/integrations-draft.txt",
+  "source": "coddoc/VSL-23/integrations-draft.txt",
   "participants": [
     ["Сайт лодочной станции"],
     ["Сервис бронирования"],

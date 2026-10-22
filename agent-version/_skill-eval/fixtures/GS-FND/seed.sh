@@ -6,5 +6,5 @@
 # эпика со строкой «Унаследовано из эпика ARS-500». Унаследованный §4.3 — не признак общего источника для #0.
 set -u
 DEST="${1:?куда}"; HERE="$(cd "$(dirname "$0")" && pwd)"
-rm -rf "$DEST"; mkdir -p "$DEST"; cp -r "$HERE/docs" "$DEST/docs"
+rm -rf "$DEST"; mkdir -p "$DEST"; cp -r "$HERE/coddoc" "$DEST/coddoc"
 echo "песочница: $DEST   файлов: $(find "$DEST" -type f | wc -l)"

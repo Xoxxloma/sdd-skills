@@ -22,8 +22,8 @@ import { join } from 'node:path'
 import { read, turn, apiFailed, writesBt, section, sectionByTitle, askedBlocks, dropNegated } from './br-lib.mjs'
 
 const CASES = {
-  card: { rel: 'docs/REP-304/business_requirements.md' },
-  new: { rel: 'docs/OFC-55/business_requirements.md' },
+  card: { rel: 'coddoc/REP-304/business_requirements.md' },
+  new: { rel: 'coddoc/OFC-55/business_requirements.md' },
 }
 // Правило из «Бизнес-правил» карточки (`WorkAcceptance`): отзыв до рассмотрения, после — неизменен.
 export const RE_ANCHOR = /((отозв|отзыв)\p{L}*[^\n]{0,120}(пока|до\s+того|не\s+рассмотр|до\s+(его\s+)?рассмотр|до\s+решени|не\s+вын[её]с)|(рассмотр|решени)\p{L}*[^\n]{0,100}(неизмен|нельзя\s+(изменить|отозвать|поправить|исправить)|не\s+меня))/iu

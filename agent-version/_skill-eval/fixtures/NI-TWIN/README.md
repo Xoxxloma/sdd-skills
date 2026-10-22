@@ -2,7 +2,7 @@
 
 > Написано до первого прогона. Толкование, дописанное после чисел, подгоняется под результат.
 
-Проба `ni-twin` (PLAN-LOOP-HARDEN, Н10). Промпт `/notes-to-intent docs/ZKM-905/meeting-2026-10-12.points.md`. За
+Проба `ni-twin` (PLAN-LOOP-HARDEN, Н10). Промпт `/notes-to-intent coddoc/ZKM-905/meeting-2026-10-12.points.md`. За
 аналитика отвечает двойник: карточка `twin-card.md` + промпт `_skill-eval/twin-objector.md`. `w-turn2.txt` — запасная
 реплика раннера. Ожидания — `expected.md`.
 
@@ -28,10 +28,10 @@
 
 ## Засев (`seed/`)
 
-- `docs/ZKM-905/business_requirements.md` — 62 строки, функция работает: FR-2 (стр. 38–39) «раз в месяц … с 9 до 21.
+- `coddoc/ZKM-905/business_requirements.md` — 62 строки, функция работает: FR-2 (стр. 38–39) «раз в месяц … с 9 до 21.
   Привоз автозаказа бесплатный»; FR-4 (стр. 44) отмена привоза «не позже чем за сутки»; заказчик — руководитель
   онлайн-магазина (стр. 14); «Принимает результат: коммерческий директор» (стр. 15) — на встрече его не было. Спеки нет.
-- `docs/ZKM-905/meeting-2026-10-12.points.md` — список `meeting-intake` (`meeting-intake/reference/output.md:10–20`),
+- `coddoc/ZKM-905/meeting-2026-10-12.points.md` — список `meeting-intake` (`meeting-intake/reference/output.md:10–20`),
   9 пунктов, строки 6–14. Пометок слоя нет.
 
 | P | Вид | Слой | Против БТ | Решил | Шаг 5 |
@@ -63,7 +63,7 @@
 3. Шаг 6 — сводка. Двойник: «Поправить: к пункту про отмену привоза добавьте — за отменённый привоз деньги с карты
    не списываем.»
 4. Сводка ещё раз. Двойник: «Записать N пунктов».
-5. Запись `docs/ZKM-905/meeting-2026-10-12-bt.md`, отчёт.
+5. Запись `coddoc/ZKM-905/meeting-2026-10-12-bt.md`, отчёт.
 
 ## Строка пробы для раннера
 
@@ -71,5 +71,5 @@
 (`run-pool-ctx-v2.sh:120–147`). Строка — как в `run-ctx-v2.sh`:
 
 ```
-  ni-twin)    FIXTURE=NI-TWIN;    PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=12; IDLE_MAX=12; DONE_RE='/docs/.*/meeting-2026-10-12-(bt|spec)\.md$'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-objector.md; MEET_ENV=1 ;;
+  ni-twin)    FIXTURE=NI-TWIN;    PROMPT_FILE=w-prompt.txt; SKILL=notes-to-intent; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=12; IDLE_MAX=12; DONE_RE='/coddoc/.*/meeting-2026-10-12-(bt|spec)\.md$'; TWIN_CARD=twin-card.md; TWIN_PROMPT=twin-objector.md; MEET_ENV=1 ;;
 ```

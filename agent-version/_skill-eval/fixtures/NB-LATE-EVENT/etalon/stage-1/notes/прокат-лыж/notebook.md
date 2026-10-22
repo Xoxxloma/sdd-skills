@@ -50,4 +50,4 @@
 ## 2026-10-20
 
 ### 1 · встреча 2026-10-12: прокат лыж
-> исходник: docs/_inbox/meeting-2026-10-12.points.md
+> исходник: coddoc/_inbox/meeting-2026-10-12.points.md

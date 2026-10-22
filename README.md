@@ -41,7 +41,7 @@
 AI-SDD/
 ├── services/          # карточки из кода; manifest.yaml ведёт человек
 ├── context/           # регламенты, договорённости, глоссарий — руками
-└── docs/SMSEC-12345/
+└── coddoc/SMSEC-12345/
     ├── business_requirements.md | bug_report.md | change_request.md
     ├── technical_specification.md
     └── stages/        # необязательно: index.md, stage-01.md, …

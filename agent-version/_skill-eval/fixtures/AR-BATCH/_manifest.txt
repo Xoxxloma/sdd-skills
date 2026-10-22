@@ -1,9 +1,9 @@
 ar-prompt.txt
 ar-turn2.txt
-docs/SHP-11/technical_specification.md
-docs/SHP-12/technical_specification.md
-docs/SHP-14/technical_specification.md
-docs/SHP-15/technical_specification.md
+coddoc/SHP-11/technical_specification.md
+coddoc/SHP-12/technical_specification.md
+coddoc/SHP-14/technical_specification.md
+coddoc/SHP-15/technical_specification.md
 README.md
 services/_history/orders-api.md
 services/admin-web.md

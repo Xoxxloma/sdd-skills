@@ -221,7 +221,7 @@ function gradeSandbox(sb, mode) {
     return r
   }
 
-  r.pathOk = brds.some((p) => p === 'docs/SMSEC-4180/business_requirements.md')
+  r.pathOk = brds.some((p) => p === 'coddoc/SMSEC-4180/business_requirements.md')
   if (!r.wrote) return { ...r, pass: false, why: 'файл не записан' }
   const s = gradeSection10(readFileSync(join(sb, brds[0]), 'utf8'))
   Object.assign(r, s)

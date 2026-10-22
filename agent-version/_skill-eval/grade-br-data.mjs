@@ -14,7 +14,7 @@
 //   none — тот же бриф без окружения: ход 1 не ссылается на карточки/код, которых нет.
 //   dlt0 — доработка, ответ «данные не меняются» → §4.3 «не применимо: причина».
 //   dlt1 — доработка, ответ «появляется причина отклонения» → §4.3 называет её и что она новая.
-//   file — регресс прода: один ход «ПРОДОЛЖЕНИЕ», состав данных в файле docs/MNT-410/data.md →
+//   file — регресс прода: один ход «ПРОДОЛЖЕНИЕ», состав данных в файле coddoc/MNT-410/data.md →
 //          БТ этим ходом, в §4.3 все 12 сведений файла бизнес-названиями, кодовых имён нет нигде.
 //
 // Критерии названы до прогонов (PLAN-BR-SECTIONS §1.0: N = 3, провал новой пробы → разбор).
@@ -24,11 +24,11 @@ import { join } from 'node:path'
 import { read, turn, apiFailed, writesBt, sectionByTitle, askedBlocks, dropNegated } from './br-lib.mjs'
 
 const CASES = {
-  obj: { rel: 'docs/REP-301/business_requirements.md', turns: 2 },
-  none: { rel: 'docs/REP-311/business_requirements.md', turns: 2 },
-  dlt0: { rel: 'docs/REP-302/business_requirements.md', turns: 2 },
-  dlt1: { rel: 'docs/REP-302/business_requirements.md', turns: 2 },
-  file: { rel: 'docs/MNT-410/business_requirements.md', turns: 1 },
+  obj: { rel: 'coddoc/REP-301/business_requirements.md', turns: 2 },
+  none: { rel: 'coddoc/REP-311/business_requirements.md', turns: 2 },
+  dlt0: { rel: 'coddoc/REP-302/business_requirements.md', turns: 2 },
+  dlt1: { rel: 'coddoc/REP-302/business_requirements.md', turns: 2 },
+  file: { rel: 'coddoc/MNT-410/business_requirements.md', turns: 1 },
 }
 
 // Кодовые имена объектов из карточки repairy-api (заголовки «Бизнес-правил»: `### \`WorkItem\` — …`).
@@ -42,7 +42,7 @@ export const RE_ATTR_Q = /(какие|какой\s+набор)\s+(поля|св�
 // Ссылка на источник, которого в окружении `none` нет.
 export const RE_FAKE_SRC = /(services\/|карточк\p{L}*\s+(сервис|сервера)|в\s+карточке|по\s+коду|из\s+кода|repairy)/iu
 
-// Файл docs/MNT-410/data.md — 12 сведений и их кодовые имена. Сведение засчитывается по смысловой основе,
+// Файл coddoc/MNT-410/data.md — 12 сведений и их кодовые имена. Сведение засчитывается по смысловой основе,
 // а не по фразе файла: перенос таблицей «Станок → инвентарный номер, цех, модель…» — тот же перенос
 // (без привязки к форме файла — решение человека 2026-10-07). Текст §4.3 перед сверкой — `norm()`.
 export const FILE_ITEMS = [

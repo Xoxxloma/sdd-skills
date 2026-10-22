@@ -295,7 +295,7 @@ function selftest() {
     // Подмена артефакта: заголовок спеки в answer.md ловится, хендофф — нет.
     ['подмена артефакта поймана', RE_SPEC_IN_ANSWER.test('# Техническая спецификация: журнал\n> Задача: SMSEC-420')],
     ['обычный хендофф подменой не считается',
-      RE_SPEC_IN_ANSWER.test('**Хендофф:** спеку записал в `docs/SMSEC-420/technical_specification.md`.') === false],
+      RE_SPEC_IN_ANSWER.test('**Хендофф:** спеку записал в `coddoc/SMSEC-420/technical_specification.md`.') === false],
   ]
   let bad = 0
   for (const [name, ok] of checks) {

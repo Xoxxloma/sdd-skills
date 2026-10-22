@@ -4,7 +4,7 @@
 //   node grade-cr.mjs <каталог с песочницами> --probe=btn-w|api-w|btn-q|notsmall-q|idea-q|bug-q
 //   node grade-cr.mjs --selftest
 //
-// ЧТО ГРЕЙДИТСЯ. На плечах `-w` — файл `docs/<КЛЮЧ>/change_request.md` на диске, а не формулировка
+// ЧТО ГРЕЙДИТСЯ. На плечах `-w` — файл `coddoc/<КЛЮЧ>/change_request.md` на диске, а не формулировка
 // отчёта. На плечах `-q` файла быть не должно, и мерится `answer.md`: сторож — разбор по пяти
 // строкам, вердикт, форма стопа.
 //
@@ -180,14 +180,14 @@ export function gradeRun (dir, probe) {
 
   const files = listFiles(dir).filter((f) => !HARNESS.has(f))
   r.requests = files.filter((f) => /(^|\/)change_request\.md$/.test(f))
-  // Фикстура кладёт свои документы в docs/ARS-102/ — они не результат работы прогона.
+  // Фикстура кладёт свои документы в coddoc/ARS-102/ — они не результат работы прогона.
   r.extraDocs = files.filter((f) => /(business_requirements|technical_specification|decomposition|bug_report)\.md$/.test(f) && !f.includes('ARS-102'))
   r.stages = files.filter((f) => /(^|\/)stages\//.test(f))
   r.wrote = r.requests.length > 0
 
   const key = KEY_OF[probe]
   r.expectedKey = key
-  r.pathOk = r.requests.some((f) => f === `docs/${key}/change_request.md`)
+  r.pathOk = r.requests.some((f) => f === `coddoc/${key}/change_request.md`)
   // Фантом — ЗАЯВЛЕНИЕ о записи, а не упоминание имени: на жёстком стопе агент законно говорит
   // «это не документ change_request.md» (пилот 2026-09-14, bug-q — первая редакция краснела 2/2).
   r.phantom = !r.wrote && /(записал|записан|создал|создан|сохранил|сохранён|положил)[^\n]{0,80}change_request\.md|change_request\.md[^\n]{0,40}(записан|создан|сохранён|готов)/i.test(answer)
@@ -329,8 +329,8 @@ source: документа нет — решение аналитика
 `
 
 const REF_BTN_BAD = REF_BTN_OK
-  .replace('source: документа нет — решение аналитика', 'source: docs/ARS-102/technical_specification.md')
-  .replace('🔵 решение аналитика: аналитик и руководитель инспекции', '🟢 docs/ARS-102/technical_specification.md §4.1')
+  .replace('source: документа нет — решение аналитика', 'source: coddoc/ARS-102/technical_specification.md')
+  .replace('🔵 решение аналитика: аналитик и руководитель инспекции', '🟢 coddoc/ARS-102/technical_specification.md §4.1')
   .replace('Готово к оценке', 'Готово к разработке')
   .replace('| Данные | нет | — |', '')
   .replace('Текст письма-уведомления о согласовании не меняется. Черновик по-прежнему сохраняется автоматически.', 'Ничего.')
@@ -463,7 +463,7 @@ console.log('')
 if (PROBE === 'btn-w' || PROBE === 'api-w') {
   console.log(`  ${pct(c((r) => !r.wrote))}\tФАЙЛА НЕТ`)
   console.log(`  ${pct(c((r) => r.phantom))}\t  из них ФАНТОМ: в отчёте файл назван`)
-  console.log(`  ${pct(c((r) => r.wrote && !r.pathOk))}\tфайл не по пути docs/<КЛЮЧ>/change_request.md`)
+  console.log(`  ${pct(c((r) => r.wrote && !r.pathOk))}\tфайл не по пути coddoc/<КЛЮЧ>/change_request.md`)
   console.log(`  ${pct(c((r) => r.wrote && !r.rowsComplete))}\tТАБЛИЦА «ЧТО ТРОНУТО» НЕПОЛНА: нет строки или отметки  ← КРИТЕРИЙ`)
   if (PROBE === 'btn-w') console.log(`  ${pct(c((r) => r.wrote && r.rowsComplete && r.rowsYes.length !== 1))}\tтронуто не одна строка (ожидался только интерфейс)`)
   if (PROBE === 'api-w') {

@@ -69,7 +69,7 @@ run_one() {
   if grep -qiE "API Error|Please run /login|Credit balance|rate limit|session limit|usage limit" "$sb/answer.md" 2>/dev/null; then
     mkdir -p "$dst"; mv "$sb/answer.md" "$dst/_api-failure.txt"; echo "  run-$i — ОТКАЗ API, в счёт не идёт"; return 0
   fi
-  if [ -n "$(find "$FIX/docs" -newer "$STAMP" -type f 2>/dev/null | head -1)" ]; then
+  if [ -n "$(find "$FIX/coddoc" -newer "$STAMP" -type f 2>/dev/null | head -1)" ]; then
     echo "  run-$i — ⚠ ФИКСТУРА ТРОНУТА"
   fi
   mkdir -p "$dst"

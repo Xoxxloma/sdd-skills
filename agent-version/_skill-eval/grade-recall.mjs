@@ -4,7 +4,7 @@
 //   node grade-recall.mjs <каталог с песочницами> --fx NEW|CHG|INLINE|FINISH|CONT|DEEP
 //   node grade-recall.mjs --selftest
 //
-// Грейдятся ФАЙЛЫ в песочнице, а не отчёт: протокол (`docs/**/meeting-*.recall.md`) и список пунктов рядом с ним
+// Грейдятся ФАЙЛЫ в песочнице, а не отчёт: протокол (`coddoc/**/meeting-*.recall.md`) и список пунктов рядом с ним
 // (`meeting-*.points.md`, meeting-recall 1.1.0, Шаг 5). Двойник аналитика внушаем: конкретное значение того, чего
 // он не помнит, предложенное агентом, принимает. Поэтому подсказка скилла видна в итоге протокола и в списке.
 //
@@ -32,7 +32,7 @@
 // и хоть одной общей. Сдвиг L<n> на строку — не красный.
 //
 // Предупреждения (в счёт не идут): ответы двойника в «Ответах» не дословно, нет строки источника в шапке, дата в
-// имени файла не та, лишние файлы в docs/; L<n> не на пункт итога, «Уточнить» или ответ аналитика; вне рамок без
+// имени файла не та, лишние файлы в coddoc/; L<n> не на пункт итога, «Уточнить» или ответ аналитика; вне рамок без
 // «не входит ли»; решение «не помню / не уверен» без пометки; строки списка вне формы; число документа задачи в
 // пункте с пометкой «в БТ / было / вместо».
 //
@@ -142,7 +142,7 @@ export const FX = {
     key: 'MED-77',
     fileDate: '2026-10-14',
     dateRe: /(^|[^\d])14\s+октябр/i,
-    seedDocs: { 'docs/MED-77/business_requirements.md': 'fixtures/RECALL-CHG/seed/docs/MED-77/business_requirements.md' },
+    seedDocs: { 'coddoc/MED-77/business_requirements.md': 'fixtures/RECALL-CHG/seed/coddoc/MED-77/business_requirements.md' },
     remembered: [
       { id: 'h12', d: 'срок отмены 12 часов', re: [/12\s*час|двенадцат/i] },
       { id: 'limit', d: 'лимит отмен поменяли', re: [/лимит|раз\S*\s+в\s+месяц|отмен\S*\s+в\s+месяц/i] },
@@ -189,8 +189,8 @@ export const FX = {
     fileDate: '2026-10-14',
     dateRe: /(^|[^\d])14\s+октябр/i,
     seedDocs: {},
-    // Ключа нет — протокол обязан лечь в `docs/_inbox/`.
-    folderRe: /docs[\\/]_inbox[\\/]/,
+    // Ключа нет — протокол обязан лечь в `coddoc/_inbox/`.
+    folderRe: /coddoc[\\/]_inbox[\\/]/,
     // Аналитик просит закончить — после его реплики не больше `stopTurns` ходов агента (итог и запись).
     stopRe: /закончим/i,
     stopTurns: 2,
@@ -241,7 +241,7 @@ export const FX = {
     strictDate: true,
     noTime: true,
     seedDocs: {},
-    folderRe: /docs[\\/]ATL-63[\\/]/,
+    folderRe: /coddoc[\\/]ATL-63[\\/]/,
     remembered: [
       { id: 'record', d: 'запись на вторую примерку — приняла Гладилина', re: [/примерк/i, /Гладил|Евдок/i] },
       { id: 'dur40', d: 'примерка 40 минут', re: [/40\s*мин|сорок\s+минут/i] },
@@ -299,8 +299,8 @@ export const FX = {
     fileDate: '2026-10-05',
     dateRe: /(^|[^\d])0?5\s+октябр/i,
     seedDocs: {},
-    seedProto: { rel: 'docs/ATL-58/meeting-2026-10-05.recall.md', src: 'fixtures/REC-CONT/seed/docs/ATL-58/meeting-2026-10-05.recall.md', keep: 26 },
-    folderRe: /docs[\\/]ATL-58[\\/]/,
+    seedProto: { rel: 'coddoc/ATL-58/meeting-2026-10-05.recall.md', src: 'fixtures/REC-CONT/seed/coddoc/ATL-58/meeting-2026-10-05.recall.md', keep: 26 },
+    folderRe: /coddoc[\\/]ATL-58[\\/]/,
     remembered: [
       { id: 'measures', d: 'мерки в профиль — приняла Шилова', re: [/профил/i, /Шилов|Стефан/i] },
       { id: 'sketch', d: 'заказы по эскизу — не уверен', re: [/эскиз/i, /не\s+уверен/i] },
@@ -976,7 +976,7 @@ const RE_PROTO = /meeting-[^/\\]*\.recall\.md$/
 const RE_POINTS = /meeting-[^/\\]*\.points\.md$/
 
 export function gradeRun(dir, fx) {
-  const docs = walk(join(dir, 'docs'))
+  const docs = walk(join(dir, 'coddoc'))
   const protos = docs.filter((p) => RE_PROTO.test(p))
   // Несколько протоколов — берём тот, где итог заполнен.
   let path = null; let g = null
@@ -1198,7 +1198,7 @@ const GOOD = {
   CHG: `# Встреча по памяти: MED-77 — отмена записи
 
 > Источник: память аналитика, расшифровки нет
-> Задача: MED-77 · документ: docs/MED-77/business_requirements.md
+> Задача: MED-77 · документ: coddoc/MED-77/business_requirements.md
 > Встреча: 2026-10-14 15:00–15:45 · онлайн, Teams · участники: главный врач (заказчик) — Зайцева Ольга; страховой отдел — Ким Сергей; разработчик — Гусев Павел
 
 ## Ответы
@@ -1318,7 +1318,7 @@ SMS — нет
   CHG: `# Встреча по памяти: MED-77 — отмена записи: правки по итогам пилота
 
 > Источник: память аналитика, расшифровки нет
-> Задача: MED-77 · документ: docs/MED-77/business_requirements.md
+> Задача: MED-77 · документ: coddoc/MED-77/business_requirements.md
 > Встреча: 2026-10-14 15:00–15:45 · онлайн, Teams · участники: главный врач (заказчик) — Зайцева Ольга; страховой отдел — Ким Сергей; разработчик — Гусев Павел; аналитик — автор заметок
 > Тема из приглашения: Правки требований к отмене записи
 
@@ -1474,7 +1474,7 @@ const PILOT_INLINE = `# Встреча по памяти: Согласие на 
 - к какому сроку Белова пришлёт текст согласия — у кого: Белова
 `
 const PILOT_INLINE_LIST = `# Пункты: Согласие на рассылку — вопросы к юристам
-> Источник: docs/_inbox/meeting-2026-10-14.recall.md
+> Источник: coddoc/_inbox/meeting-2026-10-14.recall.md
 > Задача: —
 > Встреча: 2026-10-14 16:00–16:30 · участники: юрист — Белова Ирина; маркетинг — Осипов Глеб; аналитик — автор протокола · по памяти аналитика
 
@@ -1565,7 +1565,7 @@ SMS — нет
 - звучало ли на встрече показать клиенту его место в очереди — у кого: не знаю
 `
 const R1_NEW_LIST = `# Пункты: Лист ожидания на групповые занятия — требования
-> Источник: docs/FIT-412/meeting-2026-10-14.recall.md
+> Источник: coddoc/FIT-412/meeting-2026-10-14.recall.md
 > Задача: FIT-412
 > Встреча: 2026-10-14 11:00–12:00 · участники: руководитель клиентского сервиса (заказчик) — Морозова Анна; продакт — Лебедев Игорь; разработчик мобильного приложения — Ткач Денис; аналитик — автор · по памяти аналитика
 
@@ -1584,7 +1584,7 @@ const R1_NEW_LIST = `# Пункты: Лист ожидания на группо
 // Эталонные списки — по таблице Шага 5 из протоколов выше; ожидания — по карточкам двойника.
 export const REF_LIST = {
   NEW: `# Пункты: Лист ожидания на групповые занятия — требования
-> Источник: docs/FIT-412/meeting-2026-10-14.recall.md
+> Источник: coddoc/FIT-412/meeting-2026-10-14.recall.md
 > Задача: FIT-412
 > Встреча: 2026-10-14 11:00–12:00 · участники: руководитель клиентского сервиса (заказчик) — Морозова Анна; продакт — Лебедев Игорь; разработчик мобильного приложения — Ткач Денис · по памяти аналитика
 
@@ -1600,7 +1600,7 @@ export const REF_LIST = {
 - [мысль] Показ клиенту места в очереди · L34
 `,
   CHG: `# Пункты: MED-77 — отмена записи: правки по итогам пилота
-> Источник: docs/MED-77/meeting-2026-10-14.recall.md
+> Источник: coddoc/MED-77/meeting-2026-10-14.recall.md
 > Задача: MED-77
 > Встреча: 2026-10-14 15:00–15:45 · участники: главный врач (заказчик) — Зайцева Ольга; страховой отдел — Ким Сергей; разработчик — Гусев Павел · по памяти аналитика
 
@@ -1614,7 +1614,7 @@ export const REF_LIST = {
 - [мысль] Предупреждение пациенту об оставшейся отмене · L34
 `,
   INLINE: `# Пункты: Согласие на рассылку — вопросы к юристам
-> Источник: docs/_inbox/meeting-2026-10-14.recall.md
+> Источник: coddoc/_inbox/meeting-2026-10-14.recall.md
 > Задача: —
 > Встреча: 2026-10-14 16:00–16:30 · участники: юрист — Белова Ирина; маркетинг — Осипов Глеб · по памяти аналитика
 
@@ -1742,7 +1742,7 @@ function selftest() {
   green('NEW', '«Уточнить» о числе лимита учтено пунктом о лимите', drop(ln, '- [открыто] Число лимита размера листа ожидания (по памяти: не помню) — ждёт: — · L66'))
   green('NEW', '«решил: Морозова А.»', sub(ln, 'SMS не делаем, только пуш — решил: Морозова Анна', 'SMS не делаем, только пуш — решил: Морозова А.'))
   green('NEW', '«решил: Анна Морозова»', sub(ln, 'SMS не делаем, только пуш — решил: Морозова Анна', 'SMS не делаем, только пуш — решил: Анна Морозова'))
-  green('NEW', '«Источник» с полным путём', sub(ln, '> Источник: docs/FIT-412/meeting-2026-10-14.recall.md', '> Источник: протокол по памяти C:/work/docs/FIT-412/meeting-2026-10-14.recall.md'))
+  green('NEW', '«Источник» с полным путём', sub(ln, '> Источник: coddoc/FIT-412/meeting-2026-10-14.recall.md', '> Источник: протокол по памяти C:/work/coddoc/FIT-412/meeting-2026-10-14.recall.md'))
   green('NEW', 'пуш пересказан коротко и L<n> на соседнее решение', sub(ln, '- [решено] При освобождении места первому в очереди приходит пуш, на подтверждение 30 минут, иначе место уходит следующему — решил: Морозова Анна · L49', '- [решено] Пуш первому, 30 минут на подтверждение — решил: Морозова Анна · L48'))
   green('NEW', 'лист ожидания пересказан («Делаем лист ожидания…»)', sub(ln, '- [решено] Лист ожидания на групповые занятия: когда мест нет, клиент встаёт в очередь', '- [решено] Делаем лист ожидания на групповые занятия'))
   red('NEW', 'поручение Ткача [решено]', put(ln, '- [решено] Ткач Денис оценит доработку пушей к пятнице — решил: Морозова Анна · L60'), 'errand')
@@ -1771,13 +1771,13 @@ function selftest() {
   red('NEW', 'пункт без L<n>', sub(ln, 'иначе место уходит следующему — решил: Морозова Анна · L49', 'иначе место уходит следующему — решил: Морозова Анна'), 'L')
   red('NEW', 'вид не из четырёх', put(ln, '- [поручение] Ткач Денис — оценить доработку пушей · L60'), 'kind')
   red('NEW', 'шапка без «по памяти аналитика»', sub(ln, ' · по памяти аналитика', ''), 'form')
-  red('NEW', '«Источник» не на протокол', sub(ln, '> Источник: docs/FIT-412/meeting-2026-10-14.recall.md', '> Источник: память аналитика'), 'form')
+  red('NEW', '«Источник» не на протокол', sub(ln, '> Источник: coddoc/FIT-412/meeting-2026-10-14.recall.md', '> Источник: память аналитика'), 'form')
   red('NEW', '«Задача» без ключа', sub(ln, '> Задача: FIT-412', '> Задача: —'), 'form')
   red('NEW', 'нет «# Пункты:»', sub(ln, '# Пункты: Лист ожидания', '# Список: Лист ожидания'), 'form')
 
   console.log('СПИСОК NEW по короткому протоколу (вне рамок, ответа «моя мысль» нет)')
   const gn = `# Пункты: Лист ожидания
-> Источник: docs/FIT-412/meeting-2026-10-14.recall.md
+> Источник: coddoc/FIT-412/meeting-2026-10-14.recall.md
 > Задача: FIT-412
 > Встреча: 14 октября 2026 · участники: заказчик — Морозова Анна · по памяти аналитика
 
@@ -1851,17 +1851,17 @@ function selftest() {
       for (const [rel, txt] of Object.entries(files)) { mkdirSync(dirname(join(d, rel)), { recursive: true }); writeFileSync(join(d, rel), txt) }
       return d
     }
-    const P = 'docs/FIT-412/meeting-2026-10-14.recall.md'
+    const P = 'coddoc/FIT-412/meeting-2026-10-14.recall.md'
     const crlf = (s) => s.replace(/\n/g, '\r\n')
-    const r1 = gradeRun(mk('ok', { [P]: crlf(REF.NEW), 'docs/FIT-412/meeting-2026-10-14.points.md': crlf(REF_LIST.NEW) }), FX.NEW)
+    const r1 = gradeRun(mk('ok', { [P]: crlf(REF.NEW), 'coddoc/FIT-412/meeting-2026-10-14.points.md': crlf(REF_LIST.NEW) }), FX.NEW)
     ck('протокол и список рядом (CRLF) — зелёный', r1.pass, true)
     if (!r1.pass) console.log('         ' + JSON.stringify(r1.lg && r1.lg.fails))
     ck('список не в «лишних файлах»', r1.extra.length, 0)
     const r2 = gradeRun(mk('nolist', { [P]: REF.NEW }), FX.NEW)
     ck('списка нет — красный, протокол зелёный', `${r2.pass}/${r2.protoPass}`, 'false/true')
-    const r3 = gradeRun(mk('away', { [P]: REF.NEW, 'docs/_inbox/meeting-2026-10-14.points.md': REF_LIST.NEW }), FX.NEW)
+    const r3 = gradeRun(mk('away', { [P]: REF.NEW, 'coddoc/_inbox/meeting-2026-10-14.points.md': REF_LIST.NEW }), FX.NEW)
     ck('список не в папке протокола — красный', `${r3.pass}/${r3.listElsewhere.length}`, 'false/1')
-    const r4 = gradeRun(mk('inbox', { 'docs/_inbox/meeting-2026-10-14.recall.md': REF.INLINE, 'docs/_inbox/meeting-2026-10-14.points.md': REF_LIST.INLINE }), FX.INLINE)
+    const r4 = gradeRun(mk('inbox', { 'coddoc/_inbox/meeting-2026-10-14.recall.md': REF.INLINE, 'coddoc/_inbox/meeting-2026-10-14.points.md': REF_LIST.INLINE }), FX.INLINE)
     ck('INLINE в _inbox — зелёный', r4.pass, true)
   } finally { rmSync(tmp, { recursive: true, force: true }) }
 
@@ -1967,7 +1967,7 @@ function main() {
       r.listPath && r.listElsewhere.length && 'ещё списки: ' + r.listElsewhere.join(', '),
       r.replies && r.verbatim < r.replies && `дословно в «Ответах» ${r.verbatim}/${r.replies} реплик двойника`,
       g && fx.askWarn.filter((a) => !g.askWarn[a.id]).map((a) => 'нет: ' + a.d).join(' · '),
-      r.extra.length && 'лишние файлы в docs/: ' + r.extra.join(', '),
+      r.extra.length && 'лишние файлы в coddoc/: ' + r.extra.join(', '),
       r.step1Asked && 'пересказ был в строке вызова, а вопрос «расскажите всё» задан',
       g && g.interview.maxDrill > 4 && `разбор одной темы — ${g.interview.maxDrill} кругов (предохранитель — 4)`,
       g && g.interview.askDrill && `«Уточнить» о разборе: ${g.interview.askDrill}`,

@@ -49,7 +49,7 @@ for (const probe of (probes.length ? probes : Object.keys(PROBES))) {
     const fixCards = walk(join(fixture, 'services')).map((p) => p.slice(join(fixture, 'services').length + 1)).filter((f) => !/^_history[\\/]/.test(f));
     const hasServices = fixCards.length > 0 && fixCards.every((f) => existsSync(join(run, 'services', f)));
     const scanLines = full.split('\n').filter((l) => /service-map/i.test(l)).join('\n');
-    const rel = (root) => walk(join(root, 'docs')).filter((f) => /\.archived$/.test(f)).map((f) => f.slice(join(root, 'docs').length + 1));
+    const rel = (root) => walk(join(root, 'coddoc')).filter((f) => /\.archived$/.test(f)).map((f) => f.slice(join(root, 'coddoc').length + 1));
     const seeded = new Set(rel(fixture));
     const marks = rel(run).filter((m) => !seeded.has(m));   // только поставленные прогоном
 
@@ -58,7 +58,7 @@ for (const probe of (probes.length ? probes : Object.keys(PROBES))) {
       'AR-8 состав предъявлен и подтверждения ждут': new RegExp(`(состав|${key})`, 'i').test(full) && /подтвер(д|жд)/i.test(full),
       'AR-20.3 карточки и манифест не тронуты': hasServices ? fixCards.every((f) => read(join(run, 'services', f)) === read(join(fixture, 'services', f))) : null,
       'AR-18 git не запускался': streams ? !/"name":"Bash"[^\n]*(?<![.\w/-])git /.test(streams) : null,
-      'AR-24 файла отчёта на диск нет': walk(join(run, 'docs')).every((f) => !/ARCHIVE_REPORT/i.test(f)),
+      'AR-24 файла отчёта на диск нет': walk(join(run, 'coddoc')).every((f) => !/ARCHIVE_REPORT/i.test(f)),
       'AR-3 без подтверждения метка не кладётся': turn2 ? null : marks.length === 0,   // marks = новые, без засеянных
       // ── Шаги 4–6: только после подтверждения ──────────────────────────────────────────
       'AR-20.1 скан вызван (по следу заглушки)': turn2 ? scanRan : null,
@@ -72,8 +72,8 @@ for (const probe of (probes.length ? probes : Object.keys(PROBES))) {
     }
     if (probe === 'arbasic') res['AR-22 депрекейт §6.2 назван кандидатом в notes'] = turn2 ? /v1\/session/.test(full) && /notes/i.test(full) : null;
     if (probe === 'arepic' || probe === 'arlate') {
-      res['AR-20 метка не на корне эпика'] = !existsSync(join(run, 'docs', key, '.archived'));
-      res['прежние метки целы'] = !existsSync(join(fixture, 'docs', key, 'ARS-101/.archived')) || existsSync(join(run, 'docs', key, 'ARS-101/.archived'));
+      res['AR-20 метка не на корне эпика'] = !existsSync(join(run, 'coddoc', key, '.archived'));
+      res['прежние метки целы'] = !existsSync(join(fixture, 'coddoc', key, 'ARS-101/.archived')) || existsSync(join(run, 'coddoc', key, 'ARS-101/.archived'));
     }
     if (probe === 'arepic') res['AR-7 ARS-103 назван как узел без спеки'] = /ARS-103/.test(full);
     if (probe === 'arepic') {
@@ -103,8 +103,8 @@ for (const probe of (probes.length ? probes : Object.keys(PROBES))) {
       const desc = (rows, k) => (rows.find((r) => r[1] === k) || [])[2] || '';
       const all = [...apiNew, ...webNew];
       res['B1 пачка — один вызов скана'] = turn2 ? calls === 1 : null;
-      res['B2 метки на трёх задачах пачки'] = turn2 ? ['SHP-11', 'SHP-12', 'SHP-15'].every((k) => existsSync(join(run, 'docs', k, '.archived'))) : null;
-      res['B3 SHP-14 вне пачки не тронута'] = !existsSync(join(run, 'docs/SHP-14/.archived'));
+      res['B2 метки на трёх задачах пачки'] = turn2 ? ['SHP-11', 'SHP-12', 'SHP-15'].every((k) => existsSync(join(run, 'coddoc', k, '.archived'))) : null;
+      res['B3 SHP-14 вне пачки не тронута'] = !existsSync(join(run, 'coddoc/SHP-14/.archived'));
       res['B4 прежние строки истории целы'] = turn2 ? apiHist.startsWith(seedHist.trimEnd()) : null;
       res['B5 orders-api: SHP-11 и SHP-12 по строке, SHP-15 нет'] = turn2 ? n(apiNew, 'SHP-11') === 1 && n(apiNew, 'SHP-12') === 1 && n(apiNew, 'SHP-15') === 0 : null;
       res['B6 shop-web: файл создан, SHP-11 и SHP-15 по строке, SHP-12 нет'] = turn2 ? /\|\s*Дата\s*\|\s*Задача\s*\|\s*Описание\s*\|/.test(webHist) && n(webNew, 'SHP-11') === 1 && n(webNew, 'SHP-15') === 1 && n(webNew, 'SHP-12') === 0 : null;

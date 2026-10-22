@@ -243,7 +243,7 @@ PTS['SPEC-BT'] = {
   15: P([O], [any(w('списыв'), w('синхронн'))]),
   16: P([S], [any(/(5|пят\S*)\s+секунд/i, /вечерн\S*\s+пик/i, /с\s+18/i)]),
 }
-// NI-NB-REPEAT (Н9): по правке E3 (баг 4) цель — «новая спека»: вход БТ из этого списка уже лежит в docs/CBK-208/.
+// NI-NB-REPEAT (Н9): по правке E3 (баг 4) цель — «новая спека»: вход БТ из этого списка уже лежит в coddoc/CBK-208/.
 // По тексту 1.0.0 — второй вход БТ (`NB-REPEAT/bt`, строка «по правке»), его места — по слою для входа БТ.
 PTS['NB-REPEAT'] = {
   6: P([OTHER], [any(/(8|восьм\S*)\s+(кофе|из)/i, /тысяч/i, w('девят'))]),
@@ -278,27 +278,27 @@ PTS.TWIN = {
 // ---------- фикстуры ----------
 
 export const FX = {
-  VAC: { src: 'meet', key: 'EMP-1207', kind: 'bt', folder: 'docs/EMP-1207', list: 'docs/EMP-1207/meeting-2026-10-07.points.md', goal: /^правки\s+БТ/i, goalName: 'правки БТ', wrongGoal: 'новый БТ', etalon: 'fixtures/MEET-VAC/etalon/meeting-2026-10-07-bt.md' },
+  VAC: { src: 'meet', key: 'EMP-1207', kind: 'bt', folder: 'coddoc/EMP-1207', list: 'coddoc/EMP-1207/meeting-2026-10-07.points.md', goal: /^правки\s+БТ/i, goalName: 'правки БТ', wrongGoal: 'новый БТ', etalon: 'fixtures/MEET-VAC/etalon/meeting-2026-10-07-bt.md' },
   // После круга 2: промежуточный статус, повторная заявка при заблокированной учётке и «кнопка скрыта при сбое» — слой БТ,
   // во входе спеки их быть не должно; анкеры исходной пробы на них сняты, место меряет `PTS`.
-  ACC: { src: 'meet', key: 'ACS-208', kind: 'spec', folder: 'docs/ACS-208', list: 'docs/ACS-208/meeting-2026-10-09.points.md', goal: /^нов\S*\s+спек/i, goalName: 'новая спека', wrongGoal: 'правки БТ', etalon: 'fixtures/MEET-ACC/etalon/meeting-2026-10-09-spec.md', dropMust: ['midStatus', 'blocked', 'hideRevoke'] },
-  NEW: { src: 'meet', key: 'HRS-311', kind: 'bt', folder: 'docs/HRS-311', list: 'docs/HRS-311/meeting-2026-10-08.points.md', goal: /^новый\s+БТ/i, goalName: 'новый БТ', wrongGoal: 'правка работающего', etalon: 'fixtures/MEET-NEW/etalon/meeting-2026-10-08-bt.md' },
-  CHG: { src: 'meet', key: 'EMP-1207', kind: 'bt', folder: 'docs/EMP-1207', list: 'docs/EMP-1207/meeting-2026-10-15.points.md', goal: /^правки\s+БТ/i, goalName: 'правки БТ', wrongGoal: 'новый БТ', etalon: 'fixtures/MEET-CHG/etalon/meeting-2026-10-15-bt.md' },
-  CR: { src: 'meet', key: 'SUP-412', kind: 'bt', folder: 'docs/SUP-412', list: 'docs/SUP-412/meeting-2026-10-16.points.md', goal: /^правк\S*\s+работающ/i, goalName: 'правка работающего', wrongGoal: 'новый БТ', etalon: 'fixtures/MEET-CR/etalon/meeting-2026-10-16-bt.md' },
-  REW: { src: 'meet', key: 'ACS-208', kind: 'spec', folder: 'docs/ACS-208', list: 'docs/ACS-208/meeting-2026-10-14.points.md', goal: /^правки\s+спеки/i, goalName: 'правки спеки', wrongGoal: 'новая спека', etalon: 'fixtures/MEET-REW/etalon/meeting-2026-10-14-spec.md' },
-  'MR-NEW': { src: 'mr', key: 'FIT-412', kind: 'bt', folder: 'docs/FIT-412', list: 'docs/FIT-412/meeting-2026-10-14.points.md', goal: /^новый\s+БТ/i, goalName: 'новый БТ', wrongGoal: 'правка работающего', etalon: 'fixtures/NI-MR-NEW/etalon/meeting-2026-10-14-bt.md', thought: 'Показывать клиенту его место в очереди' },
-  'MR-CHG': { src: 'mr', key: 'MED-77', kind: 'bt', folder: 'docs/MED-77', list: 'docs/MED-77/meeting-2026-10-14.points.md', goal: /^(правки\s+БТ|правк\S*\s+работающ)/i, goalName: 'правки БТ или правка работающего', wrongGoal: 'новый БТ', etalon: 'fixtures/NI-MR-CHG/etalon/meeting-2026-10-14-bt.md', thought: 'Предупреждать пациента, что у него осталась одна отмена' },
-  'NB-IN': { src: 'nb', key: 'PVZ-318', kind: 'bt', folder: 'docs/PVZ-318', list: 'notes/посылки-от-частных-лиц/notebook-2026-10-15.points.md', goal: /^новый\s+БТ/i, goalName: 'новый БТ', wrongGoal: 'правки спеки', etalon: 'fixtures/NI-NB-IN/etalon/notebook-2026-10-15-bt.md', thought: 'Печатать трек-номер прямо на чеке приёмки' },
-  'NB-ANS': { src: 'nb', key: 'RET-214', kind: 'bt', folder: 'docs/RET-214', list: 'notes/возврат-товара-без-чека/notebook-2026-10-15.points.md', goal: /^(новый\s+БТ|правк\S*\s+работающ)/i, goalName: 'новый БТ или правка работающего', wrongGoal: 'правки спеки', etalon: 'fixtures/NI-NB-ANS/etalon/notebook-2026-10-15-bt.md' },
+  ACC: { src: 'meet', key: 'ACS-208', kind: 'spec', folder: 'coddoc/ACS-208', list: 'coddoc/ACS-208/meeting-2026-10-09.points.md', goal: /^нов\S*\s+спек/i, goalName: 'новая спека', wrongGoal: 'правки БТ', etalon: 'fixtures/MEET-ACC/etalon/meeting-2026-10-09-spec.md', dropMust: ['midStatus', 'blocked', 'hideRevoke'] },
+  NEW: { src: 'meet', key: 'HRS-311', kind: 'bt', folder: 'coddoc/HRS-311', list: 'coddoc/HRS-311/meeting-2026-10-08.points.md', goal: /^новый\s+БТ/i, goalName: 'новый БТ', wrongGoal: 'правка работающего', etalon: 'fixtures/MEET-NEW/etalon/meeting-2026-10-08-bt.md' },
+  CHG: { src: 'meet', key: 'EMP-1207', kind: 'bt', folder: 'coddoc/EMP-1207', list: 'coddoc/EMP-1207/meeting-2026-10-15.points.md', goal: /^правки\s+БТ/i, goalName: 'правки БТ', wrongGoal: 'новый БТ', etalon: 'fixtures/MEET-CHG/etalon/meeting-2026-10-15-bt.md' },
+  CR: { src: 'meet', key: 'SUP-412', kind: 'bt', folder: 'coddoc/SUP-412', list: 'coddoc/SUP-412/meeting-2026-10-16.points.md', goal: /^правк\S*\s+работающ/i, goalName: 'правка работающего', wrongGoal: 'новый БТ', etalon: 'fixtures/MEET-CR/etalon/meeting-2026-10-16-bt.md' },
+  REW: { src: 'meet', key: 'ACS-208', kind: 'spec', folder: 'coddoc/ACS-208', list: 'coddoc/ACS-208/meeting-2026-10-14.points.md', goal: /^правки\s+спеки/i, goalName: 'правки спеки', wrongGoal: 'новая спека', etalon: 'fixtures/MEET-REW/etalon/meeting-2026-10-14-spec.md' },
+  'MR-NEW': { src: 'mr', key: 'FIT-412', kind: 'bt', folder: 'coddoc/FIT-412', list: 'coddoc/FIT-412/meeting-2026-10-14.points.md', goal: /^новый\s+БТ/i, goalName: 'новый БТ', wrongGoal: 'правка работающего', etalon: 'fixtures/NI-MR-NEW/etalon/meeting-2026-10-14-bt.md', thought: 'Показывать клиенту его место в очереди' },
+  'MR-CHG': { src: 'mr', key: 'MED-77', kind: 'bt', folder: 'coddoc/MED-77', list: 'coddoc/MED-77/meeting-2026-10-14.points.md', goal: /^(правки\s+БТ|правк\S*\s+работающ)/i, goalName: 'правки БТ или правка работающего', wrongGoal: 'новый БТ', etalon: 'fixtures/NI-MR-CHG/etalon/meeting-2026-10-14-bt.md', thought: 'Предупреждать пациента, что у него осталась одна отмена' },
+  'NB-IN': { src: 'nb', key: 'PVZ-318', kind: 'bt', folder: 'coddoc/PVZ-318', list: 'notes/посылки-от-частных-лиц/notebook-2026-10-15.points.md', goal: /^новый\s+БТ/i, goalName: 'новый БТ', wrongGoal: 'правки спеки', etalon: 'fixtures/NI-NB-IN/etalon/notebook-2026-10-15-bt.md', thought: 'Печатать трек-номер прямо на чеке приёмки' },
+  'NB-ANS': { src: 'nb', key: 'RET-214', kind: 'bt', folder: 'coddoc/RET-214', list: 'notes/возврат-товара-без-чека/notebook-2026-10-15.points.md', goal: /^(новый\s+БТ|правк\S*\s+работающ)/i, goalName: 'новый БТ или правка работающего', wrongGoal: 'правки спеки', etalon: 'fixtures/NI-NB-ANS/etalon/notebook-2026-10-15-bt.md' },
   // Тот же список, что NB-IN; аналитик берёт один набросок (fixtures/NI-NB-PICK/w-turn2.txt).
-  'NB-PICK': { src: 'nb', key: 'PVZ-318', kind: 'bt', folder: 'docs/PVZ-318', list: 'notes/посылки-от-частных-лиц/notebook-2026-10-15.points.md', goal: /^новый\s+БТ/i, goalName: 'новый БТ', wrongGoal: 'правки спеки', etalon: 'fixtures/NI-NB-PICK/etalon/notebook-2026-10-15-bt.md', thought: 'Печатать трек-номер прямо на чеке приёмки', pick: true },
+  'NB-PICK': { src: 'nb', key: 'PVZ-318', kind: 'bt', folder: 'coddoc/PVZ-318', list: 'notes/посылки-от-частных-лиц/notebook-2026-10-15.points.md', goal: /^новый\s+БТ/i, goalName: 'новый БТ', wrongGoal: 'правки спеки', etalon: 'fixtures/NI-NB-PICK/etalon/notebook-2026-10-15-bt.md', thought: 'Печатать трек-номер прямо на чеке приёмки', pick: true },
   // Пробы фазы 1.5 (fixtures/NI-*/expected.md): импортированных ожиданий нет (`imp: false`) — свои, `ownChecks`.
-  'SPEC-BT': { src: 'mr', imp: false, key: 'FRM-614', kind: 'spec', folder: 'docs/FRM-614', list: 'docs/FRM-614/meeting-2026-10-13.points.md', goal: /^правки\s+спеки/i, goalName: 'правки спеки', wrongGoal: 'правки БТ', thought: 'Снимать заказ своим таймером ровно в момент, когда истёк срок' },
-  'NB-REPEAT': { src: 'nb', imp: false, key: 'CBK-208', kind: 'spec', folder: 'docs/CBK-208', list: 'notes/кешбэк-в-кофейнях/notebook-2026-10-14.points.md', goal: /^нов\S*\s+спек/i, goalName: 'новая спека', wrongGoal: 'новый БТ', thought: 'Показывать новый баланс сразу после оплаты', alt: 'NB-REPEAT/bt' },
+  'SPEC-BT': { src: 'mr', imp: false, key: 'FRM-614', kind: 'spec', folder: 'coddoc/FRM-614', list: 'coddoc/FRM-614/meeting-2026-10-13.points.md', goal: /^правки\s+спеки/i, goalName: 'правки спеки', wrongGoal: 'правки БТ', thought: 'Снимать заказ своим таймером ровно в момент, когда истёк срок' },
+  'NB-REPEAT': { src: 'nb', imp: false, key: 'CBK-208', kind: 'spec', folder: 'coddoc/CBK-208', list: 'notes/кешбэк-в-кофейнях/notebook-2026-10-14.points.md', goal: /^нов\S*\s+спек/i, goalName: 'новая спека', wrongGoal: 'новый БТ', thought: 'Показывать новый баланс сразу после оплаты', alt: 'NB-REPEAT/bt' },
   // Второй вход БТ из того же списка — законен по тексту 1.0.0 (баг 4), по правке E3 его нет. Не ветка `--fx`: его выбирает
   // `gradeRun` пробы NB-REPEAT по записанному файлу.
-  'NB-REPEAT/bt': { src: 'nb', imp: false, hidden: true, fixture: 'NB-REPEAT', key: 'CBK-208', kind: 'bt', folder: 'docs/CBK-208', list: 'notes/кешбэк-в-кофейнях/notebook-2026-10-14.points.md', goal: /^правки\s+БТ/i, goalName: 'правки БТ', wrongGoal: 'новый БТ', thought: 'Показывать новый баланс сразу после оплаты', fixGoal: 'E3 (баг 4): вход БТ из этого списка уже лежит в docs/CBK-208/ — по правке цель «новая спека», вход notebook-2026-10-14-spec.md, а записан второй вход БТ' },
-  TWIN: { src: 'meet', imp: false, twin: true, key: 'ZKM-905', kind: 'bt', folder: 'docs/ZKM-905', list: 'docs/ZKM-905/meeting-2026-10-12.points.md', goal: /^(правки\s+БТ|правк\S*\s+работающ)/i, goalName: 'правки БТ или правка работающего', wrongGoal: 'новая спека' },
+  'NB-REPEAT/bt': { src: 'nb', imp: false, hidden: true, fixture: 'NB-REPEAT', key: 'CBK-208', kind: 'bt', folder: 'coddoc/CBK-208', list: 'notes/кешбэк-в-кофейнях/notebook-2026-10-14.points.md', goal: /^правки\s+БТ/i, goalName: 'правки БТ', wrongGoal: 'новый БТ', thought: 'Показывать новый баланс сразу после оплаты', fixGoal: 'E3 (баг 4): вход БТ из этого списка уже лежит в coddoc/CBK-208/ — по правке цель «новая спека», вход notebook-2026-10-14-spec.md, а записан второй вход БТ' },
+  TWIN: { src: 'meet', imp: false, twin: true, key: 'ZKM-905', kind: 'bt', folder: 'coddoc/ZKM-905', list: 'coddoc/ZKM-905/meeting-2026-10-12.points.md', goal: /^(правки\s+БТ|правк\S*\s+работающ)/i, goalName: 'правки БТ или правка работающего', wrongGoal: 'новая спека' },
 }
 for (const [n, fx] of Object.entries(FX)) fx.name = n
 
@@ -1262,10 +1262,10 @@ function selftest () {
       writeFileSync(join(sb, want.replace(/-(bt|spec)\.md$/, '.points-$1.md')), ok)
       ck('вход «<основа>.points-bt.md» (круг 2, ni-vac run-2) — красный и назван', g().red.some((m) => /вход не там/.test(m)), true)
       rmSync(join(sb, want.replace(/-(bt|spec)\.md$/, '.points-$1.md')))
-      mkdirSync(join(sb, 'docs/_inbox'), { recursive: true })
-      writeFileSync(join(sb, 'docs/_inbox', basename(want)), ok)
-      ck('вход в docs/_inbox при известном ключе — красный', g().pass, false)
-      rmSync(join(sb, 'docs/_inbox'), { recursive: true, force: true })
+      mkdirSync(join(sb, 'coddoc/_inbox'), { recursive: true })
+      writeFileSync(join(sb, 'coddoc/_inbox', basename(want)), ok)
+      ck('вход в coddoc/_inbox при известном ключе — красный', g().pass, false)
+      rmSync(join(sb, 'coddoc/_inbox'), { recursive: true, force: true })
       writeFileSync(join(sb, want), ok)
       const ev = (input, sub) => JSON.stringify({ type: 'assistant', parent_tool_use_id: sub ? 'toolu_1' : null, message: { content: [{ type: 'tool_use', id: 'x', name: 'Read', input }] } })
       writeFileSync(join(sb, 'stream-02.jsonl'), ev({ file_path: 'C:\\sb\\services\\idm.md' }, true) + '\n')
@@ -1369,8 +1369,8 @@ function selftest () {
     ck('опора: лишняя строка с числом и ФИО — красный', G2(addItem(vac, R, 'Запуск переносится на 15 марта, бюджет 2 млн — решил: Петров И. И.'), 'VAC').red.some((m) => /нет опоры.*Петров/.test(m)), true)
     ck('опора: «ждёт: не назван» вместо «ждёт: —» — зелёный', G2(vac.replace(lineOf(vac, 'VAC', 7), lineOf(vac, 'VAC', 7).replace('ждёт: —', 'ждёт: не назван')), 'VAC').pass, true)
     ck('опора: число из реплики аналитика — зелёный', gradeContent(addItem(vac, O, 'Срок ответа — 5 дней (со слов аналитика) — ждёт: —'), 'VAC', [summaryOf('VAC')], new Map(), ['Срок ответа отдела кадров — пять дней.']).pass, true)
-    ck('опора: «> Документ:» не из засева — красный', G2(vac.replace('> Документ: —', '> Документ: docs/EMP-1207/technical_specification.md'), 'VAC').red.some((m) => /Документ/.test(m)), true)
-    ck('опора: «> Документ:» из засева — зелёный', G2(vac.replace('> Документ: —', '> Документ: docs/EMP-1207/business_requirements.md'), 'VAC').pass, true)
+    ck('опора: «> Документ:» не из засева — красный', G2(vac.replace('> Документ: —', '> Документ: coddoc/EMP-1207/technical_specification.md'), 'VAC').red.some((m) => /Документ/.test(m)), true)
+    ck('опора: «> Документ:» из засева — зелёный', G2(vac.replace('> Документ: —', '> Документ: coddoc/EMP-1207/business_requirements.md'), 'VAC').pass, true)
     ck('ФИО: «ждёт: Литвинов» у пункта «ждёт: —» — красный', G2(vac.replace(lineOf(vac, 'VAC', 7), lineOf(vac, 'VAC', 7).replace('ждёт: —', 'ждёт: Литвинов И. П.')), 'VAC').red.some((m) => /^P7 .*ждёт: Литвинов/.test(m)), true)
     ck('варианты: открытый вопрос утверждением — красный', G2(vac.replace(l12, '- Минимальный срок подачи ежегодного оплачиваемого отпуска — три календарных дня до начала — ждёт: Литвинов И. П. (уточняет у Елены Сергеевны)'), 'VAC').red.some((m) => /^P12 .*вариантами/.test(m)), true)
     ck('варианты: оба варианта без «?» — зелёный', G2(vac.replace(l12, '- Минимальный срок подачи ежегодного оплачиваемого отпуска: три дня до начала, календарных или рабочих — не решено — ждёт: Литвинов И. П. (уточняет у Елены Сергеевны); до ответа: в FR-3 остаётся «не раньше следующего дня»'), 'VAC').pass, true)
@@ -1438,20 +1438,20 @@ function selftest () {
       for (const rel of seedFiles) { mkdirSync(join(sb, rel, '..'), { recursive: true }); writeFileSync(join(sb, rel), readFileSync(join(seedDir, rel))) }
       writeFileSync(join(sb, '_seeded.txt'), seedFiles.join('\n') + '\n')
       writeFileSync(join(sb, 'answer.md'), summaryOf('NB-REPEAT'))
-      const spec = 'docs/CBK-208/notebook-2026-10-14-spec.md'
+      const spec = 'coddoc/CBK-208/notebook-2026-10-14-spec.md'
       writeFileSync(join(sb, spec), fromList('NB-REPEAT'))
       let r = gradeRun(sb, 'NB-REPEAT')
       ck('NB-REPEAT песочница: вход спеки — зелёный, «по правке» пусто', `${r.pass}/${r.fix.length}`, 'true/0', r.red.concat(r.fix).join(' | '))
       rmSync(join(sb, spec))
       writeFileSync(join(sb, 'answer.md'), summaryOf('NB-REPEAT/bt'))
-      writeFileSync(join(sb, 'docs/CBK-208/notebook-2026-10-14-bt-2.md'), fromList('NB-REPEAT/bt'))
+      writeFileSync(join(sb, 'coddoc/CBK-208/notebook-2026-10-14-bt-2.md'), fromList('NB-REPEAT/bt'))
       r = gradeRun(sb, 'NB-REPEAT')
       ck('NB-REPEAT песочница: второй вход БТ -bt-2.md — не красный, «по правке» E3', `${r.pass}/${r.fix.some((m) => /E3/.test(m))}/${r.fix.some((m) => /E5/.test(m))}`, 'true/true/false', r.red.join(' | '))
-      rmSync(join(sb, 'docs/CBK-208/notebook-2026-10-14-bt-2.md'))
-      writeFileSync(join(sb, 'docs/CBK-208/notebook-2026-10-14-2-bt.md'), fromList('NB-REPEAT/bt'))
+      rmSync(join(sb, 'coddoc/CBK-208/notebook-2026-10-14-bt-2.md'))
+      writeFileSync(join(sb, 'coddoc/CBK-208/notebook-2026-10-14-2-bt.md'), fromList('NB-REPEAT/bt'))
       r = gradeRun(sb, 'NB-REPEAT')
       ck('NB-REPEAT песочница: -2-bt.md — не красный, «по правке» E3 и E5', `${r.pass}/${r.fix.some((m) => /E3/.test(m))}/${r.fix.some((m) => /E5/.test(m))}`, 'true/true/true', r.red.join(' | '))
-      writeFileSync(join(sb, 'docs/CBK-208/notebook-2026-10-14-bt.md'), fromList('NB-REPEAT/bt'))
+      writeFileSync(join(sb, 'coddoc/CBK-208/notebook-2026-10-14-bt.md'), fromList('NB-REPEAT/bt'))
       ck('NB-REPEAT песочница: первый вход переписан — красный', gradeRun(sb, 'NB-REPEAT').red.some((m) => /засев тронут/.test(m)), true)
     } finally { rmSync(sb, { recursive: true, force: true }) }
   }

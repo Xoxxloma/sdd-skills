@@ -4,12 +4,12 @@
 //   node grade-sq.mjs <каталог с песочницами run-NN>
 //   node grade-sq.mjs --selftest
 //
-// ЧТО МЕРЯЕТСЯ. Скилл обходит `docs/` из одиннадцати фич и пишет `sdd-quality-report.md` в корень песочницы.
+// ЧТО МЕРЯЕТСЯ. Скилл обходит `coddoc/` из одиннадцати фич и пишет `sdd-quality-report.md` в корень песочницы.
 // Грейдится ФАЙЛ на диске, а не пересказ в чате. Эталон и смысл каждой фичи — `fixtures/SQ-AUDIT/README.md`.
 //
 // Проверки:
 //   отчёт      — файл `sdd-quality-report*.md` в корне песочницы
-//   docs       — в `docs/` ничего не создано и не изменено
+//   docs       — в `coddoc/` ничего не создано и не изменено
 //   строки     — у каждой из одиннадцати папок своя строка сводной таблицы
 //   н/п        — колонки «н/п: баг-репорт», «н/п: узел-фундамент», «спеки нет» там, где должны
 //   счёт       — сумма частей = итог, максимум = веса применимых критериев, процент = округление
@@ -41,7 +41,7 @@ import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const FIXTURE_DOCS = join(HERE, 'fixtures', 'SQ-AUDIT', 'docs')
+const FIXTURE_DOCS = join(HERE, 'fixtures', 'SQ-AUDIT', 'coddoc')
 // Документы, у которых форма шаблона цела: в колонке «не по форме» у них «нет».
 const IN_FORM = ['PSS-2210', 'PSS-2211', 'PSS-2212', 'PSS-2213', 'ARS-312']
 // Спеки, написанные скиллом и не тронутые руками: происхождение у них «скилл».
@@ -207,7 +207,7 @@ function gradeOne (dir, seeded) {
   if (RE_API_FAILURE.test(a.slice(0, 300))) return { measured: false, why: 'отказ API' }
   const rep = readdirSync(dir).filter((n) => /^sdd-quality-report(-\d+)?\.md$/.test(n)).sort()
   const docsOk = (() => {
-    const d = join(dir, 'docs')
+    const d = join(dir, 'coddoc')
     if (!existsSync(d)) return false
     const now = walk(d).map((p) => relative(d, p).replace(/\\/g, '/')).sort()
     if (now.join('\n') !== seeded.join('\n')) return false
@@ -236,22 +236,22 @@ function selftest () {
     '## Сводная таблица',
     '| команда | ai-sdd repo | аналитик | фича | jira | БТ | БТ оценка | Спека | Спек оценка | шаблонно | не по форме | происхождение |',
     '|---|---|---|---|---|---|---|---|---|---|---|---|',
-    '| А | | | ф | PSS-2210 | docs/PSS-2210/business_requirements.md | 0.5+1+1+1+1 = 4.5 из 4.5 (100%) | docs/PSS-2210/technical_specification.md | 1+1+1+1+1 = 5.0 из 5.0 (100%) | нет | нет | скилл |',
-    '| А | | | ф | PSS-2211 | docs/PSS-2211/business_requirements.md | 0.5+1+1+1+1 = 4.5 из 4.5 (100%) | спеки нет | спеки нет | нет | нет | — |',
-    '| А | | | ф | PSS-2212 | docs/PSS-2212/business_requirements.md | 0.5+1+0.5+0.5+0.5 = 3.0 из 4.5 (67%) | docs/PSS-2212/technical_specification.md | 1+0.5+0.5+1+0.5 = 3.5 из 5.0 (70%) | нет | нет | скилл |',
-    '| А | | | ф | PSS-2213 | docs/PSS-2213/business_requirements.md | 0+0.5+0+0+0 = 0.5 из 4.5 (11%) | docs/PSS-2213/technical_specification.md | 0+0+0+0.5+0 = 0.5 из 5.0 (10%) | БТ, спека | нет | скилл |',
-    '| А | | | ф | PSS-2214 | docs/PSS-2214/business_requirements.md | 0.5+1+1+1+1 = 4.5 из 4.5 (100%) | docs/PSS-2214/technical_specification.md | 1+1+1+1+1 = 5.0 из 5.0 (100%) | нет | БТ 63% | скилл |',
-    '| А | | | ф | PSS-2215 | нет | нет | docs/PSS-2215/technical_specification.md | 0+0.5+0+1+0.5 = 2.0 из 5.0 (40%) | нет | спека 83% | по коду |',
-    '| А | | | ф | PSS-2216 | docs/PSS-2216/business_requirements.md | 0.5+1+1+1+1 = 4.5 из 4.5 (100%) | docs/PSS-2216/technical_specification.md | 1+1+0.5+1+1 = 4.5 из 5.0 (90%) | нет | спека 43% | скилл, правлена руками |',
-    '| А | | | ф | ARS-312 | н/п: баг-репорт | н/п: баг-репорт | docs/ARS-312/technical_specification.md | 1+н/п+н/п+1+н/п = 2.0 из 2.0 (100%) | нет | нет | скилл |',
-    '| А | | | ф | ARS-100 | docs/ARS-100/business_requirements.md | 0+0+0.5+0+0 = 0.5 из 4.5 (11%) | спеки нет | спеки нет | БТ | БТ 81% | — |',
-    '| А | | | ф | ARS-100 | н/п: узел-фундамент | н/п: узел-фундамент | docs/ARS-100/_foundation/technical_specification.md | н/п+0+0+0+0 = 0.0 из 4.0 (0%) | спека | спека 96% | мимо фреймворка |',
-    '| А | | | ф | ARS-101 | docs/ARS-100/ARS-101/business_requirements.md | 0+0+0+0+0 = 0.0 из 4.5 (0%) | docs/ARS-100/ARS-101/technical_specification.md | 0+0+0+0+0 = 0.0 из 5.0 (0%) | БТ, спека | БТ 94%, спека 96% | мимо фреймворка |',
+    '| А | | | ф | PSS-2210 | coddoc/PSS-2210/business_requirements.md | 0.5+1+1+1+1 = 4.5 из 4.5 (100%) | coddoc/PSS-2210/technical_specification.md | 1+1+1+1+1 = 5.0 из 5.0 (100%) | нет | нет | скилл |',
+    '| А | | | ф | PSS-2211 | coddoc/PSS-2211/business_requirements.md | 0.5+1+1+1+1 = 4.5 из 4.5 (100%) | спеки нет | спеки нет | нет | нет | — |',
+    '| А | | | ф | PSS-2212 | coddoc/PSS-2212/business_requirements.md | 0.5+1+0.5+0.5+0.5 = 3.0 из 4.5 (67%) | coddoc/PSS-2212/technical_specification.md | 1+0.5+0.5+1+0.5 = 3.5 из 5.0 (70%) | нет | нет | скилл |',
+    '| А | | | ф | PSS-2213 | coddoc/PSS-2213/business_requirements.md | 0+0.5+0+0+0 = 0.5 из 4.5 (11%) | coddoc/PSS-2213/technical_specification.md | 0+0+0+0.5+0 = 0.5 из 5.0 (10%) | БТ, спека | нет | скилл |',
+    '| А | | | ф | PSS-2214 | coddoc/PSS-2214/business_requirements.md | 0.5+1+1+1+1 = 4.5 из 4.5 (100%) | coddoc/PSS-2214/technical_specification.md | 1+1+1+1+1 = 5.0 из 5.0 (100%) | нет | БТ 63% | скилл |',
+    '| А | | | ф | PSS-2215 | нет | нет | coddoc/PSS-2215/technical_specification.md | 0+0.5+0+1+0.5 = 2.0 из 5.0 (40%) | нет | спека 83% | по коду |',
+    '| А | | | ф | PSS-2216 | coddoc/PSS-2216/business_requirements.md | 0.5+1+1+1+1 = 4.5 из 4.5 (100%) | coddoc/PSS-2216/technical_specification.md | 1+1+0.5+1+1 = 4.5 из 5.0 (90%) | нет | спека 43% | скилл, правлена руками |',
+    '| А | | | ф | ARS-312 | н/п: баг-репорт | н/п: баг-репорт | coddoc/ARS-312/technical_specification.md | 1+н/п+н/п+1+н/п = 2.0 из 2.0 (100%) | нет | нет | скилл |',
+    '| А | | | ф | ARS-100 | coddoc/ARS-100/business_requirements.md | 0+0+0.5+0+0 = 0.5 из 4.5 (11%) | спеки нет | спеки нет | БТ | БТ 81% | — |',
+    '| А | | | ф | ARS-100 | н/п: узел-фундамент | н/п: узел-фундамент | coddoc/ARS-100/_foundation/technical_specification.md | н/п+0+0+0+0 = 0.0 из 4.0 (0%) | спека | спека 96% | мимо фреймворка |',
+    '| А | | | ф | ARS-101 | coddoc/ARS-100/ARS-101/business_requirements.md | 0+0+0+0+0 = 0.0 из 4.5 (0%) | coddoc/ARS-100/ARS-101/technical_specification.md | 0+0+0+0+0 = 0.0 из 5.0 (0%) | БТ, спека | БТ 94%, спека 96% | мимо фреймворка |',
     '', '## Детали', '',
     '### PSS-2213 — ф', '', '1. Цель — 0 из 0.5', '1. Функционал из источника — 0 из 1', '',
     '### PSS-2215 — ф', '', '1. Функционал из источника — 0 из 1', '',
     '### PSS-2216 — ф', '', '1. Функционал из источника — 1 из 1', '',
-    '### PSS-2214 — ф', '', 'файл: docs/PSS-2214/business_requirements.md', '1. Цель — 0.5 из 0.5', 'форма: нет 12 из 16 — …'
+    '### PSS-2214 — ф', '', 'файл: coddoc/PSS-2214/business_requirements.md', '1. Цель — 0.5 из 0.5', 'форма: нет 12 из 16 — …'
   ].join('\n')
   const g = gradeReport(good)
   ck('эталонный отчёт — все проверки', Object.values(g.ck).every(Boolean), true)

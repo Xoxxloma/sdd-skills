@@ -7,11 +7,11 @@
 байт в байт, новый разбор ссылается на новый список. Заодно — не протекла ли чужая встреча в новую.
 
 **Домен.** Каток: расписание массовых катаний на сайте и отменённые сеансы (новая встреча). Засев — список и разбор
-другой встречи той же даты: ломбард, оценка ювелирных изделий в залог. Ключа задачи нет — оба списка в `docs/_inbox/`.
+другой встречи той же даты: ломбард, оценка ювелирных изделий в залог. Ключа задачи нет — оба списка в `coddoc/_inbox/`.
 
 **Засев** (`seed/`):
 - `vstrecha-2026-10-19.txt` — чат встречи, 127 строк, 14:02–14:12, пять участников;
-- `docs/_inbox/meeting-2026-10-19.points.md`, `docs/_inbox/meeting-2026-10-19.razbor.md` — утренняя встреча
+- `coddoc/_inbox/meeting-2026-10-19.points.md`, `coddoc/_inbox/meeting-2026-10-19.razbor.md` — утренняя встреча
   09:30–09:47 о залоге, форма `meeting-intake/reference/output.md`; её расшифровки в засеве нет.
 
 **Ход диалога.** Реплика на каждый ход — `w-turn2.txt` («Да, согласен с рекомендацией.»):
@@ -29,7 +29,7 @@
 **Строка раннера** (`run-ctx-v2.sh`):
 
 ```
-  meet-sameday) FIXTURE=MEET-SAMEDAY; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/docs/.*/meeting-2026-10-19-2\.points\.md$'; DONE_GREP='^> Встреча:.*14:[0-5][0-9]'; MEET_ENV=1 ;;
+  meet-sameday) FIXTURE=MEET-SAMEDAY; PROMPT_FILE=w-prompt.txt; SKILL=meeting-intake; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=20; IDLE_MAX=20; DONE_RE='/coddoc/.*/meeting-2026-10-19-2\.points\.md$'; DONE_GREP='^> Встреча:.*14:[0-5][0-9]'; MEET_ENV=1 ;;
 ```
 
 Ветки `--fx SAMEDAY` в `grade-meet.mjs` пока нет — проверка по `expected.md`. Засев сверять со снимком при

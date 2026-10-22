@@ -1,7 +1,7 @@
 # RECALL-CHG — встреча по памяти: правка работающего, БТ есть
 
 Скилл `meeting-recall`, проба `rec-chg`. Двойник аналитика: `_skill-eval/twin-analyst.md` +
-`twin-card.md`. В засеве — согласованный БТ `docs/MED-77/business_requirements.md` (лимит 5 отмен,
+`twin-card.md`. В засеве — согласованный БТ `coddoc/MED-77/business_requirements.md` (лимит 5 отмен,
 срок 24 часа, SMS).
 
 Как было на встрече (только грейдеру и человеку):

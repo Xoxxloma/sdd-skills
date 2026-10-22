@@ -1,4 +1,4 @@
-docs/LND-47/business_requirements.md
+coddoc/LND-47/business_requirements.md
 idk-turn2.txt
 mmd-prompt.txt
 puml-prompt.txt

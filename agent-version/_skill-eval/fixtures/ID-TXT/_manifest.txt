@@ -1,7 +1,7 @@
-docs/VSL-23/client-process.txt
-docs/VSL-23/integrations-draft.txt
-docs/VSL-23/meeting-2026-10-14.points.md
-docs/VSL-23/sync-2026-10-16.points.md
+coddoc/VSL-23/client-process.txt
+coddoc/VSL-23/integrations-draft.txt
+coddoc/VSL-23/meeting-2026-10-14.points.md
+coddoc/VSL-23/sync-2026-10-16.points.md
 idk-turn2.txt
 pt-junk-prompt.txt
 pt-prose-prompt.txt

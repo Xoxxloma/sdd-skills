@@ -1,7 +1,7 @@
 chain.conf
 expected.md
 README.md
-seed/docs/.keep
+seed/coddoc/.keep
 stage-1-prompt.txt
 stage-1-twin-card.md
 stage-2-add/meeting-2026-10-15.txt

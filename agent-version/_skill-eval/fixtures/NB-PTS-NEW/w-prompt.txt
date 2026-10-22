@@ -1,1 +1,1 @@
-/analyst-notebook docs/_inbox/meeting-2026-10-12.points.md
+/analyst-notebook coddoc/_inbox/meeting-2026-10-12.points.md

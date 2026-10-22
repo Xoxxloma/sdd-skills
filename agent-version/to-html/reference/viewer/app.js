@@ -198,7 +198,7 @@
   /** @param {string} p */
   function encPath(p) { return p.split("/").map(encodeURIComponent).join("/"); }
 
-  // base — сырой путь от упаковщика: «../../docs/» или «file:///C:/x y/»; кодируем по сегментам, не трогая схему и диск.
+  // base — сырой путь от упаковщика: «../../coddoc/» или «file:///C:/x y/»; кодируем по сегментам, не трогая схему и диск.
   /** @param {string} b */
   function encBase(b) {
     return b.split("/").map((s, i) =>

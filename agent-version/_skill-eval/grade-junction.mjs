@@ -24,8 +24,8 @@ const anyLine = (t, ...res) => lines(t).some((l) => res.every((re) => re.test(l)
 
 const FX = {
   'BR-VAC': {
-    doc: 'docs/EMP-1207/business_requirements.md',
-    seed: 'fixtures/JM-BR-VAC/seed/docs/EMP-1207/business_requirements.md',
+    doc: 'coddoc/EMP-1207/business_requirements.md',
+    seed: 'fixtures/JM-BR-VAC/seed/coddoc/EMP-1207/business_requirements.md',
     must: [
       ['критерий FR-10 на день начала', (t) => (t.match(/\[FR-10\]/g) || []).length >= 2],
       ['директора → генеральный', (t) => anyLine(t, /генеральн/i, /(директорам|директоров|замест)/i)],
@@ -42,8 +42,8 @@ const FX = {
     keep: [['§3.2 «изменения отдел кадров присылает списком»', /изменения отдел кадров присылает списком/i]],
   },
   'BR-LONG': {
-    doc: 'docs/PSS-2210/business_requirements.md',
-    seed: 'fixtures/JM-BR-LONG/seed/docs/PSS-2210/business_requirements.md',
+    doc: 'coddoc/PSS-2210/business_requirements.md',
+    seed: 'fixtures/JM-BR-LONG/seed/coddoc/PSS-2210/business_requirements.md',
     must: [
       ['срок подачи — до 18:00 рабочего дня', (t) => anyLine(t, /(18[:.]00|восемнадцат)/i, /рабоч/i)],
       ['передача заместителю после 16:00', (t) => anyLine(t, /заместител/i, /(16[:.]00|шестнадцат)/i)],
@@ -66,7 +66,7 @@ const FX = {
   },
   // Новый БТ по входу встречи, где фичу обсуждали с нуля: документа нет, есть только вход.
   'BR-NEW': {
-    doc: 'docs/HRS-311/business_requirements.md',
+    doc: 'coddoc/HRS-311/business_requirements.md',
     seed: null,
     must: [
       ['виды: с места работы и копия трудовой', (t) => /с места работы/i.test(t) && /копи\S*\s+трудов/i.test(t)],
@@ -95,8 +95,8 @@ const FX = {
   },
   // Доработка готовой спеки (редакция 1 из зелёного прогона jm-ts-acc) по входу второй встречи.
   'TS-REW': {
-    doc: 'docs/ACS-208/technical_specification.md',
-    seed: 'fixtures/JM-TS-REW/seed/docs/ACS-208/technical_specification.md',
+    doc: 'coddoc/ACS-208/technical_specification.md',
+    seed: 'fixtures/JM-TS-REW/seed/coddoc/ACS-208/technical_specification.md',
     must: [
       ['повторы: 5 минут, вдвое, до 6 часов', (t) => anyLine(t, /(5|пят\S*)\s*мин/i, /(6|шест\S*)\s*ч/i) && /(вдвое|удва|удво|в два раза|×\s*2|множител)/i.test(t)],
       ['алерт в portal-duty', (t) => /portal-duty/.test(t)],
@@ -138,7 +138,7 @@ const FX = {
     ],
   },
   'TS-ACC': {
-    doc: 'docs/ACS-208/technical_specification.md',
+    doc: 'coddoc/ACS-208/technical_specification.md',
     seed: null,
     turn1Ban: true,
     must: [

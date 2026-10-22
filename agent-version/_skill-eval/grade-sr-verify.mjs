@@ -149,7 +149,7 @@ function gradeOne (dir, key) {
   // (без пробелов и регистра) — как в `grade-sr.mjs`: перенос строки не выдумка, подменённый
   // метод — выдумка.
   let quotes = null
-  const specPath = join(dir, 'docs/PSS-2210/technical_specification.md')
+  const specPath = join(dir, 'coddoc/PSS-2210/technical_specification.md')
   if (verifyText && existsSync(specPath)) {
     const skel = s => s.replace(/\s+/g, '').replace(/[«»"„“”*`]/g, '').toLowerCase()
     const spec = skel(readFileSync(specPath, 'utf8'))

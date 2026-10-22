@@ -42,7 +42,7 @@ for (const id of ids) {
     const text = readFileSync(path, 'utf8')
     if (!/^## 5\. /m.test(text)) throw new Error('Expected original fixture parent heading')
     write(path, text.replace(/^## (5\. .+)$/m, '## ~~$1~~'))
-    const neighbor = 'docs/UA-410/business_requirements.md'
+    const neighbor = 'coddoc/UA-410/business_requirements.md'
     if (!existsSync(join(seed, neighbor))) write(join(seed, neighbor), readFileSync(join(old.work, neighbor)))
   }
   const inputHashes = files(seed)

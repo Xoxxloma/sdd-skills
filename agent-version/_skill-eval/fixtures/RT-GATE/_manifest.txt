@@ -1,4 +1,4 @@
-docs/SMSEC-77/business_requirements.md
+coddoc/SMSEC-77/business_requirements.md
 expected.md
 gate-prompt.txt
 gate-turn2.txt
