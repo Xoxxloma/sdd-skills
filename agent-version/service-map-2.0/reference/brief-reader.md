@@ -63,6 +63,7 @@ closeCloudyNights — src/nights/close-cloudy-nights.job.ts
 ObservingNight — src/nights/observing-night.entity.ts (@Entity)
 Reservation — src/reservations/reservation.entity.ts (@Entity)
 состояние: Reservation.status REQUESTED | CONFIRMED | CANCELLED — src/reservations/reservation.entity.ts
+состояние: ObservingNight.status OPEN | CLOSED — src/nights/observing-night.entity.ts
 справочник: ObservingNight.moonPhase NEW | QUARTER | FULL — src/nights/observing-night.entity.ts
 сообщение: «бронь отменена» — наблюдателю, событие telescope.reservation.cancelled — src/reservations/reservation.producer.ts
 зависит: dome-control — состояние купола перед подтверждением брони — src/dome/dome.client.ts
@@ -70,7 +71,7 @@ Reservation — src/reservations/reservation.entity.ts (@Entity)
 ⟹ топиков 6, из них с фактами 5
 ⟹ фоновых задач 3, из них с фактами 3
 ⟹ сущностей 2
-⟹ состояний 1 (значений 3), справочников 1, сообщений 1
+⟹ состояний 2 (значений 5), справочников 1, сообщений 1
 ```
 Сущность этого сервиса — класс с маркером хранения в ЭТОМ репозитории: `@Entity`/`@Table` (JPA,
 TypeORM), `model` в схеме Prisma, `@Document`/`@Schema` Mongo и подобные аннотации ORM. Аннотации

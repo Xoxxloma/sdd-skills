@@ -167,6 +167,7 @@ SPEC	операция спецификации	операция специфик
 TOPICS	топики	топики без блоков «Событий» — найди их слушатели и отправители и допиши блоки и строки описи; имя топика — из конфига, как в строке ниже
 SLOT	нет метки	блок «Событий» без строки-метки — допиши строку по коду; факта в коде нет — `не определено: <где>`
 INFRA	инфраструктура	«Зависит от» — инфраструктура из «Стека», а не сосед — убери строку из черновика и строку `зависит:` из описи
+STATE	перечисление без блока	перечисление своей сущности меняют строки `меняет:`, а блока сущности в «Бизнес-правилах» нет и строки `состояние:` с этим полем в описи нет — открой поле в коде: значение меняется по ходу жизни записи или это вид записи (у значения — условие, при котором запись появляется, и следствие) — допиши блок сущности по форме шаблона, читающий — и строку `состояние:` в опись вместо строки `справочник:` этого поля; справочник, от значений которого не зависит ни одно правило, и роль пользователя (её описывают «Роли и доступ») — блок не пиши
 KINDS_EOF
 KINDS="$(cut -f1 "$TMP/kinds" | tr '\n' ' ')"
 title() { awk -F'\t' -v k="$1" '$1 == k { print $3 }' "$TMP/kinds"; }
@@ -470,6 +471,45 @@ if [ -n "${CHECK_PARTS:-}" ]; then
       }
     }' "$TMP/prules" "$DRAFT" > "$TMP/RULES"
   printf '«Бизнес-правила» против описей частей — нет у головы: %d' "$(wc -l < "$TMP/RULES")"; [ -s "$TMP/RULES" ] && { printf ' — '; list "$TMP/RULES"; } || echo
+fi
+# Своя сущность без блока в «Бизнес-правилах», чьё поле-перечисление (два значения через `|`, null не в счёт,
+# или тип на Type|Status|State|Kind|Stage|Phase|Mode) называют строки `меняет:`, а строки `состояние:` с ним в
+# описях нет, — пропущенный объект правил. Имя сущности — без хвоста Entity. Секции в черновике нет — проверки нет.
+: > "$TMP/STATE"
+if grep -q '^## Бизнес-правила' "$DRAFT"; then
+  { cat "$OPIS"; printf '\n'; if [ -n "${CHECK_PARTS:-}" ]; then
+      for o in "$CHECK_PARTS"/part-*.opis.md; do [ ! -f "$o" ] || { cat "$o"; printf '\n'; }; done
+    fi; } | sed 's/\r$//' > "$TMP/stopis"
+  awk '
+    function cn(e) { if (e ~ /.Entity$/) sub(/Entity$/, "", e); return e }
+    function ck(k,   e, f) { e = k; sub(/\..*/, "", e); f = k; sub(/^[^.]*\./, "", f); return cn(e) "." f }
+    function chg(l,   k) { l = " " l
+      while (match(l, /[^A-Za-z0-9_][A-Z][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*/)) { k = substr(l, RSTART + 1, RLENGTH - 1); ch[ck(k)] = 1; l = substr(l, RSTART + RLENGTH) } }
+    function vals(r,   m, n, i, V, c, best) { best = 0
+      while (match(r, /`?[A-Za-z0-9_]+`?([ \t]*\\?\|[ \t]*`?[A-Za-z0-9_]+`?)+/)) {
+        m = substr(r, RSTART, RLENGTH); r = substr(r, RSTART + RLENGTH); gsub(/[`\\ \t]/, "", m)
+        n = split(m, V, "|"); c = 0; for (i = 1; i <= n; i++) if (V[i] != "" && V[i] !~ /^(null|Null|NULL|undefined|none|None|nil)$/) c++
+        if (c > best) best = c }
+      return best }
+    { sub(/\r$/, "") }
+    /^[ \t]*меняет:/ { chg($0); next }
+    FILENAME == ARGV[1] {
+      if ($0 ~ /^состояние:/) { s = $0; sub(/^[^:]*:[ \t]*/, "", s); gsub(/`/, "", s); sub(/[ \t].*/, "", s); named[ck(s)] = 1 }
+      next }
+    /^## / { sec = $0; ent = ""; next }
+    /^### / { ent = ""; if (match($0, /^### `[A-Za-z_][A-Za-z0-9_]*`/)) ent = substr($0, 6, RLENGTH - 6)
+      if (ent != "" && sec ~ /^## Бизнес-правила/) bp[cn(ent)] = 1
+      next }
+    sec ~ /^## Владеет данными/ && ent != "" && /^- `?[A-Za-z_][A-Za-z0-9_]*`?[ \t]*:/ {
+      f = $0; sub(/^- `?/, "", f); sub(/[^A-Za-z0-9_].*/, "", f)
+      r = $0; sub(/^[^:]*:[ \t]*/, "", r); t = r; gsub(/`/, "", t); sub(/[^A-Za-z0-9_].*/, "", t)
+      k = ent "." f
+      if (!(k in fe)) { fo[++nf] = k; fe[k] = (vals(r) >= 2 || t ~ /(Type|Status|State|Kind|Stage|Phase|Mode)$/) }
+    }
+    END { for (i = 1; i <= nf; i++) { k = fo[i]; e = k; sub(/\..*/, "", e)
+            if (fe[k] && (ck(k) in ch) && !(cn(e) in bp) && !(ck(k) in named)) print k } }
+  ' "$TMP/stopis" "$DRAFT" > "$TMP/STATE"
+  printf 'перечисления, которые меняют строки «меняет:», без блока «Бизнес-правил»: %d' "$(wc -l < "$TMP/STATE")"; [ -s "$TMP/STATE" ] && { printf ' — '; list "$TMP/STATE"; } || echo
 fi
 # Остаток: на каждый пункт его списка в плане (строки `остаток`) — строка `> пройдено: <пункт> — ключей N`
 # в описи остатка; пункт сверяется путём (хвост пути — тот же пункт). Нет строки — добор остатка.
@@ -820,7 +860,7 @@ awk -F'\t' -v parts="${CHECK_PARTS:+1}" -v oo="$TMP/own.opis" -v oc="$TMP/own.ca
     else if (!parts) a = "читающий"
     else if (t == "INFRA") a = "голова"
     else if (t == "SLOT") a = look(cp, kk)
-    else if (t == "RULES") a = "голова"
+    else if (t == "RULES" || t == "STATE") a = "голова"
     else if (t == "REST") { a = k; sub(/.*\(остаток /, "", a); sub(/\).*/, "", a) }
     else if (t == "MARKFILE") { a = k; sub(/.*\(часть /, "", a); sub(/\).*/, "", a) }
     else if (t == "DUP") { split(k, d, " ~ "); a = look(cp, d[1]); b = look(cp, d[2]); a = a (a != "" && b != "" ? "," : "") b }

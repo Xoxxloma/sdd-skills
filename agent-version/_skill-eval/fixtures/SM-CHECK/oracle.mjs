@@ -806,6 +806,64 @@ function formItems(draftText) {
   return { SLOT: slot, INFRA: dep.filter((d) => st.has(d.replace(/[A-Z]/g, (c) => c.toLowerCase()))).map((d) => [`${d} — имя стоит в «Стеке»`]) };
 }
 
+// A17. Своя сущность без блока «Бизнес-правил», чьё поле-перечисление называет строка «меняет:» (описи или
+// черновика), а строки «состояние:» описей с этим полем нет, — пункт («справочник:» пункт не снимает: поле
+// меняют). Перечисление: два значения, разделённых «|» (пустое и null-подобные не в счёт), или тип с
+// окончанием Type/Status/State/Kind/Stage/Phase/Mode. Имена сущностей — без окончания Entity, блок — по
+// заголовку в бэктиках. Секции «Бизнес-правила» нет — пунктов нет.
+function stateItems(draftText, opisTexts) {
+  const lines = splitLines(draftText);
+  if (!lines.some((l) => l.startsWith('## Бизнес-правила'))) return [];
+  const base = (e) => (e.length > 6 && e.endsWith('Entity') ? e.slice(0, -6) : e);
+  const keyOf = (e, f) => `${base(e)}.${f}`;
+  const NULLISH = new Set(['null', 'Null', 'NULL', 'undefined', 'none', 'None', 'nil']);
+  const changed = new Set(); const namedField = new Set();
+  const isChange = (l) => l.trimStart().startsWith('меняет:');
+  const collect = (l) => {
+    for (const tok of l.split(/[^A-Za-z0-9_.]+/)) {
+      const seg = tok.split('.');
+      for (let i = 0; i + 1 < seg.length; i++) {
+        if (/^[A-Z]\w*$/.test(seg[i]) && /^[A-Za-z_]\w*$/.test(seg[i + 1])) { changed.add(keyOf(seg[i], seg[i + 1])); i++; }
+      }
+    }
+  };
+  for (const l of opisTexts.flatMap(splitLines)) {
+    if (isChange(l)) { collect(l); continue; }
+    const m = l.match(/^состояние:\s*(\S+)/);
+    if (!m) continue;
+    const [e, f] = m[1].replace(/`/g, '').split('.');
+    if (f) namedField.add(keyOf(e, f));
+  }
+  const ruled = new Set(); const fields = new Map();
+  let sec = ''; let ent = '';
+  for (const l of lines) {
+    if (isChange(l)) { collect(l); continue; }
+    if (l.startsWith('## ')) { sec = l.slice(3); ent = ''; continue; }
+    if (l.startsWith('### ')) {
+      const m = /^### `(\w+)`/.exec(l); ent = m ? m[1] : '';
+      if (ent && sec.startsWith('Бизнес-правила')) ruled.add(base(ent));
+      continue;
+    }
+    if (!ent || !sec.startsWith('Владеет данными')) continue;
+    const m = /^- `?(\w+)`?\s*:(.*)$/.exec(l); if (!m) continue;
+    const rest = m[2];
+    const type = (rest.replace(/`/g, '').trim().match(/^\w*/) ?? [''])[0];
+    let piped = 0;
+    for (const run of rest.match(/`?\w+`?(?:\s*\\?\|\s*`?\w+`?)+/g) ?? []) {
+      const n = run.replace(/[`\\\s]/g, '').split('|').filter((v) => v && !NULLISH.has(v)).length;
+      piped = Math.max(piped, n);
+    }
+    const k = `${ent}.${m[1]}`;
+    if (!fields.has(k)) fields.set(k, { e: ent, f: m[1], isEnum: piped >= 2 || /(Type|Status|State|Kind|Stage|Phase|Mode)$/.test(type) });
+  }
+  const out = [];
+  for (const [k, x] of fields) {
+    const key = keyOf(x.e, x.f);
+    if (x.isEnum && changed.has(key) && !ruled.has(base(x.e)) && !namedField.has(key)) out.push([k]);
+  }
+  return out;
+}
+
 // Пометка не становится ключом описи. Владение — по файлу, затем по ближайшей папке плана;
 // неоднозначный относительный хвост и отсутствие владельца дают «без хозяина».
 function missedItems(planText, opisTexts) {
@@ -905,7 +963,8 @@ export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
   const ownerPlan = env.CHECK_PLAN && fs.existsSync(rel(env.CHECK_PLAN)) ? rd(rel(env.CHECK_PLAN)) : '';
   const contractKeys = parseCard(rd(draftPath)).blocks.контракт.map((b) => b.key);
   const lists = { ...it, NOPFX: noPfx.map((k) => [k]), MARKFILE: (mk?._owners ?? []).map((o) => [o]), MISSED: missedItems(ownerPlan, [rd(opisPath), ...(P?.notes ?? [])]), DECL: declItems([rd(opisPath), ...(P?.notes ?? [])], contractKeys), PARTEMPTY: P ? partEmptyItems(P.pbody, rd(draftPath)) : [], RULES: P ? rulesItems(rel(env.CHECK_PARTS), rd(draftPath)) : [], REST: P && ownerPlan ? restItems(ownerPlan, rel(env.CHECK_PARTS)) : [],
-    ...listItems(ownerPlan, rd(draftPath), [rd(opisPath), ...(P?.notes ?? [])], env.CHECK_PREFIX ? '/' + env.CHECK_PREFIX.replace(/\/$/, '').replace(/^\//, '') : '', !!P), ...formItems(rd(draftPath)) };
+    ...listItems(ownerPlan, rd(draftPath), [rd(opisPath), ...(P?.notes ?? [])], env.CHECK_PREFIX ? '/' + env.CHECK_PREFIX.replace(/\/$/, '').replace(/^\//, '') : '', !!P), ...formItems(rd(draftPath)),
+    STATE: stateItems(rd(draftPath), [rd(opisPath), ...(P ? fs.readdirSync(rel(env.CHECK_PARTS)).filter((n) => /^part-.*\.opis\.md$/.test(n)).sort().map((n) => rd(path.join(rel(env.CHECK_PARTS), n))) : [])]) };
   const dobor = {};
   const look = (m, k) => m.get(k) ?? m.get(nopK(k)) ?? null;
   for (const [cat, list] of Object.entries(lists)) for (const item of list) {
@@ -915,7 +974,7 @@ export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
     else if (!P) A = new Set(['читающий']);
     else if (cat === 'INFRA') A = new Set(['голова']);
     else if (cat === 'SLOT') A = look(P.card, item[0].split(SEP)[0]);
-    else if (cat === 'RULES') A = new Set(['голова']);
+    else if (cat === 'RULES' || cat === 'STATE') A = new Set(['голова']);
     else if (cat === 'REST') A = new Set([item[1]]);
     else if (cat === 'MARKFILE') A = new Set([item[0]]);
     else if (cat === 'DUP') A = new Set([...(look(P.card, item[0]) ?? []), ...(look(P.card, item[1]) ?? [])]);
