@@ -276,6 +276,13 @@ case "$PROBE" in
   # ответы по номерам (три «не знаю»); ход 3 — «Да, годится.». Грейд — `grade-fix.mjs`, ключ — `KEY.md`.
   ts-fix)     FIXTURE=TS-FIX;   PROMPT_FILE=fix-prompt.txt;   SKILL=technical-spec-doc; TURN2_FILE=fix-turn2.txt; TURN3_FILE=fix-yes-turn2.txt; TURNS_CAP=3 ;;
   ts-ctx)    FIXTURE=TS-CTX;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
+  # Правка логики внутри бэкенда без нового стыка (2026-10-24, находка №10 ревью): §2 неприменима, §7 → логика §3.1,
+  # выдуманной INT быть не должно. Грейдер `grade-beonly.mjs`.
+  ts-beonly) FIXTURE=TS-BEONLY; PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
+  # Спека в режиме мелкой правки (2026-10-24): таймаут (контракт не тронут → §2 неприменима, §5.1 по сути) и новое
+  # поле в ответе (контракт тронут → §2 карточка с JSON). Грейдер `grade-cr-spec.mjs --case=timeout|api`.
+  ts-cr-timeout) FIXTURE=TS-CR; PROMPT_FILE=timeout-prompt.txt; SKILL=technical-spec-doc ;;
+  ts-cr-api)     FIXTURE=TS-CR; PROMPT_FILE=api-prompt.txt;     SKILL=technical-spec-doc ;;
   ts-nodesc) FIXTURE=TS-NODESC; PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-noctx)  FIXTURE=TS-NOCTX;  PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   br-ctx)    FIXTURE=BR-CTX;    PROMPT_FILE=t1-prompt.txt;    SKILL=business-requirements-doc ;;
@@ -717,6 +724,13 @@ if [ -d "$SKILL_DIR/reference" ]; then
   rm -rf "$SNAP_ROOT/$SKILL/reference"
   cp -r "$ROUND/_skills/$SKILL.reference" "$SNAP_ROOT/$SKILL/reference"
 fi
+# Скиллы-соседи снимка, по именам через пробел (пусто → как было). `technical-spec-doc` с 1.6.0 читает
+# `../deep-search/reference/from-spec.md` от своего SKILL.md — регресс спеки с `deep-search` рядом, как на проде.
+for s in ${EXTRA_SKILLS:-}; do
+  [ -d "$ROUND/_skills/$s" ] || cp -r "$HERE/../$s" "$ROUND/_skills/$s"
+  rm -rf "$SNAP_ROOT/$s"; cp -r "$ROUND/_skills/$s" "$SNAP_ROOT/$s"
+  echo "сосед снимка: $s → $SNAP_ROOT/$s"
+done
 # Отпечаток дерева рядом со снимком: по нему видно, из какого состояния репы взят текст.
 if [ ! -f "$ROUND/_commit.txt" ]; then
   { git -C "$HERE" rev-parse HEAD 2>/dev/null || echo "нет git"; } > "$ROUND/_commit.txt"
@@ -738,9 +752,10 @@ CURRENT="$(cd "$FIXTURE_DIR" && find . -type f -not -name '_manifest.txt' | sed 
 if [ -f "$MANIFEST" ]; then
   # Манифест сравнивается без CR: репозиторий с `core.autocrlf=true` отдаёт его с CRLF, а `find`
   # печатает LF, и плечо отказывалось стартовать при неизменённой фикстуре (2026-09-22, `rt-feature`).
-  if ! printf '%s\n' "$CURRENT" | diff -q - <(tr -d '\r' < "$MANIFEST") >/dev/null 2>&1; then
+  # Сверяется набор, а не порядок: переименование `docs/` → `coddoc/` (5.71) правило манифесты на месте, без пересортировки.
+  if ! printf '%s\n' "$CURRENT" | diff -q - <(tr -d '\r' < "$MANIFEST" | sort) >/dev/null 2>&1; then
     echo "!!! СОСТАВ ФИКСТУРЫ $FIXTURE НЕ СОВПАДАЕТ С МАНИФЕСТОМ — прогон не запускался."
-    printf '%s\n' "$CURRENT" | diff - "$MANIFEST" | head -20
+    printf '%s\n' "$CURRENT" | diff - <(tr -d '\r' < "$MANIFEST" | sort) | head -20
     echo "Разберись, откуда файл: обычно это прогон, записавший результат в фикстуру."
     echo "Манифест обновляется руками, когда фикстуру меняешь осознанно."
     exit 1
