@@ -11,6 +11,7 @@
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EVAL="$(cd "$HERE/../.." && pwd)"
+. "$HERE/../sm-run.sh"   # SM_RUNNER=ps1 — через reference/run.ps1, как на Windows
 SCR="${1:?папка со скриптами plan.sh, assemble.sh, promote.sh}"
 [ "$SCR" != selftest ] || SCR="$HERE/selftest"
 SCR="$(cd "$SCR" && pwd)" || exit 2
@@ -32,7 +33,7 @@ now_ms() { local t; t=$(date +%s%N 2>/dev/null); case "$t" in *N|'') echo $(( $(
 runs() {
   local d="$1"; shift
   local t0 t1; t0=$(now_ms)
-  bash "$@" >"$d/stdout" 2>"$d/stderr"; echo $? >"$d/rc"
+  sm_run "$@" >"$d/stdout" 2>"$d/stderr"; echo $? >"$d/rc"
   t1=$(now_ms); echo $(( t1 - t0 )) >"$d/ms"
 }
 args3() { local f="$1"; K=''; W=''; R=''; { IFS= read -r K; IFS= read -r W; IFS= read -r R; } < "$f"; K="${K%$'\r'}"; W="${W%$'\r'}"; R="${R%$'\r'}"; }

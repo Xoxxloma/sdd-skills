@@ -7,6 +7,7 @@
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EVAL="$(cd "$HERE/../.." && pwd)"
+. "$HERE/../sm-run.sh"   # SM_RUNNER=ps1 — через reference/run.ps1, как на Windows
 CHECK="${1:-$EVAL/../service-map-2.0/reference/check.sh}"
 [ -f "$CHECK" ] || { echo "нет check.sh: $CHECK" >&2; exit 2; }
 command -v node >/dev/null 2>&1 || { echo "нужен node" >&2; exit 2; }
@@ -26,7 +27,7 @@ run() {
   local name="$1"; shift
   local t0 t1
   t0=$(now_ms)
-  env ${RUN_ENV[@]+"${RUN_ENV[@]}"} bash "$CHECK" "$@" >"$OUT/$name.out" 2>"$OUT/$name.err"
+  sm_run "$CHECK" ${RUN_ENV[@]+"${RUN_ENV[@]}"} "$@" >"$OUT/$name.out" 2>"$OUT/$name.err"
   echo $? >"$OUT/$name.rc"
   t1=$(now_ms)
   echo $(( t1 - t0 )) >"$OUT/$name.ms"
@@ -71,7 +72,7 @@ done <"$HERE/real-cases.txt"
 if [ -n "$big_name" ]; then
   times=()
   for _ in 1 2 3; do
-    t0=$(now_ms); bash "$CHECK" "${big_args[@]}" >/dev/null 2>&1; t1=$(now_ms)
+    t0=$(now_ms); sm_run "$CHECK" "${big_args[@]}" >/dev/null 2>&1; t1=$(now_ms)
     times+=("$(( t1 - t0 ))")
   done
   (IFS='|'; echo "$big_name|$big_bytes|${times[*]}") >"$OUT/_big.txt"

@@ -7,6 +7,7 @@
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EVAL="$(cd "$HERE/../.." && pwd)"
+. "$HERE/../sm-run.sh"   # SM_RUNNER=ps1 — через reference/run.ps1, как на Windows
 EDGES="${1:-$EVAL/../service-map-2.0/reference/edges.sh}"
 [ -f "$EDGES" ] || { echo "нет edges.sh: $EDGES" >&2; exit 2; }
 command -v node >/dev/null 2>&1 || { echo "нужен node" >&2; exit 2; }
@@ -30,7 +31,7 @@ run_case() {
   local extra=()
   [ -f "$src/args.txt" ] && read -r -a extra < "$src/args.txt"   # например «--only web»
   t0=$(now_ms)
-  bash "$EDGES" "$OUT/$name/services" "$man" ${extra[@]+"${extra[@]}"} >"$OUT/$name.out" 2>"$OUT/$name.err"
+  sm_run "$EDGES" "$OUT/$name/services" "$man" ${extra[@]+"${extra[@]}"} >"$OUT/$name.out" 2>"$OUT/$name.err"
   echo $? >"$OUT/$name.rc"
   t1=$(now_ms)
   echo $(( t1 - t0 )) >"$OUT/$name.ms"

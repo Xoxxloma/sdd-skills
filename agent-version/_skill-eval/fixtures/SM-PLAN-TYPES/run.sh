@@ -8,6 +8,7 @@
 # (д) серверная `ключ` + клиентская объявлена — «операция» только серверной; (е) тип пустой и без
 # аргумента — вывод одинаков; (ж) k_typesecs — как таблица порядка секций card.template.md.
 HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/../sm-run.sh"   # SM_RUNNER=ps1 — через reference/run.ps1, как на Windows
 REF="${1:-$HERE/../../../service-map-2.0/reference}"
 PLAN="$REF/plan.sh"
 OUT="$(mktemp -d)"; if [ -n "${KEEP:-}" ]; then echo "временная папка: $OUT"; else trap 'rm -rf "$OUT"' EXIT; fi
@@ -46,7 +47,7 @@ EOF
 
 run() {  # run <имя> <counts> [тип] — вывод в <имя>.out, план в <имя>.tsv
   local name="$1" counts="$2"; shift 2
-  bash "$PLAN" "$counts" 30 1 "$S" "$OUT/$name.tsv" "$@" > "$OUT/$name.out" 2>&1
+  sm_run "$PLAN" "$counts" 30 1 "$S" "$OUT/$name.tsv" "$@" > "$OUT/$name.out" 2>&1
 }
 
 # (а) frontend: роуты, названные «контрактом», отброшены; «экраны» — в итоге; нарезки нет
