@@ -1,6 +1,6 @@
 ---
 name: deep-search
-version: 1.0.0
+version: 1.1.0
 user-invocable: true
 argument-hint: "<вопрос о том, как сейчас работает система>"
 allowed-tools: AskUserQuestion, Read, Glob, Grep, Agent

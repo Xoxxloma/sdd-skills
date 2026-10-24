@@ -1,9 +1,9 @@
 ---
 name: technical-spec-doc
-version: 1.5.0
+version: 1.6.0
 user-invocable: false
-allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
-description: 'Turns a confirmed business-requirements doc (БТ/BRD/SRS) into ONE Russian Markdown technical spec (technical_specification.md, saved next to the БТ), organized around INTERACTIONS — the new and changed contracts crossing service or FE/BE boundaries — so a frontend agent and a backend agent code against the same contracts and meet without after-the-fact stitching. There is no code to read: NEW things are designed fully (path, schema, JSON example); anything about an EXISTING service is written only as the analyst confirmed it — inventing an endpoint of a service you cannot see is the worst failure of this skill. Requires a ready БТ (or, by orchestrator flag, a bug report, a change request or an epic-БТ for foundation node #0): given only a brief or an idea it refuses and asks for the business requirements. Use when the БТ is ready and a dev spec is needed.'
+allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion, Agent
+description: 'Turns a confirmed business-requirements doc (БТ/BRD/SRS) into ONE Russian Markdown technical spec (technical_specification.md, saved next to the БТ), organized around INTERACTIONS — the new and changed contracts crossing service or FE/BE boundaries — so a frontend agent and a backend agent code against the same contracts and meet without after-the-fact stitching. You read no code yourself: NEW things are designed fully (path, schema, JSON example); anything about an EXISTING service is written only as the analyst confirmed it — inventing an endpoint of a service you cannot see is the worst failure of this skill. Requires a ready БТ (or, by orchestrator flag, a bug report, a change request or an epic-БТ for foundation node #0): given only a brief or an idea it refuses and asks for the business requirements. Use when the БТ is ready and a dev spec is needed.'
 ---
 
 # Technical Specification Interview (BRD → Tech Spec)
@@ -43,8 +43,9 @@ gathers business *why/what* and is **banned from authoring design**. This skill 
 the confirmed business doc and produces exactly the design that skill refused to
 write: contracts, data shapes, conceptual migrations, UI states, rollout order.
 
-There is no **code** to read — only, possibly, a **выжимка** of the services (`services/`) and the
-analyst's own documents (`context/`); how to use them is Step 0.5. The source of truth splits by
+You read no **code** yourself — only, possibly, a **выжимка** of the services (`services/`) and the
+analyst's own documents (`context/`); how to use them is Step 0.5. By the analyst's choice a `deep-search`
+scout may read a neighbouring service's code (Step 3). The source of truth splits by
 provenance, and getting that split right is the whole job (see "The provenance contract").
 
 ## Precondition (entry guard): no document above → no spec.
@@ -143,12 +144,13 @@ vs. what to validate.
 
 - **О СУЩЕСТВУЮЩЕМ (🔵 / 🟡)** — anything about an already-living service (reuse an
   existing endpoint, read another service's table, rely on the auth/security service).
-  You cannot verify it — there is no code. Подтверждение делит его надвое, и цвет говорит,
+  You cannot verify it yourself — you read no code. Подтверждение делит его надвое, и цвет говорит,
   на какую половину попал пункт:
   - 🔵 **подтверждено аналитиком** — the analyst confirmed it on the interview. Write it as
     fact, tagged `🔵 подтверждено аналитиком (не по коду; валидировать при интеграции)`.
     It is trustworthy for planning but was not read from source, so integration must
-    still verify it. **Пункт закрыт:** в «Открытые вопросы» не идёт и статус не меняет.
+    still verify it. **Пункт закрыт:** в «Открытые вопросы» не идёт и статус не меняет. Подтверждено
+    после глубокого поиска (Step 3) — в скобках вместо «не по коду» стоит «по коду <сервис>, ветка <ветка>».
   - 🟡 **к валидации** — not confirmed by the analyst. It stays an open assumption, mirrored
     into «Открытые вопросы», never asserted as fact.
 
@@ -294,9 +296,10 @@ offset=<строка>` и ограничь `limit` номером следующ
   сервисам не нашёл — иду от БТ и ваших ответов») и работай дальше без изменений. Ничего не
   додумывай в компенсацию.
 
-**Прочитанное не закрывает ни одного гейта и в файл не попадает.** Запрет на конкретный путь/JSON
-чужого сервиса действует и на прочитанное в `services/` и `context/`: подтвердил аналитик → 🔵
-словами; не подтвердил → 🟡 к валидации, как если бы документа не было.
+**Прочитанное о чужой системе — в `services/`, `context/` или в ответе разведчика (Step 3) — не
+закрывает ни одного гейта и в файл не попадает.** Запрет на конкретный путь/JSON чужого сервиса
+действует и на прочитанное: подтвердил аналитик → 🔵 словами; не подтвердил → 🟡 к валидации, как
+если бы документа не было.
 
 ### Step 1 — Draft the design (to form proposals, not to write)
 From the business doc **and the Step 0.5 context (if any)**, draft proposals for each
@@ -406,6 +409,11 @@ and ask to confirm / correct / decide:
   — дефект: ответ лежит на диске. Исход не меняется: «да» → 🔵 подтверждено аналитиком;
   «не знаю» → 🟡 к валидации. **Путь из карточки — опора для вопроса, а не контент спеки: в
   файл он не идёт и после «да».**
+  **Глубокий поиск.** Перед первым вопросом о существующем сервисе открой `Read` файл
+  `deep-search/reference/from-spec.md` в папке скиллов — родителе папки этого `SKILL.md`; путь абсолютный,
+  без `..`: поиск с `..` молча пуст. Открылся — прочитай целиком и работай по нему: у какого сервиса
+  четвёртый вариант «Глубокий поиск», как запустить разведчика и что спросить по его ответу. Аналитик
+  выбрал поиск — гейт ❓, пока он не ответил на гипотезу из кода. Не открылся — вариантов три.
 - **fork (❓)** → present the options and ask them to choose (с твоей рекомендацией первой).
 - **unknown** → сначала преврати в предложение: спроектируй вариант и задай его на
   подтверждение. Открытым вопросом спрашивай только то, что вывести неоткуда (номер задачи,
@@ -483,7 +491,8 @@ invention marked "done".
 Write ONE `.md` using the template, in Russian:
 - 🟢 confirmed new design → fill concretely (schemas, JSON examples, states);
 - 🔵 analyst-confirmed existing fact → write plainly, tagged `🔵 подтверждено аналитиком
-  (не по коду; валидировать при интеграции)`;
+  (не по коду; валидировать при интеграции)`; после глубокого поиска — `по коду <сервис>, ветка
+  <ветка>` вместо `не по коду`;
 - 🟡 unconfirmed / ❓ deferred → `TBD` in-place **prefixed with its emoji** (`🟡 к валидации`
   or `❓ TBD (отложено аналитиком)`) so the kind is visible where it sits, and mirrored into
   «Открытые вопросы»;
@@ -552,7 +561,8 @@ Check, and fix anything that fails:
    сессии.** «Не возражал», «так написано в документе», «логично следует из выжимки» —
    не подтверждение: такая карточка помечается `🟡 к валидации`.
    **И отдельно пройди по конкретике:** ни одного пути, заголовка, кода ответа или JSON чужой
-   системы, прочитанного из `services/` или `context/`, в спеке быть не должно — **в том числе
+   системы, прочитанного из `services/`, `context/` или ответа разведчика (ссылки `файл:строка`, имена
+   из кода), в спеке быть не должно — **в том числе
    внутри карточки «к валидации» и внутри 🔵 после кивка**. Нашёл — замени описанием словами.
 2. **Каждое 🟢 взаимодействие — рабочий контракт.** У 🟢 есть: граница и направление, триггер,
    схема запроса и ответа, **хотя бы один настоящий JSON-пример**, значения enum'ов, семантика
@@ -626,11 +636,12 @@ a 🟡 assumption, or resolve a ❓ fork):
   answered:
   - answered ❓ fork → replace the `TBD` with the chosen design (🟢 if new);
   - confirmed 🟡 assumption → flip 🟡 «к валидации» → `🔵 подтверждено аналитиком (не по коду;
-    валидировать при интеграции)` and write it as fact; the path field stays as the analyst wrote
-    it — a nod does not fill it;
+    валидировать при интеграции)` (после глубокого поиска — `по коду <сервис>, ветка <ветка>`) and
+    write it as fact; the path field stays as the analyst wrote it — a nod does not fill it;
   - still deferred → it stays `TBD` / 🟡-к-валидации.
 - **К доработке пришли вопросы к спеке без ответов — все или часть** — задай их аналитику
-  гипотезой, как гейты интервью, и веди по реестру Step 3.5, как гейты. Пишешь только ✅ и ровно то,
+  гипотезой, как гейты интервью (о существующем сервисе — с глубоким поиском, Step 3), и веди по
+  реестру Step 3.5, как гейты. Пишешь только ✅ и ровно то,
   что сказал аналитик; гипотезу, которую его ответ не покрыл, спроси ещё раз одним ходом, не покрыл и
   тогда — ⏭️ в «Открытые вопросы». «Не знаю» → ⏭️: в спеке `❓ TBD`, о чужой системе — 🟡 к валидации.
 - **Изменился состав §2 — скажи об этом в хендоффе доработки.** Появилось или исчезло
@@ -722,7 +733,7 @@ Provenance markers (🟢 / 🔵 / 🟡 / ❓, plus ⚠️ for vague) appear inli
 >
 > **Легенда происхождения:**
 > 🟢 НОВОЕ — спроектировано в этом документе, реализуется как есть.
-> 🔵 подтверждено аналитиком — факт о существующей системе со слов аналитика (не по коду; валидировать при интеграции). Пункт закрыт.
+> 🔵 подтверждено аналитиком — факт о существующей системе со слов аналитика (не по коду или, после глубокого поиска, по коду сервиса — какого и с какой ветки, сказано у пункта; валидировать при интеграции). Пункт закрыт.
 > 🟡 к валидации — допущение о существующей системе, не подтверждено — уточнить.
 > 🔵 depends-on #0 — контракт унаследован из спеки узла-фундамента. Это НЕ открытый пункт: он уже спроектирован и подтверждён на стороне #0. В «Открытые вопросы» не попадает и «Статус готовности» не меняет. *(Строка легенды нужна, ТОЛЬКО если эта спека наследует контракт #0. Обычный прогон — просто убери её.)*
 > ❓ — открытое архитектурное решение.
@@ -771,7 +782,7 @@ Provenance markers (🟢 / 🔵 / 🟡 / ❓, plus ⚠️ for vague) appear inli
 - **Ошибки:** [коды + тело + когда возникают — см. «Каталог ошибок» в конце §2]
 - **Состояния UI по ответу (если есть фронт):** значение → …; загрузка → …; пусто/«—» → …; ошибка → …
 - **Авторизация:** [кто вправе; где проверяется; негативный случай]
-- **Происхождение:** [🟢 новое / 🔵 подтверждено аналитиком (не по коду) / 🟡 к валидации / ❓]
+- **Происхождение:** [🟢 новое / 🔵 подтверждено аналитиком (не по коду | по коду <сервис>, ветка <ветка>) / 🟡 к валидации / ❓]
 - **Трассировка:** [FR-* из БТ]
 
 ### INT-2. …
@@ -872,7 +883,7 @@ Provenance markers (🟢 / 🔵 / 🟡 / ❓, plus ⚠️ for vague) appear inli
 | ...      | ...               | ...                          |
 
 ## 8. Допущения и открытые вопросы
-- **🔵 Подтверждено аналитиком (не по коду):** [список — валидировать при интеграции].
+- **🔵 Подтверждено аналитиком:** [список, у пункта — «не по коду» или «по коду <сервис>, ветка <ветка>»; валидировать при интеграции].
 - **🟡 К валидации:** [неподтверждённые допущения о существующих системах].
 - **❓ Открытые решения:** [незакрытые архитектурные развилки].
 - **⚠️ Требует уточнения:** [подтверждено, но расплывчато].
