@@ -6,7 +6,8 @@
 //   import { plan, VARIANTS } — для compare.mjs
 //
 // Контракт (кратко): блоки «## <класс> :: <ключ|ориентир>», строки «<путь>:<число>». Вес файла =
-// Σ ключ + w × Σ ориентир; вес папки — сумма поддерева. Общий вес ≤ K → «нарезка не нужна».
+// Σ ключ + w × Σ ориентир; вес папки — сумма поддерева. Вес ключей ≤ K → «нарезка не нужна» (ориентир
+// решения не меняет: части он только раскладывает).
 // Иначе папки с ненулевым весом пакуются подряд в порядке путей (байтовая сортировка) в части ≤ K;
 // папка тяжелее K режется по подпапкам рекурсивно, её собственные файлы с весом идут подряд частями
 // «файлы» ≤ K; файл тяжелее K — отдельной частью; нулевые поддеревья — остаток; файлы вне корней в план
@@ -184,7 +185,7 @@ export function plan (countsText, K, w, rootsArg, opt = VARIANTS.primary) {
   }
   const W = round(tops.reduce((a, t) => a + t.w, 0))
   const KW = tops.reduce((a, t) => a + t.kw, 0)
-  const res = { K, w, W, itog: o.itog === 'all' ? itogAll : itogIn, keyClasses, oriClasses, outside: round(outside), outsideFiles, tests: round(tests), testsBy, itogAll, roots, parts: [], mode: W <= K || KW === 0 ? 'не нужна' : 'план' }
+  const res = { K, w, W, KW: round(KW), itog: o.itog === 'all' ? itogAll : itogIn, keyClasses, oriClasses, outside: round(outside), outsideFiles, tests: round(tests), testsBy, itogAll, roots, parts: [], mode: KW <= K ? 'не нужна' : 'план' }
   const hb = badHeaders(countsText)
   if (hb) { res.mode = 'отказ'; res.reason = hb; return res }
   const nbad = badLines(countsText)
@@ -319,7 +320,7 @@ export function fmt (res) {
     const o2 = list(minus(res.itogAll.ориентир, res.testsBy.ориентир), res.oriClasses)
     out.push(`к сверке: ${list(minus(res.itogAll.ключ, res.testsBy.ключ), res.keyClasses)}${o2 ? ` | ориентир: ${o2}` : ''}`)
   }
-  if (res.mode === 'не нужна') { out.push(res.W > res.K ? `нарезка не нужна: вес 0 ≤ K=${res.K} по ключам (ориентир весит ${num(res.W)})` : `нарезка не нужна: вес ${num(res.W)} ≤ K=${res.K}`); return out.join('\n') }
+  if (res.mode === 'не нужна') { out.push(res.W > res.KW ? `нарезка не нужна: вес по ключам ${num(res.KW)} ≤ K=${res.K} (ориентир ${num(round(res.W - res.KW))} в решение не идёт)` : `нарезка не нужна: вес ${num(res.W)} ≤ K=${res.K}`); return out.join('\n') }
   out.push(`вес сервиса ${num(res.W)} при K=${res.K}, w=${res.w}`)
   const oriOf = (p) => res.oriClasses.filter((c) => p.ori[c]).map((c) => `ориентир ${c} ${p.ori[c]}`)
   res.parts.forEach((p, i) => out.push(`часть ${String(i + 1).padStart(2, '0')} вес ${num(p.w)} (${[list(p.cls, res.keyClasses), ...oriOf(p)].filter(Boolean).join(', ')}): ${p.kind} ${p.paths.join('; ')}`))

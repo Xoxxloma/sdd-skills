@@ -15,8 +15,9 @@
 //      первая колонка «Экраны»/«Роли и доступ»/«Зависит от», ВТОРАЯ колонка (вызов) «Потребляемых API».
 //      «Нет в описи» считается только по классам описи из брифа: контракт, сущности, задачи,
 //      топики, бизнес-правила, экраны, роли.
-//  A5. Группы «Что умеет»: HTTP-ключи контракта по префиксу пути (ведущие «api»/«vN» + следующий
-//      сегмент, параметр «:x»/«{x}» обрывает), плюс каждая фоновая задача и каждый потребляемый топик.
+//  A5. Группы «Что умеет»: HTTP-ключи контракта по первым двум сегментам пути без обвязки (ведущие
+//      «api»/«openapi»/«vN» не в счёт, параметр «:x»/«{x}» обрывает), плюс каждая фоновая задача и
+//      каждый потребляемый топик.
 //  A6. [уточнено координатором] Строка таблицы, у которой первая ячейка после нормализации — «—»
 //      (пустая форма «| — | | |» и строка знания «| — | не определено: … |»), ключом не является
 //      ни в одном классе и в «строк таблиц» не считается.
@@ -142,11 +143,11 @@ export function parseCard(text) {
     }
     if (line.startsWith('### ')) {
       const cls = BLOCK_SECTIONS[sec];
-      cur = cls ? { header: line.slice(4), body: false, ...blockKey(sec, cls, line.slice(4)) } : null;
+      cur = cls ? { header: line.slice(4), body: false, unav: false, ...blockKey(sec, cls, line.slice(4)) } : null;
       if (cls) blocks[cls].push(cur);
       continue;
     }
-    if (cur && line.startsWith('- ')) cur.body = true;
+    if (cur && line.startsWith('- ')) { cur.body = true; if (line.startsWith('- недоступно')) cur.unav = true; }
     const t = TABLE_SECTIONS[sec];
     if (t && line.startsWith('|')) rawRows[t].push(line);
   }
@@ -157,7 +158,8 @@ export function parseCard(text) {
       if (isSep(r)) return;
       if (i + 1 < rows.length && isSep(rows[i + 1])) return; // строка заголовка
       if (isDashRow(r)) return;
-      tables[t].push(cells(r));
+      const c = cells(r); c.unav = r.includes('недоступно');   // пометка «недоступно» — словом в строке
+      tables[t].push(c);
     });
   }
   return { blocks, tables };
@@ -255,8 +257,10 @@ export function parseOpis(text) {
   const nofile = [];
   const totals = [];
   let cur = null;
-  for (const line of splitLines(text)) {
+  for (let line of splitLines(text)) {
     if (line.trim() === '') continue;
+    // прежняя форма объявленной без реализации операции — тот же ключ, что со строкой `недоступно:`
+    if (line.startsWith('> объявлено без реализации: ')) line = line.slice('> объявлено без реализации: '.length);
     if (line.trim().startsWith('⟹')) { totals.push(line.trim()); cur = null; continue; }
     if (/^\s/.test(line)) {
       if (cur && line.trim().startsWith('·')) cur.fact = true;
@@ -270,7 +274,10 @@ export function parseOpis(text) {
     const kt = i < 0 ? line : line.slice(0, i);
     let key;
     let kind = 'other';
-    if (kt.startsWith('состояние:')) {
+    if (kt.startsWith('вход:')) {
+      key = 'вход'; // пара — строка «вход» в «Роли и доступ»
+      if (line.includes('не определено')) { if (!keys.has(key)) keys.set(key, { kind, fact: false }); cur = keys.get(key); continue; } // ответ без файла — тоже ответ
+    } else if (kt.startsWith('состояние:')) {
       const rest = norm(kt.slice('состояние:'.length));
       key = 'объект ' + rest.split(' ')[0].split('.')[0];
       kind = 'obj';
@@ -292,14 +299,29 @@ export function parseOpis(text) {
 
 // ---------- группы «Что умеет» ----------
 
-function pathPrefix(p) {
-  const out = [];
-  for (const s of p.split('/').filter(Boolean)) {
-    if (/^[:{]/.test(s)) break;
-    out.push(s);
-    if (!/^(api|v\d+)$/i.test(s)) break;
+// HTTP: путь без общего префикса приложения и сегментов версии `v<число>`; ведущие сегменты, общие для всех путей
+// (не параметр; у самого короткого остаётся свой), — обвязка; группа — два первых сегмента после неё, параметр обрывает.
+function httpGroups(paths, prefix) {
+  const pfx = prefix ? '/' + prefix.replace(/\/+/g, '/').replace(/^\//, '').replace(/\/$/, '') : '';
+  const segs = paths.map((k) => {
+    if (pfx && pfx !== '/' && (k === pfx || k.startsWith(pfx + '/'))) k = k.slice(pfx.length);
+    return k.split('/').slice(1).filter((x) => x !== '' && !/^v\d+$/.test(x));
+  });
+  let c = 0;
+  if (segs.length > 1) {
+    const mn = Math.min(...segs.map((s) => Math.max(s.length, 1)));
+    while (c < mn - 1 && !/^[:{]/.test(segs[0][c] ?? '') && segs.every((s) => s[c] === segs[0][c])) c++;
   }
-  return '/' + out.join('/');
+  return segs.map((s) => {
+    if (c >= s.length || /^[:{]/.test(s[c])) return '/';
+    return '/' + s[c] + (c + 1 < s.length && !/^[:{]/.test(s[c + 1]) ? '/' + s[c + 1] : '');
+  });
+}
+
+// брокер в строке «Стека»: слово «шина» в ячейке слоя или слово «брокер»
+function isBroker(l) {
+  const cell = l.startsWith('|') ? (l.split('|')[1] ?? '').replace(/`/g, '').trim() : '';
+  return /(^|[\s,(/])шина/i.test(cell) || /брокер/i.test(l);
 }
 
 // ---------- всё вместе ----------
@@ -403,11 +425,16 @@ export function analyze(opisText, draftText, prevText, opt = {}) {
   let missingInOpis = 0;
   for (const set of Object.values(classKeys)) for (const k of set) if (!taken.has(k)) missingInOpis++;
 
-  const groups = new Set();
+  const groups = new Set(); const http = [];
   for (const k of classKeys.контракт) {
     const m = k.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) (\S+)/);
-    if (m) groups.add(pathPrefix(m[2]));
+    if (m && m[2].startsWith('/')) { http.push(m[2]); continue; }
+    // gRPC и `Класс.метод` — по сервису или классу, GraphQL — по операции
+    let g = k.replace(/^rpc /, '').replace(/\(.*$/, '');
+    g = (!/ /.test(g) && /\./.test(g)) ? g.replace(/\.[^.]*$/, '') : k;
+    groups.add(g);
   }
+  for (const g of httpGroups(http, opt.prefix)) groups.add(g);
   for (const k of classKeys.задачи) groups.add('задача ' + k);
   for (const k of classKeys.топики) if (k.startsWith('потребляет')) groups.add(k);
 
@@ -558,7 +585,8 @@ export function candidates(text, names) {
   r['хвост-файл'] = vis.filter((v) => v.sec !== null && !v.s.startsWith('### ') && /\S+\/[^\s\/]+\.[A-Za-z]+[`)]*\s*$/.test(v.s)).map((v) => v.n);
   r['секрет'] = vis.filter((v) => !v.s.startsWith('### ') && /[A-Za-z0-9+\/=_-]{21,}/.test(v.s.replace(/`[^`]*`/g, ''))).map((v) => v.n);
   r['события'] = blocks((s) => s === 'События').length;
-  r['брокер'] = inSec((s) => s === 'Стек').some((v) => /kafka|rabbit|nats|amqp|sqs|pubsub|pub\/sub|брокер/.test(v.s.toLowerCase())) ? 'да' : 'нет';
+  // брокер — слово «шина» в ячейке слоя (форма шаблона) или слово «брокер» в строке, продукт не важен
+  r['брокер'] = inSec((s) => s === 'Стек').some((v) => isBroker(v.s)) ? 'да' : 'нет';
   r['без сущностей'] = blocks(isContract).filter((b) => {
     const k = headKey(b.header).toLowerCase();
     if (/health|metrics|ready|live|version|docs|swagger|openapi/.test(k)) return false;
@@ -681,16 +709,35 @@ function partEmptyItems(pbody, draftText) {
   return [...keys].sort().map((k) => [k]);
 }
 
-// Блок контракта у ключа с пометкой «объявлено без реализации» — пункт добора автору блока.
-// Сравнение без хвоста-вызова у не-HTTP ключей и без имён параметров пути.
-function declItems(opisTexts, contractKeys) {
+// Ключ «недоступно»: под ключом описи строка `недоступно:` (прежняя форма — строка «> объявлено без
+// реализации: <ключ> — …»). В карточке у него пометка: у блока строка `- недоступно…`, у строки таблицы — это
+// слово. Ключ есть в карточке без пометки ни в одном месте — пункт добора автору. Ключа нет в карточке — не
+// здесь (это «нет блока»). Сравнение без хвоста-вызова у не-HTTP ключей и без имён параметров пути.
+function unavKeys(opisTexts) {
   const NOTE = '> объявлено без реализации: ';
+  const out = new Set(); let key = '';
+  for (const l of opisTexts.flatMap(splitLines)) {
+    if (l.startsWith(NOTE)) { const s = l.slice(NOTE.length); const i = s.indexOf(SEP); out.add(kopis(i < 0 ? s : s.slice(0, i))); key = ''; continue; }
+    if (/^[ \t]+недоступно:/.test(l)) { if (key) out.add(key); continue; }
+    if (/^[ \t]/.test(l)) continue;
+    if (l === '' || /^(#|⟹|\(|>|-|```|<!--)/.test(l)) { key = ''; continue; }
+    const i = l.indexOf(SEP); const h = i < 0 ? l : l.slice(0, i);
+    key = /^(зависит|состояние|справочник|сообщение|ограничение|роль|Роль):/.test(h) ? '' : kopis(h);
+  }
+  return out;
+}
+function declItems(opisTexts, draftText) {
   const same = (k) => nopK(k).replace(/\{[^}]*\}/g, '{}');
-  const declared = new Set(opisTexts.flatMap(splitLines).filter((l) => l.startsWith(NOTE)).map((l) => {
-    const s = l.slice(NOTE.length); const i = s.indexOf(SEP);
-    return same(norm(i < 0 ? s : s.slice(0, i)));
-  }));
-  return [...new Set(contractKeys.filter((k) => declared.has(same(k))))].sort().map((k) => [k]);
+  const U = new Set([...unavKeys(opisTexts)].map(same));
+  const d = parseCard(draftText);
+  const entries = [
+    ...Object.values(d.blocks).flat().map((b) => [b.key, b.unav]),
+    ...d.tables.экраны.map((c) => [norm(c[0]), c.unav]), ...d.tables.роли.map((c) => [roleKey(c), c.unav]),
+    ...d.tables.зависит.map((c) => [norm(c[0]), c.unav]), ...d.tables.api.map((c) => [norm(c[0]) + ' :: ' + kopis(c[1] ?? ''), c.unav]),
+    ...(d.tables.состояние ?? []).map((c) => [norm(c[0]), c.unav]),
+  ];
+  const ok = new Set(entries.filter(([k, u]) => u && U.has(same(k))).map(([k]) => same(k)));
+  return [...new Set(entries.filter(([k, u]) => !u && U.has(same(k)) && !ok.has(same(k))).map(([k]) => k))].sort().map((k) => [k]);
 }
 
 // A13. «Бизнес-правила» нарезанного сервиса пишет голова по описям частей: сущность строки `состояние:`
@@ -781,29 +828,73 @@ function listItems(planText, draftText, opisTexts, prefix, sliced) {
   const topics = [];
   if (nt > 0 && 2 * nh < nt) topics.push([`топики конфига без блоков «Событий»: есть ${nh} из ${nt}; нет — ${miss.join(', ')}`, rest]);
   let inStack = false; let broker = false;
-  for (const l of splitLines(draftText)) { if (l.startsWith('## ')) { inStack = l.startsWith('## Стек'); continue; } if (inStack && /kafka|rabbit|nats|amqp|sqs|pub\/?sub/i.test(l)) broker = true; }
+  for (const l of splitLines(draftText)) { if (l.startsWith('## ')) { inStack = l.startsWith('## Стек'); continue; } if (inStack && isBroker(l)) broker = true; }
   if (broker && d.blocks.топики.length <= 1 && !topics.length) topics.push([`брокер в «Стеке», а событий ${d.blocks.топики.length}`, rest]);
   return { SPEC: spec, TOPICS: topics };
 }
 
-// A16. Форма «Событий» и «Зависит от»: блок публикации или потребления без строки-метки шаблона — пункт с
-// недостающими метками; строка «Зависит от», чьё имя (без регистра латиницы) стоит словом в «Стеке», — пункт.
+// Строки уровня сервиса: ENTRY — в черновике есть «Роли и доступ», а строки `вход:` нет ни в одной описи;
+// DEP — сосед из строки `зависит:` описей без строки «Зависит от» (имена сводятся без обвязки клиента, kDep).
+function serviceItems(draftText, opisTexts) {
+  const lines = opisTexts.flatMap(splitLines);
+  const entry = splitLines(draftText).some((l) => l.startsWith('## Роли и доступ')) && !lines.some((l) => l.startsWith('вход:')) ? [['в описи нет строки «вход:»']] : [];
+  const d = parseCard(draftText);
+  const have = new Set(d.tables.зависит.map((c) => kDep(norm(c[0]))));
+  const dep = []; const seen = new Set();
+  for (const l of lines) {
+    if (!l.startsWith('зависит:')) continue;
+    let s = l.replace(/^зависит:[ \t]*/, ''); const i = s.indexOf(SEP); if (i >= 0) s = s.slice(0, i);
+    s = s.replace(/`/g, '').trim(); const k = kDep(s);
+    if (s && !have.has(k) && !seen.has(k)) { seen.add(k); dep.push([`${s} — строки «Зависит от» нет`]); }
+  }
+  return { ENTRY: entry, DEP: dep };
+}
+
+// A16. Форма «Событий», задач и «Зависит от»: блок публикации или потребления без строки-метки шаблона, блок
+// фоновой задачи без строки «наложение» — пункт с недостающими метками; строка «Зависит от», чьё имя (без
+// регистра латиницы) стоит словом в «Стеке», — пункт.
 function formItems(draftText) {
   const NEED = { 'публикует': ['тело', 'ключ', 'когда', 'гарантия', 'не шлётся'], 'потребляет': ['читает', 'группа', 'подтверждение', 'повтор', 'ошибка'] };
   const slot = []; const st = new Set(); const dep = [];
-  let sec = ''; let key = ''; let got = new Set();
-  const done = () => { if (key) { const d = key.split(' ')[0]; const miss = NEED[d].filter((x) => !got.has(x)); if (miss.length) slot.push([`${key} — нет строк ${miss.map((x) => x + ':').join(', ')}`]); } key = ''; got = new Set(); };
+  let sec = ''; let key = ''; let need = null; let got = new Set();
+  const done = () => { if (key && need) { const miss = need.filter((x) => !got.has(x)); if (miss.length) slot.push([`${key} — нет строк ${miss.map((x) => x + ':').join(', ')}`]); } key = ''; need = null; got = new Set(); };
   for (const l of splitLines(draftText)) {
     if (l.startsWith('## ')) { done(); sec = l.slice(3).trim(); continue; }
+    if (sec.startsWith('Фоновые задачи')) {
+      if (l.startsWith('### ')) { done(); let h = l.slice(4); const p = h.indexOf(SEP); if (p >= 0) h = h.slice(0, p); const k = kcanon('задачи', h); if (k) { key = k; need = ['наложение']; } continue; }
+      const m = key && l.match(/^- ([^`:]+):/); if (m) got.add(m[1]);
+    }
     if (sec.startsWith('События')) {
-      if (l.startsWith('### ')) { done(); let h = l.slice(4); const p = h.indexOf(SEP); if (p >= 0) h = h.slice(0, p); const k = kcanon('топики', h); if (k) key = k; continue; }
+      if (l.startsWith('### ')) { done(); let h = l.slice(4); const p = h.indexOf(SEP); if (p >= 0) h = h.slice(0, p); const k = kcanon('топики', h); if (k) { key = k; need = NEED[k.split(' ')[0]] ?? null; } continue; }
       const m = key && l.match(/^- ([^`:]+):/); if (m) got.add(m[1]);
     }
     if (sec.startsWith('Стек') && l.startsWith('|')) for (const w of l.replace(/[A-Z]/g, (c) => c.toLowerCase()).split(/[^a-z0-9]+/)) if (w.length > 2) st.add(w);
     if (sec.startsWith('Зависит от') && l.startsWith('|') && !/^\|[ \t:|-]*$/.test(l)) { const d = (l.split('|')[1] ?? '').replace(/`/g, '').trim(); if (d && d !== '—' && !/Сервис или система/.test(d)) dep.push(d); }
   }
   done();
-  return { SLOT: slot, INFRA: dep.filter((d) => st.has(d.replace(/[A-Z]/g, (c) => c.toLowerCase()))).map((d) => [`${d} — имя стоит в «Стеке»`]) };
+  return { SLOT: slot, INFRA: dep.filter((d) => st.has(d.replace(/[A-Z]/g, (c) => c.toLowerCase()))).map((d) => [`${d} — имя стоит в «Стеке»`]), GLUED: gluedItems(draftText) };
+}
+
+// A18. Склеенная возможность: строка «Что умеет», где в первой колонке два разных однородных глагола в
+// неопределённой форме — первым словом или сразу после запятой, точки с запятой, двоеточия, «и», «или»,
+// «либо», «также» (окончание -ть, -ться, -ести, -зти, -йти; на -ость, -есть, -асть — существительные). После
+// тире — пояснение, не действие. Текст в «» и в бэктиках не в счёт.
+function gluedItems(draftText) {
+  const out = []; let cs = false;
+  for (const l of splitLines(draftText)) {
+    if (l.startsWith('## ')) { cs = l.startsWith('## Что умеет'); continue; }
+    if (!cs || !l.startsWith('|') || /^\|[ \t:|-]*$/.test(l)) continue;
+    const c = l.split('|')[1] ?? '';
+    if (c.includes('Возможность')) continue;
+    const t = c.replace(/[ \t]+[—–][ \t].*$/, '').replace(/«[^»]*»/g, ' ').replace(/`[^`]*`/g, ' ').replace(/[«»—–]/g, ' ').replace(/[,;:/()]/g, ' # ');
+    const v = new Set(); let pv = '#';
+    for (const w of t.split(/[ \t.!?"'+=-]+/).filter(Boolean)) {
+      if (/^(#|и|или|либо|также)$/.test(pv) && /(ть|ться|ести|зти|йти)$/.test(w) && !/(ость|есть|асть)$/.test(w)) v.add(w);
+      pv = w;
+    }
+    if (v.size >= 2) out.push([c.trim()]);
+  }
+  return out;
 }
 
 // A17. Своя сущность без блока «Бизнес-правил», чьё поле-перечисление называет строка «меняет:» (описи или
@@ -962,8 +1053,9 @@ export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
   const it = res._items;
   const ownerPlan = env.CHECK_PLAN && fs.existsSync(rel(env.CHECK_PLAN)) ? rd(rel(env.CHECK_PLAN)) : '';
   const contractKeys = parseCard(rd(draftPath)).blocks.контракт.map((b) => b.key);
-  const lists = { ...it, NOPFX: noPfx.map((k) => [k]), MARKFILE: (mk?._owners ?? []).map((o) => [o]), MISSED: missedItems(ownerPlan, [rd(opisPath), ...(P?.notes ?? [])]), DECL: declItems([rd(opisPath), ...(P?.notes ?? [])], contractKeys), PARTEMPTY: P ? partEmptyItems(P.pbody, rd(draftPath)) : [], RULES: P ? rulesItems(rel(env.CHECK_PARTS), rd(draftPath)) : [], REST: P && ownerPlan ? restItems(ownerPlan, rel(env.CHECK_PARTS)) : [],
+  const lists = { ...it, NOPFX: noPfx.map((k) => [k]), MARKFILE: (mk?._owners ?? []).map((o) => [o]), MISSED: missedItems(ownerPlan, [rd(opisPath), ...(P?.notes ?? [])]), DECL: declItems([rd(opisPath), ...(P?.notes ?? [])], rd(draftPath)), PARTEMPTY: P ? partEmptyItems(P.pbody, rd(draftPath)) : [], RULES: P ? rulesItems(rel(env.CHECK_PARTS), rd(draftPath)) : [], REST: P && ownerPlan ? restItems(ownerPlan, rel(env.CHECK_PARTS)) : [],
     ...listItems(ownerPlan, rd(draftPath), [rd(opisPath), ...(P?.notes ?? [])], env.CHECK_PREFIX ? '/' + env.CHECK_PREFIX.replace(/\/$/, '').replace(/^\//, '') : '', !!P), ...formItems(rd(draftPath)),
+    ...serviceItems(rd(draftPath), [rd(opisPath), ...(P?.notes ?? [])]),
     STATE: stateItems(rd(draftPath), [rd(opisPath), ...(P ? fs.readdirSync(rel(env.CHECK_PARTS)).filter((n) => /^part-.*\.opis\.md$/.test(n)).sort().map((n) => rd(path.join(rel(env.CHECK_PARTS), n))) : [])]) };
   const dobor = {};
   const look = (m, k) => m.get(k) ?? m.get(nopK(k)) ?? null;
@@ -972,7 +1064,7 @@ export function analyzeFiles(opisPath, draftPath, prevPath, envPath) {
     if (cat === 'MISSED') A = new Set([item[1]]);
     else if (cat === 'SPEC' || cat === 'TOPICS') A = new Set([item[1]]);
     else if (!P) A = new Set(['читающий']);
-    else if (cat === 'INFRA') A = new Set(['голова']);
+    else if (cat === 'INFRA' || cat === 'ENTRY' || cat === 'DEP' || cat === 'GLUED') A = new Set(['голова']);
     else if (cat === 'SLOT') A = look(P.card, item[0].split(SEP)[0]);
     else if (cat === 'RULES' || cat === 'STATE') A = new Set(['голова']);
     else if (cat === 'REST') A = new Set([item[1]]);

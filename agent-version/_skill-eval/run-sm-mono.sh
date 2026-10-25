@@ -6,6 +6,19 @@
 #   фикстура SM-MONO-DGS  → сервис casedesk (1052 java, DGS 104 + REST 16, сущности 60, задачи 10, топики 12)
 #   фикстура SM-MONO-SPEC → тот же casedesk плюс 28 REST-операций из openapi.yaml без аннотаций (ещё 2 объявлены
 #                           без реализации) и тестовый конфиг с 4 топиками; контракт 148
+#   фикстура SM-GAPS-BACK  → сервис harvest-ledger (Java, ручки из спецификации, контракт 50) — классы потерь 2.0,
+#   фикстура SM-GAPS-FRONT → сервис yard-map-ui (React, Module Federation); ключ и грейдер — fixtures/SM-GAPS/KEY.md,
+#                           grade-sm-gaps.mjs; дерево и манифест лежат в фикстуре готовыми
+#   фикстура SM-GAPS-KT    → сервис seed-vault (Kotlin, ручки — реализации интерфейсов, сгенерированных при сборке
+#                           из спецификации вне дерева: 29 методов, 2 ручки с аннотацией); дерево — fixtures/SM-GAPS/kt
+#   фикстура SM-GAPS-NODE  → сервис parcel-hub (Node/TypeScript, имена топиков только в config/default.yaml, код
+#                           берёт их из конфига; рядом config/test.yaml); дерево — fixtures/SM-GAPS/node
+#   фикстура SM-APOLLO     → сервис apollo-portal (настоящий код Apollo, ≈ 290 ручек) — дерево копируется из
+#                           ${SM_APOLLO_SRC:-projects/apollo} без .git; ключ — fixtures/SM-APOLLO/KEY.md, grade-sm-apollo.mjs
+#   фикстура SM-LISTMONK   → сервис listmonk (Go, echo, Postgres без ORM, 185 ручек) — из ${SM_LISTMONK_SRC:-projects/listmonk}
+#                           без .git; ключ — fixtures/SM-LISTMONK/KEY.md, grade-sm-listmonk.mjs
+#   фикстура SM-VIKUNJA    → сервис vikunja-frontend (Vue 3 + TS) — из ${SM_VIKUNJA_SRC:-projects/vikunja-frontend} без .git;
+#                           ключ — fixtures/SM-VIKUNJA/KEY.md, grade-sm-vikunja.mjs
 #
 # Песочница: <раунд>/sandbox/mono-NN/w/{AI-SDD/services/manifest.yaml, <сервис>/} (у NRS-TAIL ещё weather-api,
 # как в её seed.sh). Рабочая директория прогона — w/AI-SDD, аргумент запуска — имя сервиса. Деревья фикстур
@@ -41,7 +54,14 @@ case "$FX" in
   SM-MONO-DGS|SM-MONO-SPEC) SVC=casedesk ;;
   SM-MONO-SPEC-OWN) SVC=casedesk; FXDIR=SM-MONO-SPEC; FXSUB=out/owners; FXARG=--owners ;;   # make.sh --owners
   SM-MONO-SPEC-CROSS) SVC=casedesk; FXDIR=SM-MONO-SPEC; FXSUB=out/crosscut; FXARG=--crosscut ;;   # make.sh --crosscut
-  *) echo "неизвестная фикстура: $FX (NRS-TAIL | SM-MONO-DGS | SM-MONO-SPEC | SM-MONO-SPEC-OWN | SM-MONO-SPEC-CROSS)" >&2; exit 1 ;;
+  SM-GAPS-BACK) SVC=harvest-ledger; FXDIR=SM-GAPS; FXSUB=back ;;
+  SM-GAPS-FRONT) SVC=yard-map-ui; FXDIR=SM-GAPS; FXSUB=front ;;
+  SM-GAPS-KT) SVC=seed-vault; FXDIR=SM-GAPS; FXSUB=kt ;;
+  SM-GAPS-NODE) SVC=parcel-hub; FXDIR=SM-GAPS; FXSUB=node ;;
+  SM-APOLLO) SVC=apollo-portal; FXDIR=SM-APOLLO; FXSUB=.; APOLLO="${SM_APOLLO_SRC:-/c/Users/Konstantin/projects/apollo}" ;;
+  SM-LISTMONK) SVC=listmonk; FXDIR=SM-LISTMONK; FXSUB=.; REPO="${SM_LISTMONK_SRC:-/c/Users/Konstantin/projects/listmonk}" ;;
+  SM-VIKUNJA) SVC=vikunja-frontend; FXDIR=SM-VIKUNJA; FXSUB=.; REPO="${SM_VIKUNJA_SRC:-/c/Users/Konstantin/projects/vikunja-frontend}" ;;
+  *) echo "неизвестная фикстура: $FX (NRS-TAIL | SM-MONO-DGS | SM-MONO-SPEC | SM-MONO-SPEC-OWN | SM-MONO-SPEC-CROSS | SM-GAPS-BACK | SM-GAPS-FRONT | SM-GAPS-KT | SM-GAPS-NODE | SM-APOLLO | SM-LISTMONK | SM-VIKUNJA)" >&2; exit 1 ;;
 esac
 [ -f "$SRC/SKILL.md" ] || { echo "нет $SRC/SKILL.md" >&2; exit 1; }
 [ -d "$SRC/reference" ] || { echo "нет $SRC/reference/ — снимок без скриптов лжёт" >&2; exit 1; }
@@ -55,7 +75,11 @@ OUT="$ROUND/sandbox"; mkdir -p "$OUT"
 
 # ─── дерево фикстуры ─────────────────────────────────────────────────────────────────────
 FXOUT="$FIXROOT/$FXDIR/$FXSUB"
-if [ ! -d "$FXOUT/$SVC/src" ]; then
+if [ "$FX" = SM-APOLLO ]; then
+  [ -d "$APOLLO/$SVC/src" ] || { echo "нет клона Apollo: $APOLLO/$SVC/src (SM_APOLLO_SRC)" >&2; exit 1; }
+elif [ -n "${REPO:-}" ]; then
+  [ -d "$REPO" ] || { echo "нет клона $FX: $REPO" >&2; exit 1; }
+elif [ ! -d "$FXOUT/$SVC/src" ]; then
   echo "собираю $FX: make.sh → $FXOUT"
   bash "$FIXROOT/$FXDIR/make.sh" "$FXOUT" $FXARG > "$ROUND/_make-$FX.log" 2>&1 || { echo "make.sh $FX упал, см. $ROUND/_make-$FX.log" >&2; exit 1; }
 fi
@@ -132,8 +156,23 @@ seed() {  # seed <w>
       mkdir -p "$w/AI-SDD/services"
       printf '%s\n' '# Слепок соседних сервисов. Этот файл ведёт человек.' 'services:' '  - name: casedesk' '    path: ../casedesk' '    type: backend' > "$w/AI-SDD/services/manifest.yaml"
       echo "песочница: $w   файлов в репе: $(find "$w/casedesk" -type f -not -path '*/.git/*' | wc -l)" ;;
+    SM-GAPS-BACK|SM-GAPS-FRONT|SM-GAPS-KT|SM-GAPS-NODE)
+      cp -r "$FXOUT/$SVC" "$w/$SVC"
+      mkdir -p "$w/AI-SDD/services"
+      cp "$FXOUT/manifest.yaml" "$w/AI-SDD/services/manifest.yaml"
+      echo "песочница: $w   файлов в репе: $(find "$w/$SVC" -type f | wc -l)" ;;
+    SM-APOLLO)
+      mkdir -p "$w/apollo" "$w/AI-SDD/services"
+      ( cd "$APOLLO" && tar --exclude=./.git -cf - . ) | ( cd "$w/apollo" && tar -xf - )
+      cp "$FXOUT/manifest.yaml" "$w/AI-SDD/services/manifest.yaml"
+      echo "песочница: $w   файлов в $SVC: $(find "$w/apollo/$SVC" -type f | wc -l)" ;;
+    SM-LISTMONK|SM-VIKUNJA)
+      mkdir -p "$w/$SVC" "$w/AI-SDD/services"
+      ( cd "$REPO" && tar --exclude=./.git -cf - . ) | ( cd "$w/$SVC" && tar -xf - )
+      cp "$FXOUT/manifest.yaml" "$w/AI-SDD/services/manifest.yaml"
+      echo "песочница: $w   файлов в репе: $(find "$w/$SVC" -type f | wc -l)" ;;
   esac
-  [ -d "$w/$SVC" ] && [ -f "$w/AI-SDD/services/manifest.yaml" ]
+  { [ -d "$w/$SVC" ] || [ -d "$w/apollo/$SVC" ]; } && [ -f "$w/AI-SDD/services/manifest.yaml" ]
 }
 # отпечаток файлов; где у find нет -printf (macOS) — тот же вид через stat
 fp() { ( cd "$1" && if find . -maxdepth 0 -printf '' 2>/dev/null; then find . -path ./AI-SDD -prune -o -type f -not -path '*/.git/*' -printf '%P\t%s\t%T@\n'; else find . -path ./AI-SDD -prune -o -type f -not -path '*/.git/*' -exec stat -f $'%N\t%z\t%m' {} + | sed 's|^\./||'; fi | sort ); }
@@ -193,5 +232,11 @@ if [ -n "${SM_MONO_DRY:-}" ]; then
 else
   echo "ГОТОВО: песочниц с ответом — $(find "$OUT" -maxdepth 2 -name answer.md -size +0 -path '*mono-*' | wc -l) из $N"
   rm -rf "$SNAP_ROOT"; echo "копия снимка снесена (журнальная — $SNAPREC)"
-  echo "грейдер: node $HERE/grade-sm-mono.mjs $ROUND"
+  case "$FX" in
+    SM-GAPS-*) echo "грейдер: node $HERE/grade-sm-gaps.mjs $ROUND" ;;
+    SM-APOLLO) echo "грейдер: node $HERE/grade-sm-apollo.mjs $ROUND" ;;
+    SM-LISTMONK) echo "грейдер: node $HERE/grade-sm-listmonk.mjs $ROUND" ;;
+    SM-VIKUNJA) echo "грейдер: node $HERE/grade-sm-vikunja.mjs $ROUND" ;;
+    *) echo "грейдер: node $HERE/grade-sm-mono.mjs $ROUND" ;;
+  esac
 fi

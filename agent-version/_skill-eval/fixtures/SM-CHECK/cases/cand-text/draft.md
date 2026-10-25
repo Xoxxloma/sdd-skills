@@ -23,7 +23,7 @@
 |---|---|
 | Язык и фреймворк | Java 17, Spring Boot |
 | Хранилище | PostgreSQL |
-| Очереди | RabbitMQ |
+| Шина | Azure Service Bus |
 
 ## Публичный контракт
 

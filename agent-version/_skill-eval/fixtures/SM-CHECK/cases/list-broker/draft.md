@@ -1,8 +1,10 @@
 # orders — backend
 
 ## Стек
-- Java 17, Spring Boot
-- Kafka
+| Слой | Чем |
+|---|---|
+| Язык и фреймворк | Java 17, Spring Boot |
+| Шина | Apache Pulsar |
 
 ## Публичный контракт
 

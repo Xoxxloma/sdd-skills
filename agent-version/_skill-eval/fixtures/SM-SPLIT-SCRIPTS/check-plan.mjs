@@ -19,7 +19,7 @@ export function parsePlan (text) {
     if ((m = line.match(/^итог по классам:\s*(.*)$/))) {
       const [a, b] = m[1].split('|')
       r.itog = { ключ: classList(a), ориентир: classList((b || '').replace(/^\s*ориентир:\s*/, '')) }
-    } else if ((m = line.match(/^нарезка не нужна:\s*вес\s+([\d.,]+)\s*≤\s*K\s*=\s*([\d.,]+)/))) r.none = { W: num(m[1]), K: num(m[2]) }
+    } else if ((m = line.match(/^нарезка не нужна:\s*вес\s+(?:по ключам\s+)?([\d.,]+)\s*≤\s*K\s*=\s*([\d.,]+)/))) r.none = { W: num(m[1]), K: num(m[2]) }
     else if ((m = line.match(/^вес сервиса\s+([\d.,]+)\s+при\s+K\s*=\s*([\d.,]+),\s*w\s*=\s*([\d.,]+)/))) r.head = { W: num(m[1]), K: num(m[2]), w: num(m[3]) }
     else if ((m = line.match(/^часть\s+(\d+)\s+вес\s+([\d.,]+)\s*(?:\(([^)]*)\))?:\s*(папки|файлы)\s+(.*?)\s*$/))) {
       r.parts.push({ nn: Number(m[1]), w: num(m[2]), cls: classList(m[3] || ''), kind: m[4], paths: m[5].split(/;\s*/).map((s) => s.trim()).filter(Boolean) })

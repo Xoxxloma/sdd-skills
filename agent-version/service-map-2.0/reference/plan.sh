@@ -37,13 +37,18 @@
 #   путь  <путь части> <папки|файлы> <NN части>         — владение, включая файлы без пометок;
 #   остаток <NN остатка> <папка|файлы> <путь>           — пункт списка остатка, если список напечатан;
 #   операция <МЕТОД> <путь> <operationId> <спека> <NN | -> — операция спецификации на диске и её часть;
-#   топик <имя> <конфиг>                                — топик основного конфига.
+#   топик <имя> <конфиг>                                — топик конфига, который назвал разведчик.
 # Класс `клиенты` считается как любой класс `ключ` (итог, части, файлы, контроль разведчика), но в вес не
 # входит: части он не образует, его файл вне частей — остатку.
-# Спецификации (OpenAPI/Swagger в YAML) и основной конфиг скрипт находит сам, мимо разведчика; с карточкой
-# их сверяет check.sh. Разведчик не назвал ни одной спецификации, а на диске она есть — строка
+# Спецификации (OpenAPI/Swagger в YAML) скрипт находит сам, мимо разведчика; конфиг с именами топиков называет
+# разведчик (`## конфиг топиков :: <файл>`: YAML, JSON или `ключ=значение`); с карточкой их сверяет check.sh. Разведчик не назвал ни одной спецификации, а на диске она есть — строка
 # «СПЕКА НЕ РАЗМЕЧЕНА: <файл> — операций N». Спека, которую разведчик назвал клиентской
 # (`## клиентская спека :: <файл>` — по ней генерируется клиент к соседу), не сверяется и не весит.
+# Строка разведчика с полем `в файлах с <регэксп>` перед `ключ|ориентир` — пометка ключа узнаётся только в
+# файлах, где есть второй регэксп. Счётчик считает строку как обычную; скрипт оставляет файлы, где второй
+# регэксп нашёлся (`grep -E`), остальное — строкой «вне условия файла: <класс> N в файлах M». Регэксп
+# `grep` не разобрал — строка считается вся, строкой «условие файла не разобрано».
+# Нарезку решает вес ключей: ориентир части только раскладывает.
 # При отказе файл плана остаётся пустым.
 set -u
 COUNTS="${1:?counts.txt}"; K="${2:?K}"; W="${3:?w}"; ROOTS="${4:?корни через запятую}"; TSV="${5:-}"
@@ -58,7 +63,8 @@ export LC_ALL=C
 
 # Файлы корней — для списка остатка и проверки путей счёта. Корня на диске нет — ни того, ни другого.
 # Хвостовой слеш и -mindepth: сам корень обходится, даже если он ссылка или назван как сборочная папка.
-LIST="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/plan.$$")"; : > "$LIST"; trap 'rm -f "$LIST"' EXIT
+LIST="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/plan.$$")"; : > "$LIST"
+SCOPE="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/plan-scope.$$")"; trap 'rm -f "$LIST" "$SCOPE" "$SCOPE.re"' EXIT
 ONDISK=""
 IFS=',' read -r -a RR <<< "$ROOTS"
 for r in "${RR[@]}"; do
@@ -76,7 +82,7 @@ case ",$ROOTS" in *,[A-Za-z]:[\\/]*|*,\ [A-Za-z]:[\\/]*) WIN=1 ;; esac
 grep -q '^[A-Za-z]:[\\/]' "$COUNTS" 2>/dev/null && WIN=1
 
 # Корни — через окружение: `awk -v` разбирает в значении обратные слеши, и путь `C:\Users\…` портится.
-PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" PLAN_WORK="$(dirname "$COUNTS")" awk -v K="$K" -v W="$W" -v WIN="$WIN" -v TYPE="$TYPE" "$K_AWK"'
+PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_SCOPE="$SCOPE" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" PLAN_WORK="$(dirname "$COUNTS")" awk -v K="$K" -v W="$W" -v WIN="$WIN" -v TYPE="$TYPE" "$K_AWK"'
   # Путь к одному виду: прямые слеши, без хвостового слеша, диск `C:` в верхнем регистре; `/c/…` → `C:/…`;
   # двойные слеши схлопнуты, `/./` и `<папка>/../` раскрыты (ведущий собирает корень из `../<сервис>`).
   function np(p,   d) {
@@ -154,15 +160,24 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
   }
   # Регэксп разведчика (ripgrep) — в ERE для awk: `\s`, `\d`, `\w` есть не во всех awk.
   function awkre(re) { gsub(/\\s/, "[[:space:]]", re); gsub(/\\d/, "[0-9]", re); gsub(/\\w/, "[[:alnum:]_]", re); return re }
-  # Что должно быть в карточке — по дереву на диске, мимо разведчика: операции спецификаций (OpenAPI/Swagger
-  # в YAML) и имена топиков основного конфига (`application.yml|yaml|properties`, без тестов и профилей).
-  # Сверяет check.sh по строкам «операция» и «топик» файла плана.
-  function specparse(f,   ln, ind, inp, pind, path, meth, id, n) {
-    inp = 0; pind = -1; path = ""; meth = ""; n = 0
+  # Что должно быть в карточке — по файлам на диске: операции спецификаций (OpenAPI/Swagger в YAML; файл
+  # находит скрипт) и имена топиков конфига, который назвал разведчик (`## конфиг топиков :: <файл>`).
+  # Сверяет check.sh по строкам «операция» и «топик» файла плана. Путь операции — полный, как его принимает сервис:
+  # базовый путь спецификации (путь из первого `servers: - url:` у OpenAPI 3, `basePath:` у Swagger 2) плюс путь из `paths`.
+  function specparse(f,   ln, ind, inp, ins, pind, path, meth, id, n, base, u, i) {
+    inp = 0; ins = 0; pind = -1; path = ""; meth = ""; n = 0; base = ""
     while ((getline ln < f) > 0) {
       sub(/\r$/, "", ln); if (ln ~ /^[ \t]*(#|$)/) continue
       match(ln, /^ */); ind = RLENGTH
-      if (ind == 0) { inp = (ln ~ /^paths:[ \t]*$/); path = ""; meth = ""; continue }
+      if (ind == 0) {
+        inp = (ln ~ /^paths:[ \t]*$/); ins = (ln ~ /^servers:[ \t]*$/); path = ""; meth = ""
+        if (ln ~ /^basePath:/) { u = ln; sub(/^basePath:[ \t]*/, "", u); gsub(/["\047 \t]/, "", u); base = u }
+        continue
+      }
+      if (ins && base == "" && ln ~ /^[ \t-]*url:/) {
+        u = ln; sub(/^[ \t-]*url:[ \t]*/, "", u); gsub(/["\047 \t]/, "", u); sub(/^[^\/]*:\/\/[^\/]*/, "", u)
+        base = (u ~ /^\//) ? u : ""; continue
+      }
       if (!inp) continue
       if (pind < 0 && ln ~ /^ +["\047]?\//) pind = ind
       if (ind == pind) { path = ""; meth = ""; if (ln ~ /^ +["\047]?\//) { path = ln; sub(/^ +["\047]?/, "", path); sub(/["\047]?:.*$/, "", path) }; continue }
@@ -170,6 +185,8 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
       if (meth != "" && ln ~ /^ +operationId:/) { id = ln; sub(/^ +operationId:[ \t]*/, "", id); gsub(/["\047 \t]/, "", id); n++; OPM[f, n] = meth; OPP[f, n] = path; OPI[f, n] = id }
     }
     close(f); OPN[f] = n
+    sub(/\/+$/, "", base)
+    if (base != "") for (i = 1; i <= n; i++) OPP[f, i] = base OPP[f, i]
   }
   function topicadd(v, f,   n, i, x, t) {
     sub(/[ \t]+#.*$/, "", v); gsub(/^[\[ \t]+|[\] \t]+$/, "", v)
@@ -180,7 +197,10 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
       if (t ~ /^[A-Za-z0-9._-]+$/ && t ~ /[A-Za-z]/ && !(t in tseen)) { tseen[t] = 1; tname[++ntp] = t; tfile[ntp] = f }
     }
   }
-  # Топик — значение ключа `topic`/`topics` (`…-topic`, `….topics`): строкой, списком или картой под ним.
+  # Ключ имени топика: `topic`/`topics` целиком или в конце через `-`, `_`, `.` (`events-topic`, `bus.topics`),
+  # в верблюжьей записи — `eventsTopic`.
+  function istopickey(k) { return (tolower(k) ~ /(^|[-_.])topics?$/ || k ~ /[a-z0-9]Topics?$/) }
+  # Топик — значение такого ключа: строкой, списком или картой под ним.
   function topicsyaml(f,   ln, ind, key, v, intop, tind) {
     intop = 0
     while ((getline ln < f) > 0) {
@@ -191,18 +211,44 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
       intop = 0
       if (ln !~ /^ *[A-Za-z0-9_.-]+:/) continue
       key = ln; sub(/^ */, "", key); sub(/:.*/, "", key); v = ln; sub(/^[^:]*:[ \t]*/, "", v)
-      if (tolower(key) ~ /(^|[-_.])topics?$/) { if (v == "") { intop = 1; tind = ind } else topicadd(v, f) }
+      if (istopickey(key)) { if (v == "") { intop = 1; tind = ind } else topicadd(v, f) }
     }
     close(f)
   }
+  # `ключ=значение` — properties, .env, TOML, ini.
   function topicsprops(f,   ln, key, v) {
     while ((getline ln < f) > 0) {
-      sub(/\r$/, "", ln); if (ln ~ /^[ \t]*(#|!|$)/ || ln !~ /=/) continue
+      sub(/\r$/, "", ln); if (ln ~ /^[ \t]*(#|!|;|$)/ || ln !~ /=/) continue
       key = ln; sub(/[ \t]*=.*/, "", key); v = ln; sub(/^[^=]*=[ \t]*/, "", v)
-      if (tolower(key) ~ /(^|[-_.])topics?$/) topicadd(v, f)
+      if (istopickey(key)) topicadd(v, f)
     }
     close(f)
   }
+  # JSON: `"ключ": значение` — строкой, массивом или объектом; открытые скобки — значения следующих строк до закрывающей.
+  function topicsjson(f,   ln, key, v, intop, d, t) {
+    intop = 0
+    while ((getline ln < f) > 0) {
+      sub(/\r$/, "", ln)
+      if (intop) {
+        t = ln; d += gsub(/[\[{]/, "&", t); t = ln; d -= gsub(/[\]}]/, "&", t)
+        v = ln; gsub(/"[^"]*"[ \t]*:/, "", v); gsub(/[\]{}\[]/, "", v); sub(/,[ \t]*$/, "", v)
+        if (v ~ /[^ \t]/) topicadd(v, f)
+        if (d <= 0) intop = 0
+        continue
+      }
+      if (!match(ln, /"[^"]+"[ \t]*:/)) continue
+      key = substr(ln, RSTART + 1, RLENGTH - 1); sub(/"[ \t]*:$/, "", key)
+      if (!istopickey(key)) continue
+      v = substr(ln, RSTART + RLENGTH); sub(/^[ \t]+/, "", v); sub(/,[ \t]*$/, "", v)
+      t = v; d = gsub(/[\[{]/, "&", t); t = v; d -= gsub(/[\]}]/, "&", t)
+      gsub(/"[^"]*"[ \t]*:/, "", v); gsub(/[\]{}\[]/, "", v)
+      if (v ~ /[^ \t]/) topicadd(v, f)
+      if (d > 0) intop = 1
+    }
+    close(f)
+  }
+  # Конфиг топиков называет разведчик: YAML, JSON, остальное — `ключ=значение`.
+  function topicsfile(f) { if (tolower(f) ~ /\.ya?ml$/) topicsyaml(f); else if (tolower(f) ~ /\.json$/) topicsjson(f); else topicsprops(f) }
   # Обход дерева: спецификации и конфиги. Разведчик не назвал ни одной спецификации, а в дереве она есть —
   # строка «СПЕКА НЕ РАЗМЕЧЕНА» (ведущий повторяет разведчика, как при «узком маркере»). Назвал — сверяются
   # только названные: остальные спеки, скорее всего, клиентские. Названная клиентской — не сверяется никогда.
@@ -215,8 +261,6 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
       sub(/\r$/, "", f); if (f == "") continue
       f = np(f); r = rootof(f); if (r == "") continue
       rel = substr(f, length(r) + 2); if (istest(rel) || rel ~ /^(target|build|dist)\//) continue
-      if (wtp && rel ~ /(^|\/)application\.ya?ml$/) topicsyaml(f)
-      else if (wtp && rel ~ /(^|\/)application\.properties$/) topicsprops(f)
       if (wsp && rel ~ /\.ya?ml$/) {
         isspec = 0; k = 0
         while (k < 40 && (getline ln < f) > 0) { k++; if (ln ~ /^(openapi|swagger):/) { isspec = 1; break } }
@@ -225,12 +269,45 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
       }
     }
     close(ENVIRON["PLAN_LIST"])
+    if (wtp) for (f in tcfg) topicsfile(f)
     for (f in specre) { specparse(f); ospec[++nos] = f }
     if (!named) for (i = 1; i <= nds; i++) {
       f = dspec[i]; if (f in clientspec) continue
       specparse(f); if (OPN[f] == 0) continue
       ospec[++nos] = f
       printf "СПЕКА НЕ РАЗМЕЧЕНА: %s — операций %d, строки спецификации у разведчика нет\n", f, OPN[f]
+    }
+  }
+  # Строка счёта — в итог, вес и файлы: `ключ` (класс вне веса — без веса), `ориентир` — с весом w.
+  function addcnt(path, cl, kind, cnt) {
+    if (kind == "ключ" && (cl in nowt)) { ck[path, cl] += cnt; tot[cl] += cnt; fw[path] += 0; fany[path] = 1 }
+    else if (kind == "ключ") { ck[path, cl] += cnt; tot[cl] += cnt; fw[path] += cnt; fk[path] += cnt; fany[path] = 1 }
+    else { co[path, cl] += cnt; orn[cl] += cnt; fw[path] += W * cnt }
+    isfile[path] = 1
+  }
+  # Регэксп разведчика (ripgrep) — для `grep -E`: `\b` — граница слова через класс символов.
+  function ere(re) { re = awkre(re); gsub(/\\b/, "([^[:alnum:]_]|^|$)", re); return re }
+  # Условие файла (`в файлах с <регэксп>`): по каждому регэкспу — один `grep -l` по файлам его строк счёта.
+  # Файл без совпадения — вне условия (у строки `ключ` — в строку «вне условия файла»: счётчик их посчитал; у
+  # `ориентир` — молча, в итог счётчика ориентир не идёт); файл не читается — в счёт как есть (его поймает
+  # проверка путей ниже); регэксп `grep` не разобрал (код 2 на пустом вводе) — строки этого условия в счёт целиком.
+  function scopes(   i, j, r, lst, ref, q, cmd, f, p) {
+    q = sprintf("%c", 39); lst = ENVIRON["PLAN_SCOPE"]; ref = lst ".re"
+    for (i = 1; i <= ns; i++) {
+      r = SR[i]; if (r in sdone) continue
+      sdone[r] = 1
+      print ere(r) > ref; close(ref)
+      if (system("grep -E -f " q ref q " </dev/null >/dev/null 2>&1") == 2) { sbad[r] = 1; continue }
+      printf "" > lst; for (j = i; j <= ns; j++) if (SR[j] == r) print SP[j] > lst
+      close(lst)
+      cmd = "tr " q "\\n" q " " q "\\000" q " < " q lst q " | xargs -0 grep -l -E -f " q ref q " 2>/dev/null"
+      while ((cmd | getline f) > 0) { sub(/\r$/, "", f); shit[r, np(f)] = 1 }
+      close(cmd)
+    }
+    for (i = 1; i <= ns; i++) {
+      r = SR[i]; p = SP[i]
+      if ((r in sbad) || ((r, p) in shit) || (getline f < p) < 0) { close(p); addcnt(p, SCL[i], SK[i], SC[i]); continue }
+      close(p); if (SK[i] == "ключ") { sout[SCL[i]] += SC[i]; soutf[SCL[i]]++ }
     }
   }
   # Файл спецификации тяжелее K: его операции режутся на ровные куски не больше K по строкам маркера в
@@ -374,6 +451,12 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     else { ctlbad++; if (ctlbad1 == "") ctlbad1 = substr($0, 1, 160) }
     next
   }
+  # Конфиг топиков разведчика: «## конфиг топиков :: <файл>» — не класс счёта; имена топиков из него — строки плана «топик».
+  /^## конфиг топиков[ \t]*::/ {
+    h = substr($0, 4); n = split(h, hp, " :: "); cl = ""; skipcl = ""
+    sp = hp[n]; gsub(/^[ \t]+|[ \t]+$/, "", sp); gsub(/[`"]/, "", sp); if (sp != "") tcfg[full(sp)] = 1
+    next
+  }
   # Клиентская спека разведчика: «## клиентская спека :: <файл>» — не класс счёта; в сверку и вес не идёт.
   /^## клиентская спека[ \t]*::/ {
     h = substr($0, 4); n = split(h, hp, " :: "); cl = ""; skipcl = ""
@@ -381,7 +464,7 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     next
   }
   /^## / {
-    h = substr($0, 4); n = split(h, hp, " :: "); skipcl = ""
+    h = substr($0, 4); n = split(h, hp, " :: "); skipcl = ""; scope = ""
     cl = hp[1]; kind = hp[n]; gsub(/^[ \t]+|[ \t]+$/, "", cl); gsub(/^[ \t]+|[ \t]+$/, "", kind)
     sub(/[ \t]*\(.*$/, "", kind)                       # пометка счётчика: «ключ (без маски)» — всё равно ключ
     hdr++
@@ -391,8 +474,10 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     if (cl != "" && !k_typehas(TYPE, w1)) { skipcl = w1; if (!(w1 in dropn)) { dropo[++ndrop] = w1; dropn[w1] = 0 }; cl = ""; next }
     # Класс вне веса (`клиенты`): счёт тот же, что у остальных классов, только в вес нарезки он не идёт.
     w1 = cl; sub(/[ \t].*$/, "", w1); if (w1 == "клиенты") { cl = w1; nowt[cl] = 1 }
+    # условие файла: «класс :: регэксп :: маска :: в файлах с <регэксп файла> :: ключ|ориентир»;
     # строка спецификации разведчика: «класс :: регэксп :: маска :: <файл спецификации> :: ключ»
-    if (n >= 5 && kind == "ключ") { sp = hp[n - 1]; gsub(/^[ \t]+|[ \t]+$/, "", sp); rx = hp[2]; gsub(/^[ \t]+|[ \t]+$/, "", rx); sp = full(sp); specre[sp] = rx; speccl[sp] = cl }
+    if (n >= 5 && hp[n - 1] ~ /^[ \t]*в файлах с[ \t]/) { scope = hp[n - 1]; sub(/^[ \t]*в файлах с[ \t]+/, "", scope); gsub(/^[ \t`]+|[ \t`]+$/, "", scope) }
+    else if (n >= 5 && kind == "ключ") { sp = hp[n - 1]; gsub(/^[ \t]+|[ \t]+$/, "", sp); rx = hp[2]; gsub(/^[ \t]+|[ \t]+$/, "", rx); sp = full(sp); specre[sp] = rx; speccl[sp] = cl }
     if (!(cl in seencl)) { seencl[cl] = 1; clist[++ncl] = cl }
     next
   }
@@ -403,10 +488,8 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     cnt = line; sub(/.*:/, "", cnt); path = substr(line, 1, length(line) - length(cnt) - 1)
     path = full(path); cnt += 0
     if (cnt == 0) next
-    if (kind == "ключ" && (cl in nowt)) { ck[path, cl] += cnt; tot[cl] += cnt; fw[path] += 0; fany[path] = 1 }
-    else if (kind == "ключ") { ck[path, cl] += cnt; tot[cl] += cnt; fw[path] += cnt; fk[path] += cnt; fany[path] = 1 }
-    else { co[path, cl] += cnt; orn[cl] += cnt; fw[path] += W * cnt }
-    isfile[path] = 1
+    if (scope != "") { ns++; SP[ns] = path; SC[ns] = cnt; SCL[ns] = cl; SK[ns] = kind; SR[ns] = scope; next }
+    addcnt(path, cl, kind, cnt)
     next
   }
   # Путь к файлу без счёта в конце — совпадение текстом либо список файлов: греп снят не в режиме счёта.
@@ -415,6 +498,7 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     if (hdr == 0) { print "ОТКАЗ: в файле счёта нет заголовков «## <класс> :: … :: ключ|ориентир»"; exit 3 }
     if (badh > 0) { printf "ОТКАЗ: заголовков не по форме «## <класс> :: … :: ключ|ориентир»: %d; первый: %s\n", badh, badh1; exit 3 }
     if (bad > 0) { printf "ОТКАЗ: счёт неполон — строк не по форме <путь>:<число>: %d; первая: %s\n", bad, bad1; exit 3 }
+    scopes()
     # Корень на диске, а файла из счёта там нет — путь записан не от корня либо это не путь.
     for (p in fw) {
       best = rootof(p)
@@ -446,6 +530,9 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     line = "итог по классам: " sums(tot, ""); o = sums(orn, "")
     if (o != "") line = line " | ориентир: " o
     print line
+    # Условие файла — счётчик эти совпадения считал, в итог они не вошли: ведущий прибавляет их при сверке.
+    for (cc = 1; cc <= ncl; cc++) { cl = clist[cc]; if (sout[cl] > 0) printf "вне условия файла: %s %d в файлах %d\n", cl, sout[cl], soutf[cl] }
+    for (r in sbad) printf "условие файла не разобрано: %s — строка счёта целиком\n", r
     for (i = 1; i <= ndrop; i++) printf "класс %s: у типа %s секции нет — пометок %d, не считаются\n", dropo[i], TYPE, dropn[dropo[i]]
     # Вне веса — справочно: класс `клиенты` в итоге выше, но в вес и части не идёт.
     line = ""; for (cl in nowt) if (tot[cl] > 0) line = line (line == "" ? "" : "; ") cl " — в вес и нарезку не идёт"
@@ -475,8 +562,12 @@ PLAN_ROOTS="$ROOTS" PLAN_LIST="$LIST" PLAN_ONDISK="${ONDISK#,}" PLAN_TSV="$TSV" 
     if (ctlbad > 0) printf "контроль не по форме «## контроль :: <класс> :: <файл> :: <число>»: %d; первый: %s\n", ctlbad, ctlbad1
     discover()
     if (!k_typesplit(TYPE)) { printf "нарезка не нужна: тип %s не режется (вес %g)\n", TYPE, total; dump(); exit 0 }
-    if (total <= K) { printf "нарезка не нужна: вес %g ≤ K=%g\n", total, K; dump(); exit 0 }
-    if (ktotal == 0) { printf "нарезка не нужна: вес 0 ≤ K=%g по ключам (ориентир весит %g)\n", K, total; dump(); exit 0 }
+    # Решает вес ключей: число ориентира зависит от маркера, который выбрал разведчик, — части он только раскладывает.
+    if (ktotal <= K) {
+      if (total > ktotal) printf "нарезка не нужна: вес по ключам %g ≤ K=%g (ориентир %g в решение не идёт)\n", ktotal, K, total - ktotal
+      else printf "нарезка не нужна: вес %g ≤ K=%g\n", total, K
+      dump(); exit 0
+    }
     printf "вес сервиса %g при K=%g, w=%g\n", total, K, W
     for (i = 1; i <= nr; i++) {
       r = root[i]
