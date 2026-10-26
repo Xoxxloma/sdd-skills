@@ -154,6 +154,8 @@ case "$PROBE" in
   nb-view-part) FIXTURE=NB-VIEW-PART; PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/[^/]*-20[0-9][0-9]-[0-9][0-9]-[0-9][0-9](-2)?\.md$'; MEET_ENV=1 ;;
   ts-vac)    FIXTURE=TS-VAC;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-vac-q)  FIXTURE=TS-VAC;    PROMPT_FILE=q-prompt.txt;     SKILL=technical-spec-doc ;;
+  # п.2 PLAN-FROM-POCOCK: копия TS-VAC, у FR-10 критерий с границей по датам → тест-кейс §7 несёт обе даты. grade-ts-lim.mjs
+  ts-vac-lim) FIXTURE=TS-VAC-LIM; PROMPT_FILE=spec-prompt.txt; SKILL=technical-spec-doc ;;
   ts-acc)    FIXTURE=TS-ACC;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-acc-q)  FIXTURE=TS-ACC;    PROMPT_FILE=q-prompt.txt;     SKILL=technical-spec-doc ;;
   # interaction-diagram: схема по готовой спеке DSP-330; формат назван (mmd/puml) или нет (ask).
@@ -316,6 +318,11 @@ case "$PROBE" in
   # индекс этапов «не применимо». Состав и ожидания — `fixtures/RV-AUDIT/README.md`.
   rv-bt-clean)  FIXTURE=RV-AUDIT; PROMPT_FILE=bt-clean-prompt.txt;  SKILL=spec-review ;;
   rv-bt-dirty)  FIXTURE=RV-AUDIT; PROMPT_FILE=bt-dirty-prompt.txt;  SKILL=spec-review ;;
+  # п.2 PLAN-FROM-POCOCK, шаг 4: счётная строка «порог без примера на границе» — не нарушение. grade-rv-lim.mjs --case=…
+  rv-lim-clean)   FIXTURE=RV-LIM; PROMPT_FILE=bt-clean-prompt.txt; SKILL=spec-review ;;
+  rv-lim-dirty)   FIXTURE=RV-LIM; PROMPT_FILE=bt-dirty-prompt.txt; SKILL=spec-review ;;
+  rv-crlim-clean) FIXTURE=RV-LIM; PROMPT_FILE=cr-clean-prompt.txt; SKILL=spec-review ;;
+  rv-crlim-dirty) FIXTURE=RV-LIM; PROMPT_FILE=cr-dirty-prompt.txt; SKILL=spec-review ;;
   rv-fe)        FIXTURE=RV-AUDIT; PROMPT_FILE=fe-prompt.txt;        SKILL=spec-review ;;
   rv-tpl-clean) FIXTURE=RV-AUDIT; PROMPT_FILE=tpl-clean-prompt.txt; SKILL=spec-review ;;
   rv-tpl-dirty) FIXTURE=RV-AUDIT; PROMPT_FILE=tpl-dirty-prompt.txt; SKILL=spec-review ;;
@@ -365,6 +372,9 @@ case "$PROBE" in
   # потребителям/интеграциям закрывает гейты → файл этим ходом (одноходовая, «ПРОДОЛЖЕНИЕ»).
   br-nocrit)  FIXTURE=BR-NOCRIT; PROMPT_FILE=brief-prompt.txt; SKILL=business-requirements-doc; TURN2_FILE=nocrit-turn2.txt; TURN3_FILE=nocrit-t3-turn2.txt; TURNS_CAP=3 ;;
   br-yes)     FIXTURE=BR-YES; PROMPT_FILE=yes-prompt.txt; SKILL=business-requirements-doc ;;
+  # п.2 PLAN-FROM-POCOCK: пример на границе в критерии с числом (сумма, срок, количество). grade-br-lim.mjs --case=q|w
+  br-lim-q)   FIXTURE=BR-LIM; PROMPT_FILE=q-prompt.txt; SKILL=business-requirements-doc ;;
+  br-lim-w)   FIXTURE=BR-LIM; PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc ;;
   # Замена терминов 5.35 (2026-10-06): БТ с несколькими частями → таблица §4.5 и вопрос в ответе, без «слайс»/
   # «деливербл». Одноходовая, «ПРОДОЛЖЕНИЕ». Грейдер — `grade-terms.mjs --case=cut`.
   br-cut)     FIXTURE=BR-CUT; PROMPT_FILE=cut-prompt.txt; SKILL=business-requirements-doc ;;
@@ -460,6 +470,9 @@ case "$PROBE" in
   cr-notsmall-q) FIXTURE=CR-SMALL; PROMPT_FILE=notsmall-q-prompt.txt; SKILL=change-request-doc ;;
   cr-idea-q)     FIXTURE=CR-SMALL; PROMPT_FILE=idea-q-prompt.txt;     SKILL=change-request-doc ;;
   cr-bug-q)      FIXTURE=CR-SMALL; PROMPT_FILE=bug-q-prompt.txt;      SKILL=change-request-doc ;;
+  # п.2 PLAN-FROM-POCOCK: лимит фотографий паспорта 10 → 25, пример на границе у «как должно стать». grade-cr-lim.mjs --case=q|w
+  cr-lim-q)      FIXTURE=CR-SMALL; PROMPT_FILE=lim-q-prompt.txt;      SKILL=change-request-doc ;;
+  cr-lim-w)      FIXTURE=CR-SMALL; PROMPT_FILE=lim-w-prompt.txt;      SKILL=change-request-doc ;;
 
   # ── спека на багфикс: режим `technical-spec-doc` по баг-репорту ───────────────────────────
   # Флаг багфикса изображён промптом — проводник про багфикс ещё не знает (шаг 8 плана). Дерево
@@ -660,7 +673,7 @@ case "$PROBE" in
   nb-pts-roles)   FIXTURE=NB-PTS-ROLES;   PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; IDLE_MAX=3; DONE_GREP='исходник: coddoc/_inbox/meeting-2026-10-18'; MEET_ENV=1 ;;
   nb-late-event)  FIXTURE=NB-LATE-EVENT;  PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='исходник: coddoc/_inbox/meeting-2026-10-12'; MEET_ENV=1 ;;
   nb-no-goal)     FIXTURE=NB-NO-GOAL;     PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/notebook\.md$'; MEET_ENV=1 ;;
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk bt-uf-mmd bt-uf-puml bt-uf-idk bt-uf-y pt-sh-mmd pt-sh-idk pt-sh-no pt-uf-puml pt-uf-idk pt-raw pt-nb tx-sh-mmd tx-sh-idk tx-uf-puml pt-junk pt-prose ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q sq-audit meet-vac meet-acc meet-long meet-new meet-rew meet-chg meet-cr jm-br-vac jm-br-long jm-br-new jm-ts-acc jm-ts-rew rec-new rec-chg rec-inline nb-new nb-thought nb-contra nb-noauth nb-file nb-view-api nb-view-chat nb-dispute nb-answer nb-ask nb-long nb-view-part meet-out ni-vac ni-acc ni-new ni-chg ni-cr ni-rew ni-mr-new ni-mr-chg ni-nb-in ni-nb-ans ni-nb-pick nb-pts-in nb-pts-new nb-pts-rec nb-export nb-export-since nb-route nb-desc-one nb-desc-two nb-auto nb-ans-repl nb-stale nb-prefix nb-reingest nb-handedit nb-chain-export nb-chain-ask nb-huge-export nb-fix-author nb-fix-drop nb-fix-wrong nb-fix-inplace nb-fix-noref nb-pts-plain nb-pts-spor nb-spor-side nb-same-stem nb-fact-upd nb-ans-subj nb-scope nb-pts-roles nb-late-event nb-no-goal"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-vac-lim ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk bt-uf-mmd bt-uf-puml bt-uf-idk bt-uf-y pt-sh-mmd pt-sh-idk pt-sh-no pt-uf-puml pt-uf-idk pt-raw pt-nb tx-sh-mmd tx-sh-idk tx-uf-puml pt-junk pt-prose ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-lim-clean rv-lim-dirty rv-crlim-clean rv-crlim-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-lim-q br-lim-w br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q cr-lim-q cr-lim-w sq-audit meet-vac meet-acc meet-long meet-new meet-rew meet-chg meet-cr jm-br-vac jm-br-long jm-br-new jm-ts-acc jm-ts-rew rec-new rec-chg rec-inline nb-new nb-thought nb-contra nb-noauth nb-file nb-view-api nb-view-chat nb-dispute nb-answer nb-ask nb-long nb-view-part meet-out ni-vac ni-acc ni-new ni-chg ni-cr ni-rew ni-mr-new ni-mr-chg ni-nb-in ni-nb-ans ni-nb-pick nb-pts-in nb-pts-new nb-pts-rec nb-export nb-export-since nb-route nb-desc-one nb-desc-two nb-auto nb-ans-repl nb-stale nb-prefix nb-reingest nb-handedit nb-chain-export nb-chain-ask nb-huge-export nb-fix-author nb-fix-drop nb-fix-wrong nb-fix-inplace nb-fix-noref nb-pts-plain nb-pts-spor nb-spor-side nb-same-stem nb-fact-upd nb-ans-subj nb-scope nb-pts-roles nb-late-event nb-no-goal"; exit 1 ;;
 esac
 
 SKILL_DIR="${SKILL_DIR:-$HERE/../$SKILL}"
