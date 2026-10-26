@@ -33,7 +33,7 @@
 
 Грейдер — `grade-scx-down.mjs --case=rv-doc|rv-dep|rv-dirty|sb-doc|sb-dep`, `--selftest`. Разбор пунктов отчёта и
 `owns:` проверен на живых выходах: `rv-blue-cr` (`p2b-s2fix` 2/2 зелёные, `p2b-s2fix-base` run-1 — §7 пойман, как в
-CHANGELOG 5.76), `sb-blue-cr` 3/3 и `sb-blue-na` 2/2 (`p2b-s3`) — совпадает с числами 5.77.
+CHANGELOG 5.77), `sb-blue-cr` 3/3 и `sb-blue-na` 2/2 (`p2b-s3`) — совпадает с числами 5.78.
 
 ## Рукопись, а не выход скилла
 

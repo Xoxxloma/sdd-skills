@@ -14,7 +14,8 @@
 # Нужны только git и bash. Для Windows рядом skills.ps1 — та же логика; правятся оба файла вместе. Запускать через `bash …`, а не `./…`: в
 # корпоративных образах запуск файлов из домашней папки бывает запрещён, а bash читает скрипт как текст.
 #
-# Адрес репозитория со скиллами задан ниже один раз; переопределяется переменными окружения.
+# Адреса репозитория со скиллами заданы ниже один раз: сначала https, при отказе — ssh, для тех, у кого
+# нет логина для https, но есть ssh-ключ. SDD_SKILLS_REPO заменяет оба: один или несколько адресов через пробел.
 set -euo pipefail
 
 # Работаем из временной копии: оригинал лежит в папке, которую ниже удалим и перепишем.
@@ -25,17 +26,29 @@ if [ -z "${SDD_SKILLS_SELF:-}" ]; then
 fi
 trap 'rm -f "$SDD_SKILLS_SELF"' EXIT
 
-REPO="${SDD_SKILLS_REPO:-https://api.sc-ci.sber.ru/ai-security-deparment/AI-SDD-SKILLS.git}"
+REPOS="${SDD_SKILLS_REPO:-https://api.sc-ci.sber.ru/ai-security-deparment/AI-SDD-SKILLS.git
+ssh://sc@api.sc-ci.sber.ru:7998/ai-security-deparment/AI-SDD-SKILLS.git}"
 REF="${SDD_SKILLS_REF:-}"            # ветка или тег; пусто — ветка по умолчанию
 DEST="${1:-.gigacode/skills}"
 
 command -v git >/dev/null || { echo "нужен git"; exit 1; }
 
+# Агент не ответит ни на запрос пароля https, ни на вопрос ssh «yes/no» про новый хост: клон ждал бы
+# ответа вместо перехода к следующему адресу. Свою настройку ssh у пользователя (ключ, plink) не трогаем.
+export GIT_TERMINAL_PROMPT=0
+if [ -z "${GIT_SSH_COMMAND:-}${GIT_SSH:-}" ] && ! git config --get core.sshCommand >/dev/null; then
+  export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10"
+fi
+
 SRC="$(mktemp -d "${TMPDIR:-/tmp}/sdd-skills.XXXXXX")"
 trap 'rm -rf "$SRC" "$SDD_SKILLS_SELF"' EXIT
 
-echo "скиллы: $REPO${REF:+ #$REF}"
-git clone -q --depth 1 ${REF:+--branch "$REF"} "$REPO" "$SRC"
+cloned=""
+for repo in $REPOS; do
+  echo "скиллы: $repo${REF:+ #$REF}"
+  if git clone -q --depth 1 ${REF:+--branch "$REF"} "$repo" "$SRC"; then cloned=1; break; fi
+done
+[ -n "$cloned" ] || { echo "не удалось получить скиллы ни по одному адресу"; exit 1; }
 SKILLS="$SRC/skills"
 [ -d "$SKILLS" ] || SKILLS="$SRC/.gigacode"
 [ -d "$SKILLS" ] || { echo "в репозитории со скиллами нет папки skills/"; exit 1; }

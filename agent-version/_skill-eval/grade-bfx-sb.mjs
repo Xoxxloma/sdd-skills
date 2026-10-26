@@ -15,7 +15,7 @@
 //   :174-176 «Этап без собственного стыка на выходе — не этап» → этапов ровно один.
 // О багфиксе в stage-breakdown-doc ни слова; «Разбиения на части нет» (technical-spec-doc/reference/bugfix-mode.md:133)
 // — правило автора спеки, не разреза. Справкой: скопирована ли у этапа строка «Существующий стык» (приёмка этапа после
-// 5.80 на неё опирается — spec-review/reference/checklist-stage.md:40).
+// 5.81 на неё опирается — spec-review/reference/checklist-stage.md:40).
 
 import { readdirSync, statSync, existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'

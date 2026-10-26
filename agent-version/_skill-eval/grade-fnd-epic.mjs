@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// grade-fnd-epic.mjs — пробы fnd-* : узел-фундамент #0 и ребёнок эпика после п.2б (ветка feat/blue-contract, 5.75–5.80).
+// grade-fnd-epic.mjs — пробы fnd-* : узел-фундамент #0 и ребёнок эпика после п.2б (ветка feat/blue-contract, 5.76–5.81).
 //
 //   node grade-fnd-epic.mjs <каталог плеча> --case=zero|kid|rv-kid|rv-dirty|rv-zero|sb-kid
 //   node grade-fnd-epic.mjs --selftest
