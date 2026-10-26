@@ -20,22 +20,38 @@ param([string]$Dest = $env:SDD_SKILLS_DEST)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$repo = if ($env:SDD_SKILLS_REPO) { $env:SDD_SKILLS_REPO } else { 'https://api.sc-ci.sber.ru/ai-security-deparment/AI-SDD-SKILLS.git' }
+# Сначала https, при отказе — ssh; SDD_SKILLS_REPO заменяет оба — как в skills.sh.
+$repos = if ($env:SDD_SKILLS_REPO) { @($env:SDD_SKILLS_REPO -split '\s+' | Where-Object { $_ }) } else {
+  @('https://api.sc-ci.sber.ru/ai-security-deparment/AI-SDD-SKILLS.git',
+    'ssh://sc@api.sc-ci.sber.ru:7998/ai-security-deparment/AI-SDD-SKILLS.git')
+}
 $ref = $env:SDD_SKILLS_REF            # ветка или тег; пусто — ветка по умолчанию
 if (-not $Dest) { $Dest = '.gigacode\skills' }
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Write-Output 'нужен git'; exit 1 }
 
+# Запросы пароля и «yes/no» про новый хост выключены, своя настройка ssh не трогается — как в skills.sh.
+# Окно входа Git Credential Manager остаётся: его закроют — скрипт перейдёт к ssh.
+$env:GIT_TERMINAL_PROMPT = '0'
+if (-not $env:GIT_SSH_COMMAND -and -not $env:GIT_SSH) {
+  & git config --get core.sshCommand | Out-Null
+  if ($LASTEXITCODE -ne 0) { $env:GIT_SSH_COMMAND = 'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10' }
+}
+
 $src = Join-Path $env:TEMP ('sdd-skills.' + (Get-Random))
 try {
-  if ($ref) { Write-Output "скиллы: $repo #$ref" } else { Write-Output "скиллы: $repo" }
   $cloneArgs = @('clone', '-q', '--depth', '1')
   if ($ref) { $cloneArgs += @('--branch', $ref) }
-  # Предупреждения git в stderr не должны обрывать скрипт: решает только код возврата.
-  $ErrorActionPreference = 'Continue'
-  & git @cloneArgs $repo $src
-  $ErrorActionPreference = 'Stop'
-  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  $cloned = $false
+  foreach ($repo in $repos) {
+    if ($ref) { Write-Output "скиллы: $repo #$ref" } else { Write-Output "скиллы: $repo" }
+    # Предупреждения git в stderr не должны обрывать скрипт: решает только код возврата.
+    $ErrorActionPreference = 'Continue'
+    & git @cloneArgs $repo $src
+    $ErrorActionPreference = 'Stop'
+    if ($LASTEXITCODE -eq 0) { $cloned = $true; break }
+  }
+  if (-not $cloned) { Write-Output 'не удалось получить скиллы ни по одному адресу'; exit 1 }
 
   $skills = Join-Path $src 'skills'
   if (-not (Test-Path -LiteralPath $skills -PathType Container)) { $skills = Join-Path $src '.gigacode' }
