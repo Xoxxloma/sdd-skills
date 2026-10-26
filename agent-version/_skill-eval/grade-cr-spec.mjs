@@ -28,7 +28,7 @@ function grade(spec, kase) {
       const seam = s2.split('\n').find((l) => /существующ[а-яё]*\s+стык/i.test(l)) || '';
       const rows = s2.split('\n').filter((l) => /^\s*\|/.test(l));
       m['вид «изменение существующего»'] = /изменени[ея]\s+существующ/i.test(s2);
-      m['стык под 🔵 «со слов»'] = /🔵/.test(seam) && /со\s+слов/i.test(seam);
+      m['стык под 🔵 с источником (со слов / по документу сверху)'] = /🔵/.test(seam) && /со\s+слов|по\s+документу\s+сверху/i.test(seam);
       m['таблица было → стало'] = /было/i.test(rows.join(' ')) && /стало/i.test(rows.join(' '));
     }
   }
