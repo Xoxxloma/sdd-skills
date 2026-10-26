@@ -27,6 +27,8 @@ const REPOS = ['tool-rental', 'deposit-service', 'tool-catalog', 'repairy'];
 const repairySrc = process.env.REPAIRY_SRC ?? 'C:/Users/Konstantin/projects/repairy';
 const SECRETS = ['rental-local-7731', 'Kx-local-Rent4l-2291'];
 const MAX_TURNS = 6;
+// п.2б (P2B=1): признак «поля события из кода в спеке». Самопроверка — на прежних образцах, флаг на неё не распространяется.
+let P2B_ON = process.env.P2B === '1';
 
 // ---------------------------------------------------------------- пробы (fixtures/TS-DEEP/README.md)
 
@@ -258,6 +260,9 @@ function grade(probe, turns, spec, specAfter, changed) {
   marks['ветка develop в метке'] = /по\s+коду[^\n)]{0,60}develop/i.test(spec);
   marks['нет ссылок файл:строка'] = !/[\w./-]+\.(kt|kts|py|java|ya?ml):\d+/.test(spec);
   marks['нет имён из кода'] = !/RentalEventsPublisher|RentalReturned|RentalService|KafkaTemplate|AFTER_COMMIT|RENTAL_EVENTS_TOPIC|rental\.events-topic|application\.yml|\.kt\b/.test(spec);
+  // п.2б PLAN-FROM-POCOCK (P2B=1): после «беру как в коде» поля события — контракт, они идут в спеку под 🔵 «по коду»;
+  // имена реализации (классы, переменные окружения, ключи настроек) — по-прежнему нет (строка выше).
+  if (P2B_ON) marks['п.2б: поля события из кода в спеке'] = ['rentalId', 'toolId', 'customerId', 'returnedAt', 'damaged', 'depositAmount'].filter((x) => spec.includes(x)).length >= 3;
   marks['«внутри транзакции» фактом нет'] = cardClaim(spec);
   marks['статус проставлен'] = /Статус готовности:\*\*\s*(Готово к разработке|Требуются уточнения \(\d+\))/.test(spec) && !/ПРОСТАВЛЯЕТСЯ/.test(spec);
   return { marks, t, spec };
@@ -265,6 +270,11 @@ function grade(probe, turns, spec, specAfter, changed) {
 
 // Оценщик на известных потоках: хороший проходит всё, плохой валится ровно там, где сломан.
 function selftest() {
+  const on = P2B_ON; P2B_ON = false;
+  try { return selftestBody(); } finally { P2B_ON = on; }
+}
+
+function selftestBody() {
   const ev = (o) => JSON.stringify(o);
   const tool = (name, input, parent = null, id = 't' + Math.random()) => ev({ type: 'assistant', parent_tool_use_id: parent, message: { content: [{ type: 'tool_use', id, name, input }] } });
   const res = (text) => ev({ type: 'result', result: text, total_cost_usd: 0.05, num_turns: 6 });

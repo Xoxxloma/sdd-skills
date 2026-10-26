@@ -1,10 +1,13 @@
 // Грейдер ts-cr-* (fixtures/TS-CR/README.md): спека в режиме мелкой правки.
-//   node grade-cr-spec.mjs <плечо> --case=timeout|api
+//   node grade-cr-spec.mjs <плечо> --case=timeout|api [--blue]
+//   --blue — п.2б PLAN-FROM-POCOCK: у изменённого контракта вид «изменение существующего», строка «Существующий стык»
+//   под 🔵 «со слов» (карточек в фикстуре нет, путь аналитик не называл) и таблица «было → стало» с новым полем.
 //   node grade-cr-spec.mjs --selftest
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const KEY = { timeout: 'UA-410', api: 'UA-420' };
+let BLUE = process.argv.includes('--blue');
 const section = (spec, n) => (spec.split(new RegExp(`^## (~~)?${n}\\.`, 'm'))[2] ?? '').split(/^## /m)[0];
 const sub = (spec, n) => (spec.split(new RegExp(`^### (~~)?${n.replace('.', '\\.')}\\.`, 'm'))[2] ?? '').split(/^###? /m)[0];
 
@@ -21,6 +24,13 @@ function grade(spec, kase) {
     m['§2 — карточка INT'] = /^###\s+INT-\d/m.test(s2);
     m['в карточке пример JSON'] = /```json/.test(s2);
     m['семантика null у черновика'] = /null/.test(s2);
+    if (BLUE) {
+      const seam = s2.split('\n').find((l) => /существующ[а-яё]*\s+стык/i.test(l)) || '';
+      const rows = s2.split('\n').filter((l) => /^\s*\|/.test(l));
+      m['вид «изменение существующего»'] = /изменени[ея]\s+существующ/i.test(s2);
+      m['стык под 🔵 с источником (со слов / по документу сверху)'] = /🔵/.test(seam) && /со\s+слов|по\s+документу\s+сверху/i.test(seam);
+      m['таблица было → стало'] = /было/i.test(rows.join(' ')) && /стало/i.test(rows.join(' '));
+    }
   }
   const s62 = sub(spec, '6.2');
   m['§6.2 по существу'] = s62.trim().length > 0 && !/^~~Не применимо/m.test(s62.trim());
@@ -29,6 +39,12 @@ function grade(spec, kase) {
 }
 
 function selftest() {
+  // Самотест — прежний образец без признаков п.2б: флаг на него не распространяется.
+  const blue = BLUE; BLUE = false;
+  try { return selftestBody(); } finally { BLUE = blue; }
+}
+
+function selftestBody() {
   const base = ['> **Статус готовности:** Готово к разработке', '**Тип:** мелкая правка'];
   const t = [...base, '## ~~2. Взаимодействия (ядро)~~', '~~Не применимо: новых/изменённых взаимодействий нет; задето: таймаут~~',
     '## 5. Нефункциональные требования', '### 5.1. Синхронность, кэш, производительность', 'Таймаут отправки 10 с.', '### 5.2. Надёжность',

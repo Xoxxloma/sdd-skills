@@ -1,6 +1,6 @@
 ---
 name: business-requirements-doc
-version: 1.4.0
+version: 1.5.0
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
 description: 'Gathers business requirements and writes ONE Markdown spec (BRD→SRS) in Russian. It MAY read the repo as evidence, but nothing enters the spec on your own authority: before writing, every gate is either stated by the user themselves or put to the user and answered, and only what the user explicitly leaves open becomes TBD. The mandatory first question is the linked Jira/SberTrack task key (SMSEC-1234); without it the spec is not written. Before writing it also decides the business cut (§4.5) — several separate deliveries (поставки) → it proposes the split into parts (части); one delivery → it says so explicitly («не применимо: причина») — and puts that proposal to the user in the handoff. Use whenever someone wants to write a ТЗ / BRD / SRS, formalize a request, or describe a task, feature, change, or integration for developers.'
@@ -778,7 +778,12 @@ the spec section the answer lands in.
 11. **Критерий приёмки на каждое FR** — «когда считаем, что готово». Критерий — любые слова
     пользователя о том, когда требование выполнено; общий критерий на весь поток — критерий только
     тех FR, чьё действие в нём названо, даже если без остальных итог невозможен; в Дано–Когда–Тогда
-    переводишь при записи, без переспроса; FR без таких слов — гипотезой на подтверждение. **Закрыт:**
+    переводишь при записи, без переспроса; FR без таких слов — гипотезой на подтверждение. **Форма:**
+    у требования с порогом — числом, по одну сторону которого поведение одно, по другую другое (сумма,
+    количество, срок, дата, время, процент), — гипотеза несёт пример на границе: значение порога и
+    ближайшее значение по ту сторону («лимит 5 000: ровно 5 000 проходит, 5 000,01 — отказ. Верно?»).
+    Пример — форма гипотезы, а не условие закрытия: пользователь подтвердил критерий без границы или дал
+    свой — гейт закрыт, границу не переспрашивай. **Закрыт:**
     у каждого FR есть критерий — словами пользователя или подтверждённой гипотезой. → §4.2
 12. **Кто конечный потребитель функционала**. **Закрыт:** кто пользуется результатом, назвал
     или подтвердил пользователь. → §1.2
@@ -900,6 +905,8 @@ Only confirmed content is filled; gates the user explicitly deferred (⏭️) ar
 подтверждённые (не додумывай). Нумеруй требования (FR-1, FR-2, …).]
 ### 4.2. Критерии приёмки
 - **[FR-1]** Дано [условие], когда [действие], тогда [результат].
+- **[FR-2]** Дано [значение порога], когда [действие], тогда [результат]; [ближайшее значение по ту
+  сторону] — [результат]. *(Требование с порогом, пример на границе подтверждён — гейт 11.)*
 
 ### 4.3. Бизнес-данные
 [Объекты, с которыми работает функция, — и новые, и уже существующие, что назвал или подтвердил

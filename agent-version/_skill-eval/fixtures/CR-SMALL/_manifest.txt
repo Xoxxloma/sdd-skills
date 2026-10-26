@@ -6,6 +6,8 @@ coddoc/ARS-102/business_requirements.md
 coddoc/ARS-102/technical_specification.md
 expected.md
 idea-q-prompt.txt
+lim-q-prompt.txt
+lim-w-prompt.txt
 notsmall-q-prompt.txt
 README.md
 services/auth.md

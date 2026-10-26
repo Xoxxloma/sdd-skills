@@ -154,6 +154,11 @@ case "$PROBE" in
   nb-view-part) FIXTURE=NB-VIEW-PART; PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/[^/]*-20[0-9][0-9]-[0-9][0-9]-[0-9][0-9](-2)?\.md$'; MEET_ENV=1 ;;
   ts-vac)    FIXTURE=TS-VAC;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-vac-q)  FIXTURE=TS-VAC;    PROMPT_FILE=q-prompt.txt;     SKILL=technical-spec-doc ;;
+  # п.2 PLAN-FROM-POCOCK: копия TS-VAC, у FR-10 критерий с границей по датам → тест-кейс §7 несёт обе даты. grade-ts-lim.mjs
+  ts-vac-lim) FIXTURE=TS-VAC-LIM; PROMPT_FILE=spec-prompt.txt; SKILL=technical-spec-doc ;;
+  # п.2б PLAN-FROM-POCOCK: путь и модель у 🔵 по источнику; вид «изменение существующего». grade-ts-blue.mjs --case=yes|idk
+  ts-blue-yes) FIXTURE=TS-BLUE; PROMPT_FILE=yes-prompt.txt; SKILL=technical-spec-doc ;;
+  ts-blue-idk) FIXTURE=TS-BLUE; PROMPT_FILE=idk-prompt.txt; SKILL=technical-spec-doc ;;
   ts-acc)    FIXTURE=TS-ACC;    PROMPT_FILE=spec-prompt.txt;  SKILL=technical-spec-doc ;;
   ts-acc-q)  FIXTURE=TS-ACC;    PROMPT_FILE=q-prompt.txt;     SKILL=technical-spec-doc ;;
   # interaction-diagram: схема по готовой спеке DSP-330; формат назван (mmd/puml) или нет (ask).
@@ -197,6 +202,8 @@ case "$PROBE" in
   det-q-mmd)   FIXTURE=ID-DET;  PROMPT_FILE=mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt;  TURN3_FILE=q-turn2.txt;     TURNS_CAP=3 ;;
   det-q-puml)  FIXTURE=ID-DET;  PROMPT_FILE=puml-prompt.txt; SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt;  TURN3_FILE=q-turn2.txt;     TURNS_CAP=3 ;;
   det-q-alt)   FIXTURE=ID-DET;  PROMPT_FILE=mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-scen-turn2.txt;  TURN3_FILE=q-alt-turn2.txt; TURNS_CAP=3 ;;
+  # ревью покрытия п.2б: подпись у карточки изменения — путь из строки «Существующий стык». grade-id-blue.mjs
+  id-blue)     FIXTURE=ID-BLUE; PROMPT_FILE=mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=q-turn2.txt; TURNS_CAP=3; DONE_RE='/coddoc/SHT-410/interaction_diagram\.md$' ;;
   id-q-mmd)    FIXTURE=ID-DIAG; PROMPT_FILE=mmd-prompt.txt;  SKILL=interaction-diagram; TURN2_FILE=type-short-turn2.txt; TURN3_FILE=q-turn2.txt;     TURNS_CAP=3 ;;
   det-short-mmd) FIXTURE=ID-DET; PROMPT_FILE=short-mmd-prompt.txt; SKILL=interaction-diagram ;;
   # Этап К (`PLAN-ID-SCENARIO.md` §8, скилл 4.0.0): короткая схема по времени. Ход вопросов — об участниках и
@@ -316,6 +323,20 @@ case "$PROBE" in
   # индекс этапов «не применимо». Состав и ожидания — `fixtures/RV-AUDIT/README.md`.
   rv-bt-clean)  FIXTURE=RV-AUDIT; PROMPT_FILE=bt-clean-prompt.txt;  SKILL=spec-review ;;
   rv-bt-dirty)  FIXTURE=RV-AUDIT; PROMPT_FILE=bt-dirty-prompt.txt;  SKILL=spec-review ;;
+  # п.2 PLAN-FROM-POCOCK, шаг 4: счётная строка «порог без примера на границе» — не нарушение. grade-rv-lim.mjs --case=…
+  rv-lim-clean)   FIXTURE=RV-LIM; PROMPT_FILE=bt-clean-prompt.txt; SKILL=spec-review ;;
+  rv-lim-dirty)   FIXTURE=RV-LIM; PROMPT_FILE=bt-dirty-prompt.txt; SKILL=spec-review ;;
+  rv-crlim-clean) FIXTURE=RV-LIM; PROMPT_FILE=cr-clean-prompt.txt; SKILL=spec-review ;;
+  rv-crlim-dirty) FIXTURE=RV-LIM; PROMPT_FILE=cr-dirty-prompt.txt; SKILL=spec-review ;;
+  # шаг 2 п.2б PLAN-FROM-POCOCK: приёмка спеки после 2б — источник у 🔵, «Вид», «Существующий стык», «было» на 🟡-основе. grade-rv-blue.mjs
+  rv-blue-yes)   FIXTURE=RV-BLUE; PROMPT_FILE=p410-prompt.txt; SKILL=spec-review ;;
+  rv-blue-idk)   FIXTURE=RV-BLUE; PROMPT_FILE=p411-prompt.txt; SKILL=spec-review ;;
+  rv-blue-dirty) FIXTURE=RV-BLUE; PROMPT_FILE=p412-prompt.txt; SKILL=spec-review ;;
+  rv-blue-was)   FIXTURE=RV-BLUE; PROMPT_FILE=p413-prompt.txt; SKILL=spec-review ;;
+  rv-blue-cr)    FIXTURE=RV-BLUE; PROMPT_FILE=p420-prompt.txt; SKILL=spec-review ;;
+  # ревью покрытия п.2б: приёмка файла этапа с карточкой изменения без пути. grade-rv-stage-blue.mjs
+  rv-stage-blue-idk) FIXTURE=RV-STAGE-BLUE; PROMPT_FILE=idk-prompt.txt; SKILL=spec-review ;;
+  rv-stage-blue-cr)  FIXTURE=RV-STAGE-BLUE; PROMPT_FILE=cr-prompt.txt;  SKILL=spec-review ;;
   rv-fe)        FIXTURE=RV-AUDIT; PROMPT_FILE=fe-prompt.txt;        SKILL=spec-review ;;
   rv-tpl-clean) FIXTURE=RV-AUDIT; PROMPT_FILE=tpl-clean-prompt.txt; SKILL=spec-review ;;
   rv-tpl-dirty) FIXTURE=RV-AUDIT; PROMPT_FILE=tpl-dirty-prompt.txt; SKILL=spec-review ;;
@@ -325,10 +346,43 @@ case "$PROBE" in
   rv-bt-empty)  FIXTURE=RV-AUDIT; PROMPT_FILE=bt-empty-prompt.txt;  SKILL=spec-review ;;
   rv-bt-no43)   FIXTURE=RV-AUDIT; PROMPT_FILE=bt-no43-prompt.txt;   SKILL=spec-review ;;
   sb-ctx2)   FIXTURE=SB-CTX2;   PROMPT_FILE=stage-prompt.txt; SKILL=stage-breakdown-doc ;;
+  # Узел-фундамент #0 и ребёнок эпика после п.2б (ревью покрытия feat/blue-contract): спека #0 «Вид: новое»; ребёнок —
+  # `🔵 depends-on #0`, «Вид: потребление существующего», состав контракта, без источника из списка; приёмка §13/§14;
+  # разрез — унаследованный стык извне. Засевы — подпапки FND-EPIC. grade-fnd-epic.mjs --case=zero|kid|rv-kid|rv-dirty|rv-zero|sb-kid
+  fnd-zero)     FIXTURE=FND-EPIC; PROMPT_FILE=zero-prompt.txt;     SKILL=technical-spec-doc;  SEED_SUB=seed-zero ;;
+  fnd-kid)      FIXTURE=FND-EPIC; PROMPT_FILE=kid-prompt.txt;      SKILL=technical-spec-doc;  SEED_SUB=seed-kid ;;
+  fnd-rv-kid)   FIXTURE=FND-EPIC; PROMPT_FILE=rv-kid-prompt.txt;   SKILL=spec-review;         SEED_SUB=seed-done ;;
+  fnd-rv-dirty) FIXTURE=FND-EPIC; PROMPT_FILE=rv-dirty-prompt.txt; SKILL=spec-review;         SEED_SUB=seed-done ;;
+  fnd-rv-zero)  FIXTURE=FND-EPIC; PROMPT_FILE=rv-zero-prompt.txt;  SKILL=spec-review;         SEED_SUB=seed-done ;;
+  fnd-sb-kid)   FIXTURE=FND-EPIC; PROMPT_FILE=sb-kid-prompt.txt;   SKILL=stage-breakdown-doc; SEED_SUB=seed-done; TURN2_FILE=go-turn2.txt; TURNS_CAP=2 ;;
+  # шаг 3 п.2б PLAN-FROM-POCOCK: разрез после 2б — изменение существующего во владении этапа, потребление извне. grade-sb-blue.mjs
+  sb-blue-yes) FIXTURE=SB-BLUE; PROMPT_FILE=yes-prompt.txt; SKILL=stage-breakdown-doc; TURN2_FILE=go-turn2.txt; TURNS_CAP=2 ;;
+  sb-blue-idk) FIXTURE=SB-BLUE; PROMPT_FILE=idk-prompt.txt; SKILL=stage-breakdown-doc; TURN2_FILE=go-turn2.txt; TURNS_CAP=2 ;;
+  sb-blue-cr)  FIXTURE=SB-BLUE; PROMPT_FILE=cr-prompt.txt;  SKILL=stage-breakdown-doc; TURN2_FILE=go-turn2.txt; TURNS_CAP=2 ;;
+  sb-blue-new) FIXTURE=SB-BLUE; PROMPT_FILE=new-prompt.txt; SKILL=stage-breakdown-doc; TURN2_FILE=go-turn2.txt; TURNS_CAP=2 ;;
+  sb-blue-na)  FIXTURE=SB-BLUE; PROMPT_FILE=na-prompt.txt;  SKILL=stage-breakdown-doc ;;
   # ── `spec-readiness`: достаточно ли спеки, чтобы писать код ────────────────────────────────
   # Как и приёмка, ничего не пишет на диск: артефакт — `answer.md` из stdout. Парное плечо без
   # скилла гоняется отдельным `run-ctl.sh` на той же фикстуре — оно и есть знаменатель.
+  # SCX — маршрут мелкой правки после 5.74–5.81: Р9 у запроса на правку, вопросы без порога, стык «по документу сверху»,
+  # чужой сервис — потребление; приёмка и разрез на выходе. README фикстур SCX-*; грейдеры grade-scx-cr|ts|down.mjs.
+  scx-cr-nob)   FIXTURE=SCX-CR;   PROMPT_FILE=nob-w-prompt.txt;    SKILL=change-request-doc ;;
+  scx-cr-own)   FIXTURE=SCX-CR;   PROMPT_FILE=own-w-prompt.txt;    SKILL=change-request-doc ;;
+  scx-cr-api-q) FIXTURE=SCX-CR;   PROMPT_FILE=api-q-prompt.txt;    SKILL=change-request-doc ;;
+  scx-cr-ver-q) FIXTURE=SCX-CR;   PROMPT_FILE=ver-q-prompt.txt;    SKILL=change-request-doc ;;
+  scx-ts-doc)   FIXTURE=SCX-TS;   PROMPT_FILE=doc-prompt.txt;      SKILL=technical-spec-doc ;;
+  scx-ts-dep)   FIXTURE=SCX-TS;   PROMPT_FILE=dep-prompt.txt;      SKILL=technical-spec-doc ;;
+  scx-ts-fld)   FIXTURE=SCX-TS;   PROMPT_FILE=fld-prompt.txt;      SKILL=technical-spec-doc ;;
+  scx-rv-doc)   FIXTURE=SCX-DOWN; PROMPT_FILE=rv-doc-prompt.txt;   SKILL=spec-review ;;
+  scx-rv-dep)   FIXTURE=SCX-DOWN; PROMPT_FILE=rv-dep-prompt.txt;   SKILL=spec-review ;;
+  scx-rv-dirty) FIXTURE=SCX-DOWN; PROMPT_FILE=rv-dirty-prompt.txt; SKILL=spec-review ;;
+  scx-sb-doc)   FIXTURE=SCX-DOWN; PROMPT_FILE=sb-doc-prompt.txt;   SKILL=stage-breakdown-doc; TURN2_FILE=go-turn2.txt; TURNS_CAP=2 ;;
+  scx-sb-dep)   FIXTURE=SCX-DOWN; PROMPT_FILE=sb-dep-prompt.txt;   SKILL=stage-breakdown-doc ;;
   sr-gap)    FIXTURE=SR-GAP;    PROMPT_FILE=sr-prompt.txt;   SKILL=spec-readiness ;;
+  # шаг 4 п.2б PLAN-FROM-POCOCK: готовность после 2б — изменение существующего наше, строка «Существующий стык» чужая. grade-sr-blue.mjs
+  sr-blue-yes) FIXTURE=SR-BLUE; PROMPT_FILE=yes-prompt.txt; SKILL=spec-readiness ;;
+  sr-blue-idk) FIXTURE=SR-BLUE; PROMPT_FILE=idk-prompt.txt; SKILL=spec-readiness ;;
+  sr-blue-cr)  FIXTURE=SR-BLUE; PROMPT_FILE=cr-prompt.txt;  SKILL=spec-readiness ;;
   # Свод и сверка без субагентов: роли поданы готовыми в `roles-output.md`. Мерит Шаги 3–4 на
   # замороженном входе — см. `fixtures/SR-VERIFY/README.md`. Ключ `KEY.md` в песочницу не едет.
   sr-verify) FIXTURE=SR-VERIFY; PROMPT_FILE=sr-verify-prompt.txt; SKILL=spec-readiness ;;
@@ -365,6 +419,9 @@ case "$PROBE" in
   # потребителям/интеграциям закрывает гейты → файл этим ходом (одноходовая, «ПРОДОЛЖЕНИЕ»).
   br-nocrit)  FIXTURE=BR-NOCRIT; PROMPT_FILE=brief-prompt.txt; SKILL=business-requirements-doc; TURN2_FILE=nocrit-turn2.txt; TURN3_FILE=nocrit-t3-turn2.txt; TURNS_CAP=3 ;;
   br-yes)     FIXTURE=BR-YES; PROMPT_FILE=yes-prompt.txt; SKILL=business-requirements-doc ;;
+  # п.2 PLAN-FROM-POCOCK: пример на границе в критерии с числом (сумма, срок, количество). grade-br-lim.mjs --case=q|w
+  br-lim-q)   FIXTURE=BR-LIM; PROMPT_FILE=q-prompt.txt; SKILL=business-requirements-doc ;;
+  br-lim-w)   FIXTURE=BR-LIM; PROMPT_FILE=w-prompt.txt; SKILL=business-requirements-doc ;;
   # Замена терминов 5.35 (2026-10-06): БТ с несколькими частями → таблица §4.5 и вопрос в ответе, без «слайс»/
   # «деливербл». Одноходовая, «ПРОДОЛЖЕНИЕ». Грейдер — `grade-terms.mjs --case=cut`.
   br-cut)     FIXTURE=BR-CUT; PROMPT_FILE=cut-prompt.txt; SKILL=business-requirements-doc ;;
@@ -460,12 +517,25 @@ case "$PROBE" in
   cr-notsmall-q) FIXTURE=CR-SMALL; PROMPT_FILE=notsmall-q-prompt.txt; SKILL=change-request-doc ;;
   cr-idea-q)     FIXTURE=CR-SMALL; PROMPT_FILE=idea-q-prompt.txt;     SKILL=change-request-doc ;;
   cr-bug-q)      FIXTURE=CR-SMALL; PROMPT_FILE=bug-q-prompt.txt;      SKILL=change-request-doc ;;
+  # п.2 PLAN-FROM-POCOCK: лимит фотографий паспорта 10 → 25, пример на границе у «как должно стать». grade-cr-lim.mjs --case=q|w
+  cr-lim-q)      FIXTURE=CR-SMALL; PROMPT_FILE=lim-q-prompt.txt;      SKILL=change-request-doc ;;
+  cr-lim-w)      FIXTURE=CR-SMALL; PROMPT_FILE=lim-w-prompt.txt;      SKILL=change-request-doc ;;
 
   # ── спека на багфикс: режим `technical-spec-doc` по баг-репорту ───────────────────────────
   # Флаг багфикса изображён промптом — проводник про багфикс ещё не знает (шаг 8 плана). Дерево
   # своё, а не `BG-INC`: там `bg-flick-w` сама пишет в `coddoc/ARS-312/`, и готовый репорт в
   # песочнице дал бы ей найти собственный выход засеянным.
   bf-spec)     FIXTURE=BF-SPEC; PROMPT_FILE=spec-prompt.txt; SKILL=technical-spec-doc ;;
+  # ── BFX: багфикс, починка меняет контракт (вид «изменение существующего»); флаг изображён промптом, как у bf-spec.
+  # Два засева: путь в репорте (рукопись) → 🔵 «по документу сверху»; репорт без путей + карточка и «да» → 🔵 «по карточке».
+  bfx-doc)  FIXTURE=BFX-SPEC; PROMPT_FILE=doc-prompt.txt;  SKILL=technical-spec-doc; SEED_SUB=seed-doc ;;
+  bfx-card) FIXTURE=BFX-SPEC; PROMPT_FILE=card-prompt.txt; SKILL=technical-spec-doc; SEED_SUB=seed-card ;;
+  # приёмка и разрез такой спеки (BFX-DOWN, MTR-512 — рукопись до первого зелёного bfx-doc). grade-bfx-rv.mjs, grade-bfx-sb.mjs
+  rv-bfx-clean)  FIXTURE=BFX-DOWN; PROMPT_FILE=rv512-prompt.txt; SKILL=spec-review ;;
+  rv-bfx-nomark) FIXTURE=BFX-DOWN; PROMPT_FILE=rv514-prompt.txt; SKILL=spec-review ;;
+  rv-bfx-was)    FIXTURE=BFX-DOWN; PROMPT_FILE=rv515-prompt.txt; SKILL=spec-review ;;
+  rv-bfx-nosrc)  FIXTURE=BFX-DOWN; PROMPT_FILE=rv516-prompt.txt; SKILL=spec-review ;;
+  sb-bfx)        FIXTURE=BFX-DOWN; PROMPT_FILE=sb-prompt.txt;    SKILL=stage-breakdown-doc; TURN2_FILE=go-turn2.txt; TURNS_CAP=2 ;;
 
   # ── лишние тех-гейты у багфикса: BF-GATE, два ВОПРОСНЫХ плеча ─────────────────────────────
   # Ответов аналитика заранее НЕТ — законный исход по скиллу «turn 1 = questions only»: список
@@ -543,6 +613,12 @@ case "$PROBE" in
   # его готовым. Верный исход — приёмка, чтение, ход ОСТАНОВЛЕН вопросом «принят — идём дальше?»;
   # `technical-spec-doc` запускается только следующим ходом. Заглушки дают чистый документ нарочно:
   # до правки такой документ уезжал в спеку без остановки.
+  # `rt-count-*` — гейт 2Б на ЧИСТОМ документе сверху (нарушений 0, открытых вопросов 0): верно — без «Поправить»
+  # (stage-bt.md:67–68, :105–106). Приёмка — заглушка в форме `spec-review` 1.5.0: у БТ счётных строк нет, у запроса
+  # одна строка 🔵. Прежние плечи на строках о границе (stubs/count) и контроль bt0/cr0 (stubs/bare) слиты в `stubs`.
+  # Конец — запись спеки, потолок 4 хода. Грейд — `grade-rt-count.mjs` (кейс по имени плеча). Состав — fixtures/RT-COUNT/expected.md.
+  rt-count-bt)  FIXTURE=RT-COUNT; PROMPT_FILE=bt-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs; TURN2_FILE=count-turn2.txt; TURNS_CAP=4; DONE_RE='/coddoc/[^/]+/technical_specification\.md$' ;;
+  rt-count-cr)  FIXTURE=RT-COUNT; PROMPT_FILE=cr-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs; TURN2_FILE=count-turn2.txt; TURNS_CAP=4; DONE_RE='/coddoc/[^/]+/technical_specification\.md$' ;;
   rt-gate)     FIXTURE=RT-GATE; PROMPT_FILE=gate-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs TURN2_FILE=gate-turn2.txt NODE_FILE=node-split-turn2.txt ;;
 
   # ── приёмка баг-репорта ───────────────────────────────────────────────────────────────────
@@ -660,7 +736,7 @@ case "$PROBE" in
   nb-pts-roles)   FIXTURE=NB-PTS-ROLES;   PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; IDLE_MAX=3; DONE_GREP='исходник: coddoc/_inbox/meeting-2026-10-18'; MEET_ENV=1 ;;
   nb-late-event)  FIXTURE=NB-LATE-EVENT;  PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='исходник: coddoc/_inbox/meeting-2026-10-12'; MEET_ENV=1 ;;
   nb-no-goal)     FIXTURE=NB-NO-GOAL;     PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/notebook\.md$'; MEET_ENV=1 ;;
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk bt-uf-mmd bt-uf-puml bt-uf-idk bt-uf-y pt-sh-mmd pt-sh-idk pt-sh-no pt-uf-puml pt-uf-idk pt-raw pt-nb tx-sh-mmd tx-sh-idk tx-uf-puml pt-junk pt-prose ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup sr-gap sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q sq-audit meet-vac meet-acc meet-long meet-new meet-rew meet-chg meet-cr jm-br-vac jm-br-long jm-br-new jm-ts-acc jm-ts-rew rec-new rec-chg rec-inline nb-new nb-thought nb-contra nb-noauth nb-file nb-view-api nb-view-chat nb-dispute nb-answer nb-ask nb-long nb-view-part meet-out ni-vac ni-acc ni-new ni-chg ni-cr ni-rew ni-mr-new ni-mr-chg ni-nb-in ni-nb-ans ni-nb-pick nb-pts-in nb-pts-new nb-pts-rec nb-export nb-export-since nb-route nb-desc-one nb-desc-two nb-auto nb-ans-repl nb-stale nb-prefix nb-reingest nb-handedit nb-chain-export nb-chain-ask nb-huge-export nb-fix-author nb-fix-drop nb-fix-wrong nb-fix-inplace nb-fix-noref nb-pts-plain nb-pts-spor nb-spor-side nb-same-stem nb-fact-upd nb-ans-subj nb-scope nb-pts-roles nb-late-event nb-no-goal"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-vac-lim ts-blue-yes ts-blue-idk ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd id-blue det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk bt-uf-mmd bt-uf-puml bt-uf-idk bt-uf-y pt-sh-mmd pt-sh-idk pt-sh-no pt-uf-puml pt-uf-idk pt-raw pt-nb tx-sh-mmd tx-sh-idk tx-uf-puml pt-junk pt-prose ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sb-blue-yes sb-blue-idk sb-blue-cr sb-blue-new sb-blue-na fnd-zero fnd-kid fnd-rv-kid fnd-rv-dirty fnd-rv-zero fnd-sb-kid sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-lim-clean rv-lim-dirty rv-crlim-clean rv-crlim-dirty rv-blue-yes rv-blue-idk rv-blue-dirty rv-blue-was rv-blue-cr rv-stage-blue-idk rv-stage-blue-cr rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-lim-q br-lim-w br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup scx-cr-nob scx-cr-own scx-cr-api-q scx-cr-ver-q scx-ts-doc scx-ts-dep scx-ts-fld scx-rv-doc scx-rv-dep scx-rv-dirty scx-sb-doc scx-sb-dep sr-gap sr-blue-yes sr-blue-idk sr-blue-cr sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec bfx-doc bfx-card rv-bfx-clean rv-bfx-nomark rv-bfx-was rv-bfx-nosrc sb-bfx rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-count-bt rt-count-cr rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q cr-lim-q cr-lim-w sq-audit meet-vac meet-acc meet-long meet-new meet-rew meet-chg meet-cr jm-br-vac jm-br-long jm-br-new jm-ts-acc jm-ts-rew rec-new rec-chg rec-inline nb-new nb-thought nb-contra nb-noauth nb-file nb-view-api nb-view-chat nb-dispute nb-answer nb-ask nb-long nb-view-part meet-out ni-vac ni-acc ni-new ni-chg ni-cr ni-rew ni-mr-new ni-mr-chg ni-nb-in ni-nb-ans ni-nb-pick nb-pts-in nb-pts-new nb-pts-rec nb-export nb-export-since nb-route nb-desc-one nb-desc-two nb-auto nb-ans-repl nb-stale nb-prefix nb-reingest nb-handedit nb-chain-export nb-chain-ask nb-huge-export nb-fix-author nb-fix-drop nb-fix-wrong nb-fix-inplace nb-fix-noref nb-pts-plain nb-pts-spor nb-spor-side nb-same-stem nb-fact-upd nb-ans-subj nb-scope nb-pts-roles nb-late-event nb-no-goal"; exit 1 ;;
 esac
 
 SKILL_DIR="${SKILL_DIR:-$HERE/../$SKILL}"
