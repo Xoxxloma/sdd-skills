@@ -77,9 +77,14 @@ def off_form(missing_count, kind, form_min):
     return missing_count >= form_min[kind]
 
 
+DONE_SIGNS = {1, 3, 6}  # код этой задачи уже написан: сделано в прошедшем времени, объём в строках, закрытое изменение
+
+
 def origin_verdict(code_signs, traces, form_intact):
-    """Первое подходящее сверху — как в рубрике спеки. form_intact — форма проверена и цела."""
-    if len({sign["n"] for sign in code_signs}) >= 2:
+    """Первое подходящее сверху. form_intact — форма проверена и цела. «По коду» — два разных признака, и среди них
+    «уже сделано» (1, 3, 6): пути, рефакторинг и миграции (2, 4, 5) пишет и проект поверх существующего кода."""
+    numbers = {sign["n"] for sign in code_signs}
+    if len(numbers) >= 2 and numbers & DONE_SIGNS:
         return "by_code"
     if form_intact:
         return "skill"

@@ -274,6 +274,12 @@ def main():
         pass
     check("сверка: «…» — пропуск", merge.quote_found("начало … конец", merge.normalize("Начало и середина, конец.")), "")
     check("сверка: чужое не находится", not merge.quote_found("совсем другое", merge.normalize("начало и конец")), "")
+    signs = lambda *numbers: [{"n": n, "quote": "q"} for n in numbers]  # noqa: E731
+    traces = [{"n": 2, "what": "легенда"}, {"n": 3, "what": "карточки INT-N"}]
+    for numbers, intact, expected in (((2, 5), True, "skill"), ((2, 5), False, "skill_edited"), ((3, 4), True, "by_code"),
+                                      ((2, 6), True, "by_code"), ((1, 2), True, "by_code"), ((1,), True, "skill"), ((), True, "skill")):
+        got = contract.origin_verdict(signs(*numbers), traces, intact)
+        check(f"вердикт: признаки {set(numbers) or '—'}, форма {'цела' if intact else 'нет'} → {expected}", got == expected, got)
     base = tempfile.mkdtemp(prefix="specs-merge-")
     try:
         main_checks(base)

@@ -111,7 +111,7 @@
         "template": {"description": "Заполнено шаблонно.", "type": "boolean"},
         "form_missing": {"description": "Номера разделов списка «Форма» рубрики без своего заголовка; null — модель форму не вернула.",
                          "oneOf": [{"type": "null"}, {"type": "array", "items": {"type": "integer", "minimum": 1}}]},
-        "origin": {"description": "Только у спеки: by_code — по готовому коду, skill — скиллом, skill_edited — скиллом и руками, outside — мимо фреймворка.",
+        "origin": {"description": "Только у спеки: by_code — по готовому коду (два разных признака кода, среди них «уже сделано»: 1, 3 или 6), skill — скиллом, skill_edited — скиллом и руками, outside — мимо фреймворка.",
                    "oneOf": [{"type": "null"}, {"enum": ["by_code", "skill", "skill_edited", "outside"]}]},
         "findings": {"description": "По строке на сниженный или «н/п» критерий, по порядку рубрики; у спеки «по коду» — ещё строка origin.",
                      "type": "array", "items": {"$ref": "#/$defs/finding"}}
