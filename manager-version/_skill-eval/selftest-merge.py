@@ -15,8 +15,8 @@
   task_setup (поздние вводные): задач 1 + 1 + 1 (по запуску на сессию); bq-1 [1] (вторая находка на том же ходе
     отброшена) → 1/3 = 0.333 → 42
   loaded_context: вызовов скиллов 4, все в первом ходе — контекста перед ними ещё нет, сжатий нет → 0/4 → 100
-  skill_share: реплик (с ответами на вопросы с вариантами) внутри запусков 5 + 6 + 5 + 4 = 20 из 6 + 7 + 6 + 5 = 24
-    → 0.833 → 100
+  skill_share: реплик (с вызовами через «/» и ответами на вопросы с вариантами) внутри запусков 6 + 6 + 6 + 4 = 22
+    из 7 + 7 + 7 + 5 = 26 → 0.846 → 100
   общий: (10 · (100 + 42 + 100 + 100 + 63 + 42 + 100) + 5 · 100) / 75 = 5970 / 75 = 79.6 → 80; фрод: обход (bq-3) и
   неподтверждённое как подтверждённое (bq-2) → hold. С минимумом событий 5 измерена только skill_share (вес 5 из 75)
   → скор не посчитан. Находки убранных видов (ухудшение агента, нечёткая постановка, переход к задаче) отбрасываются.
@@ -122,10 +122,10 @@ def main():
 
     # Посылки ручного счёта — факты collect.
     facts = {sid: json.load(open(os.path.join(work, f"{sid}.facts.json"), encoding="utf-8")) for sid in expected}
-    expect([facts[s]["user_turns"] for s in ("bq-1", "bq-2", "bq-3", "bq-4")] == [6, 7, 6, 5],
-           "реплики 6/7/6/5 — ответ на вопрос с вариантами тоже реплика")
-    expect([[run["user_turns"] for run in facts[s]["runs"]] for s in ("bq-1", "bq-2", "bq-3", "bq-4")] == [[5], [6], [5], [4]],
-           "реплик внутри запусков 5/6/5/4")
+    expect([facts[s]["user_turns"] for s in ("bq-1", "bq-2", "bq-3", "bq-4")] == [7, 7, 7, 5],
+           "реплики 7/7/7/5 — вызов через «/» и ответ на вопрос с вариантами тоже реплики")
+    expect([[run["user_turns"] for run in facts[s]["runs"]] for s in ("bq-1", "bq-2", "bq-3", "bq-4")] == [[6], [6], [6], [4]],
+           "реплик внутри запусков 6/6/6/4 — слэш-вызов открывает запуск и сам в нём")
     expect([[run["context_share_before"] for run in facts[s]["runs"]] for s in ("bq-1", "bq-2", "bq-3", "bq-4")]
            == [[0.0], [0.0], [0.0], [0.0]], "контекст перед вызовами: токены — с конца прошлого хода, а скиллы вызваны в первом")
     expect([[item["turn"] for item in facts[s]["decisions"]] for s in ("bq-1", "bq-2", "bq-3", "bq-4")]
@@ -139,7 +139,7 @@ def main():
     metrics = {item["id"]: item for item in doc["metrics"]}
     want = {"active_review": (0.667, 100, 0, 3), "blind_confirms": (0.333, 42, 1, 3), "delegated": (0.0, 100, 0, 3),
             "ignored": (0.0, 100, 0, 3), "completion": (0.75, 63, 1, 4), "task_setup": (0.333, 42, 1, 3),
-            "loaded_context": (0.0, 100, 0, 4), "skill_share": (0.833, 100, 0, 24)}
+            "loaded_context": (0.0, 100, 0, 4), "skill_share": (0.846, 100, 0, 26)}
     for metric_id, (value, score, hits, events) in want.items():
         got = metrics[metric_id]
         expect(got["status"] == "measured" and abs(got["value"] - value) <= 0.0005 and got["score"] == score

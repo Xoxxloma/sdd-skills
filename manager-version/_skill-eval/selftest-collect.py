@@ -82,8 +82,8 @@ def build(folder):
     a = Export("sess-a", "2026-10-20T09:00:00")
     a.start(0)                                                                                   # 1
     a.prompt(0, "Привет, давай начнём работу над БТ по выдаче справок")                          # 2
-    a.prompt(5, "/business-requirements-doc PAY-1")                                              # 3 команда
-    a.skill(6, "business-requirements-doc")                                                      # 4
+    a.prompt(5, "/business-requirements-doc PAY-1")                                              # 3 вызов через «/»
+    a.skill(6, "business-requirements-doc")                                                      # 4 тот же — не второй запуск
     a.answer(20, "Л" * 1600 + " Подтверждаешь гипотезы?", 100000)                                # 5
     a.prompt(25, "да")                                                                           # 6
     a.ask(70, [("Срок", "Какой срок хранения?", ["30 дней", "90 дней"], False, ["30 дней"], "30 дней"),
@@ -186,18 +186,19 @@ def main():
     expect(a["events"] == 16 and a["bad_events"] == 1, f"A: событий {a['events']}, битых {a['bad_events']}")
     expect(a["start"] == "2026-10-20T09:00:00Z" and a["duration_sec"] == 170, f"A: начало и длительность {a['duration_sec']}")
     expect(a["logins"] == ["ivanov"], f"A: login {a['logins']}")
-    expect(a["user_turns"] == 6, f"A: реплик пользователя {a['user_turns']}, ждали 6 (ответ на вопрос — реплика, слэш-команда — нет)")
+    expect(a["user_turns"] == 7, f"A: реплик пользователя {a['user_turns']}, ждали 7 (вызов через «/» и ответ на вопрос — реплики)")
     expect(a["unknown_events"] == ["PRE_COMPACT"], f"A: имена неизвестных событий — для сверки типизации {a['unknown_events']}")
     expect(a["scored"] is True and a["skip_reason"] is None, "A: оценивается")
     expect(a["skills"] == ["business-requirements-doc", "technical-spec-doc"], f"A: скиллы {a['skills']}")
     runs = a["runs"]
     first, second = (runs + [{}, {}])[:2]
     expect(len(runs) == 2, f"A: запусков {len(runs)}")
-    expect(first.get("turn") == 4 and first.get("user_turns") == 3 and first.get("replied") is True
+    expect(first.get("turn") == 3 and first.get("via") == "user" and first.get("user_turns") == 4 and first.get("replied") is True
            and first.get("ended_by") == "next_skill" and first.get("question") is None and first.get("error_end") is False
            and first.get("context_share_before") == 0.0 and first.get("after_compression") is False,
            f"A: первый запуск {first}")
-    expect(second.get("turn") == 11 and second.get("user_turns") == 2 and second.get("ended_by") == "session_end"
+    expect(second.get("turn") == 11 and second.get("via") == "agent" and second.get("user_turns") == 2
+           and second.get("ended_by") == "session_end"
            and second.get("question") == {"turn": 15, "text": "Какой формат ответа у ручки?"} and second.get("error_end") is False
            and second.get("context_share_before") == 0.763 and second.get("after_compression") is True,
            f"A: второй запуск — контекст с конца прошлого хода (200000 / 262000), после сжатия, концовка вопросом: {second}")
@@ -219,8 +220,9 @@ def main():
     journal = load("sess-a.journal.txt")
     lines = journal.splitlines()
     expect(lines[0].startswith("# Сессия sess-a") and "событий 16" in lines[0], f"журнал A: шапка {lines[0]}")
-    expect("[3] КОМАНДА: /business-requirements-doc PAY-1" in lines and "[4] СКИЛЛ: business-requirements-doc" in lines,
-           "журнал A: команда и скилл")
+    expect("[3] ПОЛЬЗОВАТЕЛЬ: /business-requirements-doc PAY-1" in lines
+           and "[3] СКИЛЛ: business-requirements-doc (вызов пользователем)" in lines,
+           "журнал A: вызов через «/» — реплика и запуск скилла")
     expect("[7] ОТВЕТ: Срок: 30 дней (вариант)" in lines and "[7] ОТВЕТ: Канал: СМС, почта (Другое)" in lines,
            "журнал A: ответы на вопрос с вариантами")
     expect("[7] ВОПРОС: Срок: Какой срок хранения? | варианты: 30 дней / 90 дней" in lines, "журнал A: вопрос с вариантами")
@@ -228,7 +230,8 @@ def main():
     expect(" … " in agent_line and agent_line.endswith("Подтверждаешь гипотезы?"), "журнал A: длинный ответ агента — начало и конец")
     expect("[9] СЖАТИЕ КОНТЕКСТА" in lines and "[12] ОШИБКА API: rate_limit" in lines, "журнал A: сжатие и ошибка API")
     expect("[10] ПОЛЬЗОВАТЕЛЬ: пароль от стенда ****" in journal and "qwerty123" not in journal, "журнал A: секрет замаскирован")
-    expect(not any(line.startswith(("[1]", "[16]", "[17]")) for line in lines), "журнал A: старт, битое и неизвестное — без строк")
+    expect(not any(line.startswith(("[1]", "[4]", "[16]", "[17]")) for line in lines),
+           "журнал A: старт, SKILL_USE после слэш-вызова, битое и неизвестное — без строк")
     tail = journal.split(collect.CHECKS_HEADER, 1)[-1].strip().splitlines()
     expect(tail == ["- decision [6]: ответ на вопрос агента текстом", "- decision [7]: ответ на вопрос агента с вариантами",
                     "- ending [15]: запуск technical-spec-doc кончился вопросом агента без ответа"],

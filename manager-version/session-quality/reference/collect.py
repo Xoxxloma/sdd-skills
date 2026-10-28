@@ -34,7 +34,6 @@ DECISION_MIN = READING_SPEED = HUMAN_SPEED = HUMAN_MIN_SECONDS = REPEAT_MIN_CHAR
 EVENT_NAMES = ("START_SESSION", "USER_PROMPT", "ASSISTANT_ANSWER", "ASK_USER_QUESTION", "SKILL_USE", "STOP_FAILURE")
 USER_LABEL = "ПОЛЬЗОВАТЕЛЬ"  # реплики пользователя в сжатом журнале
 CHECKS_HEADER = "## Проверить — на каждую строку ровно один ответ в checks"
-COMMAND_LIMIT = 80  # слэш-команда в журнале
 
 KEYED_SECRET_RE = re.compile(
     r"\b(пароль|password|passwd|pwd|token|токен|secret|секрет|api[_-]?key)(\s+от\s+\S+)?(\s*[:=]\s*|\s+)(?=\S*\d)(\S+)",
@@ -248,15 +247,16 @@ class Session:
         self.last_error = False       # последнее событие — ошибка API
         self.prev_stamp = None        # время прошлого события — показ вопроса с вариантами не выгружается
         self.unknown = set()          # имена неизвестных событий — для сверки типизации
+        self.command = None           # скилл, только что вызванный через «/»: следом может прийти его SKILL_USE
 
     # -- общее
 
     def event(self, turn, text):
         self.events.append((turn, text))
 
-    def start_run(self, name, turn):
+    def start_run(self, name, turn, via):
         self.close_run("next_skill")
-        self.run = {"skill": name, "turn": turn, "user_turns": 0, "replied": False, "ended_by": None,
+        self.run = {"skill": name, "turn": turn, "via": via, "user_turns": 0, "replied": False, "ended_by": None,
                     "question": None, "error_end": False,
                     # контекст на запросе прямо перед вызовом и было ли сжатие раньше — для «нагруженного контекста»
                     "context_tokens_before": self.last_tokens, "context_share_before": None,
@@ -323,12 +323,11 @@ class Session:
         flat = one_line(raw)
         if not flat:
             return
-        if flat.startswith("/"):  # слэш-команда; скилл, если это он, придёт отдельным SKILL_USE
-            self.event(turn, f"КОМАНДА: {clip(mask(flat), COMMAND_LIMIT)}")
-            return
+        # Вызов через «/» — скилл, запущенный пользователем: SKILL_USE на него не приходит, запуск открывает реплика.
+        command = flat[1:].split(maxsplit=1)[0] if flat.startswith("/") and len(flat) > 1 else None
         self.user_turns += 1
         self.last_error = False
-        if self.run:
+        if self.run and not command:
             self.run["user_turns"] += 1
         if len(raw) > INSERT_LIMIT:
             self.event(turn, f"{USER_LABEL}: {clip(mask(flat), INSERT_PREVIEW)} …(вставка, {len(raw)} симв.)")
@@ -340,7 +339,12 @@ class Session:
         self.responded(turn, stamp, len(flat), "text", asked)
         if asked:
             self.answers_total += 1
-        self.question = None
+        self.question = None  # вопрос агента отвечен — в том числе вызовом скилла
+        if command:
+            self.start_run(command, turn, "user")
+            self.run["user_turns"] += 1  # команда — первая реплика запуска
+            self.event(turn, f"СКИЛЛ: {command} (вызов пользователем)")
+        self.command = command
 
     def answer(self, event, turn, stamp):
         tokens = event.get("inputTokens")
@@ -416,7 +420,10 @@ class Session:
 
     def skill(self, event, turn):
         name = one_line(text_of(event, "skillName")) or "?"
-        self.start_run(name, turn)
+        command, self.command = self.command, None
+        if command and self.run and self.run["via"] == "user" and command.split(":")[-1] == name.split(":")[-1]:
+            return  # этот запуск уже открыл слэш-вызов
+        self.start_run(name, turn, "agent")
         self.event(turn, f"СКИЛЛ: {name}")
 
     def failure(self, event, turn):
@@ -436,6 +443,8 @@ class Session:
             self.prev_stamp = stamp
             return
         self.hits[name] += 1
+        if name not in ("USER_PROMPT", "SKILL_USE"):
+            self.command = None
         if name == "START_SESSION":
             self.start(event, turn)
         elif name == "USER_PROMPT":

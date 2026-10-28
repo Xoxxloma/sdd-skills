@@ -1,8 +1,8 @@
 """Журнал в формате qwen-code (так его собирает стенд) → выгрузка сессии, как на проде (SessionFile, sessions/*.json).
 
 Выгрузка — события хуков агента: START_SESSION (startup, compact), USER_PROMPT, ASSISTANT_ANSWER — последнее сообщение
-агента за ход и токены запроса, ASK_USER_QUESTION — вопрос с вариантами вместе с ответом, SKILL_USE, STOP_FAILURE —
-ошибка API вместо конца хода. Вызовы инструментов, их ошибки и промежуточные реплики агента в выгрузку не попадают:
+агента за ход и токены запроса, ASK_USER_QUESTION — вопрос с вариантами вместе с ответом, SKILL_USE — вызов скилла
+агентом (на слэш-вызов пользователя приходит только USER_PROMPT «/имя …»), STOP_FAILURE — ошибка API вместо конца хода. Вызовы инструментов, их ошибки и промежуточные реплики агента в выгрузку не попадают:
 стенд показывает модели ровно то, что увидит прод.
 
     to_export([(номер записи, запись), …], session_id) → (выгрузка, {номер записи: номер события})
@@ -46,11 +46,6 @@ def user_text(parts):
             continue
         texts.append(text)
     return "\n".join(texts)
-
-
-def skill_name(text):
-    first = text.lstrip()[len(SKILL_INJECT):].splitlines()[0].strip().rstrip("\\/")
-    return re.split(r"[\\/]", first)[-1] if first else "?"
 
 
 def answered(questions, output):
@@ -117,8 +112,7 @@ def to_export(records, session_id, login="user-01"):
             inject = next((part["text"] for part in parts if isinstance(part.get("text"), str)
                            and part["text"].lstrip().startswith(SKILL_INJECT)), None)
             if inject is not None:
-                mapping[position] = emit("SKILL_USE", moment, skillName=skill_name(inject))
-                continue
+                continue  # текст скилла после слэш-вызова: на проде события нет, вызов — сама реплика «/имя …»
             text = user_text(parts)
             if text:
                 close_turn()
