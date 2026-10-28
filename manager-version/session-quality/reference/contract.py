@@ -360,7 +360,8 @@ def selftest():
         ("категория в метрике", lambda d: metric(d, "completion")["evidence"].append(
             {"session": "05e393e5", "turn": 50, "category": "personal", "turns": 1}), "лишнее поле «category»"),
         ("цитата у посторонних", lambda d: d["discipline"]["off_topic"]["evidence"][0].update(quote="личное"), "лишнее поле «quote»"),
-        ("посчитана при малом числе событий", lambda d: metric(d, "blind_confirms").update(events=3), "blind_confirms: событий 3 — меньше 5"),
+        ("посчитана при малом числе событий", lambda d: (d["params"].update(min_events=5), metric(d, "blind_confirms").update(events=3)),
+         "blind_confirms: событий 3 — меньше 5"),
         ("пропущена без причины", lambda d: d["sessions"][6].pop("skip_reason"), "нет поля «skip_reason»"),
         ("оценена с причиной пропуска", lambda d: d["sessions"][0].update(skip_reason="лишнее"), "запрещённый вариант"),
         ("счёт сессий", lambda d: d["subject"].update(sessions_total=10), "sessions_total = 10"),

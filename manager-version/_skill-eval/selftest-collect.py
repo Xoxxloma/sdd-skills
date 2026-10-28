@@ -122,6 +122,26 @@ def build(folder):
     c.add(50, "ASK_USER_QUESTION", askUserQuestion="{broken")                                    # 9
     c.write(folder)
 
+    d = Export("sess-d", "2026-10-22T09:00:00")
+    d.start(0)                                                                                   # 1
+    d.prompt(1, "Собери требования по задаче выгрузки")                                          # 2
+    d.answer(10, "Нашёл три варианта схемы. Какой берём?", 20000)                                # 3
+    d.ask(30, [("Вариант", "Какой берём?", ["A", "B"], False, ["A"], "A")])                       # 4
+    d.raw(dict(d.events[-1], id="dup-1"))                                                        # 5 дубль выгрузки
+    d.prompt(40, "дальше по плану")                                                              # 6
+    d.raw(dict(d.events[-1], id="dup-2"))                                                        # 7 дубль выгрузки
+    d.write(folder)
+
+    e = Export("sess-e", "2026-10-23T09:00:00")
+    e.start(0)                                                                                   # 1
+    e.prompt(1, "Подготовь контекст по задаче выгрузки")                                         # 2
+    e.skill(5, "context-doc")                                                                    # 3 запуск агентом
+    e.ask(40, [("Источник", "Откуда берём данные?", ["Из задачи", "Из переписки"], False, ["Из задачи"], "")])  # 4 только вопрос
+    e.skill(50, "business-requirements-doc")                                                     # 5
+    e.answer(60, "Собрал черновик БТ по задаче выгрузки. Проверь разделы — всё верно?", 30000)   # 6
+    e.prompt(200, "[Pasted Content 3021 chars]")                                                 # 7 заглушка вставки
+    e.write(folder)
+
     with open(os.path.join(folder, "notes.txt"), "w", encoding="utf-8") as handle:
         handle.write("не выгрузка")
     with open(os.path.join(folder, "old.jsonl"), "w", encoding="utf-8") as handle:
@@ -174,12 +194,13 @@ def main():
     expect(summary["user"] == "ivanov", f"пользователь — login из выгрузки: {summary['user']}")
     expect("Иванов" not in json.dumps(summary, ensure_ascii=False), "ФИО в выход не попадает")
     expect(summary["params"]["context_window"] == 262000, f"окно из params.json: {summary['params']['context_window']}")
-    expect([s["session"] for s in summary["sessions"]] == ["sess-a", "sess-b", "sess-c"], "порядок сессий по началу")
+    expect([s["session"] for s in summary["sessions"]] == ["sess-a", "sess-b", "sess-c", "sess-d", "sess-e"],
+           "порядок сессий по началу")
     skipped = {item["file"]: item["reason"] for item in summary["skipped_files"]}
     expect(skipped == {"notes.txt": "не выгрузка сессии", "old.jsonl": "не выгрузка сессии", "broken.json": "не JSON",
                        "empty.json": "нет событий"}, f"пропущенные файлы: {skipped}")
     hits = summary["hits"]
-    expect(hits["SKILL_USE"] == 2 and hits["ASK_USER_QUESTION"] == 5 and hits["STOP_FAILURE"] == 1
+    expect(hits["SKILL_USE"] == 4 and hits["ASK_USER_QUESTION"] == 7 and hits["STOP_FAILURE"] == 1 and hits["duplicate"] == 2
            and hits["compact"] == 1 and hits["unknown"] == 1, f"сверка событий: {hits}")
 
     a = load("sess-a.facts.json")
@@ -206,8 +227,10 @@ def main():
     expect(a["answers"]["total"] == 3 and a["answers"]["verdicts"] == {"вариант": 1, "Другое": 1, "нет ответа": 0},
            f"A: ответы {a['answers']}")
     expect(a["decisions"] == [
-        {"turn": 6, "kind": "text", "asked": True, "agent_chars": 1624, "answer_chars": 2, "seconds": 5.0, "speed": 325},
-        {"turn": 7, "kind": "question", "asked": True, "agent_chars": 51, "answer_chars": 17, "seconds": 45.0, "speed": 1}],
+        {"turn": 6, "kind": "text", "asked": True, "option": False, "agent_chars": 1624, "answer_chars": 2, "seconds": 5.0,
+         "speed": 325},
+        {"turn": 7, "kind": "question", "asked": True, "option": False, "agent_chars": 51, "answer_chars": 17, "seconds": 45.0,
+         "speed": 1}],
         f"A: места решения — длинный текст с вопросом (1624 симв. / 5 с) и вопрос с вариантами, время — от прошлого "
         f"события [6] (45 с): {a['decisions']}")
     expect(a["fast"] == [{"turn": 6, "seconds": 5.0, "agent_chars": 1624}], f"A: быстрее человека: {a['fast']}")
@@ -264,6 +287,22 @@ def main():
     expect("[7] ПОЛЬЗОВАТЕЛЬ: спасибо, тестовая карта ****" in c_journal, "журнал C: карта замаскирована")
     expect("[8] ОТВЕТ: Режим: A (вариант)" in c_journal, "журнал C: askUserQuestion объектом, а не строкой, — разобран")
     expect("[9] ВОПРОС: — (не разобран)" in c_journal, "журнал C: битая строка askUserQuestion — без падения")
+
+    dd = load("sess-d.facts.json")
+    expect(dd["user_turns"] == 3 and dd["fast"] == [] and dd["repeat_streaks"] == []
+           and [(item["turn"], item["kind"]) for item in dd["decisions"]] == [(4, "question")] and dd["hits"]["duplicate"] == 2,
+           f"D: дубли выгрузки (тот же вопрос и та же реплика следом, другой id) пропущены, а не «ответ через 0 с»: "
+           f"{dd['user_turns']}, {dd['fast']}, {dd['decisions']}")
+    d_lines = load("sess-d.journal.txt").splitlines()
+    expect(not any(line.startswith(("[5]", "[7]")) for line in d_lines), "журнал D: дублей нет")
+
+    ee = load("sess-e.facts.json")
+    expect([(run["skill"], run["replied"]) for run in ee["runs"]] == [("context-doc", True), ("business-requirements-doc", True)],
+           f"E: запуск, где агент только спросил вариантами (ASSISTANT_ANSWER нет), — агент ответил: {ee['runs']}")
+    expect([(item["turn"], item["option"]) for item in ee["decisions"]] == [(4, True)] and ee["hidden_turns"] == [7]
+           and ee["fast"] == [] and ee["user_turns"] == 3,
+           f"E: выбор варианта помечен; реплика из одной заглушки вставки — не место решения: {ee['decisions']}, "
+           f"{ee['hidden_turns']}, {ee['user_turns']}")
 
     printed = screen.getvalue()
     for secret in ("qwerty", "пароль", "4111", "Привет", "PAY-1", "Иванов"):

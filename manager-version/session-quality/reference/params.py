@@ -25,7 +25,8 @@ REQUIRED = {
     "evaluation": ("decision_min_chars", "reading_speed", "human_speed", "human_min_seconds", "autoinput_fast_min",
                    "autoinput_repeat_min", "autoinput_repeat_min_chars", "continuation_hours", "context_window",
                    "loaded_context_share", "min_events", "min_user_turns", "min_measured_weight"),
-    "technical": ("agent_head", "agent_tail", "insert_limit", "insert_preview", "journal_limit", "evidence_limit"),
+    "technical": ("agent_head", "agent_tail", "insert_limit", "insert_preview", "journal_limit", "evidence_limit",
+                  "duplicate_seconds"),
 }
 
 

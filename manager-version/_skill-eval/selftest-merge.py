@@ -20,6 +20,12 @@
   общий: (10 · (100 + 42 + 100 + 100 + 63 + 42 + 100) + 5 · 100) / 75 = 5970 / 75 = 79.6 → 80; фрод: обход (bq-3) и
   неподтверждённое как подтверждённое (bq-2) → hold. С минимумом событий 5 измерена только skill_share (вес 5 из 75)
   → скор не посчитан. Находки убранных видов (ухудшение агента, нечёткая постановка, переход к задаче) отбрасываются.
+
+Сессия opt-1 (своя папка, выгрузка): запуски context-doc [3] и business-requirements-doc [9]; места решения — [4] выбор
+варианта (accepted), [6] и [8] текстом (engaged); [11] — одна заглушка вставки. Поздние вводные — модель на [6], [8]
+(обе в первом запуске) и [11] (заглушка — отброшена):
+  active_review 2/2 = 1.0 (выбор варианта не в знаменателе; было бы 2/3) · blind_confirms 0/3 (выбор варианта — здесь)
+  task_setup: задач 2, с поздними вводными — первая → 1/2 = 0.5 (было бы min(3, 2) / 2 = 1.0)
 """
 
 from __future__ import annotations
@@ -36,6 +42,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REFERENCE = os.path.join(HERE, "..", "session-quality", "reference")
 sys.path.insert(0, REFERENCE)
 sys.path.insert(0, HERE)
+import importlib.util  # noqa: E402
+
 import brief_fixtures  # noqa: E402
 import collect  # noqa: E402
 import contract  # noqa: E402
@@ -61,6 +69,11 @@ def main():
     loose_path = os.path.join(root, "params-min1.json")
     with open(loose_path, "w", encoding="utf-8") as handle:
         json.dump(loose, handle, ensure_ascii=False)
+    strict_params = params.load()
+    strict_params["evaluation"]["min_events"]["value"] = 5
+    strict_path = os.path.join(root, "params-min5.json")
+    with open(strict_path, "w", encoding="utf-8") as handle:
+        json.dump(strict_params, handle, ensure_ascii=False)
 
     journals = {}
     for session_id in expected:
@@ -103,7 +116,8 @@ def main():
     screen = io.StringIO()
     with contextlib.redirect_stdout(screen):
         code = merge.main(["--work", work, "--out", out, "--date", "2026-10-27", "--params", loose_path, "--keep-work"])
-        strict = merge.main(["--work", work, "--out", os.path.join(root, "strict"), "--date", "2026-10-27", "--keep-work"])
+        strict = merge.main(["--work", work, "--out", os.path.join(root, "strict"), "--date", "2026-10-27", "--params", strict_path,
+                             "--keep-work"])
 
     failures, checks = [], 0
 
@@ -222,6 +236,62 @@ def main():
     expect(not os.path.exists(work) and os.path.exists(side_log)
            and "не разобрана — находка остаётся" in open(side_log, encoding="utf-8").read(),
            "без --keep-work рабочая папка убрана, журнал отброшенного — рядом с отчётом")
+
+    expect("Вердикты (сессия [ход] проверка: вердикт):" in open(side_log, encoding="utf-8").read(),
+           "в журнале рядом с отчётом — вердикты по проверкам")
+
+    # Выбор варианта, задача своего запуска, заглушка вставки, цитата ответа — на выгрузке своей сессии.
+    spec = importlib.util.spec_from_file_location("selftest_collect", os.path.join(HERE, "selftest-collect.py"))
+    builder = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(builder)
+    opt_sessions, opt_work = os.path.join(root, "sessions", "user-02"), os.path.join(root, "work-opt")
+    os.makedirs(opt_sessions)
+    s = builder.Export("opt-1", "2026-10-24T09:00:00", login="user-02")
+    s.start(0)                                                                                   # 1
+    s.prompt(1, "Собери БТ по выгрузке платежей")                                                # 2
+    s.skill(5, "context-doc")                                                                    # 3
+    s.ask(40, [("Источник", "Откуда берём данные?", ["Из задачи", "Из переписки"], False, ["Из задачи"], "")])  # 4
+    s.answer(60, "Черновик готов. Всё верно?", 20000)                                            # 5
+    s.prompt(120, "Нет, забыл сказать: сумма обязательна")                                       # 6
+    s.answer(150, "Учёл. Ещё что-то?", 22000)                                                    # 7
+    s.prompt(220, "ещё забыл: валюта только рубли")                                              # 8
+    s.skill(230, "business-requirements-doc")                                                    # 9
+    s.answer(300, "БТ готов. Проверь, всё верно?", 30000)                                        # 10
+    s.prompt(500, "[Pasted Content 3021 chars]")                                                 # 11
+    s.write(opt_sessions)
+    with contextlib.redirect_stdout(io.StringIO()):
+        collect.main(["--sessions", opt_sessions, "--out", opt_work])
+    _events, _users, opt_candidates = merge.parse_journal(open(os.path.join(opt_work, "opt-1.journal.txt"),
+                                                               encoding="utf-8").read())
+    verdicts = {4: "accepted", 6: "engaged", 8: "engaged"}
+    answer = {"findings": [{"type": "late_requirement", "turn": 6, "quote": "забыл сказать: сумма обязательна"},
+                           {"type": "late_requirement", "turn": 8, "quote": "ещё забыл: валюта только рубли"},
+                           {"type": "late_requirement", "turn": 11, "quote": "[Pasted Content 3021 chars]"}],
+              "checks": [{"check": check, "turn": turn, "verdict": verdicts.get(turn, "no")}
+                         for check, turn in opt_candidates]}
+    with open(os.path.join(opt_work, "opt-1.findings.txt"), "w", encoding="utf-8") as handle:
+        json.dump(answer, handle, ensure_ascii=False)
+    with contextlib.redirect_stdout(io.StringIO()):
+        opt_code = merge.main(["--work", opt_work, "--out", os.path.join(root, "opt"), "--date", "2026-10-27",
+                               "--params", loose_path])
+    expect(opt_code == 0 and [check for check in opt_candidates if check[0] == "decision"]
+           == [("decision", 4), ("decision", 6), ("decision", 8)], f"opt-1: места решения {opt_candidates}")
+    opt_doc = json.load(open(os.path.join(root, "opt", "user-02-2026-10-27.json"), encoding="utf-8"))
+    opt = {item["id"]: item for item in opt_doc["metrics"]}
+    expect((opt["active_review"]["value"], opt["active_review"]["events"]) == (1.0, 2)
+           and (opt["blind_confirms"]["value"], opt["blind_confirms"]["events"]) == (0.0, 3)
+           and opt["delegated"]["events"] == 2 and opt["ignored"]["events"] == 2,
+           f"выбор варианта — только в «не читая»: {[(k, opt[k]['value'], opt[k]['events']) for k in opt]}")
+    expect((opt["task_setup"]["value"], opt["task_setup"]["events"]) == (0.5, 2)
+           and [item["turn"] for item in opt["task_setup"]["evidence"]] == [6],
+           f"поздние вводные — задача своего запуска, одна на задачу: {opt['task_setup']}")
+    opt_log = open(os.path.join(root, "opt", "user-02-2026-10-27.log.txt"), encoding="utf-8").read()
+    expect("late_requirement в ходе 11 — реплика из заглушки вставки, текста нет, отброшена" in opt_log
+           and "opt-1 [4] decision: accepted (выбор варианта)" in opt_log and "opt-1 [6] decision: engaged" in opt_log,
+           f"журнал opt-1: заглушка отброшена, вердикты записаны: {opt_log}")
+    expect(merge.line_quote({4: ["ВОПРОС: Источник: Откуда берём данные? | варианты: Из задачи / Из переписки",
+                                 "ОТВЕТ: Источник: Из задачи (вариант)"]}, 4) == "Источник: Из задачи (вариант)",
+           "цитата хода с вопросом — ответ, а не вопрос")
 
     if failures:
         print("\n".join(failures))

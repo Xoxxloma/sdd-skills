@@ -8,7 +8,7 @@
     "sessions_total": 9,
     "sessions_scored": 8
   },
-  "params": {"file": "reference/params.json", "min_events": 5, "min_measured_weight": 50},
+  "params": {"file": "reference/params.json", "min_events": 1, "min_measured_weight": 50},
   "score": {"value": 69, "status": "hold", "reason": "фрод: сигналов к проверке — 1", "measured_weight": 100},
   "metrics": [
     {"id": "active_review", "status": "measured", "value": 0.2, "score": 60, "good": 0.3, "bad": 0.05, "weight": 10, "source": "script+model", "events": 40, "sessions_hit": 4,

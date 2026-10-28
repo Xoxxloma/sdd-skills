@@ -43,6 +43,9 @@ CHECK_RE = re.compile(r"^- (\w+) \[(\d+)\]:")
 # ---------------------------------------------------------------- журнал и ответ модели
 
 
+VERDICTS_HEADER = "Вердикты (сессия [ход] проверка: вердикт):"
+
+
 def parse_journal(text):
     """(события по ходам, ходы пользователя по порядку, кандидаты раздела «Проверить»)."""
     body, _, checks = text.partition(collect.CHECKS_HEADER)
@@ -112,14 +115,16 @@ def event_quote(events, turn, prefixes=()):
 
 
 def line_quote(events, turn):
-    """Текст хода без метки — для реплик пользователя."""
-    content = events[turn][0]
+    """Текст хода без метки — для реплик пользователя; в ходе с вопросом агента — строка ответа, а не вопроса."""
+    lines = events[turn]
+    content = next((line for line in lines if line.startswith(("ОТВЕТ:", collect.USER_LABEL + ":"))), lines[0])
     content = content.split(": ", 1)[1] if ": " in content else content
     return collect.clip(content, 199)
 
 
-def model_findings(session_id, raw, events, users, candidates, schema, log):
-    """Проверенные находки модели по сессии; None — ответа нет или он не разобрался."""
+def model_findings(session_id, raw, events, users, candidates, schema, log, hidden=()):
+    """Проверенные находки модели по сессии; None — ответа нет или он не разобрался. hidden — реплики из одних
+    заглушек вставки: находки на них не судимы и отбрасываются."""
     if raw is None:
         log(f"{session_id}: нет ответа модели")
         return None
@@ -144,6 +149,9 @@ def model_findings(session_id, raw, events, users, candidates, schema, log):
             log(f"{session_id}: находка отброшена — {errors[0]}")
             continue
         turn = item["turn"]
+        if turn in hidden:
+            log(f"{session_id}: {item['type']} в ходе {turn} — реплика из заглушки вставки, текста нет, отброшена")
+            continue
         if item["type"] == "off_topic":
             if turn not in users:
                 log(f"{session_id}: посторонняя тема с хода {turn} — не реплика пользователя, отброшена")
@@ -246,34 +254,39 @@ def compute_metrics(scored, model, events, p, all_facts=None):
     out = {}
 
     # Места решения: вердикт модели делит их на «включился», «согласился», «отдал агенту», «ответил не на вопрос».
-    places, picked = 0, {kind: [] for kind in ("engaged", "blind", "delegated", "ignored")}
+    # Выбор готового варианта — только в «не читая»: остальные три меряют ответы текстом, иначе меряли бы набор скиллов.
+    places, typed_places, picked = 0, 0, {kind: [] for kind in ("engaged", "blind", "delegated", "ignored")}
     per_session = {kind: [] for kind in picked}
     for facts in with_model:
         verdicts = model[facts["session"]]["checks"]
         mine = [(item, verdicts[("decision", item["turn"])]) for item in facts["decisions"]
                 if verdicts.get(("decision", item["turn"])) not in (None, "no")]
+        typed = [(item, verdict) for item, verdict in mine if not item.get("option")]
         places += len(mine)
+        typed_places += len(typed)
         session_picked = {
-            "engaged": [item for item, verdict in mine if verdict == "engaged"],
+            "engaged": [item for item, verdict in typed if verdict == "engaged"],
             "blind": [item for item, verdict in mine if verdict == "accepted" and item["speed"] is not None
                       and item["speed"] > reading],
-            "delegated": [item for item, verdict in mine if verdict == "delegated"],
-            "ignored": [item for item, verdict in mine if verdict == "ignored"],
+            "delegated": [item for item, verdict in typed if verdict == "delegated"],
+            "ignored": [item for item, verdict in typed if verdict == "ignored"],
         }
         for kind, items in session_picked.items():
             picked[kind] += [(facts, item) for item in items]
-            per_session[kind].append(share(len(items), len(mine)))
+            per_session[kind].append(share(len(items), len(mine) if kind == "blind" else len(typed)))
     notes = {"engaged": lambda item: "включился по существу",
              "blind": lambda item: f"согласие через {item['seconds']:g} с на {item['agent_chars']} симв. текста агента",
              "delegated": lambda item: "решение отдано агенту",
              "ignored": lambda item: "ответ не на вопрос или предупреждение агента"}
     for metric_id, kind in (("active_review", "engaged"), ("blind_confirms", "blind"), ("delegated", "delegated"),
                             ("ignored", "ignored")):
-        out[metric_id] = metric(metric_id, share(len(picked[kind]), places) if with_model else None, places, per_session[kind],
+        whole = places if kind == "blind" else typed_places
+        out[metric_id] = metric(metric_id, share(len(picked[kind]), whole) if with_model else None, whole, per_session[kind],
                                 [{"session": facts["session"], "turn": item["turn"],
                                   "quote": line_quote(events[facts["session"]], item["turn"]), "note": notes[kind](item)}
                                  for facts, item in picked[kind]],
-                                no_model if not with_model else "не было мест решения")
+                                no_model if not with_model else
+                                "не было мест решения" if kind == "blind" else "не было мест решения с ответом текстом")
 
     # Доведение до результата: запуск, кончившийся ошибкой, не в счёт; спорная концовка без вердикта модели — тоже.
     order = sorted(all_facts, key=lambda facts: facts["start"])
@@ -328,11 +341,15 @@ def compute_metrics(scored, model, events, p, all_facts=None):
     for facts in with_model:
         found = model[facts["session"]]
         tasks = max(1, len(facts["runs"]))
-        bad = [dict(entry, note="вводные задним числом") for entry in found["late_requirement"]]
+        # Находка — в задачу своего запуска (до первого запуска — в первую); задача с поздними вводными одна, пример — первый.
+        by_task = {}
+        for entry in sorted(found["late_requirement"], key=lambda entry: entry["turn"]):
+            task = sum(1 for run in facts["runs"][1:] if run["turn"] <= entry["turn"])
+            by_task.setdefault(task, dict(entry, note="вводные задним числом"))
         tasks_total += tasks
-        bad_total += min(len(bad), tasks)
-        per_session_setup.append(share(min(len(bad), tasks), tasks))
-        setup += sorted(bad, key=lambda entry: entry["turn"])
+        bad_total += len(by_task)
+        per_session_setup.append(share(len(by_task), tasks))
+        setup += sorted(by_task.values(), key=lambda entry: entry["turn"])
     out["task_setup"] = metric("task_setup", share(bad_total, tasks_total) if with_model else None, tasks_total,
                                per_session_setup, setup, no_model)
 
@@ -443,7 +460,8 @@ def build(work, p, params_file, generated_at=None):
         journals[facts["session"]] = events
         raw_path = os.path.join(work, f"{facts['session']}.findings.txt")
         raw = open(raw_path, encoding="utf-8").read() if os.path.exists(raw_path) else None
-        found = model_findings(facts["session"], raw, events, users, candidates, findings_schema, log_lines.append)
+        found = model_findings(facts["session"], raw, events, users, candidates, findings_schema, log_lines.append,
+                               set(facts.get("hidden_turns", [])))
         if found is not None:
             apply_verification(work, facts["session"], found, log_lines.append)
             model[facts["session"]] = found
@@ -489,7 +507,13 @@ def build(work, p, params_file, generated_at=None):
         if not facts["scored"]:
             item["skip_reason"] = facts["skip_reason"]
         doc["sessions"].append(item)
-    return doc, log_lines
+    # Вердикты модели по каждой проверке — без цитат: по ним перепроверяют метрики, когда рабочей папки уже нет.
+    options = {(facts["session"], item["turn"]) for facts in all_facts for item in facts["decisions"] if item.get("option")}
+    verdict_lines = [f"{session_id} [{turn}] {check}: {verdict}"
+                     + (" (выбор варианта)" if check == "decision" and (session_id, turn) in options else "")
+                     for session_id, found in model.items()
+                     for (check, turn), verdict in sorted(found["checks"].items(), key=lambda pair: (pair[0][1], pair[0][0]))]
+    return doc, log_lines, verdict_lines
 
 
 # ---------------------------------------------------------------- отчёт
@@ -615,7 +639,7 @@ def main(argv=None):
         print(f"Параметры не годятся: {error}")
         return 2
 
-    doc, log_lines = build(cfg.work, p, cfg.params or params.DEFAULT_PATH)
+    doc, log_lines, verdict_lines = build(cfg.work, p, cfg.params or params.DEFAULT_PATH)
     with open(SCHEMA_PATH, encoding="utf-8") as handle:
         schema = json.load(handle)
     errors = contract.check_document(doc, schema)
@@ -631,9 +655,10 @@ def main(argv=None):
         json.dump(doc, handle, ensure_ascii=False, indent=2)
     with open(base + ".md", "w", encoding="utf-8") as handle:
         handle.write(render(doc, p))
-    if log_lines:  # что отброшено из ответов модели — рядом с отчётом, рабочая папка дальше не нужна
+    if log_lines or verdict_lines:  # что отброшено и вердикты — рядом с отчётом, рабочая папка дальше не нужна
         with open(base + ".log.txt", "w", encoding="utf-8") as handle:
-            handle.write("\n".join(log_lines) + "\n")
+            verdict_block = [VERDICTS_HEADER] + verdict_lines if verdict_lines else []
+            handle.write("\n".join(log_lines + ([""] if log_lines and verdict_block else []) + verdict_block) + "\n")
     if not cfg.keep_work:
         collect.clean_work(cfg.work)
         try:
@@ -644,7 +669,8 @@ def main(argv=None):
     print(f"Скор: {score['value'] if score['value'] is not None else '—'} ({score['status']})")
     print(f"Сессий: {doc['subject']['sessions_total']}, оценено: {doc['subject']['sessions_scored']}")
     print(f"Сигналов фрода: {len(doc['fraud']['signals'])}")
-    print(f"Записей об отброшенном: {len(log_lines)}" + (f" — {base}.log.txt" if log_lines else ""))
+    print(f"Записей об отброшенном: {len(log_lines)}, вердиктов: {len(verdict_lines)}"
+          + (f" — {base}.log.txt" if log_lines or verdict_lines else ""))
     print(f"Куда записано: {base}.json, {base}.md")
     print("Рабочая папка " + ("оставлена" if cfg.keep_work or os.path.isdir(cfg.work) else "убрана") + f": {cfg.work}")
     return 0

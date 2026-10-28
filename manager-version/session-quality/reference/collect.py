@@ -29,6 +29,7 @@ import params
 
 # Пороги и размеры ставит configure() из params.json; здесь только имена, которыми пользуется код.
 MIN_USER_TURNS = INSERT_LIMIT = INSERT_PREVIEW = AGENT_HEAD = AGENT_TAIL = JOURNAL_LIMIT = CONTEXT_WINDOW = None
+DUPLICATE_SECONDS = None
 DECISION_MIN = READING_SPEED = HUMAN_SPEED = HUMAN_MIN_SECONDS = REPEAT_MIN_CHARS = None
 
 EVENT_NAMES = ("START_SESSION", "USER_PROMPT", "ASSISTANT_ANSWER", "ASK_USER_QUESTION", "SKILL_USE", "STOP_FAILURE")
@@ -51,6 +52,7 @@ PHONE_RE = re.compile(r"(?<!\d)(?:\+7|8)[\s(-]*\d{3}[\s)-]*\d{3}[\s-]*\d{2}[\s-]
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 SNILS_RE = re.compile(r"(?<!\d)\d{3}-\d{3}-\d{3}[ -]\d{2}(?!\d)")
 LONG_DIGITS_RE = re.compile(r"(?<![\d.])\d{7,}(?![\d.])")
+PASTE_RE = re.compile(r"\[Pasted Content[^\]]*\]", re.IGNORECASE)  # заглушка вставки: текста в выгрузке нет
 
 
 # ---------------------------------------------------------------- параметры
@@ -59,6 +61,7 @@ LONG_DIGITS_RE = re.compile(r"(?<![\d.])\d{7,}(?![\d.])")
 def configure(data):
     """Значения из params.json — в имена, которыми пользуется код."""
     global MIN_USER_TURNS, INSERT_LIMIT, INSERT_PREVIEW, AGENT_HEAD, AGENT_TAIL, JOURNAL_LIMIT, CONTEXT_WINDOW
+    global DUPLICATE_SECONDS
     global DECISION_MIN, READING_SPEED, HUMAN_SPEED, HUMAN_MIN_SECONDS, REPEAT_MIN_CHARS
 
     def get(key):
@@ -67,6 +70,7 @@ def configure(data):
     MIN_USER_TURNS, INSERT_LIMIT, INSERT_PREVIEW = get("min_user_turns"), get("insert_limit"), get("insert_preview")
     AGENT_HEAD, AGENT_TAIL, CONTEXT_WINDOW = get("agent_head"), get("agent_tail"), get("context_window")
     JOURNAL_LIMIT, DECISION_MIN, READING_SPEED = get("journal_limit"), get("decision_min_chars"), get("reading_speed")
+    DUPLICATE_SECONDS = get("duplicate_seconds")
     HUMAN_SPEED, HUMAN_MIN_SECONDS = get("human_speed"), get("human_min_seconds")
     REPEAT_MIN_CHARS = get("autoinput_repeat_min_chars")
 
@@ -224,7 +228,8 @@ class Session:
         self.id = session_id
         self.context_window = context_window
         self.events = []
-        self.hits = {key: 0 for key in EVENT_NAMES + ("inputTokens", "over_window", "compact", "unknown")}
+        self.hits = {key: 0 for key in EVENT_NAMES + ("inputTokens", "over_window", "compact", "duplicate", "unknown")}
+        self.last_content = None      # (содержимое, время) прошлого события — для дублей выгрузки
         self.logins = set()
         self.user_turns = 0
         self.skills = []
@@ -236,6 +241,7 @@ class Session:
         self.answers_total = 0
         self.verdicts = {"вариант": 0, "Другое": 0, "нет ответа": 0}
         self.decisions = []           # кандидаты «место решения»: ответ на вопрос агента или на длинный текст
+        self.hidden = []              # реплики из одних заглушек вставки — текст не виден, в оценку не идут
         self.fast = []                # ответы быстрее человека
         self.streaks = []             # одинаковые реплики подряд
         self.streak = None
@@ -279,13 +285,13 @@ class Session:
         self.agent_chars = 0
         self.agent_first_ts = None
 
-    def responded(self, turn, stamp, answer_chars, kind, asked):
+    def responded(self, turn, stamp, answer_chars, kind, asked, option=False):
         """Ответ пользователя: место ли это решения (решает модель) и успел ли он прочитать (считает скрипт)."""
         chars, first = self.agent_chars, self.agent_first_ts
         seconds = (stamp - first).total_seconds() if stamp and first else None
         if chars and (asked or chars >= DECISION_MIN):
             speed = chars / max(seconds, 0.5) if seconds is not None else None
-            self.decisions.append({"turn": turn, "kind": kind, "asked": asked, "agent_chars": chars,
+            self.decisions.append({"turn": turn, "kind": kind, "asked": asked, "option": option, "agent_chars": chars,
                                    "answer_chars": answer_chars,
                                    "seconds": round(seconds, 1) if seconds is not None else None,
                                    "speed": round(speed) if speed is not None else None})
@@ -336,7 +342,11 @@ class Session:
         self.track_repeat(turn, repeat_key(flat))
         self.after_error = False
         asked = self.question is not None
-        self.responded(turn, stamp, len(flat), "text", asked)
+        if PASTE_RE.sub("", flat).strip():
+            self.responded(turn, stamp, len(flat), "text", asked)
+        else:
+            self.hidden.append(turn)  # судить не по чему — ни место решения, ни скорость чтения
+            self.forget_unread()
         if asked:
             self.answers_total += 1
         self.question = None  # вопрос агента отвечен — в том числе вызовом скилла
@@ -373,6 +383,8 @@ class Session:
             self.question = None
 
     def ask(self, event, turn, stamp):
+        if self.run:
+            self.run["replied"] = True  # ход с вопросом агента ASSISTANT_ANSWER не пишет — вопрос и есть ответ агента
         payload = event.get("askUserQuestion")
         if isinstance(payload, str):  # по типизации — строка с JSON; готовый объект тоже принимаем
             try:
@@ -416,7 +428,8 @@ class Session:
         self.agent_chars += chars
         if self.agent_first_ts is None:
             self.agent_first_ts = self.prev_stamp
-        self.responded(turn, stamp, answer_chars, "question", asked=True)
+        option = all(line.endswith("(вариант)") or line.endswith("(нет ответа)") for line in lines if line.startswith("ОТВЕТ:"))
+        self.responded(turn, stamp, answer_chars, "question", asked=True, option=option)
 
     def skill(self, event, turn):
         name = one_line(text_of(event, "skillName")) or "?"
@@ -437,6 +450,15 @@ class Session:
         stamp = parse_ts(event.get("createdAt"))
         if isinstance(event.get("login"), str) and event["login"]:
             self.logins.add(event["login"])
+        # Выгрузка иногда пишет одно событие дважды: другой id, то же содержимое, то же время. Дубль — не второй ответ
+        # пользователя (иначе «ответ через 0 с» и автоввод), пропускается и считается в сверке.
+        content = json.dumps({key: value for key, value in event.items() if key not in ("id", "createdAt")},
+                             ensure_ascii=False, sort_keys=True, default=str)
+        last = self.last_content
+        self.last_content = (content, stamp)
+        if last and last[0] == content and stamp and last[1] and abs((stamp - last[1]).total_seconds()) <= DUPLICATE_SECONDS:
+            self.hits["duplicate"] += 1
+            return
         if name not in EVENT_NAMES:
             self.hits["unknown"] += 1
             self.unknown.add(clip(name, 40))
@@ -524,6 +546,7 @@ def collect_session(path, session_id, out_dir, context_window):
         "runs": session.runs,
         "answers": {"total": session.answers_total, "verdicts": session.verdicts},
         "decisions": session.decisions,
+        "hidden_turns": session.hidden,
         "fast": session.fast,
         "repeat_streaks": session.streaks,
         "checks": checks,
@@ -612,10 +635,10 @@ def main(argv=None):
     bad = sum(facts["bad_events"] for facts in sessions)
     print(f"Сверка событий (годных: {events}, битых: {bad}):")
     unknown = sorted({name for facts in sessions for name in facts["unknown_events"]})
-    for key in EVENT_NAMES + ("inputTokens", "over_window", "compact", "unknown"):
+    for key in EVENT_NAMES + ("inputTokens", "over_window", "compact", "duplicate", "unknown"):
         count = totals.get(key, 0)
         label = {"inputTokens": "inputTokens у ответов", "compact": "сжатий (compact)", "unknown": "неизвестных событий",
-                 "over_window": "токенов больше окна"}.get(key, key)
+                 "over_window": "токенов больше окна", "duplicate": "дублей событий (пропущено)"}.get(key, key)
         if key == "over_window" and count:
             print(f"  {label:24} {count} — проверьте context_window в params.json")
             continue
