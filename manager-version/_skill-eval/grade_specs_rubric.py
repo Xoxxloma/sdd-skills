@@ -51,26 +51,20 @@ def normalize(text):
 
 
 def build_document(answer, kind, cfg):
-    """Ответ рубрики → документ specs-quality/1 (без пути и строки), по формулам contract."""
+    """Ответ рубрики → поля документа specs-quality/2, нужные для подсветки, по формулам contract."""
     weights = params.weights(cfg, kind)
-    criteria = []
-    for item in answer["criteria"]:
-        weight = weights[item["id"]]
-        if item["score"] == NA:
-            criteria.append({"id": item["id"], "status": "na", "score": None, "weight": weight})
-        else:
-            level = item["score"] / RUBRIC_MAX.get(item["id"], 1)
-            criteria.append({"id": item["id"], "status": "scored", "score": round(level * weight, 4), "weight": weight})
-    missing = answer["form"]["missing"]
-    form = {"missing": missing, "of": params.FORM_SECTIONS[kind],
-            "off_form": contract.off_form(len({m["n"] for m in missing}), kind, cfg["attention"]["form_min_missing"])}
+    form_min = cfg["attention"]["form_min_missing"]
+    criteria = {item["id"]: NA if item["score"] == NA else round(item["score"] / RUBRIC_MAX.get(item["id"], 1) * weights[item["id"]], 4)
+                for item in answer["criteria"]}
+    form_missing = sorted({m["n"] for m in answer["form"]["missing"]})
+    off = contract.off_form(len(form_missing), kind, form_min)
     origin = None
     if kind == "spec":
-        origin = {"traces": answer["origin"]["traces"], "code_signs": answer["origin"]["code_signs"]}
-        origin["verdict"] = contract.origin_verdict(origin["code_signs"], origin["traces"], form)
-    document = {"criteria": criteria, "total": contract.total(criteria), "zeros": contract.zeros(criteria),
-                "template": answer["template"], "form": form, "origin": origin}
-    document["reasons"] = contract.attention_reasons(document, cfg["attention"]["below_pct"])
+        origin = contract.origin_verdict(answer["origin"]["code_signs"], answer["origin"]["traces"], not off)
+    _, _, pct = contract.total(criteria, weights)
+    document = {"kind": kind, "pct": pct, "criteria": criteria, "template": answer["template"]["flag"],
+                "form_missing": form_missing, "off_form": off, "origin": origin}
+    document["reasons"] = contract.attention_reasons(document, cfg["attention"]["below_pct"], form_min)
     return document
 
 
@@ -106,8 +100,7 @@ def grade_answer(case, result_text, cfg, schema):
         quotes.append(answer["template"]["fact"]["quote"])
     quotes += [sign["quote"] for sign in (answer.get("origin") or {}).get("code_signs", [])]
     lost = [q for q in quotes if normalize(q) not in text]
-    summary = {"parts": parts, "pct": document["total"]["pct"], "reasons": document["reasons"],
-               "origin": document["origin"]["verdict"] if document["origin"] else None,
+    summary = {"parts": parts, "pct": document["pct"], "reasons": document["reasons"], "origin": document["origin"],
                "quotes": len(quotes), "lost": len(lost)}
     if lost:
         notes.append(f"цитат не найдено {len(lost)} из {len(quotes)}: " + "; ".join(q[:60] for q in lost[:3]))
@@ -119,8 +112,8 @@ def grade_answer(case, result_text, cfg, schema):
             problems.append(f"подсветка {attention} ({', '.join(document['reasons']) or '—'}), в 1.4.0 {reference['attention']}")
         if answer["template"]["flag"] != reference["template"]:
             problems.append(f"шаблонно {answer['template']['flag']}, в 1.4.0 {reference['template']}")
-        if document["form"]["off_form"] != reference["off_form"]:
-            problems.append(f"не по форме {document['form']['off_form']} (нет {len(document['form']['missing'])}), в 1.4.0 {reference['off_form']}")
+        if document["off_form"] != reference["off_form"]:
+            problems.append(f"не по форме {document['off_form']} (нет {len(document['form_missing'])}), в 1.4.0 {reference['off_form']}")
         if reference["origin"] and summary["origin"] != reference["origin"]:
             problems.append(f"происхождение {summary['origin']}, в 1.4.0 {reference['origin']}")
         if parts not in reference["parts"]:

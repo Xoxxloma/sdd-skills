@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""merge — последний шаг оценки: строки collect + ответы модели по рубрикам → specs-quality/1.
+"""merge — последний шаг оценки: строки collect + ответы модели по рубрикам → specs-quality/2.
 
     python3 merge.py --work <папка collect> [--keep-work]
     python3 merge.py --work <папка collect> --check   # какие ответы перезапустить: нет файла, не JSON, не по схеме
@@ -12,7 +12,8 @@
 Модель ничего не считает: итог, нули, форму, происхождение и подсветку считает contract.py по params.json. Ответ
 разбирается терпимо: последний JSON в тексте; элемент criteria с чужим id отбрасывается, повтор id — берётся
 последний, порядок — по рубрике; origin внутри form поднимается. Критерия рубрики нет, балл вне шкалы, ответ не по
-схеме — документ «оценка не состоялась». Цитата, которой нет в тексте документа, — в unverified, балл тот же.
+схеме — документ «оценка не состоялась». В выход идут только сниженные и «н/п» критерии — по строке findings с одной
+цитатой; цитаты нет в тексте документа — у строки quote_found: false, балл тот же.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ import params  # noqa: E402
 FINDINGS_SCHEMA_PATH = os.path.join(HERE, "findings.schema.json")
 NA = "н/п"
 RUBRIC_MAX = {"goal": 0.5}  # шкала рубрики: у цели БТ — до 0.5, у остальных критериев — до 1
-LIMITS = {"quote": 300, "section": 200, "text": 1000}
+LIMITS = {"text": 1000}
 NOISE_RE = re.compile(r"[`*_«»\"“”„'’~>|]")
 ELLIPSIS_RE = re.compile(r"\s*(?:…|\.\.\.)\s*")
 NOT_FOUND = {"не найдено", "не найден", "не найдена", "не найдены", "нет", "отсутствует"}  # «цитата» об отсутствии — это searched
@@ -128,73 +129,88 @@ def cut(text, limit, log, where):
 # ---------------------------------------------------------------- документ
 
 
-def failed_document(meta, reason):
-    return {"path": meta["path"], "kind": meta["kind"], "author": meta["author"], "source": meta["source"],
-            "scored": False, "skip_reason": reason, "criteria": [], "total": None, "zeros": [], "template": None,
-            "form": None, "origin": None, "attention": {"flag": False, "reasons": []}, "unverified": []}
+def num(value):
+    """1.0 → 1: в выходе целые баллы без хвоста."""
+    return int(value) if isinstance(value, float) and value.is_integer() else value
 
 
-def evidence(items, log, where):
-    return [{"section": cut(item["section"], LIMITS["section"], log, where), "quote": cut(item["quote"], LIMITS["quote"], log, where)}
-            for item in items]
+def head(meta, row):
+    """Общие поля документа: путь, вид, ключ и название строки, автор, документ сверху."""
+    source = meta["source"]["path"] if meta["source"] else None
+    return {"path": meta["path"], "kind": meta["kind"], "key": row["key"], "feature": row["feature"], "author": meta["author"],
+            "source": source}
 
 
-def scored_document(meta, answer, cfg, haystack, log):
+def failed_document(meta, row, reason):
+    return {**head(meta, row), "scored": False, "skip_reason": reason}
+
+
+def finding(criterion_id, item, haystack, log):
+    """Строка findings у сниженного или «н/п» критерия: что не так (где искал), что исправить, одна цитата."""
+    absent = [e for e in item["evidence"] if normalize(e["quote"]).rstrip(".") in NOT_FOUND]
+    searched = list(item["searched"])
+    if absent:
+        searched += [e["section"] for e in absent if e["section"] not in searched]
+        log.append(f"{criterion_id}: «не найдено» стояло цитатой — перенесено в «искал»")
+    found = [e for e in item["evidence"] if e not in absent]
+    comment = item["comment"]
+    if item["score"] == NA and not comment:
+        comment = found[0]["quote"] if found else "не применимо"
+        log.append(f"{criterion_id}: «н/п» без причины своими словами — взята цитата")
+    if searched:
+        comment = f"{comment or 'не найдено'} (искал: {', '.join(searched)})"
+    result = {"criterion": criterion_id, "comment": cut(comment, LIMITS["text"], log, criterion_id),
+              "fix": cut(item["fix"], LIMITS["text"], log, criterion_id), "quote": None}
+    if found:
+        first = found[0]
+        result["quote"] = cut(f"{first['section']}: «{first['quote']}»", LIMITS["text"], log, criterion_id)
+        if not quote_found(first["quote"], haystack):
+            result["quote_found"] = False
+    return result
+
+
+def scored_document(meta, row, answer, cfg, haystack, log):
     kind = meta["kind"]
     weights = params.weights(cfg, kind)
-    criteria, unverified = [], []
+    criteria, findings = {}, []
     for item in answer["criteria"]:
-        criterion_id, weight = item["id"], weights[item["id"]]
-        absent = [e for e in item["evidence"] if normalize(e["quote"]).rstrip(".") in NOT_FOUND]
-        if absent:
-            item["searched"] = item["searched"] + [e["section"] for e in absent if e["section"] not in item["searched"]]
-            log.append(f"{criterion_id}: «не найдено» стояло цитатой — перенесено в searched")
-        found = evidence([e for e in item["evidence"] if e not in absent], log, criterion_id)
-        unverified += [{"where": criterion_id, "quote": e["quote"]} for e in found if not quote_found(e["quote"], haystack)]
-        comment = cut(item["comment"], LIMITS["text"], log, criterion_id)
+        criterion_id = item["id"]
         if item["score"] == NA:
-            if not comment:
-                comment = found[0]["quote"] if found else "не применимо"
-                log.append(f"{criterion_id}: «н/п» без причины своими словами — взята цитата")
-            status, score = "na", None
+            criteria[criterion_id] = NA
         else:
-            status, score = "scored", round(item["score"] / RUBRIC_MAX.get(criterion_id, 1) * weight, 4)
-        criteria.append({"id": criterion_id, "status": status, "score": score, "weight": weight, "evidence": found,
-                         "searched": [cut(s, LIMITS["section"], log, criterion_id) for s in item["searched"]],
-                         "comment": comment, "fix": cut(item["fix"], LIMITS["text"], log, criterion_id)})
+            criteria[criterion_id] = num(round(item["score"] / RUBRIC_MAX.get(criterion_id, 1) * weights[criterion_id], 4))
+        if criteria[criterion_id] == NA or criteria[criterion_id] < weights[criterion_id] - 1e-9:
+            findings.append(finding(criterion_id, item, haystack, log))
 
     template = answer["template"]
-    fact = evidence([template["fact"]], log, "template")[0] if template["fact"] else None
-    if fact and not quote_found(fact["quote"], haystack):
-        unverified.append({"where": "template", "quote": fact["quote"]})
-    if not template["flag"] and fact is None:
+    if not template["flag"] and template["fact"] is None:
         log.append("«шаблонно: нет» без факта")
-    generic = [cut(g, LIMITS["quote"], log, "template") for g in template["generic"]] if template["flag"] else []
 
-    seen, missing = set(), []
+    form_missing = []
     for item in answer["form"]["missing"]:
-        if item["n"] in seen or item["n"] > params.FORM_SECTIONS[kind]:
+        if item["n"] in form_missing or item["n"] > params.FORM_SECTIONS[kind]:
             log.append(f"форма: раздел {item['n']} повтор или вне списка — отброшен")
             continue
-        seen.add(item["n"])
-        missing.append({"n": item["n"], "title": item["title"]})
-    missing.sort(key=lambda item: item["n"])
-    form = {"missing": missing, "of": params.FORM_SECTIONS[kind],
-            "off_form": contract.off_form(len(missing), kind, cfg["attention"]["form_min_missing"])}
+        form_missing.append(item["n"])
+    form_missing.sort()
+    form_min = cfg["attention"]["form_min_missing"]
 
     origin = None
     if kind == "spec":
-        signs = [{"n": s["n"], "quote": cut(s["quote"], LIMITS["quote"], log, "origin")} for s in answer["origin"]["code_signs"]]
-        unverified += [{"where": "origin", "quote": s["quote"]} for s in signs if not quote_found(s["quote"], haystack)]
-        traces = [{"n": t["n"], "what": cut(t["what"], LIMITS["text"], log, "origin")} for t in answer["origin"]["traces"]]
-        origin = {"traces": traces, "code_signs": signs, "verdict": contract.origin_verdict(signs, traces, form)}
+        signs, traces = answer["origin"]["code_signs"], answer["origin"]["traces"]
+        origin = contract.origin_verdict(signs, traces, not contract.off_form(len(form_missing), kind, form_min))
+        if origin == "by_code":
+            quote = "; ".join(f"{s['n']} — «{s['quote']}»" for s in signs)
+            line = {"criterion": contract.ORIGIN_FINDING, "comment": "признаки готового кода", "fix": None,
+                    "quote": cut(quote, LIMITS["text"], log, "origin")}
+            if not all(quote_found(s["quote"], haystack) for s in signs):
+                line["quote_found"] = False
+            findings.append(line)
 
-    document = {"path": meta["path"], "kind": kind, "author": meta["author"], "source": meta["source"], "scored": True,
-                "criteria": criteria, "total": contract.total(criteria), "zeros": contract.zeros(criteria),
-                "template": {"flag": template["flag"], "fact": fact, "generic": generic}, "form": form, "origin": origin,
-                "unverified": unverified}
-    reasons = contract.attention_reasons(document, cfg["attention"]["below_pct"])
-    document["attention"] = {"flag": bool(reasons), "reasons": reasons}
+    points, maximum, pct = contract.total(criteria, weights)
+    document = {**head(meta, row), "scored": True, "pct": pct, "sum": num(points), "max": num(maximum), "criteria": criteria,
+                "attention": [], "template": template["flag"], "form_missing": form_missing, "origin": origin, "findings": findings}
+    document["attention"] = contract.attention_reasons(document, cfg["attention"]["below_pct"], form_min)
     return document
 
 
@@ -220,14 +236,16 @@ def check_answers(work):
 
 
 def build(work, now=None):
-    """→ (документ specs-quality/1, лог поправок, collect)."""
+    """→ (документ specs-quality/2, лог поправок, collect)."""
     collected = json.loads(read(os.path.join(work, "collect.json")))
     cfg = params.load(collected["params"])
     schema = json.loads(read(FINDINGS_SCHEMA_PATH))
     root = collected["root"]
+    row_of = {cell["document"]: row for row in collected["rows"] for cell in (row["bt"], row["spec"]) if "document" in cell}
     documents, log = [], []
     for meta in collected["documents"]:
         doc_log = []
+        row = row_of[meta["path"]]
         answer_path = os.path.join(work, meta["answer"])
         try:
             if not os.path.exists(answer_path):
@@ -236,52 +254,90 @@ def build(work, now=None):
             haystack = read(os.path.join(root, meta["path"]))
             if meta["source"] and meta["source"]["path"]:
                 haystack += "\n" + read(os.path.join(root, meta["source"]["path"]))
-            document = scored_document(meta, answer, cfg, normalize(haystack), doc_log)
+            document = scored_document(meta, row, answer, cfg, normalize(haystack), doc_log)
         except Failed as error:
-            document = failed_document(meta, str(error))
+            document = failed_document(meta, row, str(error))
             doc_log.append(f"оценка не состоялась: {error}")
         documents.append(document)
         log += [f"{meta['path']}: {line}" for line in doc_log]
 
     stamp = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
     doc = {
-        "schema": "specs-quality/1",
+        "schema": "specs-quality/2",
         "generated_at": stamp,
         "subject": {"documents_dir": collected["documents_dir"], "team": collected["team"], "repo": collected["repo"],
-                    "rows_total": len(collected["rows"]), "documents_total": len(documents),
-                    "documents_scored": sum(1 for d in documents if d["scored"]),
-                    "documents_attention": sum(1 for d in documents if d["attention"]["flag"])},
+                    "documents_total": len(documents), "documents_scored": sum(1 for d in documents if d["scored"]),
+                    "documents_attention": sum(1 for d in documents if d["scored"] and d["attention"])},
         "params": {"file": collected["params"], "below_pct": cfg["attention"]["below_pct"],
                    "form_min_missing": cfg["attention"]["form_min_missing"],
                    "weights": {kind: params.weights(cfg, kind) for kind in params.KINDS}},
-        "rows": collected["rows"],
         "documents": documents,
     }
     return doc, log, collected
+
+
+# ---------------------------------------------------------------- запись
+
+
+HEAD_KEYS = ("path", "kind", "key", "feature", "author", "source")
+
+
+def dump(doc):
+    """JSON для чтения глазами: документ — несколько строк, короткие объекты и списки — в строку, находка — строка."""
+    j = lambda value: json.dumps(value, ensure_ascii=False)  # noqa: E731
+
+    def pairs(document, keys):
+        return ", ".join(f"{j(key)}: {j(document[key])}" for key in keys)
+
+    def block(document):
+        lines = ["  {" + pairs(document, HEAD_KEYS) + ","]
+        if not document["scored"]:
+            lines.append("   " + pairs(document, ("scored", "skip_reason")) + "}")
+            return "\n".join(lines)
+        lines.append("   " + pairs(document, ("scored", "pct", "sum", "max")) + ",")
+        lines.append("   " + pairs(document, ("criteria",)) + ",")
+        lines.append("   " + pairs(document, ("attention", "template", "form_missing", "origin")) + ",")
+        if document["findings"]:
+            lines.append('   "findings": [')
+            lines.append(",\n".join("    " + j(item) for item in document["findings"]))
+            lines.append("   ]}")
+        else:
+            lines.append('   "findings": []}')
+        return "\n".join(lines)
+
+    text = "\n".join([
+        "{",
+        " " + pairs(doc, ("schema", "generated_at")) + ",",
+        " " + pairs(doc, ("subject",)) + ",",
+        " " + pairs(doc, ("params",)) + ",",
+        ' "documents": [',
+        ",\n".join(block(document) for document in doc["documents"]),
+        " ]",
+        "}",
+    ]) + "\n"
+    if json.loads(text) != doc:  # раскладка не должна терять поля
+        raise ValueError("раскладка итога разошлась с документом")
+    return text
 
 
 # ---------------------------------------------------------------- экран
 
 
 def attention_lines(doc, cfg_labels):
-    by_path = {d["path"]: d for d in doc["documents"]}
     lines = []
-    for row in doc["rows"]:
-        for column in ("bt", "spec"):
-            target = row[column].get("document")
-            document = by_path.get(target) if target else None
-            if not document or not document["attention"]["flag"]:
-                continue
-            total = document["total"]
-            parts = [f"{row['key']} · {KIND_NAMES[column]} {total['sum']:g} из {total['max']:g} ({total['pct']}%)"]
-            for reason in document["attention"]["reasons"]:
-                if reason == "zero":
-                    parts.append("ноль: " + ", ".join(cfg_labels[column][c] for c in document["zeros"]))
-                elif reason == "off_form":
-                    parts.append(f"не по форме: нет {len(document['form']['missing'])} из {document['form']['of']} разделов")
-                elif REASON_NAMES[reason]:
-                    parts.append(REASON_NAMES[reason])
-            lines.append("- " + " · ".join(parts))
+    for document in doc["documents"]:
+        if not document["scored"] or not document["attention"]:
+            continue
+        kind = document["kind"]
+        parts = [f"{document['key']} · {KIND_NAMES[kind]} {document['sum']:g} из {document['max']:g} ({document['pct']}%)"]
+        for reason in document["attention"]:
+            if reason == "zero":
+                parts.append("ноль: " + ", ".join(cfg_labels[kind][c] for c in contract.zero_ids(document["criteria"])))
+            elif reason == "off_form":
+                parts.append(f"не по форме: нет {len(document['form_missing'])} из {params.FORM_SECTIONS[kind]} разделов")
+            elif REASON_NAMES[reason]:
+                parts.append(REASON_NAMES[reason])
+        lines.append("- " + " · ".join(parts))
     return lines
 
 
@@ -318,8 +374,7 @@ def main(argv=None):
         print("\n".join(errors))
         return 1
     with open(collected["output"], "w", encoding="utf-8", newline="\n") as handle:
-        json.dump(doc, handle, ensure_ascii=False, indent=1)
-        handle.write("\n")
+        handle.write(dump(doc))
     work_left = False
     if not args.keep_work:
         for _ in range(6):  # на Windows папку ненадолго держит сканер или чужой процесс
@@ -337,9 +392,9 @@ def main(argv=None):
         print(f"Рабочая папка не удалена — её держит другой процесс: {work}. Итог записан; папку можно удалить руками.")
     print(f"Документов: {subject['documents_total']}, оценено: {subject['documents_scored']}, "
           f"не состоялось: {subject['documents_total'] - subject['documents_scored']}, требуют внимания: {subject['documents_attention']}")
-    unverified = sum(len(d["unverified"]) for d in doc["documents"])
+    unverified = sum(1 for d in doc["documents"] if d["scored"] for item in d["findings"] if item.get("quote_found") is False)
     if unverified:
-        print(f"Цитат не найдено в тексте документа: {unverified} (в unverified, баллы не менялись)")
+        print(f"Цитат не найдено в тексте документа: {unverified} (quote_found: false, баллы не менялись)")
     if log:
         print(f"Поправлено в ответах модели: {len(log)}")
         print("\n".join("  " + line for line in log))

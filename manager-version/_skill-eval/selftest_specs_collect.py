@@ -45,6 +45,7 @@ def write(root, rel, text):
 def fixture_repo(base):
     root = os.path.join(base, "repo-fixture")
     shutil.copytree(specs_cases.FIXTURE, os.path.join(root, "coddoc"))
+    os.makedirs(os.path.join(root, ".git"))  # корень итога — корень репозитория
     return root
 
 
@@ -113,7 +114,8 @@ def fixture_checks(base):
           again["output"])
 
     by_root = collect.collect(root, base, today="2026-10-29")
-    check("вход корнем репо", len(by_root["rows"]) == 11, len(by_root["rows"]))
+    check("вход корнем репо", len(by_root["rows"]) == 11 and by_root["documents_dir"] == "." and
+          by_root["output"] == os.path.join(root, "specs-quality-2026-10-29.json"), (len(by_root["rows"]), by_root["documents_dir"]))
     feature = collect.collect(os.path.join(root, "coddoc", "ARS-100"), base, today="2026-10-30")
     check("вход папкой эпика — с детьми и фундаментом", sorted(rows_by_folder(feature)) ==
           ["coddoc/ARS-100", "coddoc/ARS-100/ARS-101", "coddoc/ARS-100/_foundation"], sorted(rows_by_folder(feature)))
@@ -122,10 +124,33 @@ def fixture_checks(base):
           single["documents_dir"] == "coddoc/PSS-2210", (sorted(rows_by_folder(single)), single["documents_dir"]))
     keyed = collect.collect("ARS-101", root, today="2026-11-01")
     check("вход ключом ребёнка эпика", sorted(rows_by_folder(keyed)) == ["coddoc/ARS-100/ARS-101"], sorted(rows_by_folder(keyed)))
+    check("вход папкой фичи — итог в корне репо", feature["output"] == os.path.join(root, "specs-quality-2026-10-30.json"), feature["output"])
+
+
+def any_folder_checks(base):
+    """Папка с документами — любая: имя не важно; без git итог рядом со входом; скрытые папки не сканируются."""
+    repo = os.path.join(base, "repo-any")
+    shutil.copytree(os.path.join(specs_cases.FIXTURE, "PSS-2210"), os.path.join(repo, "specs", "PSS-2210"))
+    shutil.copytree(os.path.join(specs_cases.FIXTURE, "PSS-2210"), os.path.join(repo, ".claude", "worktrees", "x", "specs", "PSS-2210"))
+    os.makedirs(os.path.join(repo, ".git"))
+    data = collect.collect("specs", repo, today="2026-10-28")
+    check("любая папка: документы найдены", sorted(rows_by_folder(data)) == ["specs/PSS-2210"] and len(data["documents"]) == 2,
+          sorted(rows_by_folder(data)))
+    check("любая папка: итог в корне репо", data["output"] == os.path.join(repo, "specs-quality-2026-10-28.json") and
+          data["documents_dir"] == "specs", (data["output"], data["documents_dir"]))
+    whole = collect.collect(repo, base, today="2026-10-29")
+    check("скрытая папка с копией не сканируется", sorted(rows_by_folder(whole)) == ["specs/PSS-2210"], sorted(rows_by_folder(whole)))
+
+    loose = os.path.join(base, "no-git", "docs")
+    shutil.copytree(os.path.join(specs_cases.FIXTURE, "ARS-312"), os.path.join(loose, "ARS-312"))
+    alone = collect.collect(loose, base, today="2026-10-28")
+    check("без git: итог рядом с папкой входа, не внутри", alone["output"] == os.path.join(base, "no-git", "specs-quality-2026-10-28.json") and
+          sorted(rows_by_folder(alone)) == ["docs/ARS-312"], (alone["output"], sorted(rows_by_folder(alone))))
 
 
 def synthetic_checks(base):
     root = os.path.join(base, "repo-synthetic")
+    os.makedirs(os.path.join(root, ".git"))
     spec = "# Техническая спецификация: правка\n\n> **Задача:** SYN-{n}\n> **Автор:** petrov, sidorova\n\n## 1. Обзор\n"
     write(root, "coddoc/SYN-1/bug_report.md", "---\ntype: bug-report\ntask: SYN-1\n---\n\n# Баг\n")
     write(root, "coddoc/SYN-2/change_request.md", "# Запрос на правку\n\n> **Задача:** SYN-2\n")
@@ -173,6 +198,7 @@ def main():
     base = tempfile.mkdtemp(prefix="specs-collect-")
     try:
         fixture_checks(base)
+        any_folder_checks(base)
         synthetic_checks(base)
     finally:
         shutil.rmtree(base, ignore_errors=True)

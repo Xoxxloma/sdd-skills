@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """collect — первый шаг оценки: найти БТ и спеки, собрать строки, прочитать шапки, написать задания субагентам.
 
-    python3 collect.py --input <coddoc/ | корень репо | папка фичи | файл | ключ> [--team <команда>] [--repo <репозиторий>] [--params <файл>]
+    python3 collect.py --input <папка с документами | файл | ключ> [--team <команда>] [--repo <репозиторий>] [--params <файл>]
 
-Пишет <корень>/specs-quality-<дата>.work/: collect.json (строки, документы, источники, шапка) и по заданию на
-документ — <id>.task.txt. Итог merge запишет в <корень>/specs-quality-<дата>.json; занято — -2, -3. На экран —
-список строк с источником каждой спеки, путь рабочей папки и итога. В coddoc/ ничего не пишется.
+Документы ищутся во всей вложенности входа; скрытые папки, stages/ и node_modules пропускаются. Корень — ближайшая
+папка с .git выше по пути входа; репозитория нет — папка, где лежит вход. Пишет <корень>/specs-quality-<дата>.work/:
+collect.json (строки, документы, источники, шапка) и по заданию на документ — <id>.task.txt. Итог merge запишет в
+<корень>/specs-quality-<дата>.json; занято — -2, -3. На экран — список строк с источником каждой спеки, путь рабочей
+папки и итога. В папке документов ничего не пишется.
 """
 
 from __future__ import annotations
@@ -22,10 +24,9 @@ sys.path.insert(0, HERE)  # соседние модули находятся и 
 
 import params  # noqa: E402
 RUBRICS = {"bt": os.path.join(HERE, "rubric-bt.md"), "spec": os.path.join(HERE, "rubric-spec.md")}
-CODDOC = "coddoc"
 BT, SPEC, BUG, CR = "business_requirements.md", "technical_specification.md", "bug_report.md", "change_request.md"
 NAMES = (BT, SPEC, BUG, CR)
-SKIP_DIRS = {"stages"}
+SKIP_DIRS = {"stages", "node_modules"}  # и все скрытые: .git, .claude с копиями ворктри
 FOUNDATION = "_foundation"
 TITLE_PREFIXES = ("бизнес-требования:", "техническая спецификация:")
 KEY_RE = re.compile(r"\b[A-Z][A-Z0-9_]*-\d+\b")
@@ -93,14 +94,11 @@ def header(text):
 # ---------------------------------------------------------------- вход и поиск
 
 
-def find_root(path):
-    """Корень репозитория — папка, где лежит coddoc/: выше по пути от входа или сам вход."""
-    path = os.path.abspath(path)
-    probe = path if os.path.isdir(path) else os.path.dirname(path)
+def git_root(path):
+    """Ближайшая папка с .git выше по пути (или сама папка); нет — None."""
+    probe = os.path.abspath(path)
     while True:
-        if os.path.basename(probe) == CODDOC:
-            return os.path.dirname(probe)
-        if os.path.isdir(os.path.join(probe, CODDOC)):
+        if os.path.exists(os.path.join(probe, ".git")):
             return probe
         parent = os.path.dirname(probe)
         if parent == probe:
@@ -108,38 +106,41 @@ def find_root(path):
         probe = parent
 
 
+def root_for(scope):
+    """Куда класть итог: корень репозитория; без репозитория — рядом с папкой входа, а не внутри неё."""
+    return git_root(scope) or os.path.dirname(scope)
+
+
+def skipped(name):
+    return name in SKIP_DIRS or name.startswith(".")
+
+
 def resolve_input(raw, cwd):
-    """→ (корень репозитория, папка поиска, рекурсивно ли)."""
+    """→ (корень, папка поиска, рекурсивно ли)."""
     if not raw or not raw.strip():
-        raise InputError("Не передан путь: нужна папка coddoc/, папка фичи, файл или ключ задачи.")
+        raise InputError("Не передан путь: нужна папка с документами, файл или ключ задачи.")
     raw = raw.strip()
     if re.match(r"^[a-z]+://", raw):
         raise InputError("Ссылку открыть нельзя — нужен путь к локальному клону репозитория.")
-    path = raw if os.path.isabs(raw) else os.path.join(cwd, raw)
+    path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(cwd, raw))
     if os.path.isfile(path):
         if os.path.basename(path) not in NAMES:
             raise InputError(f"Файл {raw} — не БТ, не спека, не баг-репорт и не запрос на правку.")
-        root = find_root(path)
-        if root is None:
-            raise InputError(f"Файл {raw} лежит не в папке {CODDOC}/.")
-        return root, os.path.dirname(os.path.abspath(path)), False
+        scope = os.path.dirname(path)
+        return root_for(scope), scope, False
     if os.path.isdir(path):
-        root = find_root(path)
-        if root is None:
-            raise InputError(f"В {raw} и выше по пути нет папки {CODDOC}/.")
-        absolute = os.path.abspath(path)
-        scope = os.path.join(root, CODDOC) if absolute == root else absolute
-        return root, scope, True
+        return root_for(path), path, True
     if KEY_RE.fullmatch(raw) or re.fullmatch(r"[A-Za-z][\w-]*", raw):
-        root = find_root(cwd)
-        if root is None:
-            raise InputError(f"Ключ {raw}: в рабочей папке и выше нет {CODDOC}/.")
-        hits = [d for d, _, _ in os.walk(os.path.join(root, CODDOC)) if os.path.basename(d) == raw]
+        base = git_root(cwd) or os.path.abspath(cwd)
+        hits = []
+        for folder, dirs, _ in os.walk(base):
+            dirs[:] = [d for d in dirs if not skipped(d)]
+            hits += [os.path.join(folder, d) for d in dirs if d == raw]
         if not hits:
-            raise InputError(f"Папки {raw} в {CODDOC}/ нет.")
+            raise InputError(f"Папки {raw} в {base} нет.")
         if len(hits) > 1:
-            raise InputError(f"Папок {raw} несколько: " + ", ".join(rel(root, d) for d in hits) + " — передай путь.")
-        return root, hits[0], True
+            raise InputError(f"Папок {raw} несколько: " + ", ".join(rel(base, d) for d in hits) + " — передай путь.")
+        return root_for(hits[0]), hits[0], True
     raise InputError(f"Нет такого пути: {raw}")
 
 
@@ -148,16 +149,16 @@ def rel(root, path):
 
 
 def scan(scope, recursive):
-    """Папки с любым из четырёх файлов → {папка: набор имён}; stages/ пропускается."""
+    """Папки с любым из четырёх файлов → {папка: набор имён}; stages/ — в «не оцениваются», скрытые и node_modules — мимо."""
     found, ignored = {}, []
     walker = os.walk(scope) if recursive else [(scope, [], os.listdir(scope))]
     for folder, dirs, files in walker:
         if recursive:
             for name in sorted(dirs):
-                if name in SKIP_DIRS:
+                if name == "stages":
                     for sub, _, sub_files in os.walk(os.path.join(folder, name)):
                         ignored += [os.path.join(sub, f) for f in sub_files if f in NAMES]
-            dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
+            dirs[:] = sorted(d for d in dirs if not skipped(d))
         names = {f for f in files if f in NAMES and os.path.isfile(os.path.join(folder, f))}
         if names:
             found[folder] = names

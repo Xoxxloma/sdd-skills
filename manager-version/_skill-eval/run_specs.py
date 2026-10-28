@@ -63,42 +63,41 @@ def read_stream(path):
 
 
 def content_checks(doc):
-    """Проверки grade-sq.mjs по JSON specs-quality/1 + случай E. → {имя: True/False}."""
+    """Проверки grade-sq.mjs по JSON specs-quality/2 + случай E. → {имя: True/False}."""
     docs = {d["path"]: d for d in doc["documents"]}
-    rows = {r["folder"]: r for r in doc["rows"]}
 
     def d(folder, kind):
         return docs.get(f"coddoc/{folder}/{BT if kind == 'bt' else SPEC}")
 
     def pct(item):
-        return item["total"]["pct"] if item and item["scored"] and item["total"]["pct"] is not None else -1
+        return item["pct"] if item and item["scored"] and item["pct"] is not None else -1
 
     def score(item, number):
-        return item["criteria"][number]["score"] if item and item["scored"] else None
+        return list(item["criteria"].values())[number] if item and item["scored"] else None
 
     def attention(folder):
-        return any(x and x["attention"]["flag"] for x in (d(folder, "bt"), d(folder, "spec")))
+        return any(x and x["scored"] and x["attention"] for x in (d(folder, "bt"), d(folder, "spec")))
 
     def flag(item):
-        return bool(item and item["scored"] and item["template"]["flag"])
+        return bool(item and item["scored"] and item["template"])
 
     def off(item):
-        return bool(item and item["form"] and item["form"]["off_form"])
+        return bool(item and item["scored"] and "off_form" in item["attention"])
 
     def origin(item):
-        return item["origin"]["verdict"] if item and item.get("origin") else None
+        return item["origin"] if item and item["scored"] else None
 
     ck = {}
-    ck["строки"] = len(rows) == 12 and len(docs) == 19
-    ck["н/п"] = (rows.get("coddoc/ARS-312", {}).get("bt") == {"none": "bug_report"} and
-                 rows.get("coddoc/ARS-100/_foundation", {}).get("bt") == {"none": "foundation"} and
-                 rows.get("coddoc/PSS-2211", {}).get("spec") == {"none": "absent"} and
-                 rows.get("coddoc/ARS-100", {}).get("spec") == {"none": "absent"})
+    ck["строки"] = len({path.rsplit("/", 1)[0] for path in docs}) == 12 and len(docs) == 19
+    bug, fnd = d("ARS-312", "spec"), d("ARS-100/_foundation", "spec")
+    ck["н/п"] = (bool(bug and bug["source"] == "coddoc/ARS-312/bug_report.md" and not d("ARS-312", "bt")) and
+                 bool(fnd and fnd["source"] is None and not d("ARS-100/_foundation", "bt")) and
+                 not d("PSS-2211", "spec") and not d("ARS-100", "spec"))
     ck["оценено всё"] = all(x["scored"] for x in doc["documents"])
     p10b, p10s = d("PSS-2210", "bt"), d("PSS-2210", "spec")
-    ck["хорошая"] = p10b and p10s and p10b["total"]["sum"] >= 4.0 and p10s["total"]["sum"] >= 4.5
+    ck["хорошая"] = bool(p10b and p10s and p10b["scored"] and p10s["scored"] and p10b["sum"] >= 4.0 and p10s["sum"] >= 4.5)
     p11 = d("PSS-2211", "bt")
-    ck["версия"] = bool(p11 and p10b and p11["total"]["sum"] >= 4.0 and abs(p11["total"]["sum"] - p10b["total"]["sum"]) <= 0.5)
+    ck["версия"] = bool(p11 and p10b and p11["scored"] and p10b["scored"] and p11["sum"] >= 4.0 and abs(p11["sum"] - p10b["sum"]) <= 0.5)
     p12b, p12s = d("PSS-2212", "bt"), d("PSS-2212", "spec")
     planted = p12s and any(score(p12s, i) is not None and score(p12s, i) <= 0.5 for i in (1, 2, 4))
     off_target = not p12s or any(score(p12s, i) is not None and score(p12s, i) < 1 for i in (0, 3))
@@ -106,10 +105,8 @@ def content_checks(doc):
                            pct(p12b) >= 50 and pct(p12s) >= 50)
     p13b, p13s = d("PSS-2213", "bt"), d("PSS-2213", "spec")
     ck["протыкано"] = 0 <= pct(p13b) < 50 and 0 <= pct(p13s) < 50 and flag(p13b) and flag(p13s)
-    bug = d("ARS-312", "spec")
-    ck["багфикс"] = bool(bug and pct(bug) >= 80 and sum(1 for i in (1, 2, 4) if bug["criteria"][i]["status"] == "na") >= 2)
-    fnd = d("ARS-100/_foundation", "spec")
-    ck["фундамент"] = bool(fnd and fnd["scored"] and fnd["criteria"][0]["status"] == "na")
+    ck["багфикс"] = bool(bug and pct(bug) >= 80 and sum(1 for i in (1, 2, 4) if score(bug, i) == "н/п") >= 2)
+    ck["фундамент"] = bool(fnd and fnd["scored"] and score(fnd, 0) == "н/п")
     ck["внимание"] = (all(attention(k) for k in ("PSS-2213", "PSS-2214", "PSS-2215", "PSS-2216")) and
                       not any(attention(k) for k in ("PSS-2210", "PSS-2211", "PSS-2212", "ARS-312")))
     ck["флаг"] = not any(flag(d(k, kind)) for k in ("PSS-2210", "PSS-2211", "PSS-2212", "ARS-312", "PSS-2214", "PSS-2215", "PSS-2216")
@@ -117,14 +114,14 @@ def content_checks(doc):
     ck["форма"] = (off(d("PSS-2214", "bt")) and not off(d("PSS-2214", "spec")) and
                    not any(off(d(k, kind)) for k in IN_FORM for kind in ("bt", "spec")) and
                    off(d("PSS-2215", "spec")) and off(d("PSS-2216", "spec")) and not off(d("PSS-2216", "bt")))
-    ck["свободная"] = bool(d("PSS-2214", "bt") and d("PSS-2214", "bt")["total"]["sum"] >= 4.0)
+    ck["свободная"] = bool(d("PSS-2214", "bt") and d("PSS-2214", "bt")["scored"] and d("PSS-2214", "bt")["sum"] >= 4.0)
     ck["по коду"] = origin(d("PSS-2215", "spec")) == "by_code" and not any(origin(d(k, "spec")) == "by_code" for k in BY_SKILL + ["PSS-2216"])
     ck["правлена"] = origin(d("PSS-2216", "spec")) == "skill_edited" and all(origin(d(k, "spec")) == "skill" for k in BY_SKILL)
     p15 = d("PSS-2215", "spec")
-    ck["без источника"] = rows.get("coddoc/PSS-2215", {}).get("bt") == {"none": "absent"} and score(p15, 0) == 0
+    ck["без источника"] = bool(p15 and p15["source"] is None and not d("PSS-2215", "bt") and score(p15, 0) == 0)
     e_bt, e_spec = d("PSS-2290", "bt"), d("PSS-2290", "spec")
-    ck["случай E: только ноль"] = bool(e_bt and e_bt["attention"]["reasons"] == ["zero"] and pct(e_bt) >= 50 and
-                                       e_spec and not e_spec["attention"]["flag"])
+    ck["случай E: только ноль"] = bool(e_bt and e_bt["scored"] and e_bt["attention"] == ["zero"] and pct(e_bt) >= 50 and
+                                       e_spec and e_spec["scored"] and not e_spec["attention"])
     return ck
 
 
@@ -183,9 +180,8 @@ def grade(run_dir, parallel):
         if not ok:
             problems.append(f"проверка «{name}»")
     if doc:
-        lines.append("подсвечено: " + ", ".join(sorted({r['key'] for r in doc['rows'] for c in ('bt', 'spec')
-                                                       if 'document' in r[c] and next(x for x in doc['documents'] if x['path'] == r[c]['document'])['attention']['flag']})))
-        lines.append(f"цитат не найдено: {sum(len(x['unverified']) for x in doc['documents'])}")
+        lines.append("подсвечено: " + ", ".join(sorted({x["key"] for x in doc["documents"] if x["scored"] and x["attention"]})))
+        lines.append("цитат не найдено: " + str(sum(1 for x in doc["documents"] if x["scored"] for f in x["findings"] if f.get("quote_found") is False)))
     verdict = "PASS" if not problems else "FAIL"
     report = "\n".join([f"Итог: {verdict}"] + [f"  - {p}" for p in problems] + lines + [f"Стоимость: ${cost:.2f}"]) + "\n"
     with open(os.path.join(run_dir, "SKILL-REPORT.txt"), "w", encoding="utf-8") as handle:
@@ -236,11 +232,11 @@ def selftest():
     known = content_checks(doc)
     problems += [f"эталон: проверка «{name}» красная" for name, ok in known.items() if not ok]
     spoils = {
-        "внимание": lambda d: next(x for x in d["documents"] if x["path"].endswith("PSS-2210/business_requirements.md"))["attention"].update(flag=True),
-        "по коду": lambda d: next(x for x in d["documents"] if x["path"].endswith("PSS-2215/technical_specification.md"))["origin"].update(verdict="skill"),
-        "случай E: только ноль": lambda d: next(x for x in d["documents"] if x["path"].endswith("PSS-2290/business_requirements.md"))["attention"].update(reasons=["zero", "off_form"]),
-        "фундамент": lambda d: next(x for x in d["documents"] if "_foundation" in x["path"])["criteria"][0].update(status="scored", score=0),
-        "строки": lambda d: d["rows"].pop(),
+        "внимание": lambda d: next(x for x in d["documents"] if x["path"].endswith("PSS-2210/business_requirements.md"))["attention"].append("zero"),
+        "по коду": lambda d: next(x for x in d["documents"] if x["path"].endswith("PSS-2215/technical_specification.md")).update(origin="skill"),
+        "случай E: только ноль": lambda d: next(x for x in d["documents"] if x["path"].endswith("PSS-2290/business_requirements.md"))["attention"].append("off_form"),
+        "фундамент": lambda d: next(x for x in d["documents"] if "_foundation" in x["path"])["criteria"].update(source_logic=0),
+        "строки": lambda d: d["documents"].pop(),
     }
     for name, spoil in spoils.items():
         spoiled = copy.deepcopy(doc)

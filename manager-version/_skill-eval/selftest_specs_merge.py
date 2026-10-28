@@ -141,52 +141,65 @@ def main_checks(base):
     errors = contract.check_document(doc, schema)
     check("итог проходит contract", not errors, errors[:5])
 
+    def totals(d):
+        return d["sum"], d["max"], d["pct"]
+
+    def line(d, criterion):
+        return next((item for item in d["findings"] if item["criterion"] == criterion), None)
+
     d = by_path(doc, "PSS-2212/" + bt)
-    check("ручной счёт: БТ 3.5 из 4.5 (78%)", d["total"] == {"sum": 3.5, "max": 4.5, "pct": 78} and not d["attention"]["flag"], d["total"])
+    check("ручной счёт: БТ 3.5 из 4.5 (78%)", totals(d) == (3.5, 4.5, 78) and d["attention"] == [], totals(d))
+    check("находки — только у сниженных, по порядку рубрики", [f["criterion"] for f in d["findings"]] == ["functional", "acceptance"], d["findings"])
+    check("ключ и название — из строки collect", d["key"] == "PSS-2212" and d["feature"] == "заявка на разовый пропуск для посетителя",
+          (d["key"], d["feature"]))
     d = by_path(doc, "ARS-100/" + bt)
-    check("ручной счёт: цель 0.25 → 2.75 из 4.5 (61%), ноль и форма", d["total"] == {"sum": 2.75, "max": 4.5, "pct": 61} and
-          d["zeros"] == ["acceptance"] and d["attention"]["reasons"] == ["zero", "off_form"], (d["total"], d["attention"]))
+    check("ручной счёт: цель 0.25 → 2.75 из 4.5 (61%), ноль и форма", totals(d) == (2.75, 4.5, 61) and
+          contract.zero_ids(d["criteria"]) == ["acceptance"] and d["attention"] == ["zero", "off_form"], (totals(d), d["attention"]))
     d = by_path(doc, "_foundation/" + sp)
-    check("ручной счёт: фундамент 0 из 4, мимо фреймворка", d["total"] == {"sum": 0, "max": 4, "pct": 0} and
-          d["origin"]["verdict"] == "outside" and d["attention"]["reasons"] == ["below_pct", "zero", "template", "off_form"], (d["total"], d["origin"]))
+    check("ручной счёт: фундамент 0 из 4, мимо фреймворка", totals(d) == (0, 4, 0) and d["origin"] == "outside" and d["source"] is None and
+          d["attention"] == ["below_pct", "zero", "template", "off_form"], (totals(d), d["origin"]))
     d = by_path(doc, "ARS-312/" + sp)
-    check("ручной счёт: багфикс 2 из 2 (100%)", d["total"] == {"sum": 2, "max": 2, "pct": 100} and d["origin"]["verdict"] == "skill", d["total"])
+    check("ручной счёт: багфикс 2 из 2 (100%), источник — баг-репорт", totals(d) == (2, 2, 100) and d["origin"] == "skill" and
+          d["source"] == "coddoc/ARS-312/bug_report.md", (totals(d), d["source"]))
     d = by_path(doc, "PSS-2215/" + sp)
-    check("ручной счёт: по коду, 2 из 5 (40%)", d["total"]["pct"] == 40 and d["origin"]["verdict"] == "by_code" and
-          d["attention"]["reasons"] == ["below_pct", "zero", "off_form", "by_code"], d["attention"])
+    check("ручной счёт: по коду, 2 из 5 (40%), признаки — строкой origin", d["pct"] == 40 and d["origin"] == "by_code" and
+          d["attention"] == ["below_pct", "zero", "off_form", "by_code"] and d["findings"][-1]["criterion"] == "origin", d["attention"])
     d = by_path(doc, "PSS-2216/" + sp)
-    check("ручной счёт: правлена руками, не по форме", d["origin"]["verdict"] == "skill_edited" and d["attention"]["reasons"] == ["off_form"], d["origin"])
+    check("ручной счёт: правлена руками, не по форме", d["origin"] == "skill_edited" and d["attention"] == ["off_form"], d["origin"])
 
     d = by_path(doc, "PSS-2210/" + bt)
-    check("нет JSON — не состоялась", not d["scored"] and "нет JSON" in d["skip_reason"], d.get("skip_reason"))
+    check("нет JSON — не состоялась, документ из одних общих полей", not d["scored"] and "нет JSON" in d["skip_reason"] and
+          set(d) == set(merge.HEAD_KEYS) | {"scored", "skip_reason"}, d)
     d = by_path(doc, "PSS-2211/" + bt)
     check("балл цели 1 — вне шкалы", not d["scored"] and "goal: балл 1 вне шкалы 0 / 0.25 / 0.5" in d["skip_reason"], d.get("skip_reason"))
     d = by_path(doc, "PSS-2213/" + bt)
-    check("два JSON — последний", d["scored"] and d["total"]["sum"] == 1, d["total"])
+    check("два JSON — последний", d["scored"] and d["sum"] == 1, totals(d))
     d = by_path(doc, "PSS-2214/" + bt)
-    check("выдуманная цитата — в unverified, балл тот же", d["criteria"][2]["score"] == 0.5 and
-          {"where": "functional", "quote": "FR-9. Этой строки в документе нет"} in d["unverified"], d["unverified"])
+    check("выдуманная цитата — quote_found: false, балл тот же", d["criteria"]["functional"] == 0.5 and
+          line(d, "functional")["quote_found"] is False and "FR-9" in line(d, "functional")["quote"], d["findings"])
     d = by_path(doc, "PSS-2214/" + sp)
-    check("цитата с переносом, **, кавычками и «…» — найдена", d["scored"] and not d["unverified"], d["unverified"])
-    check("«не найдено» цитатой — в searched", "Авторизация/доступ на бэке" in d["criteria"][2]["searched"] and
-          len(d["criteria"][2]["evidence"]) == 2, d["criteria"][2])
+    check("цитата с переносом, **, кавычками и «…» — найдена", d["scored"] and "quote_found" not in line(d, "access"), line(d, "access"))
+    check("«не найдено» цитатой — в «искал»", "искал: Авторизация/доступ на бэке" in line(d, "access")["comment"], line(d, "access"))
     d = by_path(doc, "PSS-2212/" + sp)
-    check("лишний элемент criteria — отброшен", d["scored"] and [c["id"] for c in d["criteria"]] == list(params.CRITERIA["spec"]), d.get("skip_reason"))
-    check("лишний элемент — в логе", any("PSS-2212/technical_specification.md: в criteria лишний элемент «template»" in line for line in log), log)
+    check("лишний элемент criteria — отброшен", d["scored"] and list(d["criteria"]) == list(params.CRITERIA["spec"]), d.get("skip_reason"))
+    check("лишний элемент — в логе", any("PSS-2212/technical_specification.md: в criteria лишний элемент «template»" in entry for entry in log), log)
     d = by_path(doc, "PSS-2210/" + sp)
-    check("origin внутри form — поднят", d["scored"] and d["origin"]["verdict"] == "skill", d.get("skip_reason"))
+    check("origin внутри form — поднят", d["scored"] and d["origin"] == "skill", d.get("skip_reason"))
     d = by_path(doc, "PSS-2213/" + sp)
-    check("порядок критериев — по рубрике", d["scored"] and d["criteria"][3]["score"] == 0.5 and d["criteria"][3]["id"] == "services",
-          [c["id"] for c in d["criteria"]])
+    check("порядок критериев — по рубрике", d["scored"] and list(d["criteria"]) == list(params.CRITERIA["spec"]) and
+          d["criteria"]["services"] == 0.5, d["criteria"])
     d = by_path(doc, "ARS-101/" + bt)
-    check("повтор критерия — последний", d["criteria"][4]["score"] == 0.5, d["criteria"][4])
-    check("н/п без причины — причина из цитаты", d["criteria"][0]["status"] == "na" and d["criteria"][0]["comment"], d["criteria"][0])
+    check("повтор критерия — последний", d["criteria"]["roles"] == 0.5, d["criteria"])
+    check("н/п без причины — причина из цитаты", d["criteria"]["goal"] == "н/п" and line(d, "goal")["comment"], line(d, "goal"))
     d = by_path(doc, "ARS-101/" + sp)
     check("нет критерия — не состоялась", not d["scored"] and "нет критерия data_model" in d["skip_reason"], d.get("skip_reason"))
-    check("строки и документы как у collect", doc["subject"]["rows_total"] == 11 and doc["subject"]["documents_total"] == 17, doc["subject"])
+    check("документы как у collect, строк в выходе нет", doc["subject"]["documents_total"] == 17 and "rows" not in doc, doc["subject"])
     missing = [x["path"] for x in doc["documents"] if not x["scored"] and x["skip_reason"] == "нет ответа модели"]
     check("без ответа — «нет ответа модели»", missing == ["coddoc/PSS-2216/business_requirements.md"], missing)
     check("счёт не состоявшихся", doc["subject"]["documents_scored"] == 17 - 4, doc["subject"])
+    text = merge.dump(doc)
+    check("раскладка: читается обратно без потерь, меньше 10 строк на документ", json.loads(text) == doc and
+          text.count("\n") < 10 * len(doc["documents"]), text.count("\n"))
 
     # --check: перечисляет то, что merge не примет, и не трогает work/.
     bad, _ = merge.check_answers(data["work"])
