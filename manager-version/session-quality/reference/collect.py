@@ -183,6 +183,31 @@ def read_export(path):
     return events, bad, None
 
 
+WORK_SUFFIXES = (".journal.txt", ".facts.json", ".findings.txt")
+WORK_NAMES = ("collect.json", "merge-log.txt")
+
+
+def clean_work(folder):
+    """Убирает из рабочей папки файлы прошлого запуска — только свои: журналы, факты, ответы субагентов, перепроверку.
+    Иначе упавший субагент молча подменится ответом прошлого запуска. Чужие файлы не трогает. Возвращает число убранных."""
+    removed = 0
+    verify_dir = os.path.join(folder, "verify")
+    if os.path.isdir(verify_dir):
+        for name in os.listdir(verify_dir):
+            if name.endswith((".md", ".answer.txt")):
+                os.remove(os.path.join(verify_dir, name))
+                removed += 1
+        if not os.listdir(verify_dir):
+            os.rmdir(verify_dir)
+    if os.path.isdir(folder):
+        for name in os.listdir(folder):
+            path = os.path.join(folder, name)
+            if os.path.isfile(path) and (name.endswith(WORK_SUFFIXES) or name in WORK_NAMES):
+                os.remove(path)
+                removed += 1
+    return removed
+
+
 def share_of(tokens, window):
     """Доля окна, не больше 1: токенов больше окна — значит, окно в параметрах задано меньше настоящего."""
     return min(1.0, round(tokens / window, 3)) if window else None
@@ -221,6 +246,8 @@ class Session:
         self.peak = None              # (доля окна или None, токены, ход)
         self.after_error = False
         self.last_error = False       # последнее событие — ошибка API
+        self.prev_stamp = None        # время прошлого события — показ вопроса с вариантами не выгружается
+        self.unknown = set()          # имена неизвестных событий — для сверки типизации
 
     # -- общее
 
@@ -252,11 +279,10 @@ class Session:
         self.agent_chars = 0
         self.agent_first_ts = None
 
-    def responded(self, turn, stamp, answer_chars, kind, asked, timed=True):
-        """Ответ пользователя: место ли это решения (решает модель) и успел ли он прочитать (считает скрипт).
-        timed=False — время показа вопроса неизвестно (вопрос с вариантами): скорость не считаем."""
+    def responded(self, turn, stamp, answer_chars, kind, asked):
+        """Ответ пользователя: место ли это решения (решает модель) и успел ли он прочитать (считает скрипт)."""
         chars, first = self.agent_chars, self.agent_first_ts
-        seconds = (stamp - first).total_seconds() if timed and stamp and first else None
+        seconds = (stamp - first).total_seconds() if stamp and first else None
         if chars and (asked or chars >= DECISION_MIN):
             speed = chars / max(seconds, 0.5) if seconds is not None else None
             self.decisions.append({"turn": turn, "kind": kind, "asked": asked, "agent_chars": chars,
@@ -376,9 +402,17 @@ class Session:
         if not answered:
             self.forget_unread()  # ответа нет — не место решения
             return
-        # Время показа вопроса в выгрузке нет (событие приходит с ответом): место решения есть, скорости нет.
+        # Ответ на вопрос — реплика пользователя: в петле скиллов человек работает именно так.
+        self.user_turns += 1
+        self.last_error = False
+        if self.run:
+            self.run["user_turns"] += 1
+        # Время показа вопроса не выгружается (событие приходит с ответом): читать начали не раньше прошлого события.
+        # Время чтения так завышено, скорость занижена — «не читая» ставится, только если быстрее чтения наверняка.
         self.agent_chars += chars
-        self.responded(turn, stamp, answer_chars, "question", asked=True, timed=False)
+        if self.agent_first_ts is None:
+            self.agent_first_ts = self.prev_stamp
+        self.responded(turn, stamp, answer_chars, "question", asked=True)
 
     def skill(self, event, turn):
         name = one_line(text_of(event, "skillName")) or "?"
@@ -398,6 +432,8 @@ class Session:
             self.logins.add(event["login"])
         if name not in EVENT_NAMES:
             self.hits["unknown"] += 1
+            self.unknown.add(clip(name, 40))
+            self.prev_stamp = stamp
             return
         self.hits[name] += 1
         if name == "START_SESSION":
@@ -412,6 +448,7 @@ class Session:
             self.skill(event, turn)
         else:
             self.failure(event, turn)
+        self.prev_stamp = stamp
 
 
 def candidate_checks(session):
@@ -485,6 +522,7 @@ def collect_session(path, session_id, out_dir, context_window):
         "compressions": session.compressions,
         "journal": {"file": journal_name, "chars": len(journal), "oversize": len(journal) > JOURNAL_LIMIT},
         "hits": session.hits,
+        "unknown_events": sorted(session.unknown),
     }
     with open(os.path.join(out_dir, f"{session_id}.facts.json"), "w", encoding="utf-8") as handle:
         json.dump(facts, handle, ensure_ascii=False, indent=2)
@@ -516,6 +554,7 @@ def main(argv=None):
         print(f"Нет папки с сессиями: {cfg.sessions}", file=sys.stderr)
         return 2
     os.makedirs(cfg.out, exist_ok=True)
+    stale = clean_work(cfg.out)
     window = cfg.context_window or CONTEXT_WINDOW
 
     sessions, skipped = [], []
@@ -556,17 +595,23 @@ def main(argv=None):
     scored = sum(1 for facts in sessions if facts["scored"])
     print(f"Сессий: {len(sessions)} (оценивается: {scored}, коротких: {len(sessions) - scored})")
     print(f"Пропущено файлов: {len(skipped)}")
+    if stale:
+        print(f"Убрано файлов прошлого запуска: {stale}")
     print(f"Сжатых журналов длиннее {JOURNAL_LIMIT} симв.: {sum(1 for f in sessions if f['journal']['oversize'])}")
     print(f"Куда записано: {cfg.out}")
     events = sum(facts["events"] for facts in sessions)
     bad = sum(facts["bad_events"] for facts in sessions)
     print(f"Сверка событий (годных: {events}, битых: {bad}):")
+    unknown = sorted({name for facts in sessions for name in facts["unknown_events"]})
     for key in EVENT_NAMES + ("inputTokens", "over_window", "compact", "unknown"):
         count = totals.get(key, 0)
         label = {"inputTokens": "inputTokens у ответов", "compact": "сжатий (compact)", "unknown": "неизвестных событий",
                  "over_window": "токенов больше окна"}.get(key, key)
         if key == "over_window" and count:
             print(f"  {label:24} {count} — проверьте context_window в params.json")
+            continue
+        if key == "unknown" and count:
+            print(f"  {label:24} {count}: {', '.join(unknown)}")
             continue
         print(f"  {label:24} {count if count else 'не найдено'}")
     return 0

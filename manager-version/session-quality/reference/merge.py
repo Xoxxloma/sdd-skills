@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """merge — последний шаг оценки: факты collect + находки модели → session-quality/4 и отчёт.
 
-    python3 merge.py --work <папка collect> --out <папка отчёта> [--date ГГГГ-ММ-ДД] [--params <файл>]
+    python3 merge.py --work <папка collect> --out <папка отчёта> [--date ГГГГ-ММ-ДД] [--params <файл>] [--keep-work]
 
 В --work лежат collect.json, <id>.facts.json, <id>.journal.txt (их пишет collect) и <id>.findings.txt — ответ
 модели на brief.md как есть. Пишет в --out <user>-<дата>.json (проверен contract.py) и <user>-<дата>.md,
@@ -603,6 +603,7 @@ def main(argv=None):
     parser.add_argument("--out", required=True, help="куда положить JSON и отчёт")
     parser.add_argument("--date", default=date.today().isoformat())
     parser.add_argument("--params", default=None, help="файл параметров (по умолчанию reference/params.json)")
+    parser.add_argument("--keep-work", action="store_true", help="не убирать рабочую папку после отчёта (для разбора)")
     cfg = parser.parse_args(argv)
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -630,12 +631,22 @@ def main(argv=None):
         json.dump(doc, handle, ensure_ascii=False, indent=2)
     with open(base + ".md", "w", encoding="utf-8") as handle:
         handle.write(render(doc, p))
+    if log_lines:  # что отброшено из ответов модели — рядом с отчётом, рабочая папка дальше не нужна
+        with open(base + ".log.txt", "w", encoding="utf-8") as handle:
+            handle.write("\n".join(log_lines) + "\n")
+    if not cfg.keep_work:
+        collect.clean_work(cfg.work)
+        try:
+            os.rmdir(cfg.work)
+        except OSError:
+            pass  # в папке есть чужие файлы — их не трогаем
     score = doc["score"]
     print(f"Скор: {score['value'] if score['value'] is not None else '—'} ({score['status']})")
     print(f"Сессий: {doc['subject']['sessions_total']}, оценено: {doc['subject']['sessions_scored']}")
     print(f"Сигналов фрода: {len(doc['fraud']['signals'])}")
-    print(f"Записей в merge-log.txt: {len(log_lines)}")
+    print(f"Записей об отброшенном: {len(log_lines)}" + (f" — {base}.log.txt" if log_lines else ""))
     print(f"Куда записано: {base}.json, {base}.md")
+    print("Рабочая папка " + ("оставлена" if cfg.keep_work or os.path.isdir(cfg.work) else "убрана") + f": {cfg.work}")
     return 0
 
 

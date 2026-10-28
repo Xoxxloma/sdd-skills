@@ -15,12 +15,15 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import glob
+import io
 import json
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import date
 
@@ -28,6 +31,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "session-quality"))
 sys.path.insert(0, os.path.join(SKILL, "reference"))
 sys.path.insert(0, HERE)
+import collect  # noqa: E402
 import contract  # noqa: E402
 import grade_brief  # noqa: E402
 import mocks  # noqa: E402
@@ -62,7 +66,7 @@ def grade(run_dir, parallel):
     if result.get("subtype") != "success" or result.get("is_error"):
         problems.append(f"прогон сорвался: {result.get('subtype')}")
 
-    launched_by_message, reads = {}, []
+    launched_by_message, reads, written = {}, [], {}
     for event in events:
         if event.get("type") != "assistant" or event.get("parent_tool_use_id"):
             continue  # события субагентов идут в том же потоке — считаем только ведущего
@@ -74,6 +78,10 @@ def grade(run_dir, parallel):
                 launched_by_message.setdefault(message.get("id"), set()).add(block.get("id"))
         reads += [block for block in uses if block.get("name") == "Read"
                   and str((block.get("input") or {}).get("file_path", "")).endswith(".journal.txt")]
+        for block in uses:  # ответы субагентов ведущий записывает как есть; merge потом убирает рабочую папку
+            path = str((block.get("input") or {}).get("file_path", "")).replace("\\", "/")
+            if block.get("name") == "Write" and path.endswith(".findings.txt"):
+                written[path.rsplit("/", 1)[-1][: -len(".findings.txt")]] = str(block["input"].get("content", ""))
     waves = [len(ids) for ids in launched_by_message.values()]
     lines.append(f"субагентов запущено: {sum(waves)}, волн: {len(waves)}, самая большая волна: {max(waves, default=0)} (N = {parallel})")
     if max(waves, default=0) > parallel:
@@ -93,18 +101,21 @@ def grade(run_dir, parallel):
             problems.append(f"выход не проходит contract.py: {errors[:3]}")
         lines.append(f"скор: {doc['score']['value']} ({doc['score']['status']}), сигналов фрода: {len(doc['fraud']['signals'])}")
 
+    if os.path.isdir(work):
+        problems.append("рабочая папка не убрана после отчёта")
     with open(os.path.join(SKILL, "reference", "findings.schema.json"), encoding="utf-8") as handle:
         schema = json.load(handle)
+    journals = tempfile.mkdtemp(prefix="sq-skill-journals-")  # те же журналы, что видели субагенты
+    with contextlib.redirect_stdout(io.StringIO()):
+        collect.main(["--sessions", os.path.join(ws, "sessions", "user-01"), "--out", journals])
     planted_ok = 0
     for session_id in sorted(expected):
-        path = os.path.join(work, f"{session_id}.findings.txt")
-        if not os.path.exists(path):
+        if session_id not in written:
             problems.append(f"{session_id}: нет ответа субагента")
             continue
-        with open(os.path.join(work, f"{session_id}.journal.txt"), encoding="utf-8") as handle:
+        with open(os.path.join(journals, f"{session_id}.journal.txt"), encoding="utf-8") as handle:
             journal = handle.read()
-        with open(path, encoding="utf-8") as handle:
-            answer, notes, error = grade_brief.extract_json(handle.read())
+        answer, notes, error = grade_brief.extract_json(written[session_id])
         failed, review = ([error], []) if error else grade_brief.grade_answer(session_id, answer, journal, expected[session_id], schema)
         planted_ok += not failed
         lines.append(f"{session_id}: {'PASS' if not failed else 'FAIL'}" + (f" ({'; '.join(notes)})" if notes else ""))

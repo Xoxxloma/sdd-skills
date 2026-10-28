@@ -15,7 +15,8 @@
   task_setup (поздние вводные): задач 1 + 1 + 1 (по запуску на сессию); bq-1 [1] (вторая находка на том же ходе
     отброшена) → 1/3 = 0.333 → 42
   loaded_context: вызовов скиллов 4, все в первом ходе — контекста перед ними ещё нет, сжатий нет → 0/4 → 100
-  skill_share: реплик внутри запусков 5 + 5 + 5 + 3 = 18 из 6 + 6 + 6 + 4 = 22 → 0.818 → 100
+  skill_share: реплик (с ответами на вопросы с вариантами) внутри запусков 5 + 6 + 5 + 4 = 20 из 6 + 7 + 6 + 5 = 24
+    → 0.833 → 100
   общий: (10 · (100 + 42 + 100 + 100 + 63 + 42 + 100) + 5 · 100) / 75 = 5970 / 75 = 79.6 → 80; фрод: обход (bq-3) и
   неподтверждённое как подтверждённое (bq-2) → hold. С минимумом событий 5 измерена только skill_share (вес 5 из 75)
   → скор не посчитан. Находки убранных видов (ухудшение агента, нечёткая постановка, переход к задаче) отбрасываются.
@@ -101,8 +102,8 @@ def main():
 
     screen = io.StringIO()
     with contextlib.redirect_stdout(screen):
-        code = merge.main(["--work", work, "--out", out, "--date", "2026-10-27", "--params", loose_path])
-        strict = merge.main(["--work", work, "--out", os.path.join(root, "strict"), "--date", "2026-10-27"])
+        code = merge.main(["--work", work, "--out", out, "--date", "2026-10-27", "--params", loose_path, "--keep-work"])
+        strict = merge.main(["--work", work, "--out", os.path.join(root, "strict"), "--date", "2026-10-27", "--keep-work"])
 
     failures, checks = [], 0
 
@@ -121,9 +122,10 @@ def main():
 
     # Посылки ручного счёта — факты collect.
     facts = {sid: json.load(open(os.path.join(work, f"{sid}.facts.json"), encoding="utf-8")) for sid in expected}
-    expect([facts[s]["user_turns"] for s in ("bq-1", "bq-2", "bq-3", "bq-4")] == [6, 6, 6, 4], "реплики 6/6/6/4")
-    expect([[run["user_turns"] for run in facts[s]["runs"]] for s in ("bq-1", "bq-2", "bq-3", "bq-4")] == [[5], [5], [5], [3]],
-           "реплик внутри запусков 5/5/5/3")
+    expect([facts[s]["user_turns"] for s in ("bq-1", "bq-2", "bq-3", "bq-4")] == [6, 7, 6, 5],
+           "реплики 6/7/6/5 — ответ на вопрос с вариантами тоже реплика")
+    expect([[run["user_turns"] for run in facts[s]["runs"]] for s in ("bq-1", "bq-2", "bq-3", "bq-4")] == [[5], [6], [5], [4]],
+           "реплик внутри запусков 5/6/5/4")
     expect([[run["context_share_before"] for run in facts[s]["runs"]] for s in ("bq-1", "bq-2", "bq-3", "bq-4")]
            == [[0.0], [0.0], [0.0], [0.0]], "контекст перед вызовами: токены — с конца прошлого хода, а скиллы вызваны в первом")
     expect([[item["turn"] for item in facts[s]["decisions"]] for s in ("bq-1", "bq-2", "bq-3", "bq-4")]
@@ -131,13 +133,13 @@ def main():
                [turn_of["bq-2"]("ОТВЕТ: Формат")], [turn_of["bq-3"]("Пропусти проверку готовности")],
                [turn_of["bq-4"]("ОТВЕТ: Порядок"), turn_of["bq-4"]("ПОЛЬЗОВАТЕЛЬ: да")]], "кандидаты мест решения")
     expect(facts["bq-1"]["decisions"][0]["seconds"] == 3.0, f"bq-1: согласие через 3 с {facts['bq-1']['decisions'][0]}")
-    expect([item["seconds"] for item in facts["bq-2"]["decisions"]] == [None],
-           "вопрос с вариантами: время показа в выгрузке нет — скорость не считается")
+    expect([item["seconds"] for item in facts["bq-2"]["decisions"]] == [75.0],
+           "вопрос с вариантами: время показа не выгружается — от прошлого события (вызов скилла) до ответа")
 
     metrics = {item["id"]: item for item in doc["metrics"]}
     want = {"active_review": (0.667, 100, 0, 3), "blind_confirms": (0.333, 42, 1, 3), "delegated": (0.0, 100, 0, 3),
             "ignored": (0.0, 100, 0, 3), "completion": (0.75, 63, 1, 4), "task_setup": (0.333, 42, 1, 3),
-            "loaded_context": (0.0, 100, 0, 4), "skill_share": (0.818, 100, 0, 22)}
+            "loaded_context": (0.0, 100, 0, 4), "skill_share": (0.833, 100, 0, 24)}
     for metric_id, (value, score, hits, events) in want.items():
         got = metrics[metric_id]
         expect(got["status"] == "measured" and abs(got["value"] - value) <= 0.0005 and got["score"] == score
@@ -201,7 +203,8 @@ def main():
         with open(os.path.join(work, "verify", name + ".answer.txt"), "w", encoding="utf-8") as handle:
             handle.write(answer)
     with contextlib.redirect_stdout(io.StringIO()):
-        merge.main(["--work", work, "--out", os.path.join(root, "verified"), "--date", "2026-10-27", "--params", loose_path])
+        merge.main(["--work", work, "--out", os.path.join(root, "verified"), "--date", "2026-10-27", "--params", loose_path,
+                    "--keep-work"])
     verified_doc = json.load(open(os.path.join(root, "verified", "user-01-2026-10-27.json"), encoding="utf-8"))
     verified_log = open(os.path.join(work, "merge-log.txt"), encoding="utf-8").read()
     expect([signal["kind"] for signal in verified_doc["fraud"]["signals"]] == ["bypass"]
@@ -215,6 +218,10 @@ def main():
     kept = json.load(open(os.path.join(root, "verified2", "user-01-2026-10-27.json"), encoding="utf-8"))
     expect(sorted(signal["kind"] for signal in kept["fraud"]["signals"]) == ["bypass", "deception"],
            "перепроверка без разобранного ответа — находка остаётся к ручной проверке")
+    side_log = os.path.join(root, "verified2", "user-01-2026-10-27.log.txt")
+    expect(not os.path.exists(work) and os.path.exists(side_log)
+           and "не разобрана — находка остаётся" in open(side_log, encoding="utf-8").read(),
+           "без --keep-work рабочая папка убрана, журнал отброшенного — рядом с отчётом")
 
     if failures:
         print("\n".join(failures))

@@ -142,6 +142,11 @@ def main():
     out = os.path.join(root, "out")
     os.makedirs(sessions)
     build(sessions)
+    os.makedirs(os.path.join(out, "verify"))
+    for name in ("gone.findings.txt", "gone.journal.txt", "merge-log.txt", os.path.join("verify", "x.md"),
+                 os.path.join("verify", "x.md.answer.txt"), "notes.keep"):
+        with open(os.path.join(out, name), "w", encoding="utf-8") as handle:
+            handle.write("прошлый запуск")
 
     screen = io.StringIO()
     with contextlib.redirect_stdout(screen):
@@ -161,6 +166,10 @@ def main():
             return json.load(handle) if name.endswith(".json") else handle.read()
 
     expect(code == 0, f"код выхода {code}")
+    left = sorted(os.listdir(out))
+    expect("gone.findings.txt" not in left and "gone.journal.txt" not in left and "merge-log.txt" not in left
+           and "verify" not in left and "notes.keep" in left and "Убрано файлов прошлого запуска: 5" in screen.getvalue(),
+           f"файлы прошлого запуска убраны, чужой файл остался: {left}")
     summary = load("collect.json")
     expect(summary["user"] == "ivanov", f"пользователь — login из выгрузки: {summary['user']}")
     expect("Иванов" not in json.dumps(summary, ensure_ascii=False), "ФИО в выход не попадает")
@@ -177,13 +186,14 @@ def main():
     expect(a["events"] == 16 and a["bad_events"] == 1, f"A: событий {a['events']}, битых {a['bad_events']}")
     expect(a["start"] == "2026-10-20T09:00:00Z" and a["duration_sec"] == 170, f"A: начало и длительность {a['duration_sec']}")
     expect(a["logins"] == ["ivanov"], f"A: login {a['logins']}")
-    expect(a["user_turns"] == 5, f"A: реплик пользователя {a['user_turns']}, ждали 5 (слэш-команда — не реплика)")
+    expect(a["user_turns"] == 6, f"A: реплик пользователя {a['user_turns']}, ждали 6 (ответ на вопрос — реплика, слэш-команда — нет)")
+    expect(a["unknown_events"] == ["PRE_COMPACT"], f"A: имена неизвестных событий — для сверки типизации {a['unknown_events']}")
     expect(a["scored"] is True and a["skip_reason"] is None, "A: оценивается")
     expect(a["skills"] == ["business-requirements-doc", "technical-spec-doc"], f"A: скиллы {a['skills']}")
     runs = a["runs"]
     first, second = (runs + [{}, {}])[:2]
     expect(len(runs) == 2, f"A: запусков {len(runs)}")
-    expect(first.get("turn") == 4 and first.get("user_turns") == 2 and first.get("replied") is True
+    expect(first.get("turn") == 4 and first.get("user_turns") == 3 and first.get("replied") is True
            and first.get("ended_by") == "next_skill" and first.get("question") is None and first.get("error_end") is False
            and first.get("context_share_before") == 0.0 and first.get("after_compression") is False,
            f"A: первый запуск {first}")
@@ -196,8 +206,9 @@ def main():
            f"A: ответы {a['answers']}")
     expect(a["decisions"] == [
         {"turn": 6, "kind": "text", "asked": True, "agent_chars": 1624, "answer_chars": 2, "seconds": 5.0, "speed": 325},
-        {"turn": 7, "kind": "question", "asked": True, "agent_chars": 51, "answer_chars": 17, "seconds": None, "speed": None}],
-        f"A: места решения — длинный текст с вопросом (1624 симв. / 5 с) и вопрос с вариантами без скорости: {a['decisions']}")
+        {"turn": 7, "kind": "question", "asked": True, "agent_chars": 51, "answer_chars": 17, "seconds": 45.0, "speed": 1}],
+        f"A: места решения — длинный текст с вопросом (1624 симв. / 5 с) и вопрос с вариантами, время — от прошлого "
+        f"события [6] (45 с): {a['decisions']}")
     expect(a["fast"] == [{"turn": 6, "seconds": 5.0, "agent_chars": 1624}], f"A: быстрее человека: {a['fast']}")
     expect(a["repeat_streaks"] == [{"turn": 13, "count": 2}], f"A: одинаковые реплики подряд после ошибки API: {a['repeat_streaks']}")
     expect(a["environment"] == {"tool_errors": None, "api_errors": 1} and a["compressions"] == [9],
@@ -235,7 +246,8 @@ def main():
     expect(session.peak == (1.0, 300000, 4) and session.hits["over_window"] == 1, f"B: окно из --context-window {session.peak}")
 
     c = load("sess-c.facts.json")
-    expect(c["user_turns"] == 3 and c["scored"] is True and c["skills"] == [] and c["runs"] == [], "C: без скиллов, оценивается")
+    expect(c["user_turns"] == 5 and c["scored"] is True and c["skills"] == [] and c["runs"] == [],
+           f"C: реплик 3 + ответов на вопросы 2 (без ответа и битый — нет) = 5: {c['user_turns']}")
     expect(c["answers"]["total"] == 5 and c["answers"]["verdicts"] == {"вариант": 2, "Другое": 1, "нет ответа": 2},
            f"C: ответы {c['answers']['verdicts']}")
     expect([(item["turn"], item["kind"]) for item in c["decisions"]] == [(3, "question"), (8, "question")],
