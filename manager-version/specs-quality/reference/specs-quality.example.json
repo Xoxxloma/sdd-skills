@@ -1,0 +1,201 @@
+{
+  "schema": "specs-quality/1",
+  "generated_at": "2026-10-28T15:00:00Z",
+  "subject": {"documents_dir": "coddoc", "team": "Команда А", "repo": "service-a", "rows_total": 6, "documents_total": 8, "documents_scored": 8, "documents_attention": 3},
+  "params": {
+    "file": "reference/params.json",
+    "below_pct": 50,
+    "form_min_missing": {"bt": 5, "spec": 6},
+    "weights": {
+      "bt": {"goal": 0.5, "entities": 1, "functional": 1, "acceptance": 1, "roles": 1},
+      "spec": {"source_logic": 1, "data_model": 1, "access": 1, "services": 1, "contracts": 1}
+    }
+  },
+  "rows": [
+    {"folder": "coddoc/PRJ-101", "key": "PRJ-101", "feature": "просроченная поверка на схеме цеха",
+     "bt": {"document": "coddoc/PRJ-101/business_requirements.md"}, "spec": {"document": "coddoc/PRJ-101/technical_specification.md"}},
+    {"folder": "coddoc/PRJ-102", "key": "PRJ-102", "feature": "заявка на отпуск",
+     "bt": {"document": "coddoc/PRJ-102/business_requirements.md"}, "spec": {"document": "coddoc/PRJ-102/technical_specification.md"}},
+    {"folder": "coddoc/PRJ-103", "key": "PRJ-103", "feature": "двойная отрисовка слоя на карте",
+     "bt": {"none": "bug_report"}, "spec": {"document": "coddoc/PRJ-103/technical_specification.md"}},
+    {"folder": "coddoc/PRJ-104", "key": "PRJ-104", "feature": "согласование смет",
+     "bt": {"document": "coddoc/PRJ-104/business_requirements.md"}, "spec": {"none": "absent"}},
+    {"folder": "coddoc/PRJ-104/_foundation", "key": "PRJ-104", "feature": "общий контракт смет",
+     "bt": {"none": "foundation"}, "spec": {"document": "coddoc/PRJ-104/_foundation/technical_specification.md"}},
+    {"folder": "coddoc/PRJ-105", "key": "PRJ-105", "feature": "расчёт сметы",
+     "bt": {"none": "absent"}, "spec": {"document": "coddoc/PRJ-105/technical_specification.md"}}
+  ],
+  "documents": [
+    {
+      "path": "coddoc/PRJ-101/business_requirements.md", "kind": "bt", "author": "ivanov", "source": null, "scored": true,
+      "criteria": [
+        {"id": "goal", "status": "scored", "score": 0.5, "weight": 0.5, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "entities", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "functional", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "acceptance", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "roles", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null}
+      ],
+      "total": {"sum": 4.5, "max": 4.5, "pct": 100}, "zeros": [],
+      "template": {"flag": false, "fact": {"section": "§1.1", "quote": "за квартал списано 14 приборов с просроченной поверкой"}, "generic": []},
+      "form": {"missing": [], "of": 16, "off_form": false},
+      "origin": null,
+      "attention": {"flag": false, "reasons": []},
+      "unverified": []
+    },
+    {
+      "path": "coddoc/PRJ-101/technical_specification.md", "kind": "spec", "author": "ivanov",
+      "source": {"kind": "bt", "path": "coddoc/PRJ-101/business_requirements.md"}, "scored": true,
+      "criteria": [
+        {"id": "source_logic", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "data_model", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "access", "status": "scored", "score": 0.5, "weight": 1,
+         "evidence": [{"section": "§4.4", "quote": "кнопка видна согласующему"}], "searched": ["Авторизация/доступ на бэке"],
+         "comment": "проверка на сервере не описана", "fix": "сказать, какая роль проверяется на сервере при согласовании"},
+        {"id": "services", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "contracts", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null}
+      ],
+      "total": {"sum": 4.5, "max": 5, "pct": 90}, "zeros": [],
+      "template": {"flag": false, "fact": {"section": "INT-1", "quote": "verifiedUntil: date"}, "generic": []},
+      "form": {"missing": [{"n": 19, "title": "Фиче-флаги"}], "of": 23, "off_form": false},
+      "origin": {"traces": [{"n": 2, "what": "легенда происхождения"}, {"n": 3, "what": "карточки INT-N с полями «Триггер», «Трассировка»"}], "code_signs": [], "verdict": "skill"},
+      "attention": {"flag": false, "reasons": []},
+      "unverified": []
+    },
+    {
+      "path": "coddoc/PRJ-102/business_requirements.md", "kind": "bt", "author": null, "source": null, "scored": true,
+      "criteria": [
+        {"id": "goal", "status": "scored", "score": 0.5, "weight": 0.5, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "entities", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "functional", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "acceptance", "status": "scored", "score": 0, "weight": 1,
+         "evidence": [], "searched": ["Критерии приёмки", "строки [FR-N] рядом с требованиями"],
+         "comment": "критериев приёмки нет", "fix": "дать каждому FR условие и наблюдаемый результат"},
+        {"id": "roles", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null}
+      ],
+      "total": {"sum": 3.5, "max": 4.5, "pct": 78}, "zeros": ["acceptance"],
+      "template": {"flag": false, "fact": {"section": "§1.1", "quote": "в отделе одновременно в отпуске не больше двух"}, "generic": []},
+      "form": {"missing": [], "of": 16, "off_form": false},
+      "origin": null,
+      "attention": {"flag": true, "reasons": ["zero"]},
+      "unverified": [{"where": "acceptance", "quote": "Критерии приёмки — TBD"}]
+    },
+    {
+      "path": "coddoc/PRJ-102/technical_specification.md", "kind": "spec", "author": null,
+      "source": {"kind": "bt", "path": "coddoc/PRJ-102/business_requirements.md"}, "scored": true,
+      "criteria": [
+        {"id": "source_logic", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "data_model", "status": "scored", "score": 0.5, "weight": 1,
+         "evidence": [{"section": "§3.2", "quote": "заявка хранится в таблице заявок"}], "searched": [],
+         "comment": "поля не названы", "fix": "перечислить поля заявки с типами"},
+        {"id": "access", "status": "scored", "score": 0.5, "weight": 1,
+         "evidence": [{"section": "§4.4", "quote": "руководитель видит заявки отдела"}], "searched": ["Авторизация/доступ на бэке"],
+         "comment": "описан только интерфейс", "fix": "сказать, где проверяется роль руководителя"},
+        {"id": "services", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "contracts", "status": "scored", "score": 0.5, "weight": 1,
+         "evidence": [{"section": "INT-2", "quote": "ответ: список заявок"}], "searched": [],
+         "comment": "у ответа нет полей и типов", "fix": "дать поля ответа с типами и ошибки"}
+      ],
+      "total": {"sum": 3.5, "max": 5, "pct": 70}, "zeros": [],
+      "template": {"flag": false, "fact": {"section": "INT-1", "quote": "POST /v1/vacations"}, "generic": []},
+      "form": {"missing": [], "of": 23, "off_form": false},
+      "origin": {"traces": [{"n": 1, "what": "шапка со строкой «Статус готовности»"}, {"n": 5, "what": "таблица «Трассировка приёмки»"}], "code_signs": [], "verdict": "skill"},
+      "attention": {"flag": false, "reasons": []},
+      "unverified": []
+    },
+    {
+      "path": "coddoc/PRJ-103/technical_specification.md", "kind": "spec", "author": "petrova",
+      "source": {"kind": "bug_report", "path": "coddoc/PRJ-103/bug_report.md"}, "scored": true,
+      "criteria": [
+        {"id": "source_logic", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "data_model", "status": "na", "score": null, "weight": 1,
+         "evidence": [{"section": "§3.2", "quote": "Новых сущностей нет, существующие не меняются"}], "searched": [],
+         "comment": "явное отрицание: данных правка не касается", "fix": null},
+        {"id": "access", "status": "na", "score": null, "weight": 1,
+         "evidence": [{"section": "§3.3", "quote": "Не применимо: доступ не меняется"}], "searched": [],
+         "comment": "доступ не меняется", "fix": null},
+        {"id": "services", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "contracts", "status": "na", "score": null, "weight": 1,
+         "evidence": [{"section": "§2", "quote": "Не применимо: контракт не меняется"}], "searched": [],
+         "comment": "правка внутри фронта", "fix": null}
+      ],
+      "total": {"sum": 2, "max": 2, "pct": 100}, "zeros": [],
+      "template": {"flag": false, "fact": {"section": "§1.2", "quote": "map-web"}, "generic": []},
+      "form": {"missing": [{"n": 5, "title": "Каталог ошибок"}], "of": 23, "off_form": false},
+      "origin": {"traces": [{"n": 4, "what": "разделы «Не применимо: <причина>»"}, {"n": 5, "what": "таблица «Трассировка приёмки»"}], "code_signs": [], "verdict": "skill"},
+      "attention": {"flag": false, "reasons": []},
+      "unverified": []
+    },
+    {
+      "path": "coddoc/PRJ-104/business_requirements.md", "kind": "bt", "author": "sidorov", "source": null, "scored": true,
+      "criteria": [
+        {"id": "goal", "status": "scored", "score": 0.5, "weight": 0.5, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "entities", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "functional", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "acceptance", "status": "scored", "score": 0.5, "weight": 1,
+         "evidence": [{"section": "§4.2", "quote": "Тогда: система корректно обрабатывает смету"}], "searched": [],
+         "comment": "результат непроверяем", "fix": "назвать наблюдаемый результат"},
+        {"id": "roles", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null}
+      ],
+      "total": {"sum": 4, "max": 4.5, "pct": 89}, "zeros": [],
+      "template": {"flag": false, "fact": {"section": "§2.2", "quote": "до 50 смет в месяц на участок"}, "generic": []},
+      "form": {"missing": [
+        {"n": 1, "title": "Тип изменения"}, {"n": 3, "title": "Конечные потребители"}, {"n": 4, "title": "Заказчик и стейкхолдеры"},
+        {"n": 6, "title": "Ценность для бизнеса"}, {"n": 7, "title": "Бизнес-риски и меры по снижению"},
+        {"n": 10, "title": "Архитектурные изменения и интеграции"}, {"n": 13, "title": "Разбиение на части"},
+        {"n": 14, "title": "Приоритет"}, {"n": 15, "title": "Сроки"}], "of": 16, "off_form": true},
+      "origin": null,
+      "attention": {"flag": true, "reasons": ["off_form"]},
+      "unverified": []
+    },
+    {
+      "path": "coddoc/PRJ-104/_foundation/technical_specification.md", "kind": "spec", "author": "sidorov",
+      "source": {"kind": "not_passed", "path": null}, "scored": true,
+      "criteria": [
+        {"id": "source_logic", "status": "na", "score": null, "weight": 1, "evidence": [], "searched": [],
+         "comment": "узел-фундамент: источник не передан", "fix": null},
+        {"id": "data_model", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "access", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "services", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "contracts", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null}
+      ],
+      "total": {"sum": 4, "max": 4, "pct": 100}, "zeros": [],
+      "template": {"flag": false, "fact": {"section": "INT-0", "quote": "estimateId: uuid"}, "generic": []},
+      "form": {"missing": [], "of": 23, "off_form": false},
+      "origin": {"traces": [{"n": 3, "what": "карточка INT-0 с полем «Граница/направление»"}, {"n": 2, "what": "легенда происхождения"}], "code_signs": [], "verdict": "skill"},
+      "attention": {"flag": false, "reasons": []},
+      "unverified": []
+    },
+    {
+      "path": "coddoc/PRJ-105/technical_specification.md", "kind": "spec", "author": null,
+      "source": {"kind": "none", "path": null}, "scored": true,
+      "criteria": [
+        {"id": "source_logic", "status": "scored", "score": 0, "weight": 1, "evidence": [], "searched": [],
+         "comment": "нет документа сверху: сверять не с чем", "fix": "написать спеку по требованиям"},
+        {"id": "data_model", "status": "scored", "score": 0.5, "weight": 1,
+         "evidence": [{"section": "Изменения", "quote": "добавлено поле total в смету"}], "searched": [],
+         "comment": "про миграцию ни слова", "fix": "сказать, нужна ли миграция"},
+        {"id": "access", "status": "scored", "score": 0, "weight": 1, "evidence": [], "searched": ["Авторизация", "Безопасность", "Каталог ошибок"],
+         "comment": "правил доступа нет", "fix": "назвать роль и проверку на сервере"},
+        {"id": "services", "status": "scored", "score": 1, "weight": 1, "evidence": [], "searched": [], "comment": null, "fix": null},
+        {"id": "contracts", "status": "scored", "score": 0.5, "weight": 1,
+         "evidence": [{"section": "API", "quote": "GET /v1/estimates/{id}/total"}], "searched": [],
+         "comment": "нет полей ответа и ошибок", "fix": "дать поля ответа с типами и ошибки"}
+      ],
+      "total": {"sum": 2, "max": 5, "pct": 40}, "zeros": ["source_logic", "access"],
+      "template": {"flag": false, "fact": {"section": "API", "quote": "GET /v1/estimates/{id}/total"}, "generic": []},
+      "form": {"missing": [
+        {"n": 1, "title": "Что делаем и тип изменения"}, {"n": 2, "title": "Затронутые сервисы и владельцы"},
+        {"n": 3, "title": "Связь с бизнес-требованиями"}, {"n": 4, "title": "Взаимодействия"}, {"n": 5, "title": "Каталог ошибок"},
+        {"n": 6, "title": "По сервисам (бэкенд)"}, {"n": 7, "title": "Данные и хранение"}, {"n": 8, "title": "Авторизация/доступ на бэке"},
+        {"n": 9, "title": "Где и что меняется в UI"}, {"n": 10, "title": "Пользовательские сценарии"}, {"n": 11, "title": "Состояния"},
+        {"n": 12, "title": "Loading и таймауты"}, {"n": 13, "title": "Доступ по ролям в UI"},
+        {"n": 14, "title": "Синхронность, кэш, производительность"}, {"n": 15, "title": "Надёжность/деградация"},
+        {"n": 16, "title": "Безопасность/доступ (сводно)"}, {"n": 17, "title": "Порядок выката"}, {"n": 18, "title": "Обратная совместимость"},
+        {"n": 19, "title": "Фиче-флаги"}, {"n": 20, "title": "План отката"}, {"n": 21, "title": "Преднастройка до релиза"}],
+        "of": 23, "off_form": true},
+      "origin": {"traces": [], "code_signs": [{"n": 1, "quote": "вынесена логика расчёта в хелпер"}, {"n": 2, "quote": "EstimateServiceImpl.java"}], "verdict": "by_code"},
+      "attention": {"flag": true, "reasons": ["below_pct", "zero", "off_form", "by_code"]},
+      "unverified": []
+    }
+  ]
+}

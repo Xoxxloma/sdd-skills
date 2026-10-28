@@ -1,0 +1,304 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "specs-quality/1",
+  "title": "Оценка качества бизнес-требований и тех-спек по папке coddoc/",
+  "description": "Один документ — один прогон по папке. Баллы и находки с цитатами даёт модель по рубрике; суммы, проценты, нули, форму, происхождение и подсветку считает скрипт merge. Правила, которые схемой не выразить (суммы, порог формы, причины подсветки, связь строк и документов), проверяет contract.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "generated_at", "subject", "params", "rows", "documents"],
+  "properties": {
+    "schema": {"const": "specs-quality/1"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "subject": {"$ref": "#/$defs/subject"},
+    "params": {"$ref": "#/$defs/params"},
+    "rows": {
+      "description": "Одна папка с БТ, спекой, баг-репортом или запросом на правку — одна строка.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/row"}
+    },
+    "documents": {
+      "description": "Все оценённые и неоценённые БТ и спеки; на каждый ссылается ровно одна строка.",
+      "type": "array",
+      "items": {"$ref": "#/$defs/document"}
+    }
+  },
+  "$defs": {
+    "path": {"description": "Путь от корня репозитория, через «/».", "type": "string", "minLength": 1},
+    "count": {"type": "integer", "minimum": 0},
+    "text": {"type": "string", "minLength": 1, "maxLength": 1000},
+    "quote": {"description": "Цитата из документа, коротко.", "type": "string", "minLength": 1, "maxLength": 300},
+    "nullable_text": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/text"}]},
+
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documents_dir", "team", "repo", "rows_total", "documents_total", "documents_scored", "documents_attention"],
+      "properties": {
+        "documents_dir": {"description": "Папка, по которой собраны документы, от корня репозитория: coddoc, папка фичи; при входе файлом или ключом — его папка.", "$ref": "#/$defs/path"},
+        "team": {"oneOf": [{"type": "null"}, {"type": "string", "minLength": 1}]},
+        "repo": {"oneOf": [{"type": "null"}, {"type": "string", "minLength": 1}]},
+        "rows_total": {"$ref": "#/$defs/count"},
+        "documents_total": {"$ref": "#/$defs/count"},
+        "documents_scored": {"$ref": "#/$defs/count"},
+        "documents_attention": {"$ref": "#/$defs/count"}
+      }
+    },
+
+    "params": {
+      "description": "Параметры, с которыми посчитан документ (из params.json или --params).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "below_pct", "form_min_missing", "weights"],
+      "properties": {
+        "file": {"type": "string", "minLength": 1},
+        "below_pct": {"type": "number", "minimum": 0, "maximum": 100},
+        "form_min_missing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["bt", "spec"],
+          "properties": {
+            "bt": {"type": "integer", "minimum": 1, "maximum": 16},
+            "spec": {"type": "integer", "minimum": 1, "maximum": 23}
+          }
+        },
+        "weights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["bt", "spec"],
+          "properties": {
+            "bt": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["goal", "entities", "functional", "acceptance", "roles"],
+              "properties": {
+                "goal": {"$ref": "#/$defs/weight"}, "entities": {"$ref": "#/$defs/weight"},
+                "functional": {"$ref": "#/$defs/weight"}, "acceptance": {"$ref": "#/$defs/weight"},
+                "roles": {"$ref": "#/$defs/weight"}
+              }
+            },
+            "spec": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source_logic", "data_model", "access", "services", "contracts"],
+              "properties": {
+                "source_logic": {"$ref": "#/$defs/weight"}, "data_model": {"$ref": "#/$defs/weight"},
+                "access": {"$ref": "#/$defs/weight"}, "services": {"$ref": "#/$defs/weight"},
+                "contracts": {"$ref": "#/$defs/weight"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "weight": {"type": "number", "exclusiveMinimum": 0},
+
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["folder", "key", "feature", "bt", "spec"],
+      "properties": {
+        "folder": {"$ref": "#/$defs/path"},
+        "key": {"description": "Ключ задачи из шапки; нет — имя папки, у узла-фундамента — имя папки эпика.", "type": "string", "minLength": 1},
+        "feature": {"oneOf": [{"type": "null"}, {"type": "string", "minLength": 1}]},
+        "bt": {
+          "oneOf": [
+            {"$ref": "#/$defs/document_ref"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["none"],
+              "properties": {"none": {"enum": ["bug_report", "change_request", "foundation", "absent"]}}
+            }
+          ]
+        },
+        "spec": {
+          "oneOf": [
+            {"$ref": "#/$defs/document_ref"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["none"],
+              "properties": {"none": {"const": "absent"}}
+            }
+          ]
+        }
+      }
+    },
+    "document_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document"],
+      "properties": {"document": {"$ref": "#/$defs/path"}}
+    },
+
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "author", "source", "scored", "criteria", "total", "zeros", "template", "form", "origin", "attention", "unverified"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "kind": {"enum": ["bt", "spec"]},
+        "author": {"description": "Строка «Автор» из шапки; нет — null.", "oneOf": [{"type": "null"}, {"type": "string", "minLength": 1}]},
+        "source": {"description": "У спеки — документ сверху, у БТ — null.", "oneOf": [{"type": "null"}, {"$ref": "#/$defs/source"}]},
+        "scored": {"description": "false — оценка не состоялась.", "type": "boolean"},
+        "skip_reason": {"description": "Почему оценка не состоялась.", "$ref": "#/$defs/text"},
+        "criteria": {"type": "array", "maxItems": 5, "items": {"$ref": "#/$defs/criterion"}},
+        "total": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/total"}]},
+        "zeros": {"description": "Критерии с баллом 0, по порядку рубрики.", "type": "array", "items": {"type": "string", "minLength": 1}},
+        "template": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/template"}]},
+        "form": {"description": "null — модель строку формы не вернула.", "oneOf": [{"type": "null"}, {"$ref": "#/$defs/form"}]},
+        "origin": {"description": "Только у спеки; null — у БТ или не проверено.", "oneOf": [{"type": "null"}, {"$ref": "#/$defs/origin"}]},
+        "attention": {"$ref": "#/$defs/attention"},
+        "unverified": {"description": "Цитаты модели, которых нет в тексте документа; балл от них не меняется.", "type": "array", "items": {"$ref": "#/$defs/unverified"}}
+      },
+      "allOf": [
+        {"if": {"properties": {"scored": {"const": false}}},
+         "then": {"required": ["skip_reason"], "properties": {"criteria": {"maxItems": 0}, "total": {"type": "null"}, "zeros": {"maxItems": 0},
+                                                       "template": {"type": "null"}, "form": {"type": "null"}, "origin": {"type": "null"},
+                                                       "unverified": {"maxItems": 0}}}},
+        {"if": {"properties": {"scored": {"const": true}}},
+         "then": {"not": {"required": ["skip_reason"]}, "properties": {"criteria": {"minItems": 5}, "total": {"$ref": "#/$defs/total"},
+                                                                  "template": {"$ref": "#/$defs/template"}}}}
+      ]
+    },
+
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path"],
+      "properties": {
+        "kind": {"enum": ["bt", "bug_report", "change_request", "not_passed", "none"]},
+        "path": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/path"}]}
+      },
+      "allOf": [
+        {"if": {"properties": {"kind": {"enum": ["not_passed", "none"]}}}, "then": {"properties": {"path": {"type": "null"}}}},
+        {"if": {"properties": {"kind": {"enum": ["bt", "bug_report", "change_request"]}}}, "then": {"properties": {"path": {"type": "string"}}}}
+      ]
+    },
+
+    "criterion": {
+      "description": "score — балл с весом: 0, половина веса или вес; у «н/п» — null.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "score", "weight", "evidence", "searched", "comment", "fix"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "status": {"enum": ["scored", "na"]},
+        "score": {"type": ["number", "null"], "minimum": 0},
+        "weight": {"$ref": "#/$defs/weight"},
+        "evidence": {"description": "Что нашла модель: раздел и цитата.", "type": "array", "items": {"$ref": "#/$defs/evidence"}},
+        "searched": {"description": "«Не найдено»: где модель искала.", "type": "array", "items": {"type": "string", "minLength": 1}},
+        "comment": {"description": "Что не так, или причина «н/п».", "$ref": "#/$defs/nullable_text"},
+        "fix": {"description": "Что подняло бы балл.", "$ref": "#/$defs/nullable_text"}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "scored"}}}, "then": {"properties": {"score": {"type": "number"}}}},
+        {"if": {"properties": {"status": {"const": "na"}}}, "then": {"properties": {"score": {"type": "null"}, "comment": {"$ref": "#/$defs/text"}}}}
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section", "quote"],
+      "properties": {
+        "section": {"type": "string", "minLength": 1, "maxLength": 200},
+        "quote": {"$ref": "#/$defs/quote"}
+      }
+    },
+
+    "total": {
+      "description": "sum — сумма баллов, max — сумма весов критериев без «н/п», pct — sum / max × 100 с округлением до целого; max = 0 — pct null.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sum", "max", "pct"],
+      "properties": {
+        "sum": {"type": "number", "minimum": 0},
+        "max": {"type": "number", "minimum": 0},
+        "pct": {"type": ["integer", "null"], "minimum": 0, "maximum": 100}
+      }
+    },
+
+    "template": {
+      "description": "flag — «заполнено шаблонно»: нет ни одного факта предметной области (у спеки — конкретного имени), а у спеки ещё — почти все разделы «не применимо» без причины; тогда имя может быть.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flag", "fact", "generic"],
+      "properties": {
+        "flag": {"type": "boolean"},
+        "fact": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/evidence"}]},
+        "generic": {"description": "При flag — до трёх строк общих слов.", "type": "array", "maxItems": 3, "items": {"$ref": "#/$defs/quote"}}
+      }
+    },
+
+    "form": {
+      "description": "missing — разделы списка рубрики без своего заголовка: номер из списка и название. off_form — пропущено не меньше params.form_min_missing.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["missing", "of", "off_form"],
+      "properties": {
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["n", "title"],
+            "properties": {"n": {"type": "integer", "minimum": 1}, "title": {"type": "string", "minLength": 1}}
+          }
+        },
+        "of": {"type": "integer", "minimum": 1},
+        "off_form": {"type": "boolean"}
+      }
+    },
+
+    "origin": {
+      "description": "Как появилась спека. verdict — первое подходящее: by_code — не меньше двух разных признаков кода; skill — форма цела; skill_edited — не меньше двух разных следов скилла; outside — остальное.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["traces", "code_signs", "verdict"],
+      "properties": {
+        "traces": {
+          "description": "Следы скилла фреймворка: номер из списка рубрики и что именно.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["n", "what"],
+            "properties": {"n": {"type": "integer", "minimum": 1, "maximum": 5}, "what": {"$ref": "#/$defs/text"}}
+          }
+        },
+        "code_signs": {
+          "description": "Признаки написанного кода: номер из списка рубрики и цитата.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["n", "quote"],
+            "properties": {"n": {"type": "integer", "minimum": 1, "maximum": 6}, "quote": {"$ref": "#/$defs/quote"}}
+          }
+        },
+        "verdict": {"enum": ["by_code", "skill", "skill_edited", "outside"]}
+      }
+    },
+
+    "attention": {
+      "description": "Требует внимания: процент ниже params.below_pct, ноль по критерию, заполнено шаблонно, не по форме или спека по коду.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flag", "reasons"],
+      "properties": {
+        "flag": {"type": "boolean"},
+        "reasons": {"type": "array", "items": {"enum": ["below_pct", "zero", "template", "off_form", "by_code"]}}
+      }
+    },
+
+    "unverified": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["where", "quote"],
+      "properties": {
+        "where": {"description": "Критерий, template или origin.", "type": "string", "minLength": 1},
+        "quote": {"$ref": "#/$defs/quote"}
+      }
+    }
+  }
+}

@@ -1,0 +1,279 @@
+#!/usr/bin/env python3
+"""Самопроверка merge.py specs-quality: collect по фикстуре + ответы известного вида → итог против ручного счёта.
+
+    python3 selftest_specs_merge.py
+
+Ответы собираются из эталонных баллов 1.4.0 с настоящими цитатами из документов. Проверяется: итог, нули, форма,
+происхождение и подсветка по ручному счёту; допуски разбора (лишний элемент criteria, повтор id, порядок, origin
+внутри form, два JSON); «оценка не состоялась» (нет JSON, балл вне шкалы, нет критерия, нет ответа); цитаты —
+выдуманная в unverified при том же балле, с другим переносом, разметкой и «…» — найдена; итог проходит
+contract.py, work/ удаляется после успеха и остаётся при провале контракта. Если рядом есть ответы среза 2
+(runs/*-rubric-json*/responses), они тоже собираются в итог, который обязан пройти контракт.
+"""
+
+from __future__ import annotations
+
+import glob
+import json
+import os
+import shutil
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "specs-quality", "reference"))
+sys.path.insert(0, HERE)
+import collect  # noqa: E402
+import contract  # noqa: E402
+import merge  # noqa: E402
+import params  # noqa: E402
+import specs_cases  # noqa: E402
+
+NA = "н/п"
+failures = []
+checks = 0
+
+
+def check(name, condition, detail=""):
+    global checks
+    checks += 1
+    if not condition:
+        failures.append(f"{name}: {detail}")
+
+
+def real_quote(text):
+    """Строка прозы из документа без разметки — заведомо найдётся."""
+    for line in text.split("\n"):
+        plain = line.strip().lstrip("#>-").strip()
+        if len(plain) > 25 and "|" not in plain and "**" not in plain and "`" not in plain:
+            return plain[:120]
+    return text.strip().split("\n")[0].lstrip("# ").strip()
+
+
+def answer(kind, parts, quote, flag=False, missing=0, signs=(), traces=(2, 3)):
+    criteria = []
+    for criterion_id, score in zip(params.CRITERIA[kind], parts):
+        lowered = score == NA or score < merge.RUBRIC_MAX.get(criterion_id, 1)
+        criteria.append({"id": criterion_id, "evidence": [{"section": "§1", "quote": quote}] if lowered else [],
+                         "searched": [], "comment": "не применимо" if score == NA else ("дыра" if lowered else None),
+                         "fix": "дописать" if lowered and score != NA else None, "score": score})
+    result = {"criteria": criteria,
+              "template": {"fact": None if flag else {"section": "§1", "quote": quote}, "generic": ["общие слова"] if flag else [],
+                           "flag": flag}}
+    if kind == "spec":
+        result["origin"] = {"traces": [{"n": n, "what": "след"} for n in traces], "code_signs": [{"n": n, "quote": quote} for n in signs]}
+    result["form"] = {"missing": [{"n": n, "title": "раздел"} for n in range(1, missing + 1)]}
+    return result
+
+
+def setup(base, name):
+    root = os.path.join(base, name)
+    shutil.copytree(specs_cases.FIXTURE, os.path.join(root, "coddoc"))
+    data = collect.collect("coddoc/", root, today="2026-10-28")
+    return root, data
+
+
+def doc_meta(data, tail):
+    return next(d for d in data["documents"] if d["path"].endswith(tail))
+
+
+def put(data, tail, text):
+    with open(os.path.join(data["work"], doc_meta(data, tail)["answer"]), "w", encoding="utf-8") as handle:
+        handle.write(text)
+
+
+def text_of(root, data, tail):
+    with open(os.path.join(root, doc_meta(data, tail)["path"]), encoding="utf-8") as handle:
+        return handle.read()
+
+
+def by_path(doc, tail):
+    return next(d for d in doc["documents"] if d["path"].endswith(tail))
+
+
+def main_checks(base):
+    root, data = setup(base, "repo")
+    q = lambda tail: real_quote(text_of(root, data, tail))  # noqa: E731
+    bt, sp = "business_requirements.md", "technical_specification.md"
+
+    # Ручной счёт по эталону.
+    put(data, "PSS-2212/" + bt, json.dumps(answer("bt", (0.5, 1, 0.5, 0.5, 1), q("PSS-2212/" + bt)), ensure_ascii=False))
+    put(data, "ARS-100/" + bt, json.dumps(answer("bt", (0.25, 0.5, 1, 0, 1), q("ARS-100/" + bt), missing=12), ensure_ascii=False))
+    put(data, "_foundation/" + sp, json.dumps(answer("spec", (NA, 0, 0, 0, 0), q("_foundation/" + sp), flag=True, missing=22, traces=(1,)), ensure_ascii=False))
+    put(data, "ARS-312/" + sp, json.dumps(answer("spec", (1, NA, NA, 1, NA), q("ARS-312/" + sp), missing=1, traces=(4, 5)), ensure_ascii=False))
+    put(data, "PSS-2215/" + sp, json.dumps(answer("spec", (0, 1, 0, 0.5, 0.5), q("PSS-2215/" + sp), missing=22, signs=(1, 2), traces=()), ensure_ascii=False))
+    put(data, "PSS-2216/" + sp, json.dumps(answer("spec", (1, 1, 0.5, 1, 1), q("PSS-2216/" + sp), missing=10), ensure_ascii=False))
+
+    # Порча и допуски.
+    put(data, "PSS-2210/" + bt, "Оценка готова, но JSON не пришёл.")
+    put(data, "PSS-2211/" + bt, json.dumps(answer("bt", (1, 1, 1, 1, 1), q("PSS-2211/" + bt)), ensure_ascii=False))
+    first = answer("bt", (0, 0, 0, 0, 0), q("PSS-2213/" + bt), flag=True)
+    second = answer("bt", (0, 0.5, 0.5, 0, 0), q("PSS-2213/" + bt), flag=True)
+    put(data, "PSS-2213/" + bt, "Черновик:\n" + json.dumps(first, ensure_ascii=False) + "\nИсправляю:\n" + json.dumps(second, ensure_ascii=False))
+    invented = answer("bt", (0.5, 1, 1, 1, 1), q("PSS-2214/" + bt), missing=12)
+    invented["criteria"][2].update(score=0.5, evidence=[{"section": "§4.1", "quote": "FR-9. Этой строки в документе нет"}], comment="дыра", fix="x")
+    put(data, "PSS-2214/" + bt, json.dumps(invented, ensure_ascii=False))
+    spec14 = answer("spec", (1, 1, 0.5, 1, 1), q("PSS-2214/" + sp))
+    spec14["criteria"][2]["evidence"] = [{"section": "шапка", "quote": "**Статус готовности:**\nГотово к разработке"},
+                                         {"section": "шапка", "quote": "«Статус готовности» … «Задача: PSS-2214»"},
+                                         {"section": "Авторизация/доступ на бэке", "quote": "Не найдено."}]
+    put(data, "PSS-2214/" + sp, json.dumps(spec14, ensure_ascii=False))
+    extra = answer("spec", (1, 0.5, 0.5, 1, 1), q("PSS-2212/" + sp))
+    extra["criteria"].append({"id": "template", "evidence": [], "searched": [], "comment": None, "fix": None, "score": 1})
+    put(data, "PSS-2212/" + sp, json.dumps(extra, ensure_ascii=False))
+    nested = answer("spec", (1, 1, 0.5, 1, 1), q("PSS-2210/" + sp))
+    nested["form"]["origin"] = nested.pop("origin")
+    put(data, "PSS-2210/" + sp, json.dumps(nested, ensure_ascii=False))
+    shuffled = answer("spec", (0, 0, 0, 0.5, 0), q("PSS-2213/" + sp), flag=True, traces=(1, 3))
+    shuffled["criteria"].reverse()
+    put(data, "PSS-2213/" + sp, json.dumps(shuffled, ensure_ascii=False))
+    twice = answer("bt", (NA, 0, 0, 0, 0), q("ARS-101/" + bt), flag=True, missing=15)
+    twice["criteria"][0]["comment"] = None  # «н/п» без причины своими словами
+    twice["criteria"].append(dict(twice["criteria"][4], score=0.5, comment="дыра"))
+    put(data, "ARS-101/" + bt, json.dumps(twice, ensure_ascii=False))
+    short = answer("spec", (0, 0, 0, 0, 0), q("ARS-101/" + sp), flag=True, missing=22, traces=())
+    short["criteria"].pop(1)
+    put(data, "ARS-101/" + sp, json.dumps(short, ensure_ascii=False))
+    # У PSS-2216 БТ ответа нет вовсе.
+
+    doc, log, _ = merge.build(data["work"])
+    schema = contract.load_json(contract.SCHEMA_PATH)
+    errors = contract.check_document(doc, schema)
+    check("итог проходит contract", not errors, errors[:5])
+
+    d = by_path(doc, "PSS-2212/" + bt)
+    check("ручной счёт: БТ 3.5 из 4.5 (78%)", d["total"] == {"sum": 3.5, "max": 4.5, "pct": 78} and not d["attention"]["flag"], d["total"])
+    d = by_path(doc, "ARS-100/" + bt)
+    check("ручной счёт: цель 0.25 → 2.75 из 4.5 (61%), ноль и форма", d["total"] == {"sum": 2.75, "max": 4.5, "pct": 61} and
+          d["zeros"] == ["acceptance"] and d["attention"]["reasons"] == ["zero", "off_form"], (d["total"], d["attention"]))
+    d = by_path(doc, "_foundation/" + sp)
+    check("ручной счёт: фундамент 0 из 4, мимо фреймворка", d["total"] == {"sum": 0, "max": 4, "pct": 0} and
+          d["origin"]["verdict"] == "outside" and d["attention"]["reasons"] == ["below_pct", "zero", "template", "off_form"], (d["total"], d["origin"]))
+    d = by_path(doc, "ARS-312/" + sp)
+    check("ручной счёт: багфикс 2 из 2 (100%)", d["total"] == {"sum": 2, "max": 2, "pct": 100} and d["origin"]["verdict"] == "skill", d["total"])
+    d = by_path(doc, "PSS-2215/" + sp)
+    check("ручной счёт: по коду, 2 из 5 (40%)", d["total"]["pct"] == 40 and d["origin"]["verdict"] == "by_code" and
+          d["attention"]["reasons"] == ["below_pct", "zero", "off_form", "by_code"], d["attention"])
+    d = by_path(doc, "PSS-2216/" + sp)
+    check("ручной счёт: правлена руками, не по форме", d["origin"]["verdict"] == "skill_edited" and d["attention"]["reasons"] == ["off_form"], d["origin"])
+
+    d = by_path(doc, "PSS-2210/" + bt)
+    check("нет JSON — не состоялась", not d["scored"] and "нет JSON" in d["skip_reason"], d.get("skip_reason"))
+    d = by_path(doc, "PSS-2211/" + bt)
+    check("балл цели 1 — вне шкалы", not d["scored"] and "goal: балл 1 вне шкалы 0 / 0.25 / 0.5" in d["skip_reason"], d.get("skip_reason"))
+    d = by_path(doc, "PSS-2213/" + bt)
+    check("два JSON — последний", d["scored"] and d["total"]["sum"] == 1, d["total"])
+    d = by_path(doc, "PSS-2214/" + bt)
+    check("выдуманная цитата — в unverified, балл тот же", d["criteria"][2]["score"] == 0.5 and
+          {"where": "functional", "quote": "FR-9. Этой строки в документе нет"} in d["unverified"], d["unverified"])
+    d = by_path(doc, "PSS-2214/" + sp)
+    check("цитата с переносом, **, кавычками и «…» — найдена", d["scored"] and not d["unverified"], d["unverified"])
+    check("«не найдено» цитатой — в searched", "Авторизация/доступ на бэке" in d["criteria"][2]["searched"] and
+          len(d["criteria"][2]["evidence"]) == 2, d["criteria"][2])
+    d = by_path(doc, "PSS-2212/" + sp)
+    check("лишний элемент criteria — отброшен", d["scored"] and [c["id"] for c in d["criteria"]] == list(params.CRITERIA["spec"]), d.get("skip_reason"))
+    check("лишний элемент — в логе", any("PSS-2212/technical_specification.md: в criteria лишний элемент «template»" in line for line in log), log)
+    d = by_path(doc, "PSS-2210/" + sp)
+    check("origin внутри form — поднят", d["scored"] and d["origin"]["verdict"] == "skill", d.get("skip_reason"))
+    d = by_path(doc, "PSS-2213/" + sp)
+    check("порядок критериев — по рубрике", d["scored"] and d["criteria"][3]["score"] == 0.5 and d["criteria"][3]["id"] == "services",
+          [c["id"] for c in d["criteria"]])
+    d = by_path(doc, "ARS-101/" + bt)
+    check("повтор критерия — последний", d["criteria"][4]["score"] == 0.5, d["criteria"][4])
+    check("н/п без причины — причина из цитаты", d["criteria"][0]["status"] == "na" and d["criteria"][0]["comment"], d["criteria"][0])
+    d = by_path(doc, "ARS-101/" + sp)
+    check("нет критерия — не состоялась", not d["scored"] and "нет критерия data_model" in d["skip_reason"], d.get("skip_reason"))
+    check("строки и документы как у collect", doc["subject"]["rows_total"] == 11 and doc["subject"]["documents_total"] == 17, doc["subject"])
+    missing = [x["path"] for x in doc["documents"] if not x["scored"] and x["skip_reason"] == "нет ответа модели"]
+    check("без ответа — «нет ответа модели»", missing == ["coddoc/PSS-2216/business_requirements.md"], missing)
+    check("счёт не состоявшихся", doc["subject"]["documents_scored"] == 17 - 4, doc["subject"])
+
+    # --check: перечисляет то, что merge не примет, и не трогает work/.
+    bad, _ = merge.check_answers(data["work"])
+    listed = sorted(meta["path"].replace("coddoc/", "") for meta, _ in bad)
+    check("--check: битые и без ответа — к перезапуску", listed == ["ARS-100/ARS-101/technical_specification.md", "PSS-2210/business_requirements.md",
+                                                                     "PSS-2211/business_requirements.md", "PSS-2216/business_requirements.md"], listed)
+    check("--check: поправимое (лишний элемент, origin в form) — не к перезапуску",
+          not any(tail in " ".join(listed) for tail in ("PSS-2212/technical", "PSS-2210/technical")), listed)
+    code = merge.main(["--work", data["work"], "--check"])
+    check("--check: work/ на месте, итога нет", code == 0 and os.path.exists(data["work"]) and not os.path.exists(data["output"]), code)
+
+    # main: успех — итог записан, work/ удалена.
+    code = merge.main(["--work", data["work"]])
+    check("main: успех", code == 0 and os.path.exists(data["output"]) and not os.path.exists(data["work"]), (code, os.path.exists(data["work"])))
+    with open(data["output"], encoding="utf-8") as handle:
+        written = json.load(handle)
+    check("main: записанный итог проходит contract", not contract.check_document(written, schema), "")
+
+    # main: контракт не прошёл — итога нет, work/ на месте.
+    _, data2 = setup(base, "repo-fail")
+    original = contract.check_document
+    contract.check_document = lambda doc, schema: ["порча для самопроверки"]
+    try:
+        code = merge.main(["--work", data2["work"]])
+    finally:
+        contract.check_document = original
+    check("main: провал контракта — итога нет, work/ оставлена", code == 1 and not os.path.exists(data2["output"]) and os.path.exists(data2["work"]),
+          (code, os.path.exists(data2["output"])))
+
+
+def real_answers_checks(base):
+    """Ответы модели из среза 2 — в итог; итог обязан пройти контракт."""
+    runs = sorted(glob.glob(os.path.join(HERE, "runs", "*-rubric-json*", "responses")))
+    if not runs:
+        print("ответов среза 2 рядом нет — проверка на них пропущена")
+        return
+    names = {case["name"]: (case["path"], case["kind"]) for case in specs_cases.fixture_cases()}
+
+    def same_rubric(run_dir, kind):  # ответ получен той рубрикой, что лежит в скилле сейчас
+        snapshot, current = os.path.join(run_dir, f"rubric-{kind}.md"), os.path.join(merge.HERE, f"rubric-{kind}.md")
+        if not os.path.exists(snapshot):
+            return False
+        with open(snapshot, encoding="utf-8") as left, open(current, encoding="utf-8") as right:
+            return left.read() == right.read()
+
+    used = 0
+    for number, folder in enumerate(runs):
+        fresh = {kind for kind in params.KINDS if same_rubric(os.path.dirname(folder), kind)}
+        for run_tag in ("r1", "r2"):
+            root, data = setup(base, f"real-{number}-{run_tag}")
+            for name, (path, kind) in names.items():
+                response = os.path.join(folder, f"{name}-{run_tag}.json")
+                if kind not in fresh or not os.path.exists(response):
+                    continue
+                with open(response, encoding="utf-8") as handle:
+                    result = json.load(handle).get("result") or ""
+                put(data, path.replace("coddoc/", "", 1), result)
+                used += 1
+            doc, log, _ = merge.build(data["work"])
+            errors = contract.check_document(doc, contract.load_json(contract.SCHEMA_PATH))
+            check(f"реальные ответы {os.path.basename(os.path.dirname(folder))} {run_tag}: итог проходит contract", not errors, errors[:3])
+            failed = [d["path"] for d in doc["documents"] if not d["scored"] and d["skip_reason"] != "нет ответа модели"]
+            check(f"реальные ответы {os.path.basename(os.path.dirname(folder))} {run_tag}: ни один не «не состоялся»", not failed,
+                  [(p, by_path(doc, p)["skip_reason"]) for p in failed])
+    print(f"реальных ответов среза 2 собрано: {used}")
+
+
+def main():
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
+    check("сверка: «…» — пропуск", merge.quote_found("начало … конец", merge.normalize("Начало и середина, конец.")), "")
+    check("сверка: чужое не находится", not merge.quote_found("совсем другое", merge.normalize("начало и конец")), "")
+    base = tempfile.mkdtemp(prefix="specs-merge-")
+    try:
+        main_checks(base)
+        real_answers_checks(base)
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
+    if failures:
+        print("\n".join(failures))
+        print(f"selftest merge: провалов {len(failures)} из {checks}")
+        return 1
+    print(f"selftest merge: {checks}/{checks}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
