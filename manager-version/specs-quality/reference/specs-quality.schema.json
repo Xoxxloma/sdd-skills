@@ -1,16 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "specs-quality/2",
+  "$id": "specs-quality/3",
   "title": "Оценка качества бизнес-требований и тех-спек по папке с документами",
   "description": "Один документ — один прогон по папке. Баллы и находки с цитатами даёт модель по рубрике; суммы, проценты, подсветку и происхождение считает скрипт merge. Правила, которые схемой не выразить (суммы, шкала балла, причины подсветки, находки ровно у сниженных критериев), проверяет contract.py.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "generated_at", "subject", "params", "documents"],
+  "required": ["schema", "generated_at", "subject", "params", "people", "documents"],
   "properties": {
-    "schema": {"const": "specs-quality/2"},
+    "schema": {"const": "specs-quality/3"},
     "generated_at": {"type": "string", "format": "date-time"},
     "subject": {"$ref": "#/$defs/subject"},
     "params": {"$ref": "#/$defs/params"},
+    "people": {"description": "Сводка по авторам: по строке на автора, документы без автора — строкой user: null в конце.", "type": "array", "items": {"$ref": "#/$defs/person"}},
     "documents": {"description": "Все найденные БТ и спеки, оценённые и нет.", "type": "array", "items": {"$ref": "#/$defs/document"}}
   },
   "$defs": {
@@ -74,6 +75,40 @@
       }
     },
 
+    "person": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user", "bt", "spec"],
+      "properties": {"user": {"$ref": "#/$defs/nullable_string"}, "bt": {"$ref": "#/$defs/group"}, "spec": {"$ref": "#/$defs/group"}}
+    },
+    "group": {
+      "description": "Сводка документов автора одного вида. Суммы, а не средние: дашборд складывает их между репозиториями. pct = sum / max, form_pct = form_present / form_total; знаменатель 0 — null. Неоценённые документы — в count, не в суммах.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "scored", "sum", "max", "pct", "form_present", "form_total", "form_pct", "attention", "metrics"],
+      "properties": {
+        "count": {"$ref": "#/$defs/count"},
+        "scored": {"$ref": "#/$defs/count"},
+        "sum": {"type": "number", "minimum": 0},
+        "max": {"type": "number", "minimum": 0},
+        "pct": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
+        "form_present": {"description": "Разделов шаблона на месте — по документам с проверенной формой.", "$ref": "#/$defs/count"},
+        "form_total": {"$ref": "#/$defs/count"},
+        "form_pct": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
+        "attention": {"description": "Сколько документов требуют внимания.", "$ref": "#/$defs/count"},
+        "by_code": {"description": "Только у спек: сколько «по коду».", "$ref": "#/$defs/count"},
+        "metrics": {"description": "По критерию рубрики: measured — на скольких оценён (без «н/п»), full — у скольких полный балл, pct — сумма баллов / сумма весов.",
+                    "type": "array", "items": {"$ref": "#/$defs/metric"}}
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "measured", "full", "pct"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "measured": {"$ref": "#/$defs/count"}, "full": {"$ref": "#/$defs/count"},
+                     "pct": {"type": ["integer", "null"], "minimum": 0, "maximum": 100}}
+    },
+
     "criteria_bt": {
       "type": "object",
       "additionalProperties": false,
@@ -111,6 +146,7 @@
         "template": {"description": "Заполнено шаблонно.", "type": "boolean"},
         "form_missing": {"description": "Номера разделов списка «Форма» рубрики без своего заголовка; null — модель форму не вернула.",
                          "oneOf": [{"type": "null"}, {"type": "array", "items": {"type": "integer", "minimum": 1}}]},
+        "form_pct": {"description": "Доля разделов шаблона на месте; форма не проверена — null.", "type": ["integer", "null"], "minimum": 0, "maximum": 100},
         "origin": {"description": "Только у спеки: by_code — по готовому коду (два разных признака кода, среди них «уже сделано»: 1, 3 или 6), skill — скиллом, skill_edited — скиллом и руками, outside — мимо фреймворка.",
                    "oneOf": [{"type": "null"}, {"enum": ["by_code", "skill", "skill_edited", "outside"]}]},
         "findings": {"description": "По строке на сниженный или «н/п» критерий, по порядку рубрики; у спеки «по коду» — ещё строка origin.",
@@ -122,7 +158,7 @@
                   "allOf": [{"not": {"required": ["criteria"]}}, {"not": {"required": ["pct"]}}, {"not": {"required": ["findings"]}},
                             {"not": {"required": ["attention"]}}]}},
         {"if": {"properties": {"scored": {"const": true}}},
-         "then": {"required": ["pct", "sum", "max", "criteria", "attention", "template", "form_missing", "origin", "findings"],
+         "then": {"required": ["pct", "sum", "max", "criteria", "attention", "template", "form_missing", "form_pct", "origin", "findings"],
                   "not": {"required": ["skip_reason"]}}}
       ]
     },

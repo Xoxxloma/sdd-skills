@@ -129,9 +129,7 @@ def cut(text, limit, log, where):
 # ---------------------------------------------------------------- документ
 
 
-def num(value):
-    """1.0 → 1: в выходе целые баллы без хвоста."""
-    return int(value) if isinstance(value, float) and value.is_integer() else value
+num = contract.num
 
 
 def head(meta, row):
@@ -209,7 +207,9 @@ def scored_document(meta, row, answer, cfg, haystack, log):
 
     points, maximum, pct = contract.total(criteria, weights)
     document = {**head(meta, row), "scored": True, "pct": pct, "sum": num(points), "max": num(maximum), "criteria": criteria,
-                "attention": [], "template": template["flag"], "form_missing": form_missing, "origin": origin, "findings": findings}
+                "attention": [], "template": template["flag"], "form_missing": form_missing, "form_pct": None, "origin": origin,
+                "findings": findings}
+    document["form_pct"] = contract.form_pct(document)
     document["attention"] = contract.attention_reasons(document, cfg["attention"]["below_pct"], form_min)
     return document
 
@@ -262,15 +262,17 @@ def build(work, now=None):
         log += [f"{meta['path']}: {line}" for line in doc_log]
 
     stamp = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    weights = {kind: params.weights(cfg, kind) for kind in params.KINDS}
     doc = {
-        "schema": "specs-quality/2",
+        "schema": "specs-quality/3",
         "generated_at": stamp,
         "subject": {"documents_dir": collected["documents_dir"], "team": collected["team"], "repo": collected["repo"],
                     "documents_total": len(documents), "documents_scored": sum(1 for d in documents if d["scored"]),
                     "documents_attention": sum(1 for d in documents if d["scored"] and d["attention"])},
         "params": {"file": collected["params"], "below_pct": cfg["attention"]["below_pct"],
                    "form_min_missing": cfg["attention"]["form_min_missing"],
-                   "weights": {kind: params.weights(cfg, kind) for kind in params.KINDS}},
+                   "weights": weights},
+        "people": contract.people_summary(documents, weights),
         "documents": documents,
     }
     return doc, log, collected
@@ -296,7 +298,7 @@ def dump(doc):
             return "\n".join(lines)
         lines.append("   " + pairs(document, ("scored", "pct", "sum", "max")) + ",")
         lines.append("   " + pairs(document, ("criteria",)) + ",")
-        lines.append("   " + pairs(document, ("attention", "template", "form_missing", "origin")) + ",")
+        lines.append("   " + pairs(document, ("attention", "template", "form_missing", "form_pct", "origin")) + ",")
         if document["findings"]:
             lines.append('   "findings": [')
             lines.append(",\n".join("    " + j(item) for item in document["findings"]))
@@ -305,11 +307,17 @@ def dump(doc):
             lines.append('   "findings": []}')
         return "\n".join(lines)
 
+    def person(item):
+        return "  {" + pairs(item, ("user",)) + ",\n   " + pairs(item, ("bt",)) + ",\n   " + pairs(item, ("spec",)) + "}"
+
     text = "\n".join([
         "{",
         " " + pairs(doc, ("schema", "generated_at")) + ",",
         " " + pairs(doc, ("subject",)) + ",",
         " " + pairs(doc, ("params",)) + ",",
+        ' "people": [',
+        ",\n".join(person(item) for item in doc["people"]),
+        " ],",
         ' "documents": [',
         ",\n".join(block(document) for document in doc["documents"]),
         " ]",

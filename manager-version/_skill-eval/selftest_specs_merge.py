@@ -197,6 +197,16 @@ def main_checks(base):
     missing = [x["path"] for x in doc["documents"] if not x["scored"] and x["skip_reason"] == "нет ответа модели"]
     check("без ответа — «нет ответа модели»", missing == ["coddoc/PSS-2216/business_requirements.md"], missing)
     check("счёт не состоявшихся", doc["subject"]["documents_scored"] == 17 - 4, doc["subject"])
+    people = {p["user"]: p for p in doc["people"]}
+    ivanova = people.get("ivanova.ma", {}).get("bt", {})
+    # Ручной счёт: три БТ с автором ivanova.ma — PSS-2211 не состоялся (балл цели вне шкалы), PSS-2216 без ответа,
+    # PSS-2214 — 0.5+1+0.5+1+1 = 4 из 4.5, нет 12 разделов из 16.
+    check("сводка по автору — ручной счёт", [p["user"] for p in doc["people"]] == ["ivanova.ma", None] and
+          {k: ivanova.get(k) for k in ("count", "scored", "sum", "max", "pct", "form_present", "form_total", "form_pct", "attention")} ==
+          {"count": 3, "scored": 1, "sum": 4, "max": 4.5, "pct": 89, "form_present": 4, "form_total": 16, "form_pct": 25, "attention": 1} and
+          people["ivanova.ma"]["spec"]["count"] == 0 and people["ivanova.ma"]["spec"]["pct"] is None, people.get("ivanova.ma"))
+    roles = next(m for m in ivanova.get("metrics", []) if m["id"] == "functional")
+    check("метрика по автору — ручной счёт", roles == {"id": "functional", "measured": 1, "full": 0, "pct": 50}, roles)
     text = merge.dump(doc)
     check("раскладка: читается обратно без потерь, меньше 10 строк на документ", json.loads(text) == doc and
           text.count("\n") < 10 * len(doc["documents"]), text.count("\n"))

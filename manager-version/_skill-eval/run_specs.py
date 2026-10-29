@@ -119,6 +119,9 @@ def content_checks(doc):
     ck["правлена"] = origin(d("PSS-2216", "spec")) == "skill_edited" and all(origin(d(k, "spec")) == "skill" for k in BY_SKILL)
     p15 = d("PSS-2215", "spec")
     ck["без источника"] = bool(p15 and p15["source"] is None and not d("PSS-2215", "bt") and score(p15, 0) == 0)
+    people = {p["user"]: p for p in doc["people"]}
+    ck["люди"] = (list(people) == ["ivanova.ma", None] and people["ivanova.ma"]["bt"]["count"] == 3 and
+                  people[None]["bt"]["count"] + people[None]["spec"]["count"] == 16)  # PSS-2211, 2214, 2216 БТ — ivanova.ma
     e_bt, e_spec = d("PSS-2290", "bt"), d("PSS-2290", "spec")
     ck["случай E: только ноль"] = bool(e_bt and e_bt["scored"] and e_bt["attention"] == ["zero"] and pct(e_bt) >= 50 and
                                        e_spec and e_spec["scored"] and not e_spec["attention"])

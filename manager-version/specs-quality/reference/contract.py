@@ -93,6 +93,51 @@ def origin_verdict(code_signs, traces, form_intact):
     return "outside"
 
 
+def num(value):
+    """1.0 → 1: в выходе целые числа без хвоста."""
+    return int(value) if isinstance(value, float) and value.is_integer() else value
+
+
+def form_pct(document):
+    """Доля разделов шаблона на месте; форма не проверена — None."""
+    if document["form_missing"] is None:
+        return None
+    sections = params.FORM_SECTIONS[document["kind"]]
+    return round_half_up(100.0 * (sections - len(document["form_missing"])) / sections)
+
+
+def group_summary(documents, kind, weights):
+    """Сводка документов одного вида: суммы, а не средние, — чтобы дашборд складывал их между репозиториями."""
+    docs = [d for d in documents if d["kind"] == kind]
+    scored = [d for d in docs if d["scored"]]
+    points, maximum = round(sum(d["sum"] for d in scored), 4), round(sum(d["max"] for d in scored), 4)
+    checked = [d for d in scored if d["form_missing"] is not None]
+    present = sum(params.FORM_SECTIONS[kind] - len(d["form_missing"]) for d in checked)
+    sections = params.FORM_SECTIONS[kind] * len(checked)
+    metrics = []
+    for cid in params.CRITERIA[kind]:
+        values = [d["criteria"][cid] for d in scored if d["criteria"][cid] != NA]
+        metrics.append({"id": cid, "measured": len(values), "full": sum(1 for v in values if close(v, weights[cid])),
+                        "pct": round_half_up(100.0 * sum(values) / (weights[cid] * len(values))) if values else None})
+    group = {"count": len(docs), "scored": len(scored), "sum": num(points), "max": num(maximum),
+             "pct": round_half_up(100.0 * points / maximum) if maximum else None,
+             "form_present": present, "form_total": sections, "form_pct": round_half_up(100.0 * present / sections) if sections else None,
+             "attention": sum(1 for d in scored if d["attention"])}
+    if kind == "spec":
+        group["by_code"] = sum(1 for d in scored if d["origin"] == "by_code")
+    group["metrics"] = metrics
+    return group
+
+
+def people_summary(documents, weights):
+    """По строке на автора, документы без автора — строкой user: null в конце."""
+    users = sorted({d["author"] for d in documents if d["author"]})
+    if any(not d["author"] for d in documents):
+        users.append(None)
+    return [{"user": user, **{kind: group_summary([d for d in documents if d["author"] == user], kind, weights[kind])
+                              for kind in params.KINDS}} for user in users]
+
+
 def attention_reasons(document, below_pct, form_min):
     reasons = []
     if document["pct"] is not None and document["pct"] < below_pct:
@@ -272,6 +317,9 @@ def check_document_rules(document, doc_params):
     if missing is not None and (missing != sorted(set(missing)) or any(n > params.FORM_SECTIONS[kind] for n in missing)):
         errors.append(f"{name}: form_missing — не по возрастанию, с повтором или вне списка 1–{params.FORM_SECTIONS[kind]}")
 
+    if document["form_pct"] != form_pct(document):
+        errors.append(f"{name}: form_pct {document['form_pct']}, по form_missing {form_pct(document)}")
+
     expected = attention_reasons(document, doc_params["below_pct"], doc_params["form_min_missing"])
     if document["attention"] != expected:
         errors.append(f"{name}: attention {document['attention']}, по правилам {expected}")
@@ -297,6 +345,18 @@ def check_invariants(doc):
     for field, value in counts.items():
         if subject[field] != value:
             errors.append(f"subject.{field} = {subject[field]}, а по списку {value}")
+
+    if errors:
+        return errors  # сводка по людям считается из документов — сверять её с битыми документами бессмысленно
+    expected = {person["user"]: person for person in people_summary(documents, doc["params"]["weights"])}
+    got = {person["user"]: person for person in doc["people"]}
+    if list(expected) != [person["user"] for person in doc["people"]]:
+        errors.append(f"people: люди {[p['user'] for p in doc['people']]}, по авторам документов {list(expected)}")
+    for user in set(expected) & set(got):
+        for kind in params.KINDS:
+            for field, value in expected[user][kind].items():
+                if got[user][kind].get(field) != value:
+                    errors.append(f"people {user}.{kind}.{field}: {got[user][kind].get(field)}, по документам {value}")
     return errors
 
 
@@ -324,6 +384,17 @@ def selftest():
     def document(doc, tail):
         return next(item for item in doc["documents"] if item["path"].endswith(tail))
 
+    # Качество группы — Σ баллов / Σ максимумов, а не среднее процентов: у документов разный максимум.
+    spec_weights = example["params"]["weights"]["spec"]
+    pair = [{"kind": "spec", "scored": True, "sum": 2, "max": 2, "pct": 100, "form_missing": [], "attention": [], "origin": "skill",
+             "criteria": {"source_logic": 1, "data_model": NA, "access": NA, "services": 1, "contracts": NA}},
+            {"kind": "spec", "scored": True, "sum": 0.5, "max": 5, "pct": 10, "form_missing": [1, 2], "attention": ["below_pct"],
+             "origin": "skill", "criteria": {"source_logic": 0, "data_model": 0, "access": 0, "services": 0.5, "contracts": 0}}]
+    group = group_summary(pair, "spec", spec_weights)
+    if (group["pct"], group["form_present"], group["form_total"], group["attention"]) != (36, 44, 46, 1):
+        problems.append(f"сводка двух спек: pct/форма/внимание {group['pct']}, {group['form_present']}/{group['form_total']}, "
+                        f"{group['attention']} — ждали 36, 44/46, 1 (2.5 из 7)")
+
     good_bt, good_spec = "PRJ-101/business_requirements.md", "PRJ-101/technical_specification.md"
     zero_bt, part_spec = "PRJ-102/business_requirements.md", "PRJ-102/technical_specification.md"
     bug_spec, epic_bt = "PRJ-103/technical_specification.md", "PRJ-104/business_requirements.md"
@@ -337,7 +408,7 @@ def selftest():
 
     def fail_document(doc):
         item = document(doc, good_bt)
-        for field in ("pct", "sum", "max", "criteria", "attention", "template", "form_missing", "origin", "findings"):
+        for field in ("pct", "sum", "max", "criteria", "attention", "template", "form_missing", "form_pct", "origin", "findings"):
             item.pop(field)
         item.update(scored=False, skip_reason="нет ответа модели")
         doc["subject"]["documents_scored"] = 7
@@ -394,7 +465,7 @@ def selftest():
         ("вид не по имени файла", lambda d: document(d, good_spec).update(kind="bt"), "вид bt, а имя файла не business_requirements.md"),
         ("не оценён, а баллы есть", lambda d: document(d, good_bt).update(scored=False, skip_reason="нет ответа"), "запрещённый вариант"),
         ("не оценён без причины", lambda d: [document(d, good_bt).pop(f) for f in ("pct", "sum", "max", "criteria", "attention", "template",
-                                                                                   "form_missing", "origin", "findings")] and document(d, good_bt).update(scored=False),
+                                                                                   "form_missing", "form_pct", "origin", "findings")] and document(d, good_bt).update(scored=False),
          "нет поля «skip_reason»"),
         ("оценён с причиной пропуска", lambda d: document(d, good_bt).update(skip_reason="лишнее"), "запрещённый вариант"),
         ("чужой критерий", lambda d: document(d, good_bt)["criteria"].update(contracts=1), "лишнее поле «contracts»"),
@@ -404,6 +475,12 @@ def selftest():
         ("счёт подсвеченных", lambda d: d["subject"].update(documents_attention=2), "subject.documents_attention = 2, а по списку 3"),
         ("документ дважды", lambda d: d["documents"].append(copy.deepcopy(d["documents"][0])), "встречается дважды"),
         ("лишнее поле", lambda d: d.update(rows=[]), "лишнее поле «rows»"),
+        ("form_pct документа", lambda d: document(d, good_spec).update(form_pct=90), "form_pct 90, по form_missing 96"),
+        ("сумма у человека", lambda d: d["people"][0]["bt"].update(sum=4), "people ivanov.bt.sum: 4, по документам 4.5"),
+        ("форма у человека", lambda d: d["people"][2]["bt"].update(form_present=8), "people sidorov.bt.form_present: 8, по документам 7"),
+        ("метрика у человека", lambda d: d["people"][3]["spec"]["metrics"][0].update(full=2), "people None.spec.metrics"),
+        ("человек пропал", lambda d: d["people"].pop(1), "people: люди ['ivanov', 'sidorov', None]"),
+        ("документы без автора — не последними", lambda d: d["people"].insert(0, d["people"].pop()), "по авторам документов ['ivanov', 'petrova', 'sidorov', None]"),
         ("время без пояса", lambda d: d.update(generated_at="2026-10-28T15:00:00"), "часовым поясом"),
         ("true вместо числа", lambda d: document(d, good_bt)["criteria"].update(roles=True), "ожидался тип number"),
     ]
@@ -417,9 +494,16 @@ def selftest():
     valid = [("оценка не состоялась", fail_document), ("шаблонно — с причиной подсветки", template_flag),
              ("форма не проверена — подсветки нет", form_unchecked), ("БТ без 5 разделов — не по форме", bt_five_missing),
              ("БТ без 4 разделов — по форме", bt_four_missing), ("ровно 50% — не ниже порога", spec_exactly_half)]
+    def refresh(doc):  # верный вариант меняет документы — сводку и долю формы пересчитываем, проверяется другое правило
+        for item in doc["documents"]:
+            if item["scored"]:
+                item["form_pct"] = form_pct(item)
+        doc["people"] = people_summary(doc["documents"], doc["params"]["weights"])
+
     for name, change in valid:
         doc = copy.deepcopy(example)
         change(doc)
+        refresh(doc)
         errors = check_document(doc, schema)
         if errors:
             problems.append(f"верный вариант «{name}» не прошёл: {errors}")
