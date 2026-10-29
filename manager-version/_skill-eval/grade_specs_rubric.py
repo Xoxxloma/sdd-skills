@@ -54,7 +54,7 @@ def build_document(answer, kind, cfg):
     """Ответ рубрики → поля документа specs-quality/2, нужные для подсветки, по формулам contract."""
     weights = params.weights(cfg, kind)
     form_min = cfg["attention"]["form_min_missing"]
-    criteria = {item["id"]: NA if item["score"] == NA else round(item["score"] / RUBRIC_MAX.get(item["id"], 1) * weights[item["id"]], 4)
+    criteria = {item["id"]: None if item["score"] == NA else round(item["score"] / RUBRIC_MAX.get(item["id"], 1) * weights[item["id"]], 4)
                 for item in answer["criteria"]}
     form_missing = sorted({m["n"] for m in answer["form"]["missing"]})
     off = contract.off_form(len(form_missing), kind, form_min)

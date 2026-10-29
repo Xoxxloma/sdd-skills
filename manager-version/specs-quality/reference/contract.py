@@ -34,9 +34,10 @@ KNOWN_KEYWORDS = {
 }
 DATE_TIME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$")
 
-NA = "н/п"
 FILE_NAMES = {"bt": "business_requirements.md", "spec": "technical_specification.md"}
-ORIGIN_FINDING = "origin"
+# Признаки кода по номерам списка рубрики спеки — подпись идёт в выход рядом с цитатой.
+SIGN_KINDS = {1: "сделано в коде", 2: "путь к исходнику", 3: "объём правки в строках", 4: "рефакторинг или тесты",
+              5: "миграция или changelog", 6: "закрытое изменение источником"}
 
 
 # ---------------------------------------------------------------- формулы
@@ -56,8 +57,8 @@ def score_ok(score, weight):
 
 
 def total(criteria, weights):
-    """criteria — {критерий: балл с весом | «н/п»} → (sum, max, pct)."""
-    scored = {cid: score for cid, score in criteria.items() if score != NA}
+    """criteria — {критерий: балл с весом | None — «н/п»} → (sum, max, pct)."""
+    scored = {cid: score for cid, score in criteria.items() if score is not None}
     points = sum(scored.values())
     maximum = sum(weights[cid] for cid in scored)
     pct = round_half_up(100.0 * points / maximum) if maximum else None
@@ -65,12 +66,19 @@ def total(criteria, weights):
 
 
 def zero_ids(criteria):
-    return [cid for cid, score in criteria.items() if score != NA and close(score, 0)]
+    return [cid for cid, score in criteria.items() if score is not None and close(score, 0)]
 
 
 def lowered_ids(criteria, weights):
-    """Критерии, у которых должна быть строка findings: «н/п» или балл ниже веса."""
-    return [cid for cid, score in criteria.items() if score == NA or score < weights[cid] - 1e-9]
+    """Критерии, у которых должна быть строка findings: «н/п» (None) или балл ниже веса."""
+    return [cid for cid, score in criteria.items() if score is None or score < weights[cid] - 1e-9]
+
+
+def is_by_code(code_signs):
+    """«По коду» — два разных признака, и среди них «уже сделано» (1, 3, 6): пути, рефакторинг и миграции (2, 4, 5)
+    пишет и проект поверх существующего кода."""
+    numbers = {sign["n"] for sign in code_signs}
+    return len(numbers) >= 2 and bool(numbers & DONE_SIGNS)
 
 
 def off_form(missing_count, kind, form_min):
@@ -81,10 +89,8 @@ DONE_SIGNS = {1, 3, 6}  # код этой задачи уже написан: с
 
 
 def origin_verdict(code_signs, traces, form_intact):
-    """Первое подходящее сверху. form_intact — форма проверена и цела. «По коду» — два разных признака, и среди них
-    «уже сделано» (1, 3, 6): пути, рефакторинг и миграции (2, 4, 5) пишет и проект поверх существующего кода."""
-    numbers = {sign["n"] for sign in code_signs}
-    if len(numbers) >= 2 and numbers & DONE_SIGNS:
+    """Первое подходящее сверху. form_intact — форма проверена и цела."""
+    if is_by_code(code_signs):
         return "by_code"
     if form_intact:
         return "skill"
@@ -116,7 +122,7 @@ def group_summary(documents, kind, weights):
     sections = params.FORM_SECTIONS[kind] * len(checked)
     metrics = []
     for cid in params.CRITERIA[kind]:
-        values = [d["criteria"][cid] for d in scored if d["criteria"][cid] != NA]
+        values = [d["criteria"][cid] for d in scored if d["criteria"][cid] is not None]
         metrics.append({"id": cid, "measured": len(values), "full": sum(1 for v in values if close(v, weights[cid])),
                         "pct": round_half_up(100.0 * sum(values) / (weights[cid] * len(values))) if values else None})
     group = {"count": len(docs), "scored": len(scored), "sum": num(points), "max": num(maximum),
@@ -148,9 +154,7 @@ def attention_reasons(document, below_pct, form_min):
         reasons.append("template")
     if document["form_missing"] is not None and off_form(len(document["form_missing"]), document["kind"], form_min):
         reasons.append("off_form")
-    if document["origin"] == "by_code":
-        reasons.append("by_code")
-    return reasons
+    return reasons  # «по коду» сюда не входит: это поле origin с доказательствами в code_signs, а не причина подсветки
 
 
 # ---------------------------------------------------------------- валидатор схемы
@@ -294,8 +298,17 @@ def check_document_rules(document, doc_params):
         errors.append(f"{name}: у БТ source должен быть null")
     if not document["scored"]:
         return errors
-    if kind == "bt" and document["origin"] is not None:
-        errors.append(f"{name}: у БТ origin должен быть null")
+    if kind == "bt" and (document["origin"] is not None or document["code_signs"] is not None):
+        errors.append(f"{name}: у БТ origin и code_signs должны быть null")
+    if kind == "spec" and (document["origin"] is None or document["code_signs"] is None):
+        errors.append(f"{name}: у спеки нужны origin и code_signs")
+    if kind == "spec" and document["code_signs"] is not None:
+        for sign in document["code_signs"]:
+            if sign["kind"] != SIGN_KINDS[sign["n"]]:
+                errors.append(f"{name}: признак {sign['n']} подписан «{sign['kind']}», по рубрике «{SIGN_KINDS[sign['n']]}»")
+        if document["origin"] is not None and (document["origin"] == "by_code") != is_by_code(document["code_signs"]):
+            numbers = sorted({sign["n"] for sign in document["code_signs"]})
+            errors.append(f"{name}: origin {document['origin']}, а по признакам {numbers} «по коду» {'да' if is_by_code(document['code_signs']) else 'нет'}")
 
     criteria = document["criteria"]
     if tuple(criteria) != params.CRITERIA[kind]:
@@ -303,7 +316,7 @@ def check_document_rules(document, doc_params):
         return errors  # дальше счёт по чужим критериям бессмыслен
     weights = doc_params["weights"][kind]
     for cid, score in criteria.items():
-        if score != NA and not score_ok(score, weights[cid]):
+        if score is not None and not score_ok(score, weights[cid]):
             errors.append(f"{name}: {cid}: балл {score:g} не из шкалы 0 / {weights[cid] / 2:g} / {weights[cid]:g}")
     points, maximum, pct = total(criteria, weights)
     if not close(document["sum"], points):
@@ -325,7 +338,7 @@ def check_document_rules(document, doc_params):
         errors.append(f"{name}: attention {document['attention']}, по правилам {expected}")
 
     finding_ids = [item["criterion"] for item in document["findings"]]
-    expected_ids = lowered_ids(criteria, weights) + ([ORIGIN_FINDING] if document["origin"] == "by_code" else [])
+    expected_ids = lowered_ids(criteria, weights)
     if finding_ids != expected_ids:
         errors.append(f"{name}: findings по {finding_ids}, а нужны ровно по {expected_ids} — сниженные и «н/п» по порядку рубрики")
     return errors
@@ -387,7 +400,7 @@ def selftest():
     # Качество группы — Σ баллов / Σ максимумов, а не среднее процентов: у документов разный максимум.
     spec_weights = example["params"]["weights"]["spec"]
     pair = [{"kind": "spec", "scored": True, "sum": 2, "max": 2, "pct": 100, "form_missing": [], "attention": [], "origin": "skill",
-             "criteria": {"source_logic": 1, "data_model": NA, "access": NA, "services": 1, "contracts": NA}},
+             "criteria": {"source_logic": 1, "data_model": None, "access": None, "services": 1, "contracts": None}},
             {"kind": "spec", "scored": True, "sum": 0.5, "max": 5, "pct": 10, "form_missing": [1, 2], "attention": ["below_pct"],
              "origin": "skill", "criteria": {"source_logic": 0, "data_model": 0, "access": 0, "services": 0.5, "contracts": 0}}]
     group = group_summary(pair, "spec", spec_weights)
@@ -408,7 +421,7 @@ def selftest():
 
     def fail_document(doc):
         item = document(doc, good_bt)
-        for field in ("pct", "sum", "max", "criteria", "attention", "template", "form_missing", "form_pct", "origin", "findings"):
+        for field in ("pct", "sum", "max", "criteria", "attention", "template", "form_missing", "form_pct", "origin", "code_signs", "findings"):
             item.pop(field)
         item.update(scored=False, skip_reason="нет ответа модели")
         doc["subject"]["documents_scored"] = 7
@@ -446,7 +459,7 @@ def selftest():
         ("ноль без причины", lambda d: document(d, zero_bt).update(attention=[]), "attention [], по правилам ['zero']"),
         ("не по форме без причины", lambda d: document(d, epic_bt).update(attention=[]), "по правилам ['off_form']"),
         ("причина без повода", lambda d: document(d, good_bt).update(attention=["zero"]), "attention ['zero'], по правилам []"),
-        ("лишняя причина", lambda d: document(d, code_spec)["attention"].append("template"), "по правилам ['below_pct', 'zero', 'off_form', 'by_code']"),
+        ("лишняя причина", lambda d: document(d, code_spec)["attention"].append("template"), "по правилам ['below_pct', 'zero', 'off_form']"),
         ("н/п не на своём месте", swap_criteria, "критерии source_logic, access, data_model"),
         ("балл не из шкалы", lambda d: document(d, good_spec)["criteria"].update(access=0.7), "access: балл 0.7 не из шкалы 0 / 0.5 / 1"),
         ("балл цели по шкале критерия", lambda d: document(d, good_bt)["criteria"].update(goal=1), "goal: балл 1 не из шкалы 0 / 0.25 / 0.5"),
@@ -455,17 +468,26 @@ def selftest():
         ("находка у полного балла", lambda d: document(d, good_bt)["findings"].append({"criterion": "roles", "comment": "x", "fix": None, "quote": None}),
          "findings по ['roles'], а нужны ровно по []"),
         ("находки не по порядку", lambda d: document(d, part_spec)["findings"].reverse(), "нужны ровно по ['data_model', 'access', 'contracts']"),
-        ("по коду без находки origin", lambda d: document(d, code_spec)["findings"].pop(), "нужны ровно по ['source_logic', 'data_model', 'access', 'contracts', 'origin']"),
-        ("находка origin без «по коду»", lambda d: document(d, good_spec)["findings"].append({"criterion": "origin", "comment": "x", "fix": None, "quote": None}),
-         "нужны ровно по ['access']"),
-        ("origin у БТ", lambda d: document(d, good_bt).update(origin="outside"), "у БТ origin должен быть null"),
+        ("по коду без признака «уже сделано»", lambda d: document(d, code_spec)["code_signs"][0].update(n=4, kind="рефакторинг или тесты"),
+         "origin by_code, а по признакам [2, 4] «по коду» нет"),
+        ("по коду на одном номере дважды", lambda d: document(d, code_spec)["code_signs"].__setitem__(1, dict(document(d, code_spec)["code_signs"][0])),
+         "origin by_code, а по признакам [1] «по коду» нет"),
+        ("признаки «по коду», а origin другой", lambda d: document(d, part_spec)["code_signs"].insert(0, {"n": 1, "kind": "сделано в коде", "quote": "x"}),
+         "origin skill, а по признакам [1, 2] «по коду» да"),
+        ("подпись признака не к номеру", lambda d: document(d, code_spec)["code_signs"][1].update(n=3), "признак 3 подписан «путь к исходнику», по рубрике «объём правки в строках»"),
+        ("находка origin в findings", lambda d: document(d, code_spec)["findings"].append({"criterion": "origin", "comment": "x", "fix": None, "quote": None}),
+         "нужны ровно по ['source_logic', 'data_model', 'access', 'contracts']"),
+        ("origin у БТ", lambda d: document(d, good_bt).update(origin="outside"), "у БТ origin и code_signs должны быть null"),
+        ("признаки у БТ", lambda d: document(d, good_bt).update(code_signs=[]), "у БТ origin и code_signs должны быть null"),
+        ("спека без признаков", lambda d: document(d, good_spec).update(code_signs=None), "у спеки нужны origin и code_signs"),
         ("source у БТ", lambda d: document(d, good_bt).update(source="coddoc/x/bug_report.md"), "у БТ source должен быть null"),
         ("форма не по возрастанию", lambda d: document(d, epic_bt).update(form_missing=[3, 1, 4, 6, 7, 10, 13, 14, 15]), "form_missing — не по возрастанию"),
         ("номер раздела вне списка", lambda d: document(d, good_spec).update(form_missing=[19, 24]), "вне списка 1–23"),
         ("вид не по имени файла", lambda d: document(d, good_spec).update(kind="bt"), "вид bt, а имя файла не business_requirements.md"),
         ("не оценён, а баллы есть", lambda d: document(d, good_bt).update(scored=False, skip_reason="нет ответа"), "запрещённый вариант"),
         ("не оценён без причины", lambda d: [document(d, good_bt).pop(f) for f in ("pct", "sum", "max", "criteria", "attention", "template",
-                                                                                   "form_missing", "form_pct", "origin", "findings")] and document(d, good_bt).update(scored=False),
+                                                                                   "form_missing", "form_pct", "origin", "code_signs", "findings")]
+         and document(d, good_bt).update(scored=False),
          "нет поля «skip_reason»"),
         ("оценён с причиной пропуска", lambda d: document(d, good_bt).update(skip_reason="лишнее"), "запрещённый вариант"),
         ("чужой критерий", lambda d: document(d, good_bt)["criteria"].update(contracts=1), "лишнее поле «contracts»"),

@@ -102,7 +102,9 @@ def main_checks(base):
     put(data, "_foundation/" + sp, json.dumps(answer("spec", (NA, 0, 0, 0, 0), q("_foundation/" + sp), flag=True, missing=22, traces=(1,)), ensure_ascii=False))
     put(data, "ARS-312/" + sp, json.dumps(answer("spec", (1, NA, NA, 1, NA), q("ARS-312/" + sp), missing=1, traces=(4, 5)), ensure_ascii=False))
     put(data, "PSS-2215/" + sp, json.dumps(answer("spec", (0, 1, 0, 0.5, 0.5), q("PSS-2215/" + sp), missing=22, signs=(1, 2), traces=()), ensure_ascii=False))
-    put(data, "PSS-2216/" + sp, json.dumps(answer("spec", (1, 1, 0.5, 1, 1), q("PSS-2216/" + sp), missing=10), ensure_ascii=False))
+    edited = answer("spec", (1, 1, 0.5, 1, 1), q("PSS-2216/" + sp), missing=10)
+    edited["origin"]["code_signs"] = [{"n": 2, "quote": "src/PassService.java — этой строки в документе нет"}]
+    put(data, "PSS-2216/" + sp, json.dumps(edited, ensure_ascii=False))
 
     # Порча и допуски.
     put(data, "PSS-2210/" + bt, "Оценка готова, но JSON не пришёл.")
@@ -162,10 +164,17 @@ def main_checks(base):
     check("ручной счёт: багфикс 2 из 2 (100%), источник — баг-репорт", totals(d) == (2, 2, 100) and d["origin"] == "skill" and
           d["source"] == "coddoc/ARS-312/bug_report.md", (totals(d), d["source"]))
     d = by_path(doc, "PSS-2215/" + sp)
-    check("ручной счёт: по коду, 2 из 5 (40%), признаки — строкой origin", d["pct"] == 40 and d["origin"] == "by_code" and
-          d["attention"] == ["below_pct", "zero", "off_form", "by_code"] and d["findings"][-1]["criterion"] == "origin", d["attention"])
+    check("ручной счёт: по коду, 2 из 5 (40%), «по коду» — не причина подсветки", d["pct"] == 40 and d["origin"] == "by_code" and
+          d["attention"] == ["below_pct", "zero", "off_form"], d["attention"])
+    check("признаки кода — своим полем, не в findings", [(s["n"], s["kind"]) for s in d["code_signs"]] == [(1, "сделано в коде"), (2, "путь к исходнику")]
+          and not any("quote_found" in s for s in d["code_signs"]) and "origin" not in [f["criterion"] for f in d["findings"]], d["code_signs"])
     d = by_path(doc, "PSS-2216/" + sp)
     check("ручной счёт: правлена руками, не по форме", d["origin"] == "skill_edited" and d["attention"] == ["off_form"], d["origin"])
+    check("один признак — не «по коду», но в code_signs; выдуманная цитата — quote_found: false",
+          d["code_signs"] == [{"n": 2, "kind": "путь к исходнику", "quote": "src/PassService.java — этой строки в документе нет", "quote_found": False}],
+          d["code_signs"])
+    check("у БТ code_signs null, у спеки без признаков — []", by_path(doc, "PSS-2212/" + bt)["code_signs"] is None and
+          by_path(doc, "ARS-312/" + sp)["code_signs"] == [], (by_path(doc, "PSS-2212/" + bt)["code_signs"], by_path(doc, "ARS-312/" + sp)["code_signs"]))
 
     d = by_path(doc, "PSS-2210/" + bt)
     check("нет JSON — не состоялась, документ из одних общих полей", not d["scored"] and "нет JSON" in d["skip_reason"] and
@@ -190,7 +199,7 @@ def main_checks(base):
           d["criteria"]["services"] == 0.5, d["criteria"])
     d = by_path(doc, "ARS-101/" + bt)
     check("повтор критерия — последний", d["criteria"]["roles"] == 0.5, d["criteria"])
-    check("н/п без причины — причина из цитаты", d["criteria"]["goal"] == "н/п" and line(d, "goal")["comment"], line(d, "goal"))
+    check("н/п без причины — null, причина из цитаты", d["criteria"]["goal"] is None and line(d, "goal")["comment"], line(d, "goal"))
     d = by_path(doc, "ARS-101/" + sp)
     check("нет критерия — не состоялась", not d["scored"] and "нет критерия data_model" in d["skip_reason"], d.get("skip_reason"))
     check("документы как у collect, строк в выходе нет", doc["subject"]["documents_total"] == 17 and "rows" not in doc, doc["subject"])

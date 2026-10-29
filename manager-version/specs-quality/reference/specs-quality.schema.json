@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "specs-quality/3",
+  "$id": "specs-quality/4",
   "title": "Оценка качества бизнес-требований и тех-спек по папке с документами",
   "description": "Один документ — один прогон по папке. Баллы и находки с цитатами даёт модель по рубрике; суммы, проценты, подсветку и происхождение считает скрипт merge. Правила, которые схемой не выразить (суммы, шкала балла, причины подсветки, находки ровно у сниженных критериев), проверяет contract.py.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "generated_at", "subject", "params", "people", "documents"],
   "properties": {
-    "schema": {"const": "specs-quality/3"},
+    "schema": {"const": "specs-quality/4"},
     "generated_at": {"type": "string", "format": "date-time"},
     "subject": {"$ref": "#/$defs/subject"},
     "params": {"$ref": "#/$defs/params"},
@@ -21,7 +21,7 @@
     "nullable_text": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/text"}]},
     "nullable_string": {"oneOf": [{"type": "null"}, {"type": "string", "minLength": 1}]},
     "weight": {"type": "number", "exclusiveMinimum": 0},
-    "score": {"description": "Балл с весом: 0, половина веса или вес; «н/п» — не применимо.", "oneOf": [{"type": "number", "minimum": 0}, {"const": "н/п"}]},
+    "score": {"description": "Балл с весом: 0, половина веса или вес; null — не применимо («н/п»), причина — в findings этого критерия.", "type": ["number", "null"], "minimum": 0},
 
     "subject": {
       "type": "object",
@@ -142,14 +142,16 @@
         "max": {"description": "Сумма весов критериев без «н/п».", "type": "number", "minimum": 0},
         "criteria": {"description": "Критерий → балл, по порядку рубрики.", "oneOf": [{"$ref": "#/$defs/criteria_bt"}, {"$ref": "#/$defs/criteria_spec"}]},
         "attention": {"description": "Причины «требует внимания»; пусто — не требует.", "type": "array",
-                      "items": {"enum": ["below_pct", "zero", "template", "off_form", "by_code"]}},
+                      "items": {"enum": ["below_pct", "zero", "template", "off_form"]}},
         "template": {"description": "Заполнено шаблонно.", "type": "boolean"},
         "form_missing": {"description": "Номера разделов списка «Форма» рубрики без своего заголовка; null — модель форму не вернула.",
                          "oneOf": [{"type": "null"}, {"type": "array", "items": {"type": "integer", "minimum": 1}}]},
         "form_pct": {"description": "Доля разделов шаблона на месте; форма не проверена — null.", "type": ["integer", "null"], "minimum": 0, "maximum": 100},
         "origin": {"description": "Только у спеки: by_code — по готовому коду (два разных признака кода, среди них «уже сделано»: 1, 3 или 6), skill — скиллом, skill_edited — скиллом и руками, outside — мимо фреймворка.",
                    "oneOf": [{"type": "null"}, {"enum": ["by_code", "skill", "skill_edited", "outside"]}]},
-        "findings": {"description": "По строке на сниженный или «н/п» критерий, по порядку рубрики; у спеки «по коду» — ещё строка origin.",
+        "code_signs": {"description": "Только у спеки, у БТ — null: признаки кода, что выписал оценщик, — доказательства для origin. «По коду» — два разных номера, среди них 1, 3 или 6.",
+                       "oneOf": [{"type": "null"}, {"type": "array", "items": {"$ref": "#/$defs/code_sign"}}]},
+        "findings": {"description": "По строке на сниженный или «н/п» критерий рубрики, по её порядку.",
                      "type": "array", "items": {"$ref": "#/$defs/finding"}}
       },
       "allOf": [
@@ -158,9 +160,21 @@
                   "allOf": [{"not": {"required": ["criteria"]}}, {"not": {"required": ["pct"]}}, {"not": {"required": ["findings"]}},
                             {"not": {"required": ["attention"]}}]}},
         {"if": {"properties": {"scored": {"const": true}}},
-         "then": {"required": ["pct", "sum", "max", "criteria", "attention", "template", "form_missing", "form_pct", "origin", "findings"],
+         "then": {"required": ["pct", "sum", "max", "criteria", "attention", "template", "form_missing", "form_pct", "origin", "code_signs", "findings"],
                   "not": {"required": ["skip_reason"]}}}
       ]
+    },
+
+    "code_sign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["n", "kind", "quote"],
+      "properties": {
+        "n": {"description": "Номер признака из списка рубрики спеки.", "type": "integer", "minimum": 1, "maximum": 6},
+        "kind": {"enum": ["сделано в коде", "путь к исходнику", "объём правки в строках", "рефакторинг или тесты", "миграция или changelog", "закрытое изменение источником"]},
+        "quote": {"$ref": "#/$defs/text"},
+        "quote_found": {"description": "Есть только если цитаты нет в тексте документа.", "const": false}
+      }
     },
 
     "finding": {
@@ -168,10 +182,10 @@
       "additionalProperties": false,
       "required": ["criterion", "comment", "fix", "quote"],
       "properties": {
-        "criterion": {"description": "Критерий рубрики или origin.", "type": "string", "minLength": 1},
+        "criterion": {"description": "Критерий рубрики.", "type": "string", "minLength": 1},
         "comment": {"description": "Что не так, или причина «н/п»; где искал — в скобках.", "$ref": "#/$defs/nullable_text"},
         "fix": {"description": "Что подняло бы балл.", "$ref": "#/$defs/nullable_text"},
-        "quote": {"description": "Раздел и цитата: «§3.2: «…»»; у origin — признаки кода.", "$ref": "#/$defs/nullable_text"},
+        "quote": {"description": "Раздел и цитата: «§3.2: «…»».", "$ref": "#/$defs/nullable_text"},
         "quote_found": {"description": "Есть только если цитаты нет в тексте документа; балл от этого не меняется.", "const": false}
       }
     }

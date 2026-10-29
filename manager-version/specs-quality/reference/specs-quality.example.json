@@ -1,5 +1,5 @@
 {
- "schema": "specs-quality/3", "generated_at": "2026-10-28T15:00:00Z",
+ "schema": "specs-quality/4", "generated_at": "2026-10-28T15:00:00Z",
  "subject": {"documents_dir": "coddoc", "team": "Команда А", "repo": "service-a", "documents_total": 8, "documents_scored": 8, "documents_attention": 3},
  "params": {"file": "reference/params.json", "below_pct": 50, "form_min_missing": {"bt": 5, "spec": 6}, "weights": {"bt": {"goal": 0.5, "entities": 1, "functional": 1, "acceptance": 1, "roles": 1}, "spec": {"source_logic": 1, "data_model": 1, "access": 1, "services": 1, "contracts": 1}}},
  "people": [
@@ -21,11 +21,13 @@
    "scored": true, "pct": 100, "sum": 4.5, "max": 4.5,
    "criteria": {"goal": 0.5, "entities": 1, "functional": 1, "acceptance": 1, "roles": 1},
    "attention": [], "template": false, "form_missing": [], "form_pct": 100, "origin": null,
+   "code_signs": null,
    "findings": []},
   {"path": "coddoc/PRJ-101/technical_specification.md", "kind": "spec", "key": "PRJ-101", "feature": "просроченная поверка на схеме цеха", "author": "ivanov", "source": "coddoc/PRJ-101/business_requirements.md",
    "scored": true, "pct": 90, "sum": 4.5, "max": 5,
    "criteria": {"source_logic": 1, "data_model": 1, "access": 0.5, "services": 1, "contracts": 1},
    "attention": [], "template": false, "form_missing": [19], "form_pct": 96, "origin": "skill",
+   "code_signs": [],
    "findings": [
     {"criterion": "access", "comment": "проверка на сервере не описана (искал: Авторизация/доступ на бэке)", "fix": "сказать, какая роль проверяется на сервере при согласовании", "quote": "§4.4: «кнопка видна согласующему»"}
    ]},
@@ -33,6 +35,7 @@
    "scored": true, "pct": 78, "sum": 3.5, "max": 4.5,
    "criteria": {"goal": 0.5, "entities": 1, "functional": 1, "acceptance": 0, "roles": 1},
    "attention": ["zero"], "template": false, "form_missing": [], "form_pct": 100, "origin": null,
+   "code_signs": null,
    "findings": [
     {"criterion": "acceptance", "comment": "критериев приёмки нет (искал: Критерии приёмки, строки [FR-N] рядом с требованиями)", "fix": "дать каждому FR условие и наблюдаемый результат", "quote": "§4.2: «Критерии приёмки — TBD»", "quote_found": false}
    ]},
@@ -40,6 +43,7 @@
    "scored": true, "pct": 70, "sum": 3.5, "max": 5,
    "criteria": {"source_logic": 1, "data_model": 0.5, "access": 0.5, "services": 1, "contracts": 0.5},
    "attention": [], "template": false, "form_missing": [], "form_pct": 100, "origin": "skill",
+   "code_signs": [{"n": 2, "kind": "путь к исходнику", "quote": "§5: «правка в LeaveRequestController»"}],
    "findings": [
     {"criterion": "data_model", "comment": "поля не названы", "fix": "перечислить поля заявки с типами", "quote": "§3.2: «заявка хранится в таблице заявок»"},
     {"criterion": "access", "comment": "описан только интерфейс (искал: Авторизация/доступ на бэке)", "fix": "сказать, где проверяется роль руководителя", "quote": "§4.4: «руководитель видит заявки отдела»"},
@@ -47,8 +51,9 @@
    ]},
   {"path": "coddoc/PRJ-103/technical_specification.md", "kind": "spec", "key": "PRJ-103", "feature": "двойная отрисовка слоя на карте", "author": "petrova", "source": "coddoc/PRJ-103/bug_report.md",
    "scored": true, "pct": 100, "sum": 2, "max": 2,
-   "criteria": {"source_logic": 1, "data_model": "н/п", "access": "н/п", "services": 1, "contracts": "н/п"},
+   "criteria": {"source_logic": 1, "data_model": null, "access": null, "services": 1, "contracts": null},
    "attention": [], "template": false, "form_missing": [5], "form_pct": 96, "origin": "skill",
+   "code_signs": [],
    "findings": [
     {"criterion": "data_model", "comment": "явное отрицание: данных правка не касается", "fix": null, "quote": "§3.2: «Новых сущностей нет, существующие не меняются»"},
     {"criterion": "access", "comment": "доступ не меняется", "fix": null, "quote": "§3.3: «Не применимо: доступ не меняется»"},
@@ -58,26 +63,28 @@
    "scored": true, "pct": 89, "sum": 4, "max": 4.5,
    "criteria": {"goal": 0.5, "entities": 1, "functional": 1, "acceptance": 0.5, "roles": 1},
    "attention": ["off_form"], "template": false, "form_missing": [1, 3, 4, 6, 7, 10, 13, 14, 15], "form_pct": 44, "origin": null,
+   "code_signs": null,
    "findings": [
     {"criterion": "acceptance", "comment": "результат непроверяем", "fix": "назвать наблюдаемый результат", "quote": "§4.2: «Тогда: система корректно обрабатывает смету»"}
    ]},
   {"path": "coddoc/PRJ-104/_foundation/technical_specification.md", "kind": "spec", "key": "PRJ-104", "feature": "общий контракт смет", "author": "sidorov", "source": null,
    "scored": true, "pct": 100, "sum": 4, "max": 4,
-   "criteria": {"source_logic": "н/п", "data_model": 1, "access": 1, "services": 1, "contracts": 1},
+   "criteria": {"source_logic": null, "data_model": 1, "access": 1, "services": 1, "contracts": 1},
    "attention": [], "template": false, "form_missing": [], "form_pct": 100, "origin": "skill",
+   "code_signs": [],
    "findings": [
     {"criterion": "source_logic", "comment": "узел-фундамент: источник не передан", "fix": null, "quote": null}
    ]},
   {"path": "coddoc/PRJ-105/technical_specification.md", "kind": "spec", "key": "PRJ-105", "feature": "расчёт сметы", "author": null, "source": null,
    "scored": true, "pct": 40, "sum": 2, "max": 5,
    "criteria": {"source_logic": 0, "data_model": 0.5, "access": 0, "services": 1, "contracts": 0.5},
-   "attention": ["below_pct", "zero", "off_form", "by_code"], "template": false, "form_missing": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21], "form_pct": 9, "origin": "by_code",
+   "attention": ["below_pct", "zero", "off_form"], "template": false, "form_missing": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21], "form_pct": 9, "origin": "by_code",
+   "code_signs": [{"n": 1, "kind": "сделано в коде", "quote": "Изменения: «вынесена логика расчёта в хелпер»"}, {"n": 2, "kind": "путь к исходнику", "quote": "Изменения: «EstimateServiceImpl.java»"}],
    "findings": [
     {"criterion": "source_logic", "comment": "нет документа сверху: сверять не с чем", "fix": "написать спеку по требованиям", "quote": null},
     {"criterion": "data_model", "comment": "про миграцию ни слова", "fix": "сказать, нужна ли миграция", "quote": "Изменения: «добавлено поле total в смету»"},
     {"criterion": "access", "comment": "правил доступа нет (искал: Авторизация, Безопасность, Каталог ошибок)", "fix": "назвать роль и проверку на сервере", "quote": null},
-    {"criterion": "contracts", "comment": "нет полей ответа и ошибок", "fix": "дать поля ответа с типами и ошибки", "quote": "API: «GET /v1/estimates/{id}/total»"},
-    {"criterion": "origin", "comment": "признаки готового кода", "fix": null, "quote": "1 — «вынесена логика расчёта в хелпер»; 2 — «EstimateServiceImpl.java»"}
+    {"criterion": "contracts", "comment": "нет полей ответа и ошибок", "fix": "дать поля ответа с типами и ошибки", "quote": "API: «GET /v1/estimates/{id}/total»"}
    ]}
  ]
 }

@@ -39,7 +39,7 @@ LIMITS = {"text": 1000}
 NOISE_RE = re.compile(r"[`*_«»\"“”„'’~>|]")
 ELLIPSIS_RE = re.compile(r"\s*(?:…|\.\.\.)\s*")
 NOT_FOUND = {"не найдено", "не найден", "не найдена", "не найдены", "нет", "отсутствует"}  # «цитата» об отсутствии — это searched
-REASON_NAMES = {"below_pct": None, "zero": "ноль", "template": "шаблонно: да", "off_form": "не по форме", "by_code": "по коду"}
+REASON_NAMES = {"below_pct": None, "zero": "ноль", "template": "шаблонно: да", "off_form": "не по форме"}
 KIND_NAMES = {"bt": "БТ", "spec": "спека"}
 
 
@@ -174,10 +174,10 @@ def scored_document(meta, row, answer, cfg, haystack, log):
     for item in answer["criteria"]:
         criterion_id = item["id"]
         if item["score"] == NA:
-            criteria[criterion_id] = NA
+            criteria[criterion_id] = None  # «н/п» модели → null в выходе, причина — в findings
         else:
             criteria[criterion_id] = num(round(item["score"] / RUBRIC_MAX.get(criterion_id, 1) * weights[criterion_id], 4))
-        if criteria[criterion_id] == NA or criteria[criterion_id] < weights[criterion_id] - 1e-9:
+        if criteria[criterion_id] is None or criteria[criterion_id] < weights[criterion_id] - 1e-9:
             findings.append(finding(criterion_id, item, haystack, log))
 
     template = answer["template"]
@@ -193,22 +193,21 @@ def scored_document(meta, row, answer, cfg, haystack, log):
     form_missing.sort()
     form_min = cfg["attention"]["form_min_missing"]
 
-    origin = None
+    origin, code_signs = None, None
     if kind == "spec":
         signs, traces = answer["origin"]["code_signs"], answer["origin"]["traces"]
         origin = contract.origin_verdict(signs, traces, not contract.off_form(len(form_missing), kind, form_min))
-        if origin == "by_code":
-            quote = "; ".join(f"{s['n']} — «{s['quote']}»" for s in signs)
-            line = {"criterion": contract.ORIGIN_FINDING, "comment": "признаки готового кода", "fix": None,
-                    "quote": cut(quote, LIMITS["text"], log, "origin")}
-            if not all(quote_found(s["quote"], haystack) for s in signs):
-                line["quote_found"] = False
-            findings.append(line)
+        code_signs = []
+        for sign in signs:  # все признаки, что выписал оценщик, — и когда до «по коду» не дотянули
+            item = {"n": sign["n"], "kind": contract.SIGN_KINDS[sign["n"]], "quote": cut(sign["quote"], LIMITS["text"], log, "origin")}
+            if not quote_found(sign["quote"], haystack):
+                item["quote_found"] = False
+            code_signs.append(item)
 
     points, maximum, pct = contract.total(criteria, weights)
     document = {**head(meta, row), "scored": True, "pct": pct, "sum": num(points), "max": num(maximum), "criteria": criteria,
                 "attention": [], "template": template["flag"], "form_missing": form_missing, "form_pct": None, "origin": origin,
-                "findings": findings}
+                "code_signs": code_signs, "findings": findings}
     document["form_pct"] = contract.form_pct(document)
     document["attention"] = contract.attention_reasons(document, cfg["attention"]["below_pct"], form_min)
     return document
@@ -264,7 +263,7 @@ def build(work, now=None):
     stamp = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
     weights = {kind: params.weights(cfg, kind) for kind in params.KINDS}
     doc = {
-        "schema": "specs-quality/3",
+        "schema": "specs-quality/4",
         "generated_at": stamp,
         "subject": {"documents_dir": collected["documents_dir"], "team": collected["team"], "repo": collected["repo"],
                     "documents_total": len(documents), "documents_scored": sum(1 for d in documents if d["scored"]),
@@ -299,6 +298,7 @@ def dump(doc):
         lines.append("   " + pairs(document, ("scored", "pct", "sum", "max")) + ",")
         lines.append("   " + pairs(document, ("criteria",)) + ",")
         lines.append("   " + pairs(document, ("attention", "template", "form_missing", "form_pct", "origin")) + ",")
+        lines.append("   " + pairs(document, ("code_signs",)) + ",")
         if document["findings"]:
             lines.append('   "findings": [')
             lines.append(",\n".join("    " + j(item) for item in document["findings"]))

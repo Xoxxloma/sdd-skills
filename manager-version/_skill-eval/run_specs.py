@@ -105,8 +105,8 @@ def content_checks(doc):
                            pct(p12b) >= 50 and pct(p12s) >= 50)
     p13b, p13s = d("PSS-2213", "bt"), d("PSS-2213", "spec")
     ck["протыкано"] = 0 <= pct(p13b) < 50 and 0 <= pct(p13s) < 50 and flag(p13b) and flag(p13s)
-    ck["багфикс"] = bool(bug and pct(bug) >= 80 and sum(1 for i in (1, 2, 4) if score(bug, i) == "н/п") >= 2)
-    ck["фундамент"] = bool(fnd and fnd["scored"] and score(fnd, 0) == "н/п")
+    ck["багфикс"] = bool(bug and pct(bug) >= 80 and sum(1 for i in (1, 2, 4) if score(bug, i) is None) >= 2)  # оценён, None — «н/п»
+    ck["фундамент"] = bool(fnd and fnd["scored"] and score(fnd, 0) is None)
     ck["внимание"] = (all(attention(k) for k in ("PSS-2213", "PSS-2214", "PSS-2215", "PSS-2216")) and
                       not any(attention(k) for k in ("PSS-2210", "PSS-2211", "PSS-2212", "ARS-312")))
     ck["флаг"] = not any(flag(d(k, kind)) for k in ("PSS-2210", "PSS-2211", "PSS-2212", "ARS-312", "PSS-2214", "PSS-2215", "PSS-2216")
