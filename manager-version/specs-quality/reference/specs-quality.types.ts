@@ -1,66 +1,30 @@
 /**
- * Типизация выхода specs-quality: формат specs-quality/4.
- * Итог: <корень репозитория>/specs-quality-<дата>.json — одна папка с документами.
+ * Типизация выхода specs-quality: формат specs-quality/5.
+ * Итог: <имя документа>.quality.json рядом с документом — один документ, БТ или спека.
  * Источник правды — specs-quality.schema.json и contract.py; этот файл — их описание для чтения.
+ *
+ * Сводку по автору собирает дашборд из файлов его документов, суммами, а не средними процентов:
+ *   качество = Σ sum / Σ max × 100 по оценённым документам одного вида (у документов разный max);
+ *   форма = Σ (разделов − form_missing.length) / Σ разделов по документам с form_missing ≠ null (16 у БТ, 23 у спеки);
+ *   по критерию = Σ баллов / Σ весов по документам, где он не null.
  */
 
-/** Корень отчёта. */
-export interface SpecsQualityReport {
-  schema: "specs-quality/4";        // версия формата
-  generated_at: string;             // когда собран отчёт, ISO 8601 с поясом
-  subject: Subject;                 // что оценивали
-  params: Params;                   // с какими порогами и весами считали
-  people: Person[];                 // сводка по авторам
-  documents: Document[];            // все найденные БТ и спеки, оценённые и нет
-}
-
-export interface Subject {
-  documents_dir: string;            // папка, по которой собраны документы, от корня репо: "coddoc", "docs/PRJ-1"; "." — весь корень
-  team: string | null;              // команда (если передали при запуске)
-  repo: string | null;              // репозиторий (если передали при запуске)
-  documents_total: number;          // сколько документов найдено
-  documents_scored: number;         // сколько оценено (у остальных scored = false)
-  documents_attention: number;      // сколько требуют внимания (attention не пуст)
+/** Корень выхода. */
+export interface SpecsQualityResult {
+  schema: "specs-quality/5";        // версия формата
+  generated_at: string;             // когда собран, ISO 8601 с поясом
+  params: Params;                   // с какими порогами и весами считали — для вида этого документа
+  document: Document;               // сам документ
 }
 
 export interface Params {
-  file: string;                     // файл параметров
   below_pct: number;                // порог «низкий итог»: pct ниже — причина below_pct (сейчас 50)
-  form_min_missing: { bt: number; spec: number }; // с какого числа пропущенных разделов «не по форме» (сейчас 5 и 6)
-  weights: {                        // вес каждого критерия
-    bt: { goal: number; entities: number; functional: number; acceptance: number; roles: number };            // сейчас 0.5, 1, 1, 1, 1
-    spec: { source_logic: number; data_model: number; access: number; services: number; contracts: number }; // сейчас все 1
-  };
+  form_min_missing: number;         // с какого числа пропущенных разделов «не по форме» (сейчас у БТ 5, у спеки 6)
+  weights: WeightsBt | WeightsSpec; // вес каждого критерия рубрики этого вида
 }
 
-/** Сводка по одному автору. Порядок — по алфавиту; документы без автора — последней строкой с user: null. */
-export interface Person {
-  user: string | null;              // строка «Автор» из шапки как есть («petrov, sidorova» — отдельный автор); null — автора нет
-  bt: Group;                        // его БТ
-  spec: Group;                      // его спеки
-}
-
-/** Суммы, а не средние: дашборд может складывать их между репозиториями. Знаменатель 0 — pct = null. */
-export interface Group {
-  count: number;                    // сколько документов этого вида у автора
-  scored: number;                   // сколько из них оценено (неоценённые есть в count, но не в суммах)
-  sum: number;                      // сумма баллов по оценённым
-  max: number;                      // сумма максимумов (весов без «н/п»)
-  pct: number | null;               // sum / max × 100, целое
-  form_present: number;             // сколько разделов шаблона на месте — по документам с проверенной формой
-  form_total: number;               // сколько разделов должно быть (16 на БТ, 23 на спеку)
-  form_pct: number | null;          // form_present / form_total × 100
-  attention: number;                // сколько документов требуют внимания
-  by_code?: number;                 // только у спек: сколько с origin = "by_code"
-  metrics: GroupMetric[];           // по каждому критерию рубрики
-}
-
-export interface GroupMetric {
-  id: CriterionBt | CriterionSpec;
-  measured: number;                 // на скольких документах критерий оценён (без «н/п»)
-  full: number;                     // у скольких полный балл
-  pct: number | null;               // сумма баллов / сумма весов × 100
-}
+export interface WeightsBt { goal: number; entities: number; functional: number; acceptance: number; roles: number }            // сейчас 0.5, 1, 1, 1, 1
+export interface WeightsSpec { source_logic: number; data_model: number; access: number; services: number; contracts: number } // сейчас все 1
 
 /**
  * Документ — одно из трёх: оценка не состоялась; оценённые БТ; оценённая спека.
@@ -71,6 +35,7 @@ export type Document = SkippedDocument | ScoredBt | ScoredSpec;
 /** Поля, которые есть у любого документа. */
 export interface DocumentBase {
   path: string;                     // путь от корня репо: "coddoc/PRJ-101/technical_specification.md"
+  repo: string | null;              // репозиторий, если передали при запуске; null — не передали
   kind:
     | "bt"                          // бизнес-требования (business_requirements.md)
     | "spec";                       // техническая спецификация (technical_specification.md)

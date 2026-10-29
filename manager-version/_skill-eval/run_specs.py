@@ -5,11 +5,12 @@
     python3 run_specs.py --name lead-pilot --grade-only
 
 Песочница: runs/<дата>-<имя>/run-01/ — coddoc/ фикстуры, папка PSS-2290 (случай E: хороший БТ без критериев
-приёмки), скилл — в .claude/skills/specs-quality. Ведущий запускается через `claude -p "/specs-quality coddoc/ …"` в
-обычном режиме разрешений и только с теми инструментами, что нужны скиллу, — как run_skill.py у session-quality.
-Оценка — после завершения прогона, по файлам: итог есть и проходит contract.py, work/ убрана, coddoc/ не тронута,
-ответов субагентов столько же, сколько документов, волны ≤ N, ведущий документы сам не читал; содержание — проверки
-grade-sq.mjs стенда sdd-quality-audit по JSON и случай E. Стоимость — total_cost_usd.
+приёмки), скилл — в .claude/skills/specs-quality; в песочнице своя .git — корнем итога становится она. Ведущий
+запускается через `claude -p "/specs-quality coddoc/ …"` в обычном режиме разрешений и только с теми инструментами,
+что нужны скиллу, — как run_skill.py у session-quality. Оценка — после завершения прогона, по файлам: рядом с каждым
+документом выход <имя>.quality.json, каждый проходит contract.py, work/ убрана, документы coddoc/ не тронуты, ответов
+субагентов столько же, сколько документов, волны ≤ N, ведущий документы сам не читал; содержание — проверки
+grade-sq.mjs стенда sdd-quality-audit по выходам и случай E. Стоимость — total_cost_usd.
 """
 
 from __future__ import annotations
@@ -36,16 +37,17 @@ from run_specs_rubric import claude_exe  # noqa: E402
 AGENT_TOOLS = ("Agent", "Task")
 ALLOWED_TOOLS = ["Read", "Write", "Glob", "Agent", "Task", "Bash(python:*)", "Bash(python3:*)"]
 DENIED_TOOLS = ["WebFetch", "WebSearch", "Edit", "NotebookEdit"]
-PROMPT = "/specs-quality coddoc/ АРМ.Процессы pss --parallel {parallel}"
+PROMPT = "/specs-quality coddoc/ pss --parallel {parallel}"
 BT, SPEC = "business_requirements.md", "technical_specification.md"
 IN_FORM = ["PSS-2210", "PSS-2211", "PSS-2212", "PSS-2213", "ARS-312"]
 BY_SKILL = ["PSS-2210", "PSS-2212", "PSS-2213", "PSS-2214", "ARS-312"]
 
 
 def digest(folder):
+    """Отпечатки документов; выходы скилла <имя>.quality.json — не документы."""
     out = {}
     for path in sorted(glob.glob(os.path.join(folder, "**", "*"), recursive=True)):
-        if os.path.isfile(path):
+        if os.path.isfile(path) and not path.endswith(".quality.json"):
             with open(path, "rb") as handle:
                 out[os.path.relpath(path, folder)] = hashlib.sha256(handle.read()).hexdigest()
     return out
@@ -63,7 +65,7 @@ def read_stream(path):
 
 
 def content_checks(doc):
-    """Проверки grade-sq.mjs по JSON specs-quality/2 + случай E. → {имя: True/False}."""
+    """Проверки grade-sq.mjs по документам выходов specs-quality/5 + случай E. doc — {"documents": [...]}. → {имя: True/False}."""
     docs = {d["path"]: d for d in doc["documents"]}
 
     def d(folder, kind):
@@ -119,9 +121,12 @@ def content_checks(doc):
     ck["правлена"] = origin(d("PSS-2216", "spec")) == "skill_edited" and all(origin(d(k, "spec")) == "skill" for k in BY_SKILL)
     p15 = d("PSS-2215", "spec")
     ck["без источника"] = bool(p15 and p15["source"] is None and not d("PSS-2215", "bt") and score(p15, 0) == 0)
-    people = {p["user"]: p for p in doc["people"]}
-    ck["люди"] = (list(people) == ["ivanova.ma", None] and people["ivanova.ma"]["bt"]["count"] == 3 and
-                  people[None]["bt"]["count"] + people[None]["spec"]["count"] == 16)  # PSS-2211, 2214, 2216 БТ — ivanova.ma
+    by_author = {}
+    for item in doc["documents"]:
+        by_author.setdefault(item["author"], []).append(item)
+    ck["авторы"] = (set(by_author) == {"ivanova.ma", None} and [x["kind"] for x in by_author["ivanova.ma"]] == ["bt"] * 3 and
+                    len(by_author[None]) == 16)  # PSS-2211, 2214, 2216 БТ — ivanova.ma
+    ck["репозиторий"] = all(item["repo"] == "pss" for item in doc["documents"])
     e_bt, e_spec = d("PSS-2290", "bt"), d("PSS-2290", "spec")
     ck["случай E: только ноль"] = bool(e_bt and e_bt["scored"] and e_bt["attention"] == ["zero"] and pct(e_bt) >= 50 and
                                        e_spec and e_spec["scored"] and not e_spec["attention"])
@@ -166,17 +171,29 @@ def grade(run_dir, parallel):
             problems.append("coddoc/ изменена")
     if glob.glob(os.path.join(ws, "specs-quality-*.work")):
         problems.append("рабочая папка не убрана")
-    outputs = glob.glob(os.path.join(ws, "specs-quality-*.json"))
-    if len(outputs) != 1:
-        problems.append(f"итоговых JSON {len(outputs)}, а нужен один")
-        doc = None
-    else:
-        with open(outputs[0], encoding="utf-8") as handle:
-            doc = json.load(handle)
-        errors = contract.check_document(doc, contract.load_json(contract.SCHEMA_PATH))
+    stray = [p for p in glob.glob(os.path.join(ws, "**", "*.json"), recursive=True)
+             if not p.endswith(".quality.json") and os.sep + ".claude" + os.sep not in p]
+    if stray:
+        problems.append(f"лишние JSON вне документов: {[os.path.relpath(p, ws) for p in stray]}")
+    documents = sorted(glob.glob(os.path.join(ws, "coddoc", "**", "*.md"), recursive=True))
+    documents = [p for p in documents if os.path.basename(p) in (BT, SPEC) and os.sep + "stages" + os.sep not in p
+                 and os.sep + "_foundation" + os.sep + BT not in p]
+    missing = [os.path.relpath(p, ws) for p in documents if not os.path.exists(p[:-len(".md")] + ".quality.json")]
+    doc = {"documents": []}
+    if missing:
+        problems.append(f"нет выхода рядом с документом: {missing}")
+    schema = contract.load_json(contract.SCHEMA_PATH)
+    for path in sorted(glob.glob(os.path.join(ws, "coddoc", "**", "*.quality.json"), recursive=True)):
+        with open(path, encoding="utf-8") as handle:
+            output = json.load(handle)
+        errors = contract.check_document(output, schema)
         if errors:
-            problems.append(f"итог не проходит contract.py: {errors[:3]}")
+            problems.append(f"{os.path.relpath(path, ws)} не проходит contract.py: {errors[:3]}")
             doc = None
+            break
+        doc["documents"].append(output["document"])
+    if doc is not None and not doc["documents"]:
+        doc = None
     checks = content_checks(doc) if doc else {}
     for name, ok in checks.items():
         lines.append(f"  {'ok  ' if ok else 'НЕТ '} {name}")
@@ -220,7 +237,7 @@ def selftest():
         for name, text in specs_cases.zero_only_folder().items():
             with open(os.path.join(root, "coddoc", "PSS-2290", name), "w", encoding="utf-8") as handle:
                 handle.write(text)
-        data = collect.collect("coddoc/", root, today="2026-10-28")
+        data = collect.collect("coddoc/", root, repo="pss", today="2026-10-28")
         for meta in data["documents"]:
             key = meta["path"][len("coddoc/"):].rsplit("/", 1)[0] + "/" + meta["kind"]
             parts, flag, missing, signs, traces = shape[key]
@@ -228,7 +245,8 @@ def selftest():
                 quote = sm.real_quote(handle.read())
             with open(os.path.join(data["work"], meta["answer"]), "w", encoding="utf-8") as handle:
                 json.dump(sm.answer(meta["kind"], parts, quote, flag, missing, signs, traces), handle, ensure_ascii=False)
-        doc, _, _ = merge.build(data["work"])
+        outputs, _, _ = merge.build(data["work"])
+        doc = {"documents": [output["document"] for _meta, output in outputs]}
     finally:
         shutil.rmtree(base, ignore_errors=True)
     problems = []
@@ -278,6 +296,7 @@ def main(argv=None):
         return 2
     ws = os.path.join(run_dir, "run-01")
     shutil.copytree(specs_cases.FIXTURE, os.path.join(ws, "coddoc"))
+    os.makedirs(os.path.join(ws, ".git"))  # корень итога — песочница, а не репозиторий стенда
     os.makedirs(os.path.join(ws, "coddoc", "PSS-2290"))
     for name, text in specs_cases.zero_only_folder().items():
         with open(os.path.join(ws, "coddoc", "PSS-2290", name), "w", encoding="utf-8", newline="\n") as handle:

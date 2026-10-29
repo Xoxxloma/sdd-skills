@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Контракт выхода session-quality/5: схема и правила, которые схемой не выразить.
+"""Контракт выхода session-quality/6: схема и правила, которые схемой не выразить.
 
-    python3 contract.py <report.json>   # «OK» или список нарушений, код выхода 1
-    python3 contract.py --selftest      # пример проходит, испорченные копии — нет
+    python3 contract.py <id>.quality.json   # «OK» или список нарушений, код выхода 1
+    python3 contract.py --selftest          # пример проходит, испорченные копии — нет
 
 Без сторонних библиотек: на проме ничего не ставится. Валидатор понимает только
 ключевые слова JSON Schema из session-quality.schema.json; незнакомое слово в схеме —
-ошибка, а не молчаливый пропуск. Формулы скора здесь же — merge берёт их отсюда.
+ошибка, а не молчаливый пропуск. Формулы скора здесь же — merge берёт их для справочного
+скора сессии в отчёте, дашборд — для скора за период по суммам hits и events.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCHEMA_PATH = os.path.join(HERE, "session-quality.schema.json")
 EXAMPLE_PATH = os.path.join(HERE, "session-quality.example.json")
 
+FORMAT = "session-quality/6"
 METRIC_IDS = params.IMPLEMENTED_METRICS
 VALUE_TOLERANCE = 0.0005  # value в выходе округлён до трёх знаков
 
@@ -212,8 +214,19 @@ def close(left, right):
 
 def check_invariants(doc):
     errors = []
+    session = doc["session"]
+    start, end = parse_time(session["start"]), parse_time(session["end"])
+    if end < start:
+        errors.append(f"сессия {session['id']}: конец раньше начала")
+    elif session["duration_sec"] != round((end - start).total_seconds()):
+        errors.append(f"сессия {session['id']}: duration_sec не равен концу минус начало")
+    for signal in doc["fraud"]["signals"]:
+        if signal["count"] < len(signal["evidence"]):
+            errors.append(f"фрод {signal['kind']}: count меньше числа доказательств")
+    if not session["scored"]:
+        return errors
+
     metrics = doc["metrics"]
-    sessions = doc["sessions"]
     by_id = {}
     for metric in metrics:
         if metric["id"] in by_id:
@@ -223,86 +236,30 @@ def check_invariants(doc):
     if missing:
         errors.append(f"нет метрик: {', '.join(missing)}")
 
-    session_ids = [session["id"] for session in sessions]
-    if len(set(session_ids)) != len(session_ids):
-        errors.append("id сессий повторяются")
-    known = set(session_ids)
-    scored = [session for session in sessions if session["scored"]]
-    scored_ids = {session["id"] for session in scored}
-
-    subject = doc["subject"]
-    if subject["sessions_total"] != len(sessions):
-        errors.append(f"subject.sessions_total = {subject['sessions_total']}, а сессий {len(sessions)}")
-    if subject["sessions_scored"] != len(scored):
-        errors.append(f"subject.sessions_scored = {subject['sessions_scored']}, а оценённых {len(scored)}")
-
-    for session in sessions:
-        start, end = parse_time(session["start"]), parse_time(session["end"])
-        if end < start:
-            errors.append(f"сессия {session['id']}: конец раньше начала")
-        elif session["duration_sec"] != round((end - start).total_seconds()):
-            errors.append(f"сессия {session['id']}: duration_sec не равен концу минус начало")
-
-    period = subject["period"]
-    if not sessions:
-        if period is not None:
-            errors.append("subject.period должен быть null: сессий нет")
-    elif period is None:
-        errors.append("subject.period пуст, а сессии есть")
-    else:
-        if parse_time(period["from"]) != min(parse_time(session["start"]) for session in sessions):
-            errors.append("subject.period.from — не самое раннее начало сессии")
-        if parse_time(period["to"]) != max(parse_time(session["end"]) for session in sessions):
-            errors.append("subject.period.to — не самый поздний конец сессии")
-
     min_events = doc["params"]["min_events"]
     for metric in metrics:
-        name = metric["id"]
+        name, hits, events = metric["id"], metric["hits"], metric["events"]
         if metric["good"] == metric["bad"]:
             errors.append(f"{name}: good и bad совпадают — скор не посчитать")
+        if hits > events:
+            errors.append(f"{name}: hits {hits} больше events {events}")
             continue
-        if metric["sessions_hit"] > len(scored):
-            errors.append(f"{name}: sessions_hit больше числа оценённых сессий")
-        for item in metric["evidence"]:
-            if item["session"] not in scored_ids:
-                errors.append(f"{name}: доказательство из неоценённой или неизвестной сессии {item['session']}")
-        if metric["status"] != "measured":
-            continue
-        if metric["events"] < min_events:
-            errors.append(f"{name}: событий {metric['events']} — меньше {min_events:g}, а метрика посчитана")
-        expected = metric_score(metric["value"], metric["good"], metric["bad"])
-        if metric["score"] != expected:
-            errors.append(f"{name}: score {metric['score']}, по формуле {expected}")
-
-    score = doc["score"]
-    share = measured_weight(metrics)
-    if abs(score["measured_weight"] - share) > 0.01:
-        errors.append(f"score.measured_weight {score['measured_weight']}, по метрикам {round(share, 2)}")
-    status = score_status(share, doc["fraud"]["status"], doc["params"]["min_measured_weight"])
-    if score["status"] != status:
-        errors.append(f"score.status {score['status']}, по правилу {status}")
-    if status != "insufficient":
-        expected = total_score(metrics)
-        if score["value"] != expected:
-            errors.append(f"score.value {score['value']}, по формуле {expected}")
+        if metric["status"] == "measured":
+            if events < min_events or not events:
+                errors.append(f"{name}: событий {events} — меньше {max(min_events, 1):g}, а метрика посчитана")
+            elif not close(metric["value"], hits / events):
+                errors.append(f"{name}: value {metric['value']:g}, по hits / events {round(hits / events, 3):g}")
+        else:
+            if events and events >= min_events:
+                errors.append(f"{name}: событий {events} хватает, а метрика не измерена")
+            if metric["evidence"]:
+                errors.append(f"{name}: не измерена, а доказательства есть")
+        if metric.get("end_break") and hits >= events:
+            errors.append(f"{name}: end_break — последний запуск брошен, а обрывов нет (hits {hits} из {events})")
 
     topic = doc["discipline"]["off_topic"]
-    for item in topic["evidence"]:
-        if item["session"] not in known:
-            errors.append(f"посторонние темы: неизвестная сессия {item['session']}")
-    if not set(topic["sessions"]) <= known:
-        errors.append("посторонние темы: неизвестная сессия в sessions")
     if topic["cases"] < len(topic["evidence"]):
         errors.append("посторонние темы: cases меньше числа примеров")
-
-    for signal in doc["fraud"]["signals"]:
-        if not set(signal["sessions"]) <= known:
-            errors.append(f"фрод {signal['kind']}: неизвестная сессия в sessions")
-        for item in signal["evidence"]:
-            if item["session"] not in signal["sessions"]:
-                errors.append(f"фрод {signal['kind']}: доказательство из сессии вне списка сигнала")
-        if signal["count"] < len(signal["evidence"]):
-            errors.append(f"фрод {signal['kind']}: count меньше числа доказательств")
     return errors
 
 
@@ -330,54 +287,54 @@ def selftest():
     def metric(doc, metric_id):
         return next(item for item in doc["metrics"] if item["id"] == metric_id)
 
-    def unmeasure(doc, metric_id):
-        item = metric(doc, metric_id)
-        item.update(status="not_measured", value=None, score=None, reason="мало событий")
-
     def no_fraud(doc):
         doc["fraud"] = {"status": "none", "signals": []}
-        doc["score"].update(status="final", reason=None)
 
-    def one_unmeasured(doc):
-        unmeasure(doc, "skill_share")
-        doc["score"].update(value=66, measured_weight=92.31)
+    def skipped(doc):  # короткая сессия: ни метрик, ни посторонних тем; фрод и окружение — как у любой
+        for field in ("metrics", "discipline"):
+            doc.pop(field)
+        doc["session"].update(scored=False, skip_reason="меньше 3 реплик пользователя")
 
-    mostly = ("active_review", "blind_confirms", "delegated", "ignored", "completion")
-
-    def mostly_unmeasured(doc):
-        for metric_id in mostly:
-            unmeasure(doc, metric_id)
-        doc["score"].update(value=None, status="insufficient", reason="измерено 23.08 % веса", measured_weight=23.08)
+    def few_events(doc):
+        doc["params"]["min_events"] = 5
+        for metric_id, events in (("blind_confirms", 3), ("completion", 2), ("loaded_context", 2)):
+            metric(doc, metric_id).update(status="not_measured", value=None, evidence=[], reason=f"мало событий: {events}, нужно от 5")
 
     # Порча → ожидаемый кусок сообщения. Известный результат, а не «хоть какая-то ошибка».
     broken = [
-        ("скор не по формуле", lambda d: d["score"].update(value=70), "score.value 70, по формуле 68"),
-        ("скор метрики не по формуле", lambda d: metric(d, "loaded_context").update(score=49), "loaded_context: score 49, по формуле 50"),
-        ("final при фроде к проверке", lambda d: d["score"].update(status="final", reason=None), "score.status final, по правилу hold"),
+        ("доля не по hits / events", lambda d: metric(d, "loaded_context").update(value=0.4), "loaded_context: value 0.4, по hits / events 0.5"),
+        ("hits больше events", lambda d: metric(d, "active_review").update(hits=9), "active_review: hits 9 больше events 7"),
         ("нет метрики", lambda d: d["metrics"].pop(), "нет метрик: skill_share"),
         ("метрика дважды", lambda d: metric(d, "skill_share").update(id="active_review"), "встречается дважды"),
         ("длинная цитата", lambda d: metric(d, "completion")["evidence"][0].update(quote="а" * 201), "quote: длиннее 200 симв."),
-        ("категория в метрике", lambda d: metric(d, "completion")["evidence"].append(
-            {"session": "05e393e5", "turn": 50, "category": "personal", "turns": 1}), "лишнее поле «category»"),
+        ("категория в метрике", lambda d: metric(d, "completion")["evidence"].append({"turn": 50, "category": "personal", "turns": 1}),
+         "лишнее поле «category»"),
         ("цитата у посторонних", lambda d: d["discipline"]["off_topic"]["evidence"][0].update(quote="личное"), "лишнее поле «quote»"),
-        ("посчитана при малом числе событий", lambda d: (d["params"].update(min_events=5), metric(d, "blind_confirms").update(events=3)),
-         "blind_confirms: событий 3 — меньше 5"),
-        ("пропущена без причины", lambda d: d["sessions"][6].pop("skip_reason"), "нет поля «skip_reason»"),
-        ("оценена с причиной пропуска", lambda d: d["sessions"][0].update(skip_reason="лишнее"), "запрещённый вариант"),
-        ("счёт сессий", lambda d: d["subject"].update(sessions_total=10), "sessions_total = 10"),
-        ("неизвестная сессия", lambda d: metric(d, "completion")["evidence"][0].update(session="deadbeef"), "неизвестной сессии deadbeef"),
-        ("доказательство из пропущенной", lambda d: metric(d, "completion")["evidence"][0].update(session="7c1e09aa"), "неоценённой или неизвестной сессии 7c1e09aa"),
-        ("посторонняя тема из чужой сессии", lambda d: d["discipline"]["off_topic"]["evidence"][0].update(session="deadbeef"), "посторонние темы: неизвестная сессия deadbeef"),
+        ("посчитана при малом числе событий", lambda d: d["params"].update(min_events=5), "blind_confirms: событий 3 — меньше 5"),
+        ("не измерена при хватающих событиях", lambda d: metric(d, "ignored").update(status="not_measured", value=None, reason="нет"),
+         "ignored: событий 7 хватает, а метрика не измерена"),
+        ("не измерена, а доказательства есть", lambda d: (d["params"].update(min_events=5),
+                                                         metric(d, "loaded_context").update(status="not_measured", value=None, reason="мало")),
+         "loaded_context: не измерена, а доказательства есть"),
+        ("не измерена, а число есть", lambda d: metric(d, "skill_share").update(status="not_measured", reason="нет"),
+         "$.metrics[6].value: ожидался тип null"),
+        ("end_break не у completion", lambda d: metric(d, "skill_share").update(end_break=False), "запрещённый вариант"),
+        ("completion без end_break", lambda d: metric(d, "completion").pop("end_break"), "нет поля «end_break»"),
+        ("end_break без обрыва", lambda d: metric(d, "completion").update(hits=2, value=1.0), "end_break — последний запуск брошен, а обрывов нет"),
+        ("оценена с причиной пропуска", lambda d: d["session"].update(skip_reason="лишнее"), "запрещённый вариант"),
+        ("не оценена, а метрики есть", lambda d: d["session"].update(scored=False, skip_reason="меньше 3 реплик пользователя"),
+         "запрещённый вариант"),
+        ("оценена без метрик", lambda d: d.pop("metrics"), "нет поля «metrics»"),
+        ("нет пользователя", lambda d: d["session"].pop("user"), "нет поля «user»"),
+        ("доказательство с сессией", lambda d: metric(d, "active_review")["evidence"][0].update(session="1f6a2c90"), "лишнее поле «session»"),
+        ("поле старого формата", lambda d: d.update(subject={}), "лишнее поле «subject»"),
+        ("старая версия формата", lambda d: d.update(schema="session-quality/5"), 'ожидалось "session-quality/6"'),
+        ("скор в выходе", lambda d: metric(d, "skill_share").update(score=100), "лишнее поле «score»"),
         ("фрод none с сигналами", lambda d: d["fraud"].update(status="none"), "элементов больше 0"),
         ("неизвестный вид фрода", lambda d: d["fraud"]["signals"][0].update(kind="repeat_requests"), "значение не из списка"),
-        ("лишнее поле", lambda d: d.update(team="a"), "лишнее поле «team»"),
-        ("не измерена, а число есть", lambda d: metric(d, "skill_share").update(status="not_measured", reason="нет"), "$.metrics[6].value: ожидался тип null"),
-        ("длительность", lambda d: d["sessions"][1].update(duration_sec=2600), "сессия 1f6a2c90: duration_sec"),
-        ("период", lambda d: d["subject"]["period"].update(to="2026-10-27T12:00:00Z"), "period.to"),
+        ("длительность", lambda d: d["session"].update(duration_sec=2600), "сессия 1f6a2c90: duration_sec"),
         ("время без пояса", lambda d: d.update(generated_at="2026-10-27T15:00:00"), "часовым поясом"),
         ("true вместо 1", lambda d: metric(d, "skill_share").update(weight=True), "ожидался тип number"),
-        ("мало веса, а скор есть", lambda d: [unmeasure(d, m) for m in mostly],
-         "score.status hold, по правилу insufficient"),
     ]
     for name, spoil, expected in broken:
         doc = copy.deepcopy(example)
@@ -386,8 +343,8 @@ def selftest():
         if not any(expected in error for error in errors):
             problems.append(f"порча «{name}»: ждали «{expected}», получили {errors or 'OK'}")
 
-    valid = [("без фрода — final", no_fraud), ("одна метрика не измерена — 66 из 92.31 % веса", one_unmeasured),
-             ("измерено 23.08 % веса — insufficient", mostly_unmeasured)]
+    valid = [("без фрода", no_fraud), ("сессия не оценена — фрод и окружение остаются", skipped),
+             ("мало событий — метрики не измерены", few_events)]
     for name, change in valid:
         doc = copy.deepcopy(example)
         change(doc)

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Контракт выхода specs-quality/2: схема и правила, которые схемой не выразить.
+"""Контракт выхода specs-quality/5: схема и правила, которые схемой не выразить.
 
-    python3 contract.py <specs-quality.json>   # «OK» или список нарушений, код выхода 1
-    python3 contract.py --selftest             # пример проходит, испорченные копии — нет
+    python3 contract.py <документ>.quality.json   # «OK» или список нарушений, код выхода 1
+    python3 contract.py --selftest                # пример и кейсы проходят, испорченные копии — нет
 
 Без сторонних библиотек: на проме ничего не ставится. Валидатор понимает только
 ключевые слова JSON Schema из specs-quality.schema.json; незнакомое слово в схеме —
@@ -25,6 +25,8 @@ sys.path.insert(0, HERE)  # соседние модули находятся и 
 import params  # noqa: E402
 SCHEMA_PATH = os.path.join(HERE, "specs-quality.schema.json")
 EXAMPLE_PATH = os.path.join(HERE, "specs-quality.example.json")
+CASES_PATH = os.path.join(HERE, "specs-quality.cases.json")  # документы разных видов и случаев — для --selftest
+FORMAT = "specs-quality/5"
 
 KNOWN_KEYWORDS = {
     "$schema", "$id", "title", "description", "$defs", "$ref", "type", "enum", "const",
@@ -112,36 +114,12 @@ def form_pct(document):
     return round_half_up(100.0 * (sections - len(document["form_missing"])) / sections)
 
 
-def group_summary(documents, kind, weights):
-    """Сводка документов одного вида: суммы, а не средние, — чтобы дашборд складывал их между репозиториями."""
-    docs = [d for d in documents if d["kind"] == kind]
-    scored = [d for d in docs if d["scored"]]
-    points, maximum = round(sum(d["sum"] for d in scored), 4), round(sum(d["max"] for d in scored), 4)
-    checked = [d for d in scored if d["form_missing"] is not None]
-    present = sum(params.FORM_SECTIONS[kind] - len(d["form_missing"]) for d in checked)
-    sections = params.FORM_SECTIONS[kind] * len(checked)
-    metrics = []
-    for cid in params.CRITERIA[kind]:
-        values = [d["criteria"][cid] for d in scored if d["criteria"][cid] is not None]
-        metrics.append({"id": cid, "measured": len(values), "full": sum(1 for v in values if close(v, weights[cid])),
-                        "pct": round_half_up(100.0 * sum(values) / (weights[cid] * len(values))) if values else None})
-    group = {"count": len(docs), "scored": len(scored), "sum": num(points), "max": num(maximum),
-             "pct": round_half_up(100.0 * points / maximum) if maximum else None,
-             "form_present": present, "form_total": sections, "form_pct": round_half_up(100.0 * present / sections) if sections else None,
-             "attention": sum(1 for d in scored if d["attention"])}
-    if kind == "spec":
-        group["by_code"] = sum(1 for d in scored if d["origin"] == "by_code")
-    group["metrics"] = metrics
-    return group
-
-
-def people_summary(documents, weights):
-    """По строке на автора, документы без автора — строкой user: null в конце."""
-    users = sorted({d["author"] for d in documents if d["author"]})
-    if any(not d["author"] for d in documents):
-        users.append(None)
-    return [{"user": user, **{kind: group_summary([d for d in documents if d["author"] == user], kind, weights[kind])
-                              for kind in params.KINDS}} for user in users]
+def result(document, below_pct, form_min, weights, generated_at):
+    """Выход по одному документу; form_min и weights — по обоим видам, как в params.json, в выход — только его вида."""
+    kind = document["kind"]
+    return {"schema": FORMAT, "generated_at": generated_at,
+            "params": {"below_pct": below_pct, "form_min_missing": form_min[kind], "weights": dict(weights[kind])},
+            "document": document}
 
 
 def attention_reasons(document, below_pct, form_min):
@@ -296,6 +274,12 @@ def check_document_rules(document, doc_params):
         errors.append(f"{name}: вид {kind}, а имя файла не {FILE_NAMES[kind]}")
     if kind == "bt" and document["source"] is not None:
         errors.append(f"{name}: у БТ source должен быть null")
+    if tuple(doc_params["weights"]) != params.CRITERIA[kind]:
+        errors.append(f"params.weights: критерии {', '.join(doc_params['weights'])}, а у вида {kind} — {', '.join(params.CRITERIA[kind])}")
+        return errors  # баллы и сумму по чужим весам не проверить
+    if doc_params["form_min_missing"] > params.FORM_SECTIONS[kind]:
+        errors.append(f"params.form_min_missing {doc_params['form_min_missing']} — больше разделов шаблона вида {kind} "
+                      f"({params.FORM_SECTIONS[kind]})")
     if not document["scored"]:
         return errors
     if kind == "bt" and (document["origin"] is not None or document["code_signs"] is not None):
@@ -314,7 +298,7 @@ def check_document_rules(document, doc_params):
     if tuple(criteria) != params.CRITERIA[kind]:
         errors.append(f"{name}: критерии {', '.join(criteria)}, а по рубрике {', '.join(params.CRITERIA[kind])}")
         return errors  # дальше счёт по чужим критериям бессмыслен
-    weights = doc_params["weights"][kind]
+    weights = doc_params["weights"]
     for cid, score in criteria.items():
         if score is not None and not score_ok(score, weights[cid]):
             errors.append(f"{name}: {cid}: балл {score:g} не из шкалы 0 / {weights[cid] / 2:g} / {weights[cid]:g}")
@@ -333,7 +317,7 @@ def check_document_rules(document, doc_params):
     if document["form_pct"] != form_pct(document):
         errors.append(f"{name}: form_pct {document['form_pct']}, по form_missing {form_pct(document)}")
 
-    expected = attention_reasons(document, doc_params["below_pct"], doc_params["form_min_missing"])
+    expected = attention_reasons(document, doc_params["below_pct"], {kind: doc_params["form_min_missing"]})
     if document["attention"] != expected:
         errors.append(f"{name}: attention {document['attention']}, по правилам {expected}")
 
@@ -345,32 +329,7 @@ def check_document_rules(document, doc_params):
 
 
 def check_invariants(doc):
-    errors = []
-    documents = doc["documents"]
-    paths = [item["path"] for item in documents]
-    for path in sorted({p for p in paths if paths.count(p) > 1}):
-        errors.append(f"документ {path} встречается дважды")
-    for document in documents:
-        errors += check_document_rules(document, doc["params"])
-    subject = doc["subject"]
-    counts = {"documents_total": len(documents), "documents_scored": sum(1 for item in documents if item["scored"]),
-              "documents_attention": sum(1 for item in documents if item["scored"] and item["attention"])}
-    for field, value in counts.items():
-        if subject[field] != value:
-            errors.append(f"subject.{field} = {subject[field]}, а по списку {value}")
-
-    if errors:
-        return errors  # сводка по людям считается из документов — сверять её с битыми документами бессмысленно
-    expected = {person["user"]: person for person in people_summary(documents, doc["params"]["weights"])}
-    got = {person["user"]: person for person in doc["people"]}
-    if list(expected) != [person["user"] for person in doc["people"]]:
-        errors.append(f"people: люди {[p['user'] for p in doc['people']]}, по авторам документов {list(expected)}")
-    for user in set(expected) & set(got):
-        for kind in params.KINDS:
-            for field, value in expected[user][kind].items():
-                if got[user][kind].get(field) != value:
-                    errors.append(f"people {user}.{kind}.{field}: {got[user][kind].get(field)}, по документам {value}")
-    return errors
+    return check_document_rules(doc["document"], doc["params"])
 
 
 # ---------------------------------------------------------------- вход
@@ -393,144 +352,117 @@ def selftest():
     problems = check_schema_keywords(schema)
     example = load_json(EXAMPLE_PATH)
     problems += [f"пример: {error}" for error in check_document(example, schema)]
+    cases = load_json(CASES_PATH)
+    case_params = cases["params"]
 
-    def document(doc, tail):
-        return next(item for item in doc["documents"] if item["path"].endswith(tail))
+    def case(tail):
+        """Выход по документу кейсов, чей путь кончается на tail."""
+        document = next(item for item in cases["documents"] if item["path"].endswith(tail))
+        return copy.deepcopy(result(document, case_params["below_pct"], case_params["form_min_missing"],
+                                    case_params["weights"], cases["generated_at"]))
 
-    # Качество группы — Σ баллов / Σ максимумов, а не среднее процентов: у документов разный максимум.
-    spec_weights = example["params"]["weights"]["spec"]
-    pair = [{"kind": "spec", "scored": True, "sum": 2, "max": 2, "pct": 100, "form_missing": [], "attention": [], "origin": "skill",
-             "criteria": {"source_logic": 1, "data_model": None, "access": None, "services": 1, "contracts": None}},
-            {"kind": "spec", "scored": True, "sum": 0.5, "max": 5, "pct": 10, "form_missing": [1, 2], "attention": ["below_pct"],
-             "origin": "skill", "criteria": {"source_logic": 0, "data_model": 0, "access": 0, "services": 0.5, "contracts": 0}}]
-    group = group_summary(pair, "spec", spec_weights)
-    if (group["pct"], group["form_present"], group["form_total"], group["attention"]) != (36, 44, 46, 1):
-        problems.append(f"сводка двух спек: pct/форма/внимание {group['pct']}, {group['form_present']}/{group['form_total']}, "
-                        f"{group['attention']} — ждали 36, 44/46, 1 (2.5 из 7)")
+    for item in cases["documents"]:
+        problems += [f"кейс {item['path']}: {error}" for error in check_document(case(item["path"]), schema)]
 
     good_bt, good_spec = "PRJ-101/business_requirements.md", "PRJ-101/technical_specification.md"
     zero_bt, part_spec = "PRJ-102/business_requirements.md", "PRJ-102/technical_specification.md"
     bug_spec, epic_bt = "PRJ-103/technical_specification.md", "PRJ-104/business_requirements.md"
     fnd_spec, code_spec = "_foundation/technical_specification.md", "PRJ-105/technical_specification.md"
+    scored_fields = ("pct", "sum", "max", "criteria", "attention", "template", "form_missing", "form_pct", "origin", "code_signs", "findings")
 
-    def swap_criteria(doc):
-        item = document(doc, bug_spec)
-        keys = list(item["criteria"])
+    def swap_criteria(d):
+        keys = list(d["document"]["criteria"])
         keys[1], keys[2] = keys[2], keys[1]
-        item["criteria"] = {key: item["criteria"][key] for key in keys}
+        d["document"]["criteria"] = {key: d["document"]["criteria"][key] for key in keys}
 
-    def fail_document(doc):
-        item = document(doc, good_bt)
-        for field in ("pct", "sum", "max", "criteria", "attention", "template", "form_missing", "form_pct", "origin", "code_signs", "findings"):
-            item.pop(field)
-        item.update(scored=False, skip_reason="нет ответа модели")
-        doc["subject"]["documents_scored"] = 7
+    def fail_document(d):
+        for field in scored_fields:
+            d["document"].pop(field)
+        d["document"].update(scored=False, skip_reason="нет ответа модели")
 
-    def template_flag(doc):
-        item = document(doc, good_bt)
-        item.update(template=True, attention=["template"])
-        doc["subject"]["documents_attention"] = 4
-
-    def form_unchecked(doc):
-        item = document(doc, epic_bt)
-        item.update(form_missing=None, attention=[])
-        doc["subject"]["documents_attention"] = 2
-
-    def bt_five_missing(doc):  # порог БТ — от 5: ровно 5 — уже не по форме
-        item = document(doc, good_bt)
-        item.update(form_missing=[1, 2, 3, 4, 5], attention=["off_form"])
-        doc["subject"]["documents_attention"] = 4
-
-    def bt_four_missing(doc):
-        document(doc, good_bt).update(form_missing=[1, 2, 3, 4])
-
-    def spec_exactly_half(doc):  # 50% — не «ниже 50%»: подсвечивает только ноль
-        item = document(doc, part_spec)
+    def spec_exactly_half(d):  # 50% — не «ниже 50%»: подсвечивает только ноль
+        item = d["document"]
         item["criteria"] = dict(zip(params.CRITERIA["spec"], (1, 0.5, 0.5, 0.5, 0)))
         item.update(sum=2.5, max=5, pct=50, attention=["zero"])
         item["findings"].insert(2, {"criterion": "services", "comment": "дыра", "fix": "x", "quote": None})
-        doc["subject"]["documents_attention"] = 4
 
     # Порча → ожидаемый кусок сообщения. Известный результат, а не «хоть какая-то ошибка».
+    doc = lambda d: d["document"]  # noqa: E731
     broken = [
-        ("сумма частей", lambda d: document(d, good_spec).update(sum=4), "sum 4, по критериям 4.5"),
-        ("максимум без вычета н/п", lambda d: document(d, fnd_spec).update(max=5), "max 5, по весам без «н/п» 4"),
-        ("процент", lambda d: document(d, zero_bt).update(pct=77), "pct 77, по формуле 78"),
-        ("ноль без причины", lambda d: document(d, zero_bt).update(attention=[]), "attention [], по правилам ['zero']"),
-        ("не по форме без причины", lambda d: document(d, epic_bt).update(attention=[]), "по правилам ['off_form']"),
-        ("причина без повода", lambda d: document(d, good_bt).update(attention=["zero"]), "attention ['zero'], по правилам []"),
-        ("лишняя причина", lambda d: document(d, code_spec)["attention"].append("template"), "по правилам ['below_pct', 'zero', 'off_form']"),
-        ("н/п не на своём месте", swap_criteria, "критерии source_logic, access, data_model"),
-        ("балл не из шкалы", lambda d: document(d, good_spec)["criteria"].update(access=0.7), "access: балл 0.7 не из шкалы 0 / 0.5 / 1"),
-        ("балл цели по шкале критерия", lambda d: document(d, good_bt)["criteria"].update(goal=1), "goal: балл 1 не из шкалы 0 / 0.25 / 0.5"),
-        ("вес в params не тот, каким считали", lambda d: d["params"]["weights"]["bt"].update(roles=2), "max 4.5, по весам без «н/п» 5.5"),
-        ("нет находки у сниженного", lambda d: document(d, part_spec)["findings"].pop(0), "нужны ровно по ['data_model', 'access', 'contracts']"),
-        ("находка у полного балла", lambda d: document(d, good_bt)["findings"].append({"criterion": "roles", "comment": "x", "fix": None, "quote": None}),
+        ("сумма частей", good_spec, lambda d: doc(d).update(sum=4), "sum 4, по критериям 4.5"),
+        ("максимум без вычета н/п", fnd_spec, lambda d: doc(d).update(max=5), "max 5, по весам без «н/п» 4"),
+        ("процент", zero_bt, lambda d: doc(d).update(pct=77), "pct 77, по формуле 78"),
+        ("ноль без причины", zero_bt, lambda d: doc(d).update(attention=[]), "attention [], по правилам ['zero']"),
+        ("не по форме без причины", epic_bt, lambda d: doc(d).update(attention=[]), "по правилам ['off_form']"),
+        ("причина без повода", good_bt, lambda d: doc(d).update(attention=["zero"]), "attention ['zero'], по правилам []"),
+        ("лишняя причина", code_spec, lambda d: doc(d)["attention"].append("template"), "по правилам ['below_pct', 'zero', 'off_form']"),
+        ("н/п не на своём месте", bug_spec, swap_criteria, "критерии source_logic, access, data_model"),
+        ("балл не из шкалы", good_spec, lambda d: doc(d)["criteria"].update(access=0.7), "access: балл 0.7 не из шкалы 0 / 0.5 / 1"),
+        ("балл цели по шкале критерия", good_bt, lambda d: doc(d)["criteria"].update(goal=1), "goal: балл 1 не из шкалы 0 / 0.25 / 0.5"),
+        ("вес в params не тот, каким считали", good_bt, lambda d: d["params"]["weights"].update(roles=2), "max 4.5, по весам без «н/п» 5.5"),
+        ("веса чужого вида", good_bt, lambda d: d["params"].update(weights=dict(case_params["weights"]["spec"])),
+         "params.weights: критерии source_logic, data_model, access, services, contracts, а у вида bt"),
+        ("порог формы больше разделов вида", good_bt, lambda d: d["params"].update(form_min_missing=20), "больше разделов шаблона вида bt (16)"),
+        ("нет находки у сниженного", part_spec, lambda d: doc(d)["findings"].pop(0), "нужны ровно по ['data_model', 'access', 'contracts']"),
+        ("находка у полного балла", good_bt, lambda d: doc(d)["findings"].append({"criterion": "roles", "comment": "x", "fix": None, "quote": None}),
          "findings по ['roles'], а нужны ровно по []"),
-        ("находки не по порядку", lambda d: document(d, part_spec)["findings"].reverse(), "нужны ровно по ['data_model', 'access', 'contracts']"),
-        ("по коду без признака «уже сделано»", lambda d: document(d, code_spec)["code_signs"][0].update(n=4, kind="рефакторинг или тесты"),
+        ("находки не по порядку", part_spec, lambda d: doc(d)["findings"].reverse(), "нужны ровно по ['data_model', 'access', 'contracts']"),
+        ("по коду без признака «уже сделано»", code_spec, lambda d: doc(d)["code_signs"][0].update(n=4, kind="рефакторинг или тесты"),
          "origin by_code, а по признакам [2, 4] «по коду» нет"),
-        ("по коду на одном номере дважды", lambda d: document(d, code_spec)["code_signs"].__setitem__(1, dict(document(d, code_spec)["code_signs"][0])),
+        ("по коду на одном номере дважды", code_spec, lambda d: doc(d)["code_signs"].__setitem__(1, dict(doc(d)["code_signs"][0])),
          "origin by_code, а по признакам [1] «по коду» нет"),
-        ("признаки «по коду», а origin другой", lambda d: document(d, part_spec)["code_signs"].insert(0, {"n": 1, "kind": "сделано в коде", "quote": "x"}),
+        ("признаки «по коду», а origin другой", part_spec, lambda d: doc(d)["code_signs"].insert(0, {"n": 1, "kind": "сделано в коде", "quote": "x"}),
          "origin skill, а по признакам [1, 2] «по коду» да"),
-        ("подпись признака не к номеру", lambda d: document(d, code_spec)["code_signs"][1].update(n=3), "признак 3 подписан «путь к исходнику», по рубрике «объём правки в строках»"),
-        ("находка origin в findings", lambda d: document(d, code_spec)["findings"].append({"criterion": "origin", "comment": "x", "fix": None, "quote": None}),
+        ("подпись признака не к номеру", code_spec, lambda d: doc(d)["code_signs"][1].update(n=3),
+         "признак 3 подписан «путь к исходнику», по рубрике «объём правки в строках»"),
+        ("находка origin в findings", code_spec, lambda d: doc(d)["findings"].append({"criterion": "origin", "comment": "x", "fix": None, "quote": None}),
          "нужны ровно по ['source_logic', 'data_model', 'access', 'contracts']"),
-        ("origin у БТ", lambda d: document(d, good_bt).update(origin="outside"), "у БТ origin и code_signs должны быть null"),
-        ("признаки у БТ", lambda d: document(d, good_bt).update(code_signs=[]), "у БТ origin и code_signs должны быть null"),
-        ("спека без признаков", lambda d: document(d, good_spec).update(code_signs=None), "у спеки нужны origin и code_signs"),
-        ("source у БТ", lambda d: document(d, good_bt).update(source="coddoc/x/bug_report.md"), "у БТ source должен быть null"),
-        ("форма не по возрастанию", lambda d: document(d, epic_bt).update(form_missing=[3, 1, 4, 6, 7, 10, 13, 14, 15]), "form_missing — не по возрастанию"),
-        ("номер раздела вне списка", lambda d: document(d, good_spec).update(form_missing=[19, 24]), "вне списка 1–23"),
-        ("вид не по имени файла", lambda d: document(d, good_spec).update(kind="bt"), "вид bt, а имя файла не business_requirements.md"),
-        ("не оценён, а баллы есть", lambda d: document(d, good_bt).update(scored=False, skip_reason="нет ответа"), "запрещённый вариант"),
-        ("не оценён без причины", lambda d: [document(d, good_bt).pop(f) for f in ("pct", "sum", "max", "criteria", "attention", "template",
-                                                                                   "form_missing", "form_pct", "origin", "code_signs", "findings")]
-         and document(d, good_bt).update(scored=False),
+        ("origin у БТ", good_bt, lambda d: doc(d).update(origin="outside"), "у БТ origin и code_signs должны быть null"),
+        ("признаки у БТ", good_bt, lambda d: doc(d).update(code_signs=[]), "у БТ origin и code_signs должны быть null"),
+        ("спека без признаков", good_spec, lambda d: doc(d).update(code_signs=None), "у спеки нужны origin и code_signs"),
+        ("source у БТ", good_bt, lambda d: doc(d).update(source="coddoc/x/bug_report.md"), "у БТ source должен быть null"),
+        ("форма не по возрастанию", epic_bt, lambda d: doc(d).update(form_missing=[3, 1, 4, 6, 7, 10, 13, 14, 15]), "form_missing — не по возрастанию"),
+        ("номер раздела вне списка", good_spec, lambda d: doc(d).update(form_missing=[19, 24]), "вне списка 1–23"),
+        ("вид не по имени файла", good_spec, lambda d: doc(d).update(kind="bt"), "вид bt, а имя файла не business_requirements.md"),
+        ("не оценён, а баллы есть", good_bt, lambda d: doc(d).update(scored=False, skip_reason="нет ответа"), "запрещённый вариант"),
+        ("не оценён без причины", good_bt, lambda d: [doc(d).pop(f) for f in scored_fields] and doc(d).update(scored=False),
          "нет поля «skip_reason»"),
-        ("оценён с причиной пропуска", lambda d: document(d, good_bt).update(skip_reason="лишнее"), "запрещённый вариант"),
-        ("чужой критерий", lambda d: document(d, good_bt)["criteria"].update(contracts=1), "лишнее поле «contracts»"),
-        ("quote_found: true", lambda d: document(d, part_spec)["findings"][0].update(quote_found=True), "ожидалось false"),
-        ("н/п строкой с опечаткой", lambda d: document(d, bug_spec)["criteria"].update(access="н.п"), "ожидался тип number"),
-        ("счёт документов", lambda d: d["subject"].update(documents_total=9), "subject.documents_total = 9, а по списку 8"),
-        ("счёт подсвеченных", lambda d: d["subject"].update(documents_attention=2), "subject.documents_attention = 2, а по списку 3"),
-        ("документ дважды", lambda d: d["documents"].append(copy.deepcopy(d["documents"][0])), "встречается дважды"),
-        ("лишнее поле", lambda d: d.update(rows=[]), "лишнее поле «rows»"),
-        ("form_pct документа", lambda d: document(d, good_spec).update(form_pct=90), "form_pct 90, по form_missing 96"),
-        ("сумма у человека", lambda d: d["people"][0]["bt"].update(sum=4), "people ivanov.bt.sum: 4, по документам 4.5"),
-        ("форма у человека", lambda d: d["people"][2]["bt"].update(form_present=8), "people sidorov.bt.form_present: 8, по документам 7"),
-        ("метрика у человека", lambda d: d["people"][3]["spec"]["metrics"][0].update(full=2), "people None.spec.metrics"),
-        ("человек пропал", lambda d: d["people"].pop(1), "people: люди ['ivanov', 'sidorov', None]"),
-        ("документы без автора — не последними", lambda d: d["people"].insert(0, d["people"].pop()), "по авторам документов ['ivanov', 'petrova', 'sidorov', None]"),
-        ("время без пояса", lambda d: d.update(generated_at="2026-10-28T15:00:00"), "часовым поясом"),
-        ("true вместо числа", lambda d: document(d, good_bt)["criteria"].update(roles=True), "ожидался тип number"),
+        ("оценён с причиной пропуска", good_bt, lambda d: doc(d).update(skip_reason="лишнее"), "запрещённый вариант"),
+        ("чужой критерий", good_bt, lambda d: doc(d)["criteria"].update(contracts=1), "лишнее поле «contracts»"),
+        ("quote_found: true", part_spec, lambda d: doc(d)["findings"][0].update(quote_found=True), "ожидалось false"),
+        ("н/п строкой с опечаткой", bug_spec, lambda d: doc(d)["criteria"].update(access="н.п"), "ожидался тип number"),
+        ("поле старого формата", good_bt, lambda d: d.update(documents=[]), "лишнее поле «documents»"),
+        ("старая версия формата", good_bt, lambda d: d.update(schema="specs-quality/4"), 'ожидалось "specs-quality/5"'),
+        ("нет repo", good_bt, lambda d: doc(d).pop("repo"), "нет поля «repo»"),
+        ("form_pct документа", good_spec, lambda d: doc(d).update(form_pct=90), "form_pct 90, по form_missing 96"),
+        ("время без пояса", good_bt, lambda d: d.update(generated_at="2026-10-28T15:00:00"), "часовым поясом"),
+        ("true вместо числа", good_bt, lambda d: doc(d)["criteria"].update(roles=True), "ожидался тип number"),
     ]
-    for name, spoil, expected in broken:
-        doc = copy.deepcopy(example)
-        spoil(doc)
-        errors = check_document(doc, schema)
+    for name, tail, spoil, expected in broken:
+        output = case(tail)
+        spoil(output)
+        errors = check_document(output, schema)
         if not any(expected in error for error in errors):
             problems.append(f"порча «{name}»: ждали «{expected}», получили {errors or 'OK'}")
 
-    valid = [("оценка не состоялась", fail_document), ("шаблонно — с причиной подсветки", template_flag),
-             ("форма не проверена — подсветки нет", form_unchecked), ("БТ без 5 разделов — не по форме", bt_five_missing),
-             ("БТ без 4 разделов — по форме", bt_four_missing), ("ровно 50% — не ниже порога", spec_exactly_half)]
-    def refresh(doc):  # верный вариант меняет документы — сводку и долю формы пересчитываем, проверяется другое правило
-        for item in doc["documents"]:
-            if item["scored"]:
-                item["form_pct"] = form_pct(item)
-        doc["people"] = people_summary(doc["documents"], doc["params"]["weights"])
-
-    for name, change in valid:
-        doc = copy.deepcopy(example)
-        change(doc)
-        refresh(doc)
-        errors = check_document(doc, schema)
+    valid = [
+        ("оценка не состоялась", good_bt, fail_document),
+        ("шаблонно — с причиной подсветки", good_bt, lambda d: doc(d).update(template=True, attention=["template"])),
+        ("форма не проверена — подсветки нет", epic_bt, lambda d: doc(d).update(form_missing=None, attention=[])),
+        ("БТ без 5 разделов — не по форме", good_bt, lambda d: doc(d).update(form_missing=[1, 2, 3, 4, 5], attention=["off_form"])),
+        ("БТ без 4 разделов — по форме", good_bt, lambda d: doc(d).update(form_missing=[1, 2, 3, 4])),
+        ("ровно 50% — не ниже порога", part_spec, spec_exactly_half),
+    ]
+    for name, tail, change in valid:
+        output = case(tail)
+        change(output)
+        if output["document"]["scored"]:  # верный вариант меняет форму — долю пересчитываем, проверяется другое правило
+            output["document"]["form_pct"] = form_pct(output["document"])
+        errors = check_document(output, schema)
         if errors:
             problems.append(f"верный вариант «{name}» не прошёл: {errors}")
 
-    total_cases = 1 + len(broken) + len(valid)
+    total_cases = 1 + len(cases["documents"]) + len(broken) + len(valid)
     if problems:
         print("\n".join(problems))
         print(f"selftest: провалов {len(problems)} из {total_cases} случаев")

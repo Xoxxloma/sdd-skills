@@ -3,26 +3,27 @@
 
     python3 selftest-merge.py
 
-Ручной счёт (сессии bq-1 … bq-4, все оценены; ответа модели по bq-4 нет — модельные метрики по трём сессиям;
-параметры — reference/params.json, но минимум событий 1, иначе на четырёх сессиях почти ничего не измерено):
+Ручной счёт по каждой сессии (bq-1 … bq-4, все оценены; ответа модели по bq-4 нет; параметры — reference/params.json,
+но минимум событий 1). Выход — <id>.quality.json рядом с выгрузкой, hits / events:
   места решения по вердикту модели: bq-1 [5] accepted (согласие через 3 с — «не читая»), [12] engaged; bq-2 [5] engaged;
-    bq-3 [5] — верный ответ «no», не в счёт → 3 места:
-    active_review 2/3 = 0.667 → 100 · blind_confirms 1/3 = 0.333 → (0.333 − 0.5) / (0.1 − 0.5) → 42 ·
-    delegated 0/3 → 100 · ignored 0/3 → 100
-  completion: запусков 4; bq-1 кончился вопросом «Добавить раздел…?» — модель: no, доведён; bq-2 — вопросом о коде
-    ошибки — модель: yes, обрыв (следующая сессия через сутки — не продолжение); bq-3, bq-4 — без висящего вопроса
-    → 3/4 = 0.75 → (0.75 − 0.5) / (0.9 − 0.5) = 62.5 → 63
-  loaded_context: вызовов скиллов 4, все в первом ходе — контекста перед ними ещё нет, сжатий нет → 0/4 → 100
-  skill_share: реплик (с вызовами через «/» и ответами на вопросы с вариантами) внутри запусков 6 + 6 + 6 + 4 = 22
-    из 7 + 7 + 7 + 5 = 26 → 0.846 → 100
-  общий: (10 · (100 + 42 + 100 + 100 + 63 + 100) + 5 · 100) / 65 = 5550 / 65 = 85.4 → 85; фрод: обход (bq-3) и
-  неподтверждённое как подтверждённое (bq-2, второе на том же ходе отброшено) → hold. С минимумом событий 5 измерена
-  только skill_share (вес 5 из 65) → скор не посчитан. Находки убранных видов (ухудшение агента, нечёткая постановка,
-  переход к задаче, поздние вводные) отбрасываются.
+    bq-3 [5] — верный ответ «no», не в счёт:
+    bq-1: active_review 1/2, blind_confirms 1/2, delegated 0/2, ignored 0/2 · bq-2: 1/1, 0/1, 0/1, 0/1 ·
+    bq-3: мест нет — не измерены · bq-4: ответа модели нет — не измерены
+  completion: bq-1 кончился вопросом «Добавить раздел…?» — модель: no, 1/1; bq-2 — вопросом о коде ошибки — модель: yes,
+    0/1 и end_break: брошен в конце сессии (продолжение по следующей сессии считает дашборд); bq-3, bq-4 — 1/1
+  loaded_context: у каждой 0/1 — скилл вызван в первом ходе, контекста ещё нет
+  skill_share: 6/7, 6/7, 6/7, 4/5
+  суммы по сессиям — прежний счёт за период: active_review 2/3, blind_confirms 1/3, completion 3/4, skill_share 22/26
+  справочный скор сессии (только в отчёте): bq-1 — (10 · (100 + 0 + 100 + 100 + 100 + 100) + 5 · 100) / 65 = 85, без
+  фрода; bq-2 — 85, «не окончательный» (неподтверждённое как подтверждённое, второе на том же ходе отброшено); bq-3 —
+  измерено 25 из 65 веса (38.46 %) — не посчитан; фрод bq-3 — обход. С минимумом событий 5 у каждой сессии измерена только
+  работа через скиллы. Находки убранных видов (ухудшение агента, нечёткая постановка, переход к задаче, поздние вводные)
+  отбрасываются.
 
 Сессия opt-1 (своя папка, выгрузка): запуски context-doc [3] и business-requirements-doc [9]; места решения — [4] выбор
 варианта (accepted), [6] и [8] текстом (engaged); [11] — одна заглушка вставки, находка на ней отброшена:
   active_review 2/2 = 1.0 (выбор варианта не в знаменателе; было бы 2/3) · blind_confirms 0/3 (выбор варианта — здесь)
+Вход файлом: collect по одной выгрузке — одна сессия; повторный collect по папке итоги <id>.quality.json сессиями не считает.
 """
 
 from __future__ import annotations
@@ -48,6 +49,17 @@ import grade_brief  # noqa: E402
 import merge  # noqa: E402
 import params  # noqa: E402
 
+SESSIONS = ("bq-1", "bq-2", "bq-3", "bq-4")
+
+
+def read(path):
+    with open(path, encoding="utf-8") as handle:
+        return handle.read()
+
+
+def outputs(folder, ids=SESSIONS):
+    return {sid: json.loads(read(os.path.join(folder, f"{sid}.quality.json"))) for sid in ids}
+
 
 def main():
     try:
@@ -56,7 +68,7 @@ def main():
         pass
     root = tempfile.mkdtemp(prefix="sq-merge-")
     sessions = os.path.join(root, "sessions", "user-01")
-    work, out = os.path.join(root, "work"), os.path.join(root, "out")
+    work = os.path.join(root, "work")
     os.makedirs(sessions)
     expected = brief_fixtures.build(sessions)
     with contextlib.redirect_stdout(io.StringIO()):
@@ -72,10 +84,7 @@ def main():
     with open(strict_path, "w", encoding="utf-8") as handle:
         json.dump(strict_params, handle, ensure_ascii=False)
 
-    journals = {}
-    for session_id in expected:
-        with open(os.path.join(work, f"{session_id}.journal.txt"), encoding="utf-8") as handle:
-            journals[session_id] = handle.read()
+    journals = {session_id: read(os.path.join(work, f"{session_id}.journal.txt")) for session_id in expected}
     perfect = {session_id: grade_brief.perfect_answer(session_id, journals[session_id],
                                                       dict(expected[session_id], background=False))
                for session_id in expected}
@@ -111,12 +120,6 @@ def main():
         with open(os.path.join(work, f"{session_id}.findings.txt"), "w", encoding="utf-8") as handle:
             handle.write(text)
 
-    screen = io.StringIO()
-    with contextlib.redirect_stdout(screen):
-        code = merge.main(["--work", work, "--out", out, "--date", "2026-10-27", "--params", loose_path, "--keep-work"])
-        strict = merge.main(["--work", work, "--out", os.path.join(root, "strict"), "--date", "2026-10-27", "--params", strict_path,
-                             "--keep-work"])
-
     failures, checks = [], 0
 
     def expect(condition, message):
@@ -125,22 +128,32 @@ def main():
         if not condition:
             failures.append(message)
 
-    expect(code == 0 and strict == 0, f"код выхода {code}, {strict}: {screen.getvalue()}")
-    doc = json.load(open(os.path.join(out, "user-01-2026-10-27.json"), encoding="utf-8"))
-    report = open(os.path.join(out, "user-01-2026-10-27.md"), encoding="utf-8").read()
-    log = open(os.path.join(work, "merge-log.txt"), encoding="utf-8").read()
-    with open(merge.SCHEMA_PATH, encoding="utf-8") as handle:
-        expect(not contract.check_document(doc, json.load(handle)), "выход проходит contract.py")
+    def run_merge(*extra):
+        screen = io.StringIO()
+        with contextlib.redirect_stdout(screen):
+            code = merge.main(["--work", work, *extra])
+        return code, screen.getvalue()
+
+    code, screen = run_merge("--params", loose_path, "--keep-work")
+    expect(code == 0, f"код выхода {code}: {screen}")
+    docs = outputs(sessions)
+    reports = {sid: read(os.path.join(sessions, f"{sid}.quality.md")) for sid in SESSIONS}
+    log = read(os.path.join(work, "merge-log.txt"))
+    schema = json.loads(read(merge.SCHEMA_PATH))
+    bad = {sid: contract.check_document(doc, schema) for sid, doc in docs.items()}
+    expect(not any(bad.values()), f"выход каждой сессии проходит contract.py: {bad}")
+    expect(sorted(name for name in os.listdir(sessions) if name.endswith(".quality.json")) ==
+           [f"{sid}.quality.json" for sid in SESSIONS], f"итог — рядом с выгрузкой каждой сессии: {sorted(os.listdir(sessions))}")
 
     # Посылки ручного счёта — факты collect.
-    facts = {sid: json.load(open(os.path.join(work, f"{sid}.facts.json"), encoding="utf-8")) for sid in expected}
-    expect([facts[s]["user_turns"] for s in ("bq-1", "bq-2", "bq-3", "bq-4")] == [7, 7, 7, 5],
+    facts = {sid: json.loads(read(os.path.join(work, f"{sid}.facts.json"))) for sid in expected}
+    expect([facts[s]["user_turns"] for s in SESSIONS] == [7, 7, 7, 5],
            "реплики 7/7/7/5 — вызов через «/» и ответ на вопрос с вариантами тоже реплики")
-    expect([[run["user_turns"] for run in facts[s]["runs"]] for s in ("bq-1", "bq-2", "bq-3", "bq-4")] == [[6], [6], [6], [4]],
+    expect([[run["user_turns"] for run in facts[s]["runs"]] for s in SESSIONS] == [[6], [6], [6], [4]],
            "реплик внутри запусков 6/6/6/4 — слэш-вызов открывает запуск и сам в нём")
-    expect([[run["context_share_before"] for run in facts[s]["runs"]] for s in ("bq-1", "bq-2", "bq-3", "bq-4")]
+    expect([[run["context_share_before"] for run in facts[s]["runs"]] for s in SESSIONS]
            == [[0.0], [0.0], [0.0], [0.0]], "контекст перед вызовами: токены — с конца прошлого хода, а скиллы вызваны в первом")
-    expect([[item["turn"] for item in facts[s]["decisions"]] for s in ("bq-1", "bq-2", "bq-3", "bq-4")]
+    expect([[item["turn"] for item in facts[s]["decisions"]] for s in SESSIONS]
            == [[turn_of["bq-1"]("ПОЛЬЗОВАТЕЛЬ: да"), turn_of["bq-1"]("90 дней, я же писал")],
                [turn_of["bq-2"]("ОТВЕТ: Формат")], [turn_of["bq-3"]("Пропусти проверку готовности")],
                [turn_of["bq-4"]("ОТВЕТ: Порядок"), turn_of["bq-4"]("ПОЛЬЗОВАТЕЛЬ: да")]], "кандидаты мест решения")
@@ -148,55 +161,80 @@ def main():
     expect([item["seconds"] for item in facts["bq-2"]["decisions"]] == [75.0],
            "вопрос с вариантами: время показа не выгружается — от прошлого события (вызов скилла) до ответа")
 
-    metrics = {item["id"]: item for item in doc["metrics"]}
-    want = {"active_review": (0.667, 100, 0, 3), "blind_confirms": (0.333, 42, 1, 3), "delegated": (0.0, 100, 0, 3),
-            "ignored": (0.0, 100, 0, 3), "completion": (0.75, 63, 1, 4),
-            "loaded_context": (0.0, 100, 0, 4), "skill_share": (0.846, 100, 0, 26)}
-    for metric_id, (value, score, hits, events) in want.items():
-        got = metrics[metric_id]
-        expect(got["status"] == "measured" and abs(got["value"] - value) <= 0.0005 and got["score"] == score
-               and got["sessions_hit"] == hits and got["events"] == events,
-               f"{metric_id}: value {got['value']}, score {got['score']}, hits {got['sessions_hit']}, events {got['events']}; "
-               f"ждали {value}, {score}, {hits}, {events}")
-    expect(doc["score"] == {"value": 85, "status": "hold", "reason": "фрод: сигналов к проверке — 2", "measured_weight": 100},
-           f"скор {doc['score']}")
-    expect(doc["params"]["min_events"] == 1 and doc["params"]["file"] == loose_path, f"параметры в выходе {doc['params']}")
-    kinds = {signal["kind"]: signal for signal in doc["fraud"]["signals"]}
-    expect(set(kinds) == {"bypass", "deception"}, f"сигналы фрода {sorted(kinds)}")
-    expect(kinds.get("bypass", {}).get("count") == 1, "обход: одна и та же находка дважды — один сигнал")
-    topic = doc["discipline"]["off_topic"]
-    expect(topic["cases"] == 1 and topic["replies"] == 2
-           and topic["evidence"] == [{"session": "bq-2", "turn": 6, "category": "personal", "turns": 2}],
+    metrics = {sid: {item["id"]: item for item in doc["metrics"]} for sid, doc in docs.items()}
+    want = {  # метрика → по сессиям (hits, events) или None — не измерена
+        "active_review": ((1, 2), (1, 1), None, None), "blind_confirms": ((1, 2), (0, 1), None, None),
+        "delegated": ((0, 2), (0, 1), None, None), "ignored": ((0, 2), (0, 1), None, None),
+        "completion": ((1, 1), (0, 1), (1, 1), (1, 1)), "loaded_context": ((0, 1), (0, 1), (0, 1), (0, 1)),
+        "skill_share": ((6, 7), (6, 7), (6, 7), (4, 5)),
+    }
+    for metric_id, per_session in want.items():
+        for sid, pair in zip(SESSIONS, per_session):
+            got = metrics[sid][metric_id]
+            if pair is None:
+                ok = got["status"] == "not_measured" and got["value"] is None and got["evidence"] == []
+            else:
+                ok = got["status"] == "measured" and (got["hits"], got["events"]) == pair and abs(got["value"] - pair[0] / pair[1]) <= 0.0005
+            expect(ok, f"{sid} {metric_id}: {got['status']} {got['hits']}/{got['events']} value {got['value']}; ждали {pair or 'не измерена'}")
+    expect(metrics["bq-3"]["active_review"]["reason"] == "не было мест решения с ответом текстом" and
+           metrics["bq-4"]["active_review"]["reason"] == "нет разобранного ответа модели",
+           f"причины «не измерено»: {metrics['bq-3']['active_review'].get('reason')}, {metrics['bq-4']['active_review'].get('reason')}")
+    totals = {metric_id: (sum(metrics[s][metric_id]["hits"] for s in SESSIONS), sum(metrics[s][metric_id]["events"] for s in SESSIONS))
+              for metric_id in ("active_review", "blind_confirms", "completion", "skill_share")}
+    expect(totals == {"active_review": (2, 3), "blind_confirms": (1, 3), "completion": (3, 4), "skill_share": (22, 26)},
+           f"суммы hits / events по сессиям — прежний счёт за период: {totals}")
+    breaks = {sid: metrics[sid]["completion"]["end_break"] for sid in SESSIONS}
+    expect(breaks == {"bq-1": False, "bq-2": True, "bq-3": False, "bq-4": False}, f"end_break — только у брошенного в конце сессии: {breaks}")
+    evidence = metrics["bq-2"]["completion"]["evidence"]
+    expect([item["turn"] for item in evidence] == [bq2_end] and "без ответа работа не закончена" in evidence[0]["note"]
+           and "в конце сессии" in evidence[0]["note"], f"обрыв bq-2 [{bq2_end}]: {evidence}")
+    expect(all("session" not in item for doc in docs.values() for metric in doc["metrics"] for item in metric["evidence"]),
+           "в доказательствах нет id сессии — он в session.id")
+    expect(all([item["id"] for item in doc["metrics"]] == list(params.IMPLEMENTED_METRICS) for doc in docs.values()), "порядок метрик")
+    expect(all(doc["params"] == {"min_events": 1, "min_measured_weight": 50, "continuation_hours": 12} for doc in docs.values()),
+           f"параметры в выходе: {docs['bq-1']['params']}")
+    expect(all(doc["session"]["user"] == "user-01" and "score" not in doc for doc in docs.values()),
+           f"пользователь — у сессии, скора в выходе нет: {docs['bq-1']['session']}")
+
+    signals = {sid: {signal["kind"]: signal for signal in doc["fraud"]["signals"]} for sid, doc in docs.items()}
+    expect({sid: sorted(kinds) for sid, kinds in signals.items()} == {"bq-1": [], "bq-2": ["deception"], "bq-3": ["bypass"], "bq-4": []},
+           f"сигналы фрода по сессиям: {({sid: sorted(kinds) for sid, kinds in signals.items()})}")
+    expect(signals["bq-3"]["bypass"]["count"] == 1 and signals["bq-2"]["deception"]["count"] == 1,
+           "обход дважды — один сигнал; второе «неподтверждённое» на том же ходе отброшено")
+    topic = docs["bq-2"]["discipline"]["off_topic"]
+    expect(topic["cases"] == 1 and topic["replies"] == 2 and topic["evidence"] == [{"turn": 6, "category": "personal", "turns": 2}],
            f"посторонние темы — вне скора, без пересказа: {topic}")
-    expect(set(doc["environment"]) == {"tool_errors", "api_errors", "compressions"}, f"окружение {doc['environment']}")
-    expect([item["id"] for item in doc["metrics"]] == list(params.IMPLEMENTED_METRICS), "порядок метрик")
-    completion = metrics["completion"]["evidence"]
-    expect([(item["session"], item["turn"]) for item in completion] == [("bq-2", bq2_end)]
-           and "без ответа работа не закончена" in completion[0]["note"], f"обрыв — bq-2 [{bq2_end}]: {completion}")
+    expect(docs["bq-4"]["discipline"]["off_topic"]["status"] == "not_measured", "без ответа модели посторонние темы не измерены")
+    expect(set(docs["bq-1"]["environment"]) == {"tool_errors", "api_errors", "compressions"}, f"окружение {docs['bq-1']['environment']}")
     for line in ("цитата не подтвердилась", "вырезан пересказ", "turns: меньше 1", "самоисправление", "bq-4: нет ответа модели",
                  f"deception в ходе {deception_turn} — на ходе уже есть такая находка", "находка отброшена — $.type"):
         expect(line in log, f"в merge-log.txt нет «{line}»")
-
-    strict_doc = json.load(open(os.path.join(root, "strict", "user-01-2026-10-27.json"), encoding="utf-8"))
-    expect(strict_doc["score"]["status"] == "insufficient" and strict_doc["score"]["measured_weight"] == 7.69
-           and strict_doc["score"]["reason"] == "измерено 7.69 % веса — меньше 50",
-           f"минимум событий 5: измерена только работа через скиллы → скор не посчитан: {strict_doc['score']}")
-    blind_strict = next(item for item in strict_doc["metrics"] if item["id"] == "blind_confirms")
-    expect(blind_strict["status"] == "not_measured" and blind_strict["reason"] == "мало событий: 3, нужно от 5",
-           f"метрика с одним событием не считается: {blind_strict}")
-
-    expect("**Скор: 85 из 100 — не окончательный:**" in report, "отчёт: скор и статус")
     expect(log.count("находка отброшена — $.type") == 5, "убранные виды находок отброшены все пять")
-    expect("Обход правил и проверок" in report and "Неподтверждённое выдаётся за подтверждённое" in report, "отчёт: фрод")
-    expect("## Дисциплина" in report and "личное, реплик — 2" in report, "отчёт: посторонние темы — в дисциплине, без содержания")
+    expect("bq-4: bq-4:" not in log, "id сессии в строке лога один раз")
+
+    expect("**Скор сессии: 85 из 100** — справочно" in reports["bq-1"], "отчёт bq-1: скор 85, справочно")
+    expect("**Скор сессии: 85 из 100 — не окончательный:**" in reports["bq-2"] and "Неподтверждённое выдаётся за подтверждённое" in reports["bq-2"],
+           "отчёт bq-2: не окончательный — фрод")
+    expect("**Скор сессии не посчитан:** измерено 38.46 % веса — меньше 50." in reports["bq-3"] and "Обход правил и проверок" in reports["bq-3"],
+           "отчёт bq-3: мало веса — скора нет; фрод — обход")
+    expect("Последний запуск брошен в конце сессии" in reports["bq-2"] and "Последний запуск брошен" not in reports["bq-1"],
+           "отчёт: про обрыв в конце сессии — только у bq-2")
+    expect("## Дисциплина" in reports["bq-2"] and "личное, реплик — 2" in reports["bq-2"], "отчёт: посторонние темы — в дисциплине, без содержания")
     for secret in ("подарить", "жене", "отпуск", "Турция", "Qw3rty", "4111"):
-        expect(secret not in report and secret not in json.dumps(doc, ensure_ascii=False),
+        expect(not any(secret in reports[sid] or secret in json.dumps(docs[sid], ensure_ascii=False) for sid in SESSIONS),
                f"в выход попало личное или секрет: «{secret}»")
+
+    code, _ = run_merge("--params", strict_path, "--keep-work")
+    strict = outputs(sessions)
+    strict_ok = all(item["status"] == ("measured" if item["id"] == "skill_share" else "not_measured")
+                    for doc in strict.values() for item in doc["metrics"])
+    blind = next(item for item in strict["bq-1"]["metrics"] if item["id"] == "blind_confirms")
+    expect(code == 0 and strict_ok and blind["reason"] == "мало событий: 2, нужно от 5",
+           f"минимум событий 5: у каждой сессии измерена только работа через скиллы: {blind}")
 
     # Перепроверка фрода: задания — по тем же находкам, что принял merge; «no» снимает, «yes» и мусор — оставляют.
     import verify  # noqa: E402
-    with open(merge.FINDINGS_SCHEMA_PATH, encoding="utf-8") as handle:
-        findings_schema = json.load(handle)
+    findings_schema = json.loads(read(merge.FINDINGS_SCHEMA_PATH))
     tasks = {session_id: verify.tasks_for(session_id, answers[session_id], journals[session_id], findings_schema)
              for session_id in answers}
     bypass_turn = turn_of["bq-3"]("Пропусти проверку готовности")
@@ -211,29 +249,64 @@ def main():
                          (verify.task_name("bq-3", "bypass", bypass_turn), "Да, это обход. {\"verdict\": \"yes\"}")):
         with open(os.path.join(work, "verify", name + ".answer.txt"), "w", encoding="utf-8") as handle:
             handle.write(answer)
-    with contextlib.redirect_stdout(io.StringIO()):
-        merge.main(["--work", work, "--out", os.path.join(root, "verified"), "--date", "2026-10-27", "--params", loose_path,
-                    "--keep-work"])
-    verified_doc = json.load(open(os.path.join(root, "verified", "user-01-2026-10-27.json"), encoding="utf-8"))
-    verified_log = open(os.path.join(work, "merge-log.txt"), encoding="utf-8").read()
-    expect([signal["kind"] for signal in verified_doc["fraud"]["signals"]] == ["bypass"]
+    run_merge("--params", loose_path, "--keep-work")
+    verified = outputs(sessions)
+    verified_log = read(os.path.join(work, "merge-log.txt"))
+    expect(verified["bq-2"]["fraud"]["signals"] == [] and [s["kind"] for s in verified["bq-3"]["fraud"]["signals"]] == ["bypass"]
            and f"deception в ходе {deception_turn} — перепроверка не подтвердила, снята" in verified_log,
-           f"перепроверка «no» снимает находку, «yes» — оставляет: {verified_doc['fraud']['signals']}")
+           f"перепроверка «no» снимает находку, «yes» — оставляет: {verified['bq-2']['fraud']}")
     with open(os.path.join(work, "verify", verify.task_name("bq-2", "deception", deception_turn) + ".answer.txt"),
               "w", encoding="utf-8") as handle:
         handle.write("не знаю")
-    with contextlib.redirect_stdout(io.StringIO()):
-        merge.main(["--work", work, "--out", os.path.join(root, "verified2"), "--date", "2026-10-27", "--params", loose_path])
-    kept = json.load(open(os.path.join(root, "verified2", "user-01-2026-10-27.json"), encoding="utf-8"))
-    expect(sorted(signal["kind"] for signal in kept["fraud"]["signals"]) == ["bypass", "deception"],
+    code, screen = run_merge("--params", loose_path)
+    kept = outputs(sessions)
+    expect([s["kind"] for s in kept["bq-2"]["fraud"]["signals"]] == ["deception"],
            "перепроверка без разобранного ответа — находка остаётся к ручной проверке")
-    side_log = os.path.join(root, "verified2", "user-01-2026-10-27.log.txt")
-    expect(not os.path.exists(work) and os.path.exists(side_log)
-           and "не разобрана — находка остаётся" in open(side_log, encoding="utf-8").read(),
-           "без --keep-work рабочая папка убрана, журнал отброшенного — рядом с отчётом")
+    side_log = os.path.join(sessions, "bq-2.quality.log.txt")
+    expect(not os.path.exists(work) and os.path.exists(side_log) and "не разобрана — находка остаётся" in read(side_log),
+           "без --keep-work рабочая папка убрана, журнал отброшенного — рядом с отчётом сессии")
+    expect(merge.VERDICTS_HEADER in read(side_log) and f"[{bq2_end}] ending: yes" in read(side_log),
+           "в журнале рядом с отчётом — вердикты по проверкам этой сессии")
+    expect(all(f"{sid}.quality.json" in screen for sid in SESSIONS) and "справочно" in screen,
+           f"на экран — строка на сессию со справочным скором и путём: {screen}")
 
-    expect("Вердикты (сессия [ход] проверка: вердикт):" in open(side_log, encoding="utf-8").read(),
-           "в журнале рядом с отчётом — вердикты по проверкам")
+    # Провал контракта — не пишется ни один выход, рабочая папка остаётся.
+    fail_sessions, fail_work = os.path.join(root, "sessions", "user-03"), os.path.join(root, "work-fail")
+    os.makedirs(fail_sessions)
+    shutil.copy(os.path.join(sessions, "bq-1.json"), fail_sessions)
+    with contextlib.redirect_stdout(io.StringIO()):
+        collect.main(["--sessions", fail_sessions, "--out", fail_work])
+    original = contract.check_document
+    contract.check_document = lambda doc, schema: ["порча для самопроверки"]
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            fail_code = merge.main(["--work", fail_work])
+    finally:
+        contract.check_document = original
+    expect(fail_code == 1 and not [n for n in os.listdir(fail_sessions) if ".quality." in n] and os.path.isdir(fail_work),
+           f"провал контракта — выходов нет, рабочая папка оставлена: {fail_code}, {os.listdir(fail_sessions)}")
+
+    # Вход файлом и повторный запуск по папке.
+    single_work = os.path.join(root, "work-single")
+    with contextlib.redirect_stdout(io.StringIO()):
+        collect.main(["--sessions", os.path.join(sessions, "bq-1.json"), "--out", single_work])
+    single = json.loads(read(os.path.join(single_work, "collect.json")))
+    expect([item["session"] for item in single["sessions"]] == ["bq-1"] and
+           single["sessions"][0]["output"] == os.path.join(os.path.abspath(sessions), "bq-1.quality"),
+           f"вход файлом — одна сессия, итог рядом с ней: {single['sessions']}")
+    again_work = os.path.join(root, "work-again")
+    with contextlib.redirect_stdout(io.StringIO()):
+        collect.main(["--sessions", sessions, "--out", again_work])
+    again = json.loads(read(os.path.join(again_work, "collect.json")))
+    expect([item["session"] for item in again["sessions"]] == list(SESSIONS) and
+           not any(".quality." in item["file"] for item in again["skipped_files"]),
+           f"повторный запуск по папке: итоги не сессии и не «пропущенные файлы»: {again['skipped_files']}")
+    default_screen = io.StringIO()
+    with contextlib.redirect_stdout(default_screen):
+        collect.main(["--sessions", os.path.join(sessions, "bq-2.json")])
+    expect(os.path.isdir(os.path.join(sessions, collect.WORK_DIR)) and
+           f"Работа: {os.path.join(os.path.abspath(sessions), collect.WORK_DIR)}" in default_screen.getvalue(),
+           f"рабочая папка по умолчанию — {collect.WORK_DIR} рядом с сессиями: {default_screen.getvalue()[:200]}")
 
     # Выбор варианта, заглушка вставки, цитата ответа — на выгрузке своей сессии.
     spec = importlib.util.spec_from_file_location("selftest_collect", os.path.join(HERE, "selftest-collect.py"))
@@ -256,8 +329,7 @@ def main():
     s.write(opt_sessions)
     with contextlib.redirect_stdout(io.StringIO()):
         collect.main(["--sessions", opt_sessions, "--out", opt_work])
-    _events, _users, opt_candidates = merge.parse_journal(open(os.path.join(opt_work, "opt-1.journal.txt"),
-                                                               encoding="utf-8").read())
+    _events, _users, opt_candidates = merge.parse_journal(read(os.path.join(opt_work, "opt-1.journal.txt")))
     verdicts = {4: "accepted", 6: "engaged", 8: "engaged"}
     answer = {"findings": [{"type": "deception", "turn": 11, "quote": "[Pasted Content 3021 chars]"}],
               "checks": [{"check": check, "turn": turn, "verdict": verdicts.get(turn, "no")}
@@ -265,19 +337,17 @@ def main():
     with open(os.path.join(opt_work, "opt-1.findings.txt"), "w", encoding="utf-8") as handle:
         json.dump(answer, handle, ensure_ascii=False)
     with contextlib.redirect_stdout(io.StringIO()):
-        opt_code = merge.main(["--work", opt_work, "--out", os.path.join(root, "opt"), "--date", "2026-10-27",
-                               "--params", loose_path])
+        opt_code = merge.main(["--work", opt_work, "--params", loose_path])
     expect(opt_code == 0 and [check for check in opt_candidates if check[0] == "decision"]
            == [("decision", 4), ("decision", 6), ("decision", 8)], f"opt-1: места решения {opt_candidates}")
-    opt_doc = json.load(open(os.path.join(root, "opt", "user-02-2026-10-27.json"), encoding="utf-8"))
-    opt = {item["id"]: item for item in opt_doc["metrics"]}
-    expect((opt["active_review"]["value"], opt["active_review"]["events"]) == (1.0, 2)
-           and (opt["blind_confirms"]["value"], opt["blind_confirms"]["events"]) == (0.0, 3)
+    opt = {item["id"]: item for item in outputs(opt_sessions, ("opt-1",))["opt-1"]["metrics"]}
+    expect((opt["active_review"]["hits"], opt["active_review"]["events"]) == (2, 2)
+           and (opt["blind_confirms"]["hits"], opt["blind_confirms"]["events"]) == (0, 3)
            and opt["delegated"]["events"] == 2 and opt["ignored"]["events"] == 2,
-           f"выбор варианта — только в «не читая»: {[(k, opt[k]['value'], opt[k]['events']) for k in opt]}")
-    opt_log = open(os.path.join(root, "opt", "user-02-2026-10-27.log.txt"), encoding="utf-8").read()
+           f"выбор варианта — только в «не читая»: {[(k, opt[k]['hits'], opt[k]['events']) for k in opt]}")
+    opt_log = read(os.path.join(opt_sessions, "opt-1.quality.log.txt"))
     expect("deception в ходе 11 — реплика из заглушки вставки, текста нет, отброшена" in opt_log
-           and "opt-1 [4] decision: accepted (выбор варианта)" in opt_log and "opt-1 [6] decision: engaged" in opt_log,
+           and "[4] decision: accepted (выбор варианта)" in opt_log and "[6] decision: engaged" in opt_log,
            f"журнал opt-1: заглушка отброшена, вердикты записаны: {opt_log}")
     expect(merge.line_quote({4: ["ВОПРОС: Источник: Откуда берём данные? | варианты: Из задачи / Из переписки",
                                  "ОТВЕТ: Источник: Из задачи (вариант)"]}, 4) == "Источник: Из задачи (вариант)",

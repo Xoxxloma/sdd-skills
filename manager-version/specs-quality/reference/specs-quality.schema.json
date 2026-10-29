@@ -1,112 +1,50 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "specs-quality/4",
-  "title": "Оценка качества бизнес-требований и тех-спек по папке с документами",
-  "description": "Один документ — один прогон по папке. Баллы и находки с цитатами даёт модель по рубрике; суммы, проценты, подсветку и происхождение считает скрипт merge. Правила, которые схемой не выразить (суммы, шкала балла, причины подсветки, находки ровно у сниженных критериев), проверяет contract.py.",
+  "$id": "specs-quality/5",
+  "title": "Оценка качества одного документа: бизнес-требований или тех-спеки",
+  "description": "Один документ — один файл <имя документа>.quality.json рядом с ним. Баллы и находки с цитатами даёт модель по рубрике; суммы, проценты, подсветку и происхождение считает скрипт merge. Правила, которые схемой не выразить (суммы, шкала балла, причины подсветки, находки ровно у сниженных критериев, веса того же вида), проверяет contract.py. Сводку по автору собирает дашборд: Σ sum / Σ max, разделы формы — по form_missing.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "generated_at", "subject", "params", "people", "documents"],
+  "required": ["schema", "generated_at", "params", "document"],
   "properties": {
-    "schema": {"const": "specs-quality/4"},
+    "schema": {"const": "specs-quality/5"},
     "generated_at": {"type": "string", "format": "date-time"},
-    "subject": {"$ref": "#/$defs/subject"},
     "params": {"$ref": "#/$defs/params"},
-    "people": {"description": "Сводка по авторам: по строке на автора, документы без автора — строкой user: null в конце.", "type": "array", "items": {"$ref": "#/$defs/person"}},
-    "documents": {"description": "Все найденные БТ и спеки, оценённые и нет.", "type": "array", "items": {"$ref": "#/$defs/document"}}
+    "document": {"$ref": "#/$defs/document"}
   },
   "$defs": {
     "path": {"description": "Путь от корня, через «/».", "type": "string", "minLength": 1},
-    "count": {"type": "integer", "minimum": 0},
     "text": {"type": "string", "minLength": 1, "maxLength": 1000},
     "nullable_text": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/text"}]},
     "nullable_string": {"oneOf": [{"type": "null"}, {"type": "string", "minLength": 1}]},
     "weight": {"type": "number", "exclusiveMinimum": 0},
     "score": {"description": "Балл с весом: 0, половина веса или вес; null — не применимо («н/п»), причина — в findings этого критерия.", "type": ["number", "null"], "minimum": 0},
 
-    "subject": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["documents_dir", "team", "repo", "documents_total", "documents_scored", "documents_attention"],
-      "properties": {
-        "documents_dir": {"description": "Папка, по которой собраны документы, от корня; при входе файлом или ключом — его папка; вход — сам корень — «.».", "$ref": "#/$defs/path"},
-        "team": {"$ref": "#/$defs/nullable_string"},
-        "repo": {"$ref": "#/$defs/nullable_string"},
-        "documents_total": {"$ref": "#/$defs/count"},
-        "documents_scored": {"$ref": "#/$defs/count"},
-        "documents_attention": {"$ref": "#/$defs/count"}
-      }
-    },
-
     "params": {
-      "description": "Параметры, с которыми посчитан документ (из params.json или --params).",
+      "description": "Параметры, с которыми посчитан документ, — для его вида (из params.json или --params).",
       "type": "object",
       "additionalProperties": false,
-      "required": ["file", "below_pct", "form_min_missing", "weights"],
+      "required": ["below_pct", "form_min_missing", "weights"],
       "properties": {
-        "file": {"type": "string", "minLength": 1},
         "below_pct": {"type": "number", "minimum": 0, "maximum": 100},
-        "form_min_missing": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["bt", "spec"],
-          "properties": {"bt": {"type": "integer", "minimum": 1, "maximum": 16}, "spec": {"type": "integer", "minimum": 1, "maximum": 23}}
-        },
-        "weights": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["bt", "spec"],
-          "properties": {
-            "bt": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["goal", "entities", "functional", "acceptance", "roles"],
-              "properties": {"goal": {"$ref": "#/$defs/weight"}, "entities": {"$ref": "#/$defs/weight"}, "functional": {"$ref": "#/$defs/weight"},
-                             "acceptance": {"$ref": "#/$defs/weight"}, "roles": {"$ref": "#/$defs/weight"}}
-            },
-            "spec": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["source_logic", "data_model", "access", "services", "contracts"],
-              "properties": {"source_logic": {"$ref": "#/$defs/weight"}, "data_model": {"$ref": "#/$defs/weight"}, "access": {"$ref": "#/$defs/weight"},
-                             "services": {"$ref": "#/$defs/weight"}, "contracts": {"$ref": "#/$defs/weight"}}
-            }
-          }
-        }
+        "form_min_missing": {"description": "С какого числа пропущенных разделов шаблона документ «не по форме»: у БТ из 16, у спеки из 23.",
+                             "type": "integer", "minimum": 1, "maximum": 23},
+        "weights": {"description": "Вес каждого критерия рубрики этого вида.", "oneOf": [{"$ref": "#/$defs/weights_bt"}, {"$ref": "#/$defs/weights_spec"}]}
       }
     },
-
-    "person": {
+    "weights_bt": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["user", "bt", "spec"],
-      "properties": {"user": {"$ref": "#/$defs/nullable_string"}, "bt": {"$ref": "#/$defs/group"}, "spec": {"$ref": "#/$defs/group"}}
+      "required": ["goal", "entities", "functional", "acceptance", "roles"],
+      "properties": {"goal": {"$ref": "#/$defs/weight"}, "entities": {"$ref": "#/$defs/weight"}, "functional": {"$ref": "#/$defs/weight"},
+                     "acceptance": {"$ref": "#/$defs/weight"}, "roles": {"$ref": "#/$defs/weight"}}
     },
-    "group": {
-      "description": "Сводка документов автора одного вида. Суммы, а не средние: дашборд складывает их между репозиториями. pct = sum / max, form_pct = form_present / form_total; знаменатель 0 — null. Неоценённые документы — в count, не в суммах.",
+    "weights_spec": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["count", "scored", "sum", "max", "pct", "form_present", "form_total", "form_pct", "attention", "metrics"],
-      "properties": {
-        "count": {"$ref": "#/$defs/count"},
-        "scored": {"$ref": "#/$defs/count"},
-        "sum": {"type": "number", "minimum": 0},
-        "max": {"type": "number", "minimum": 0},
-        "pct": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
-        "form_present": {"description": "Разделов шаблона на месте — по документам с проверенной формой.", "$ref": "#/$defs/count"},
-        "form_total": {"$ref": "#/$defs/count"},
-        "form_pct": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
-        "attention": {"description": "Сколько документов требуют внимания.", "$ref": "#/$defs/count"},
-        "by_code": {"description": "Только у спек: сколько «по коду».", "$ref": "#/$defs/count"},
-        "metrics": {"description": "По критерию рубрики: measured — на скольких оценён (без «н/п»), full — у скольких полный балл, pct — сумма баллов / сумма весов.",
-                    "type": "array", "items": {"$ref": "#/$defs/metric"}}
-      }
-    },
-    "metric": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "measured", "full", "pct"],
-      "properties": {"id": {"type": "string", "minLength": 1}, "measured": {"$ref": "#/$defs/count"}, "full": {"$ref": "#/$defs/count"},
-                     "pct": {"type": ["integer", "null"], "minimum": 0, "maximum": 100}}
+      "required": ["source_logic", "data_model", "access", "services", "contracts"],
+      "properties": {"source_logic": {"$ref": "#/$defs/weight"}, "data_model": {"$ref": "#/$defs/weight"}, "access": {"$ref": "#/$defs/weight"},
+                     "services": {"$ref": "#/$defs/weight"}, "contracts": {"$ref": "#/$defs/weight"}}
     },
 
     "criteria_bt": {
@@ -127,9 +65,10 @@
     "document": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "kind", "key", "feature", "author", "source", "scored"],
+      "required": ["path", "repo", "kind", "key", "feature", "author", "source", "scored"],
       "properties": {
         "path": {"$ref": "#/$defs/path"},
+        "repo": {"description": "Репозиторий, если передали при запуске; нет — null.", "$ref": "#/$defs/nullable_string"},
         "kind": {"enum": ["bt", "spec"]},
         "key": {"description": "Ключ задачи из шапки; нет — имя папки, у узла-фундамента — имя папки эпика.", "type": "string", "minLength": 1},
         "feature": {"$ref": "#/$defs/nullable_string"},

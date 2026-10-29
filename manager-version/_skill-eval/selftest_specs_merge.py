@@ -6,9 +6,10 @@
 Ответы собираются из эталонных баллов 1.4.0 с настоящими цитатами из документов. Проверяется: итог, нули, форма,
 происхождение и подсветка по ручному счёту; допуски разбора (лишний элемент criteria, повтор id, порядок, origin
 внутри form, два JSON); «оценка не состоялась» (нет JSON, балл вне шкалы, нет критерия, нет ответа); цитаты —
-выдуманная в unverified при том же балле, с другим переносом, разметкой и «…» — найдена; итог проходит
-contract.py, work/ удаляется после успеха и остаётся при провале контракта. Если рядом есть ответы среза 2
-(runs/*-rubric-json*/responses), они тоже собираются в итог, который обязан пройти контракт.
+выдуманная в unverified при том же балле, с другим переносом, разметкой и «…» — найдена; выход каждого документа
+проходит contract.py и пишется рядом с ним, work/ удаляется после успеха; провал контракта — не пишется ни один выход,
+work/ остаётся. Если рядом есть ответы среза 2 (runs/*-rubric-json*/responses), они тоже собираются в выходы, которые
+обязаны пройти контракт.
 """
 
 from __future__ import annotations
@@ -66,11 +67,15 @@ def answer(kind, parts, quote, flag=False, missing=0, signs=(), traces=(2, 3)):
     return result
 
 
-def setup(base, name):
+def setup(base, name, repo=None):
     root = os.path.join(base, name)
     shutil.copytree(specs_cases.FIXTURE, os.path.join(root, "coddoc"))
-    data = collect.collect("coddoc/", root, today="2026-10-28")
+    data = collect.collect("coddoc/", root, repo=repo, today="2026-10-28")
     return root, data
+
+
+def written(root):
+    return sorted(glob.glob(os.path.join(root, "**", "*.quality.json"), recursive=True))
 
 
 def doc_meta(data, tail):
@@ -91,8 +96,14 @@ def by_path(doc, tail):
     return next(d for d in doc["documents"] if d["path"].endswith(tail))
 
 
+def built(work):
+    """merge.build → (выходы по документам, {"documents": документы} для поиска по пути, лог)."""
+    outputs, log, _ = merge.build(work)
+    return outputs, {"documents": [output["document"] for _meta, output in outputs]}, log
+
+
 def main_checks(base):
-    root, data = setup(base, "repo")
+    root, data = setup(base, "repo", repo="pss")
     q = lambda tail: real_quote(text_of(root, data, tail))  # noqa: E731
     bt, sp = "business_requirements.md", "technical_specification.md"
 
@@ -138,10 +149,15 @@ def main_checks(base):
     put(data, "ARS-101/" + sp, json.dumps(short, ensure_ascii=False))
     # У PSS-2216 БТ ответа нет вовсе.
 
-    doc, log, _ = merge.build(data["work"])
+    outputs, doc, log = built(data["work"])
     schema = contract.load_json(contract.SCHEMA_PATH)
-    errors = contract.check_document(doc, schema)
-    check("итог проходит contract", not errors, errors[:5])
+    errors = [f"{meta['path']}: {error}" for meta, output in outputs for error in contract.check_document(output, schema)]
+    check("выход каждого документа проходит contract", not errors, errors[:5])
+    params_of = {output["document"]["path"]: output["params"] for _meta, output in outputs}
+    check("параметры — своего вида", params_of["coddoc/PSS-2212/business_requirements.md"]["form_min_missing"] == 5 and
+          list(params_of["coddoc/PSS-2212/business_requirements.md"]["weights"]) == list(params.CRITERIA["bt"]) and
+          params_of["coddoc/PSS-2212/technical_specification.md"]["form_min_missing"] == 6, params_of["coddoc/PSS-2212/business_requirements.md"])
+    check("репозиторий — в каждом документе", all(d["repo"] == "pss" for d in doc["documents"]), {d["repo"] for d in doc["documents"]})
 
     def totals(d):
         return d["sum"], d["max"], d["pct"]
@@ -202,23 +218,23 @@ def main_checks(base):
     check("н/п без причины — null, причина из цитаты", d["criteria"]["goal"] is None and line(d, "goal")["comment"], line(d, "goal"))
     d = by_path(doc, "ARS-101/" + sp)
     check("нет критерия — не состоялась", not d["scored"] and "нет критерия data_model" in d["skip_reason"], d.get("skip_reason"))
-    check("документы как у collect, строк в выходе нет", doc["subject"]["documents_total"] == 17 and "rows" not in doc, doc["subject"])
+    check("выход на каждый документ collect", [meta["path"] for meta, _output in outputs] == [meta["path"] for meta in data["documents"]] and
+          len(outputs) == 17, len(outputs))
     missing = [x["path"] for x in doc["documents"] if not x["scored"] and x["skip_reason"] == "нет ответа модели"]
     check("без ответа — «нет ответа модели»", missing == ["coddoc/PSS-2216/business_requirements.md"], missing)
-    check("счёт не состоявшихся", doc["subject"]["documents_scored"] == 17 - 4, doc["subject"])
-    people = {p["user"]: p for p in doc["people"]}
-    ivanova = people.get("ivanova.ma", {}).get("bt", {})
-    # Ручной счёт: три БТ с автором ivanova.ma — PSS-2211 не состоялся (балл цели вне шкалы), PSS-2216 без ответа,
-    # PSS-2214 — 0.5+1+0.5+1+1 = 4 из 4.5, нет 12 разделов из 16.
-    check("сводка по автору — ручной счёт", [p["user"] for p in doc["people"]] == ["ivanova.ma", None] and
-          {k: ivanova.get(k) for k in ("count", "scored", "sum", "max", "pct", "form_present", "form_total", "form_pct", "attention")} ==
-          {"count": 3, "scored": 1, "sum": 4, "max": 4.5, "pct": 89, "form_present": 4, "form_total": 16, "form_pct": 25, "attention": 1} and
-          people["ivanova.ma"]["spec"]["count"] == 0 and people["ivanova.ma"]["spec"]["pct"] is None, people.get("ivanova.ma"))
-    roles = next(m for m in ivanova.get("metrics", []) if m["id"] == "functional")
-    check("метрика по автору — ручной счёт", roles == {"id": "functional", "measured": 1, "full": 0, "pct": 50}, roles)
-    text = merge.dump(doc)
-    check("раскладка: читается обратно без потерь, меньше 10 строк на документ", json.loads(text) == doc and
-          text.count("\n") < 10 * len(doc["documents"]), text.count("\n"))
+    check("счёт не состоявшихся", sum(1 for d in doc["documents"] if d["scored"]) == 17 - 4, "")
+    authors = sorted({d["author"] or "—" for d in doc["documents"]})
+    check("автор — из шапки, сводки по людям в выходе нет", authors == ["ivanova.ma", "—"] and
+          all(set(output) == {"schema", "generated_at", "params", "document"} for _meta, output in outputs), authors)
+    for _meta, output in outputs:
+        text = merge.dump(output)
+        document = output["document"]
+        lines_max = 12 + len(document.get("findings") or []) + len(document.get("code_signs") or [])
+        if json.loads(text) != output or text.count("\n") > lines_max:
+            check(f"раскладка {document['path']}: читается обратно, строк не больше {lines_max}", False, text.count("\n"))
+            break
+    else:
+        check("раскладка: читается обратно без потерь, строка на находку и признак", True)
 
     # --check: перечисляет то, что merge не примет, и не трогает work/.
     bad, _ = merge.check_answers(data["work"])
@@ -228,25 +244,30 @@ def main_checks(base):
     check("--check: поправимое (лишний элемент, origin в form) — не к перезапуску",
           not any(tail in " ".join(listed) for tail in ("PSS-2212/technical", "PSS-2210/technical")), listed)
     code = merge.main(["--work", data["work"], "--check"])
-    check("--check: work/ на месте, итога нет", code == 0 and os.path.exists(data["work"]) and not os.path.exists(data["output"]), code)
+    check("--check: work/ на месте, выходов нет", code == 0 and os.path.exists(data["work"]) and not written(root), code)
 
-    # main: успех — итог записан, work/ удалена.
+    # main: успех — выход рядом с каждым документом, work/ удалена.
     code = merge.main(["--work", data["work"]])
-    check("main: успех", code == 0 and os.path.exists(data["output"]) and not os.path.exists(data["work"]), (code, os.path.exists(data["work"])))
-    with open(data["output"], encoding="utf-8") as handle:
-        written = json.load(handle)
-    check("main: записанный итог проходит contract", not contract.check_document(written, schema), "")
+    expected = sorted(os.path.normpath(os.path.join(root, meta["output"])) for meta in data["documents"])
+    check("main: успех — выход рядом с каждым документом", code == 0 and [os.path.normpath(p) for p in written(root)] == expected and
+          not os.path.exists(data["work"]), (code, len(written(root)), os.path.exists(data["work"])))
+    bad_files = []
+    for path in written(root):
+        with open(path, encoding="utf-8") as handle:
+            if contract.check_document(json.load(handle), schema):
+                bad_files.append(path)
+    check("main: записанные выходы проходят contract", not bad_files, bad_files[:2])
 
-    # main: контракт не прошёл — итога нет, work/ на месте.
-    _, data2 = setup(base, "repo-fail")
+    # main: контракт не прошёл — не пишется ни один выход, work/ на месте.
+    root2, data2 = setup(base, "repo-fail")
     original = contract.check_document
     contract.check_document = lambda doc, schema: ["порча для самопроверки"]
     try:
         code = merge.main(["--work", data2["work"]])
     finally:
         contract.check_document = original
-    check("main: провал контракта — итога нет, work/ оставлена", code == 1 and not os.path.exists(data2["output"]) and os.path.exists(data2["work"]),
-          (code, os.path.exists(data2["output"])))
+    check("main: провал контракта — выходов нет, work/ оставлена", code == 1 and not written(root2) and os.path.exists(data2["work"]),
+          (code, len(written(root2))))
 
 
 def real_answers_checks(base):
@@ -277,9 +298,10 @@ def real_answers_checks(base):
                     result = json.load(handle).get("result") or ""
                 put(data, path.replace("coddoc/", "", 1), result)
                 used += 1
-            doc, log, _ = merge.build(data["work"])
-            errors = contract.check_document(doc, contract.load_json(contract.SCHEMA_PATH))
-            check(f"реальные ответы {os.path.basename(os.path.dirname(folder))} {run_tag}: итог проходит contract", not errors, errors[:3])
+            outputs, doc, log = built(data["work"])
+            out_schema = contract.load_json(contract.SCHEMA_PATH)
+            errors = [error for _meta, output in outputs for error in contract.check_document(output, out_schema)]
+            check(f"реальные ответы {os.path.basename(os.path.dirname(folder))} {run_tag}: выходы проходят contract", not errors, errors[:3])
             failed = [d["path"] for d in doc["documents"] if not d["scored"] and d["skip_reason"] != "нет ответа модели"]
             check(f"реальные ответы {os.path.basename(os.path.dirname(folder))} {run_tag}: ни один не «не состоялся»", not failed,
                   [(p, by_path(doc, p)["skip_reason"]) for p in failed])

@@ -191,7 +191,10 @@ def main():
            and "verify" not in left and "notes.keep" in left and "Убрано файлов прошлого запуска: 5" in screen.getvalue(),
            f"файлы прошлого запуска убраны, чужой файл остался: {left}")
     summary = load("collect.json")
-    expect(summary["user"] == "ivanov", f"пользователь — login из выгрузки: {summary['user']}")
+    users = {item["session"]: item["user"] for item in summary["sessions"]}
+    expect(set(users.values()) == {"ivanov"}, f"пользователь — login из выгрузки, у каждой сессии: {users}")
+    expect(all(item["output"] == os.path.join(os.path.abspath(sessions), item["session"] + ".quality") for item in summary["sessions"]),
+           f"итог — рядом с выгрузкой сессии: {[item['output'] for item in summary['sessions']][:2]}")
     expect("Иванов" not in json.dumps(summary, ensure_ascii=False), "ФИО в выход не попадает")
     expect(summary["params"]["context_window"] == 262000, f"окно из params.json: {summary['params']['context_window']}")
     expect([s["session"] for s in summary["sessions"]] == ["sess-a", "sess-b", "sess-c", "sess-d", "sess-e"],

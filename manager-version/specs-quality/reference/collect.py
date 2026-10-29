@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """collect — первый шаг оценки: найти БТ и спеки, собрать строки, прочитать шапки, написать задания субагентам.
 
-    python3 collect.py --input <папка с документами | файл | ключ> [--team <команда>] [--repo <репозиторий>] [--params <файл>]
+    python3 collect.py --input <папка с документами | файл | ключ> [--repo <репозиторий>] [--params <файл>]
 
-Документы ищутся во всей вложенности входа; скрытые папки, stages/ и node_modules пропускаются. Корень — ближайшая
-папка с .git выше по пути входа; репозитория нет — папка, где лежит вход. Пишет <корень>/specs-quality-<дата>.work/:
-collect.json (строки, документы, источники, шапка) и по заданию на документ — <id>.task.txt. Итог merge запишет в
-<корень>/specs-quality-<дата>.json; занято — -2, -3. На экран — список строк с источником каждой спеки, путь рабочей
-папки и итога. В папке документов ничего не пишется.
+Документы ищутся во всей вложенности входа; скрытые папки, stages/ и node_modules пропускаются; вход файлом — только
+этот документ. Корень — ближайшая папка с .git выше по пути входа; репозитория нет — папка, где лежит вход. Пишет
+<корень>/specs-quality-<дата>.work/ (занято — -2, -3): collect.json (строки, документы, источники, шапка) и по
+заданию на документ — <id>.task.txt. Итог merge запишет рядом с каждым документом — <имя>.quality.json. На экран —
+список строк с источником каждой спеки и путь рабочей папки. В папке документов collect ничего не пишет.
 """
 
 from __future__ import annotations
@@ -116,7 +116,7 @@ def skipped(name):
 
 
 def resolve_input(raw, cwd):
-    """→ (корень, папка поиска, рекурсивно ли)."""
+    """→ (корень, папка поиска, рекурсивно ли, имя файла — если вход один документ)."""
     if not raw or not raw.strip():
         raise InputError("Не передан путь: нужна папка с документами, файл или ключ задачи.")
     raw = raw.strip()
@@ -124,12 +124,12 @@ def resolve_input(raw, cwd):
         raise InputError("Ссылку открыть нельзя — нужен путь к локальному клону репозитория.")
     path = os.path.abspath(raw if os.path.isabs(raw) else os.path.join(cwd, raw))
     if os.path.isfile(path):
-        if os.path.basename(path) not in NAMES:
-            raise InputError(f"Файл {raw} — не БТ, не спека, не баг-репорт и не запрос на правку.")
+        if os.path.basename(path) not in (BT, SPEC):
+            raise InputError(f"Файл {raw} — не БТ и не спека: оцениваются {BT} и {SPEC}.")
         scope = os.path.dirname(path)
-        return root_for(scope), scope, False
+        return root_for(scope), scope, False, os.path.basename(path)
     if os.path.isdir(path):
-        return root_for(path), path, True
+        return root_for(path), path, True, None
     if KEY_RE.fullmatch(raw) or re.fullmatch(r"[A-Za-z][\w-]*", raw):
         base = git_root(cwd) or os.path.abspath(cwd)
         hits = []
@@ -140,7 +140,7 @@ def resolve_input(raw, cwd):
             raise InputError(f"Папки {raw} в {base} нет.")
         if len(hits) > 1:
             raise InputError(f"Папок {raw} несколько: " + ", ".join(rel(base, d) for d in hits) + " — передай путь.")
-        return root_for(hits[0]), hits[0], True
+        return root_for(hits[0]), hits[0], True, None
     raise InputError(f"Нет такого пути: {raw}")
 
 
@@ -210,7 +210,8 @@ def build(root, found, ignored):
             doc_id = f"{number:02d}-{re.sub(r'[^A-Za-z0-9_-]+', '_', task)}-{kind}"
             documents.append({"id": doc_id, "path": f"{folder_rel}/{name}", "kind": kind,
                               "author": heads[name]["author"], "title": heads[name]["title"], "source": doc_source,
-                              "task": f"{doc_id}.task.txt", "answer": f"{doc_id}.findings.txt"})
+                              "task": f"{doc_id}.task.txt", "answer": f"{doc_id}.findings.txt",
+                              "output": f"{folder_rel}/{name[:-len('.md')]}.quality.json"})
     return rows, documents, skipped
 
 
@@ -226,14 +227,13 @@ def task_text(root, document):
     return "\n".join(lines) + "\n"
 
 
-def output_paths(root, today):
-    """Итог и рабочая папка с общим суффиксом: занято что-то одно — берём следующий номер."""
+def work_path(root, today):
+    """Рабочая папка прогона; занята — следующий номер."""
     number = 1
     while True:
-        stem = f"specs-quality-{today}" + ("" if number == 1 else f"-{number}")
-        out, work = os.path.join(root, stem + ".json"), os.path.join(root, stem + ".work")
-        if not os.path.exists(out) and not os.path.exists(work):
-            return out, work
+        work = os.path.join(root, f"specs-quality-{today}" + ("" if number == 1 else f"-{number}") + ".work")
+        if not os.path.exists(work):
+            return work
         number += 1
 
 
@@ -241,8 +241,13 @@ def describe(rows, documents):
     by_path = {doc["path"]: doc for doc in documents}
     lines = []
     for row in rows:
-        bt = "БТ" if "document" in row["bt"] else ROW_LABELS[row["bt"]["none"]]
-        if "document" in row["spec"]:
+        if "document" in row["bt"]:
+            bt = "БТ" if row["bt"]["document"] in by_path else "БТ не на входе"
+        else:
+            bt = ROW_LABELS[row["bt"]["none"]]
+        if "document" in row["spec"] and row["spec"]["document"] not in by_path:
+            spec = "спека не на входе"
+        elif "document" in row["spec"]:
             source = by_path[row["spec"]["document"]]["source"]
             where = source["path"].rsplit("/", 1)[-1] if source["path"] else SOURCE_LABELS[source["kind"]]
             spec = f"спека ← {where}"
@@ -252,19 +257,20 @@ def describe(rows, documents):
     return lines
 
 
-def collect(raw_input, cwd, team=None, repo=None, params_path=None, today=None):
+def collect(raw_input, cwd, repo=None, params_path=None, today=None):
     params.load(params_path)  # битые параметры — остановка до работы
-    root, scope, recursive = resolve_input(raw_input, cwd)
+    root, scope, recursive, only = resolve_input(raw_input, cwd)
     found, ignored = scan(scope, recursive)
     rows, documents, skipped = build(root, found, ignored)
-    out, work = output_paths(root, today or date.today().isoformat())
+    if only:  # вход файлом — оценивается только он; соседние файлы папки нужны только как документ сверху
+        documents = [document for document in documents if document["path"].endswith("/" + only) or document["path"] == only]
+    work = work_path(root, today or date.today().isoformat())
     os.makedirs(work)
     for document in documents:
         with open(os.path.join(work, document["task"]), "w", encoding="utf-8", newline="\n") as handle:
             handle.write(task_text(root, document))
-    data = {"schema": "specs-quality/collect/1", "input": raw_input, "documents_dir": rel(root, scope), "root": root,
-            "output": out, "work": work,
-            "team": team or None, "repo": repo or None,
+    data = {"schema": "specs-quality/collect/2", "input": raw_input, "documents_dir": rel(root, scope), "root": root,
+            "work": work, "repo": repo or None,
             "params": os.path.abspath(params_path) if params_path else params.DEFAULT_PATH,
             "rubrics": RUBRICS, "rows": rows, "documents": documents, "skipped": skipped}
     with open(os.path.join(work, "collect.json"), "w", encoding="utf-8", newline="\n") as handle:
@@ -279,12 +285,11 @@ def main(argv=None):
         pass
     parser = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     parser.add_argument("--input", required=True)
-    parser.add_argument("--team")
     parser.add_argument("--repo")
     parser.add_argument("--params")
     args = parser.parse_args(argv)
     try:
-        data = collect(args.input, os.getcwd(), args.team, args.repo, args.params)
+        data = collect(args.input, os.getcwd(), args.repo, args.params)
     except (InputError, params.ParamsError) as error:
         print(error)
         return 2
@@ -296,7 +301,7 @@ def main(argv=None):
     if data["skipped"]:
         print("Не оцениваются: " + ", ".join(data["skipped"]))
     print(f"Работа: {data['work']}")
-    print(f"Итог: {data['output']}")
+    print("Итоги: рядом с каждым документом — <имя>.quality.json")
     if not documents:
         print("Документов: 0 — оценивать нечего.")
     return 0

@@ -1,83 +1,92 @@
 /**
- * Типизация выхода session-quality: формат session-quality/5.
- * Итог: <папка сессий>-quality/<пользователь>-<дата>.json — один пользователь за период.
+ * Типизация выхода session-quality: формат session-quality/6.
+ * Итог: <id>.quality.json рядом с выгрузкой сессии <id>.json — одна сессия.
  * Источник правды — session-quality.schema.json и contract.py; этот файл — их описание для чтения.
+ *
+ * Скор за период собирает дашборд из файлов сессий пользователя — суммами, а не средними:
+ *   метрика: value = Σ hits / Σ events по оценённым сессиям; events < params.min_events — не измерена;
+ *   балл метрики = округление(clamp((value − bad) / (good − bad), 0, 1) × 100);
+ *   скор = округление(Σ вес × балл / Σ вес) по измеренным метрикам; измерено меньше min_measured_weight % веса — скора нет;
+ *   есть сигнал фрода хотя бы в одной сессии — скор «не окончательный».
+ *   completion: у сессии с end_break = true, если следующая сессия того же пользователя началась не позже
+ *   params.continuation_hours после session.end, — к Σ hits прибавить 1 (работу продолжили, это не обрыв).
+ * Скоры сессий между собой не усредняют: в сессии бывает 2–5 мест решения.
  */
 
-/** Корень отчёта. */
-export interface SessionQualityReport {
-  schema: "session-quality/5";      // версия формата
-  generated_at: string;             // когда собран отчёт, ISO 8601 с поясом: "2026-10-27T15:00:00Z"
-  subject: Subject;                 // кого и за какой период оценили
-  params: Params;                   // с какими порогами считали
-  score: Score;                     // общий скор 0–100
-  metrics: Metric[];                // ровно 7 метрик (см. MetricId), из них складывается скор
+/** Корень выхода. */
+export type SessionQualityResult = ScoredResult | SkippedResult;
+
+export interface ResultBase {
+  schema: "session-quality/6";      // версия формата
+  generated_at: string;             // когда собран, ISO 8601 с поясом: "2026-10-27T15:00:00Z"
+  params: Params;                   // пороги, нужные дашборду для периода
   fraud: Fraud;                     // признаки нечестной работы: в скор не входят, но «замораживают» его
-  discipline: Discipline;           // посторонние темы: справочно, в скор не входят
   environment: Environment;         // сбои среды, не вина пользователя: справочно
-  sessions: Session[];              // все сессии из папки, и оценённые, и пропущенные
 }
 
-export interface Subject {
-  user: string;                     // логин пользователя
-  sessions_dir: string;             // папка с журналами, которую оценивали
-  period: { from: string; to: string } | null; // от начала самой ранней до конца самой поздней сессии; null — сессий нет
-  sessions_total: number;           // сколько сессий найдено
-  sessions_scored: number;          // сколько оценено; почему остальные пропущены — в sessions[].skip_reason
+/** Оценённая сессия: метрики и посторонние темы есть. */
+export interface ScoredResult extends ResultBase {
+  session: Session & { scored: true };
+  metrics: Metric[];                // ровно 7 метрик (см. MetricId)
+  discipline: Discipline;           // посторонние темы: справочно, в скор не входят
+}
+
+/** Сессия короче params min_user_turns реплик: метрик и посторонних тем нет, фрод и окружение есть. */
+export interface SkippedResult extends ResultBase {
+  session: Session & { scored: false; skip_reason: string };  // skip_reason: «меньше 3 реплик пользователя»
 }
 
 export interface Params {
-  file: string;                     // файл параметров (reference/params.json или свой через --params)
-  min_events: number;               // метрика считается, если событий в знаменателе не меньше этого
-  min_measured_weight: number;      // общий скор ставится, если измерено не меньше этого % веса метрик
+  min_events: number;               // метрика считается, если событий в знаменателе за период не меньше этого
+  min_measured_weight: number;      // скор за период ставится, если измерено не меньше этого % веса метрик
+  continuation_hours: number;       // окно продолжения для end_break, часов
 }
 
-/**
- * Общий скор — одно из трёх состояний, различать по status.
- * value = округление(Σ вес × балл / Σ вес) по измеренным метрикам.
- */
-export type Score =
-  | { status: "final"; value: number; reason: null; measured_weight: number }          // окончательный
-  | { status: "hold"; value: number; reason: string; measured_weight: number }         // посчитан, но не окончательный:
-                                                                                        //   есть сигнал фрода, нужна ручная проверка;
-                                                                                        //   reason: «фрод: сигналов к проверке — 1»
-  | { status: "insufficient"; value: null; reason: string; measured_weight: number };  // данных мало, скора нет: измерено
-                                                                                        //   меньше min_measured_weight % веса
-// measured_weight — какая доля веса метрик измерена, %.
+export interface Session {
+  id: string;                       // id сессии = имя файла выгрузки без .json
+  user: string;                     // логин из выгрузки; нет или несколько — --user, иначе имя папки сессий
+  start: string;                    // начало, ISO 8601
+  end: string;                      // конец, ISO 8601
+  duration_sec: number;             // длительность, секунды (= end − start)
+  user_turns: number;               // сколько реплик пользователя
+  skills: string[];                 // скиллы по порядку вызова
+  context_peak: number | null;      // наибольшая заполненность окна модели, 0–1; null — в журнале нет данных
+  scored: boolean;
+  skip_reason?: string;             // есть только у неоценённой
+}
 
 /** Метрика — измерена или нет, различать по status. */
 export type Metric = MeasuredMetric | UnmeasuredMetric;
 
 export interface MetricBase {
   id: MetricId;
+  hits: number;                     // числитель доли: у «больше — лучше» — хорошие события, у остальных — плохие
+  events: number;                   // знаменатель: мест решения, запусков, реплик
   good: number;                     // значение, при котором балл 100
   bad: number;                      // значение, при котором балл 0 (bad > good — значит «меньше — лучше»)
-  weight: number;                   // вес в общем скоре
+  weight: number;                   // вес в скоре
   source:
     | "script"                      // посчитал скрипт по журналу
     | "model"                       // нашла модель по смыслу, с цитатой
     | "script+model";               // скрипт по вердиктам модели
-  events: number;                   // сколько событий в знаменателе: мест решения, запусков, реплик
-  sessions_hit: number;             // в скольких оценённых сессиях метрика хуже good
-  evidence: QuoteEvidence[];        // примеры из журналов
+  end_break?: boolean;              // только у completion: последний запуск брошен в конце сессии (см. шапку)
+  evidence: QuoteEvidence[];        // примеры из журнала сессии
 }
 
 export interface MeasuredMetric extends MetricBase {
   status: "measured";
-  value: number;                    // сама доля, 0–1 (0.2 = 20 %)
-  score: number;                    // балл 0–100 = округление(clamp((value − bad) / (good − bad), 0, 1) × 100)
+  value: number;                    // hits / events, 0–1 (0.2 = 20 %), три знака
 }
 
 export interface UnmeasuredMetric extends MetricBase {
-  status: "not_measured";           // событий меньше min_events — в скор не входит
+  status: "not_measured";           // событий меньше min_events или нет ответа модели
   value: null;
-  score: null;
   reason: string;                   // почему не измерена
 }
 
 /**
  * «Место решения» — ответ пользователя на вопрос агента или на его длинный текст, где, по мнению модели, было что решать.
- * Пороги good / bad и веса — текущие из params.json; в отчёте у каждой метрики свои фактические значения.
+ * Пороги good / bad и веса — текущие из params.json; в выходе у каждой метрики свои фактические значения.
  */
 export type MetricId =
   | "active_review"   // «активная проверка»: доля мест решения, где пользователь включился по существу —
@@ -97,7 +106,6 @@ export type MetricId =
                       //   Больше — лучше; good 0.6, bad 0.2, вес 5.
 
 export interface QuoteEvidence {
-  session: string;                  // id сессии (есть в sessions[])
   turn: number;                     // номер записи в журнале сессии, с 1
   quote: string;                    // цитата из журнала, до 200 символов; секреты и длинные числа замаскированы (****)
   note?: string;                    // пояснение: «согласие через 3 с на 1833 симв. текста агента»
@@ -106,7 +114,7 @@ export interface QuoteEvidence {
 /** Фрод — есть сигналы или нет, различать по status. */
 export type Fraud =
   | { status: "none"; signals: [] }                    // сигналов нет
-  | { status: "to_review"; signals: FraudSignal[] };   // хотя бы один сигнал; тогда score.status = "hold"
+  | { status: "to_review"; signals: FraudSignal[] };   // хотя бы один сигнал — скор за период «не окончательный»
 
 export interface FraudSignal {
   kind:
@@ -116,19 +124,17 @@ export interface FraudSignal {
     | "autoinput";                  // автоматический ввод: одинаковые реплики подряд, ответы быстрее человека
                                     //   на длинные вопросы (пороги — в params.json)
   status: "to_review";              // всегда «к ручной проверке»: это сигнал, а не приговор
-  count: number;                    // сколько случаев
-  sessions: string[];               // в каких сессиях
+  count: number;                    // сколько случаев в сессии
   evidence: QuoteEvidence[];        // цитаты
 }
 
 export interface Discipline {
-  off_topic: OffTopic;              // посторонние темы в рабочих сессиях
+  off_topic: OffTopic;              // посторонние темы в рабочей сессии
 }
 
 export interface OffTopicBase {
   cases: number;                    // сколько эпизодов посторонних тем
   replies: number;                  // сколько реплик в них
-  sessions: string[];               // в каких сессиях
   evidence: TopicEvidence[];        // где и сколько, без цитат: личное не пересказывается
 }
 
@@ -138,7 +144,6 @@ export type OffTopic =
   | (OffTopicBase & { status: "not_measured"; reason: string });
 
 export interface TopicEvidence {
-  session: string;
   turn: number;                     // где эпизод начался
   category:
     | "personal"                    // личное
@@ -156,18 +161,3 @@ export interface Environment {      // чужие сбои, в скор не в�
 export type EnvValue =
   | { status: "measured"; value: number }                   // сколько раз
   | { status: "not_measured"; value: null; reason: string }; // reason: «нет поля в журнале»
-
-/** Сессия — оценена или пропущена, различать по scored. */
-export type Session =
-  | (SessionBase & { scored: true })
-  | (SessionBase & { scored: false; skip_reason: string });  // skip_reason: «меньше 3 реплик пользователя»
-
-export interface SessionBase {
-  id: string;                       // id сессии
-  start: string;                    // начало, ISO 8601
-  end: string;                      // конец, ISO 8601
-  duration_sec: number;             // длительность, секунды (= end − start)
-  user_turns: number;               // сколько реплик пользователя
-  skills: string[];                 // скиллы по порядку вызова
-  context_peak: number | null;      // наибольшая заполненность окна модели, 0–1; null — в журнале нет данных
-}

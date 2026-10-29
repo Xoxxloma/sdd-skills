@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""merge — последний шаг оценки: строки collect + ответы модели по рубрикам → specs-quality/2.
+"""merge — последний шаг оценки: строки collect + ответы модели по рубрикам → specs-quality/5 по каждому документу.
 
     python3 merge.py --work <папка collect> [--keep-work]
     python3 merge.py --work <папка collect> --check   # какие ответы перезапустить: нет файла, не JSON, не по схеме
 
-В --work лежат collect.json и задания (их пишет collect) и <id>.findings.txt — ответ модели как есть. Пишет итог по
-пути из collect.json, проверенный contract.py; после записи удаляет --work (с --keep-work — оставляет). Выход не
-прошёл contract — итог не пишется, папка остаётся для разбора. На экран — что поправлено в ответах и список
-«Требуют внимания».
+В --work лежат collect.json и задания (их пишет collect) и <id>.findings.txt — ответ модели как есть. Пишет рядом с
+каждым документом <имя>.quality.json, проверенный contract.py; после записи удаляет --work (с --keep-work — оставляет).
+Хоть один выход не прошёл contract — не пишется ни один, папка остаётся для разбора. На экран — что поправлено в
+ответах и список «Требуют внимания».
 
 Модель ничего не считает: итог, нули, форму, происхождение и подсветку считает contract.py по params.json. Ответ
 разбирается терпимо: последний JSON в тексте; элемент criteria с чужим id отбрасывается, повтор id — берётся
@@ -132,15 +132,15 @@ def cut(text, limit, log, where):
 num = contract.num
 
 
-def head(meta, row):
-    """Общие поля документа: путь, вид, ключ и название строки, автор, документ сверху."""
+def head(meta, row, repo):
+    """Общие поля документа: путь, репозиторий, вид, ключ и название строки, автор, документ сверху."""
     source = meta["source"]["path"] if meta["source"] else None
-    return {"path": meta["path"], "kind": meta["kind"], "key": row["key"], "feature": row["feature"], "author": meta["author"],
-            "source": source}
+    return {"path": meta["path"], "repo": repo, "kind": meta["kind"], "key": row["key"], "feature": row["feature"],
+            "author": meta["author"], "source": source}
 
 
-def failed_document(meta, row, reason):
-    return {**head(meta, row), "scored": False, "skip_reason": reason}
+def failed_document(meta, row, repo, reason):
+    return {**head(meta, row, repo), "scored": False, "skip_reason": reason}
 
 
 def finding(criterion_id, item, haystack, log):
@@ -167,7 +167,7 @@ def finding(criterion_id, item, haystack, log):
     return result
 
 
-def scored_document(meta, row, answer, cfg, haystack, log):
+def scored_document(meta, row, repo, answer, cfg, haystack, log):
     kind = meta["kind"]
     weights = params.weights(cfg, kind)
     criteria, findings = {}, []
@@ -205,7 +205,7 @@ def scored_document(meta, row, answer, cfg, haystack, log):
             code_signs.append(item)
 
     points, maximum, pct = contract.total(criteria, weights)
-    document = {**head(meta, row), "scored": True, "pct": pct, "sum": num(points), "max": num(maximum), "criteria": criteria,
+    document = {**head(meta, row, repo), "scored": True, "pct": pct, "sum": num(points), "max": num(maximum), "criteria": criteria,
                 "attention": [], "template": template["flag"], "form_missing": form_missing, "form_pct": None, "origin": origin,
                 "code_signs": code_signs, "findings": findings}
     document["form_pct"] = contract.form_pct(document)
@@ -235,13 +235,15 @@ def check_answers(work):
 
 
 def build(work, now=None):
-    """→ (документ specs-quality/2, лог поправок, collect)."""
+    """→ ([(строка документа collect, выход specs-quality/5)], лог поправок, collect)."""
     collected = json.loads(read(os.path.join(work, "collect.json")))
     cfg = params.load(collected["params"])
     schema = json.loads(read(FINDINGS_SCHEMA_PATH))
-    root = collected["root"]
+    root, repo = collected["root"], collected["repo"]
+    stamp = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    weights = {kind: params.weights(cfg, kind) for kind in params.KINDS}
     row_of = {cell["document"]: row for row in collected["rows"] for cell in (row["bt"], row["spec"]) if "document" in cell}
-    documents, log = [], []
+    outputs, log = [], []
     for meta in collected["documents"]:
         doc_log = []
         row = row_of[meta["path"]]
@@ -253,77 +255,48 @@ def build(work, now=None):
             haystack = read(os.path.join(root, meta["path"]))
             if meta["source"] and meta["source"]["path"]:
                 haystack += "\n" + read(os.path.join(root, meta["source"]["path"]))
-            document = scored_document(meta, row, answer, cfg, normalize(haystack), doc_log)
+            document = scored_document(meta, row, repo, answer, cfg, normalize(haystack), doc_log)
         except Failed as error:
-            document = failed_document(meta, row, str(error))
+            document = failed_document(meta, row, repo, str(error))
             doc_log.append(f"оценка не состоялась: {error}")
-        documents.append(document)
+        outputs.append((meta, contract.result(document, cfg["attention"]["below_pct"], cfg["attention"]["form_min_missing"],
+                                              weights, stamp)))
         log += [f"{meta['path']}: {line}" for line in doc_log]
-
-    stamp = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    weights = {kind: params.weights(cfg, kind) for kind in params.KINDS}
-    doc = {
-        "schema": "specs-quality/4",
-        "generated_at": stamp,
-        "subject": {"documents_dir": collected["documents_dir"], "team": collected["team"], "repo": collected["repo"],
-                    "documents_total": len(documents), "documents_scored": sum(1 for d in documents if d["scored"]),
-                    "documents_attention": sum(1 for d in documents if d["scored"] and d["attention"])},
-        "params": {"file": collected["params"], "below_pct": cfg["attention"]["below_pct"],
-                   "form_min_missing": cfg["attention"]["form_min_missing"],
-                   "weights": weights},
-        "people": contract.people_summary(documents, weights),
-        "documents": documents,
-    }
-    return doc, log, collected
+    return outputs, log, collected
 
 
 # ---------------------------------------------------------------- запись
 
 
-HEAD_KEYS = ("path", "kind", "key", "feature", "author", "source")
+HEAD_KEYS = ("path", "repo", "kind", "key", "feature", "author", "source")
 
 
-def dump(doc):
-    """JSON для чтения глазами: документ — несколько строк, короткие объекты и списки — в строку, находка — строка."""
+def dump(output):
+    """JSON для чтения глазами: короткие объекты и списки — в строку, находка и признак кода — строка."""
     j = lambda value: json.dumps(value, ensure_ascii=False)  # noqa: E731
 
-    def pairs(document, keys):
-        return ", ".join(f"{j(key)}: {j(document[key])}" for key in keys)
+    def pairs(item, keys):
+        return ", ".join(f"{j(key)}: {j(item[key])}" for key in keys)
 
-    def block(document):
-        lines = ["  {" + pairs(document, HEAD_KEYS) + ","]
-        if not document["scored"]:
-            lines.append("   " + pairs(document, ("scored", "skip_reason")) + "}")
-            return "\n".join(lines)
-        lines.append("   " + pairs(document, ("scored", "pct", "sum", "max")) + ",")
-        lines.append("   " + pairs(document, ("criteria",)) + ",")
-        lines.append("   " + pairs(document, ("attention", "template", "form_missing", "form_pct", "origin")) + ",")
-        lines.append("   " + pairs(document, ("code_signs",)) + ",")
-        if document["findings"]:
-            lines.append('   "findings": [')
-            lines.append(",\n".join("    " + j(item) for item in document["findings"]))
-            lines.append("   ]}")
-        else:
-            lines.append('   "findings": []}')
-        return "\n".join(lines)
+    def listed(name, items, last):
+        if not items:
+            return [f'  "{name}": []' + ("}" if last else ",")]
+        return [f'  "{name}": [', ",\n".join("   " + j(item) for item in items), "  ]" + ("}" if last else ",")]
 
-    def person(item):
-        return "  {" + pairs(item, ("user",)) + ",\n   " + pairs(item, ("bt",)) + ",\n   " + pairs(item, ("spec",)) + "}"
-
-    text = "\n".join([
-        "{",
-        " " + pairs(doc, ("schema", "generated_at")) + ",",
-        " " + pairs(doc, ("subject",)) + ",",
-        " " + pairs(doc, ("params",)) + ",",
-        ' "people": [',
-        ",\n".join(person(item) for item in doc["people"]),
-        " ],",
-        ' "documents": [',
-        ",\n".join(block(document) for document in doc["documents"]),
-        " ]",
-        "}",
-    ]) + "\n"
-    if json.loads(text) != doc:  # раскладка не должна терять поля
+    document = output["document"]
+    lines = ["{", " " + pairs(output, ("schema", "generated_at")) + ",", " " + pairs(output, ("params",)) + ",",
+             ' "document": {' + pairs(document, HEAD_KEYS) + ","]
+    if not document["scored"]:
+        lines.append("  " + pairs(document, ("scored", "skip_reason")) + "}")
+    else:
+        lines.append("  " + pairs(document, ("scored", "pct", "sum", "max")) + ",")
+        lines.append("  " + pairs(document, ("criteria",)) + ",")
+        lines.append("  " + pairs(document, ("attention", "template", "form_missing", "form_pct", "origin")) + ",")
+        lines += listed("code_signs", document["code_signs"], False) if document["code_signs"] is not None \
+            else ['  "code_signs": null,']
+        lines += listed("findings", document["findings"], True)
+    text = "\n".join(lines + ["}"]) + "\n"
+    if json.loads(text) != output:  # раскладка не должна терять поля
         raise ValueError("раскладка итога разошлась с документом")
     return text
 
@@ -331,9 +304,9 @@ def dump(doc):
 # ---------------------------------------------------------------- экран
 
 
-def attention_lines(doc, cfg_labels):
+def attention_lines(documents, cfg_labels):
     lines = []
-    for document in doc["documents"]:
+    for document in documents:
         if not document["scored"] or not document["attention"]:
             continue
         kind = document["kind"]
@@ -371,18 +344,22 @@ def main(argv=None):
             print(f"- {meta['id']}: {reason}\n  задание: {os.path.join(work, meta['task'])}\n  ответ: {os.path.join(work, meta['answer'])}")
         return 0
     try:
-        doc, log, collected = build(work)
+        outputs, log, collected = build(work)
+        texts = [dump(output) for _meta, output in outputs]
     except (OSError, ValueError, params.ParamsError) as error:
         print(f"Не собрать итог: {error}")
         return 2
     out_schema = json.loads(read(contract.SCHEMA_PATH))
-    errors = contract.check_schema_keywords(out_schema) + contract.check_document(doc, out_schema)
+    errors = contract.check_schema_keywords(out_schema)
+    for meta, output in outputs:
+        errors += [f"{meta['path']}: {error}" for error in contract.check_document(output, out_schema)]
     if errors:
-        print("Выход не прошёл contract.py — итог не записан, рабочая папка оставлена:")
+        print("Выход не прошёл contract.py — итоги не записаны, рабочая папка оставлена:")
         print("\n".join(errors))
         return 1
-    with open(collected["output"], "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(dump(doc))
+    for (meta, _output), text in zip(outputs, texts):
+        with open(os.path.join(collected["root"], meta["output"]), "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
     work_left = False
     if not args.keep_work:
         for _ in range(6):  # на Windows папку ненадолго держит сканер или чужой процесс
@@ -394,13 +371,14 @@ def main(argv=None):
 
     cfg = params.load(collected["params"])
     labels = {kind: {cid: params.label(cfg, kind, cid) for cid in params.CRITERIA[kind]} for kind in params.KINDS}
-    subject = doc["subject"]
-    print(f"Итог: {collected['output']}")
+    documents = [output["document"] for _meta, output in outputs]
+    scored = sum(1 for d in documents if d["scored"])
+    print(f"Итоги: рядом с каждым документом — <имя>.quality.json, файлов {len(outputs)}")
     if work_left:
-        print(f"Рабочая папка не удалена — её держит другой процесс: {work}. Итог записан; папку можно удалить руками.")
-    print(f"Документов: {subject['documents_total']}, оценено: {subject['documents_scored']}, "
-          f"не состоялось: {subject['documents_total'] - subject['documents_scored']}, требуют внимания: {subject['documents_attention']}")
-    unverified = sum(1 for d in doc["documents"] if d["scored"] for item in d["findings"] if item.get("quote_found") is False)
+        print(f"Рабочая папка не удалена — её держит другой процесс: {work}. Итоги записаны; папку можно удалить руками.")
+    print(f"Документов: {len(documents)}, оценено: {scored}, не состоялось: {len(documents) - scored}, "
+          f"требуют внимания: {sum(1 for d in documents if d['scored'] and d['attention'])}")
+    unverified = sum(1 for d in documents if d["scored"] for item in d["findings"] if item.get("quote_found") is False)
     if unverified:
         print(f"Цитат не найдено в тексте документа: {unverified} (quote_found: false, баллы не менялись)")
     if log:
@@ -408,7 +386,7 @@ def main(argv=None):
         print("\n".join("  " + line for line in log))
     print("")
     print("Требуют внимания:")
-    lines = attention_lines(doc, labels)
+    lines = attention_lines(documents, labels)
     print("\n".join(lines) if lines else "Сильно некачественных документов нет.")
     return 0
 

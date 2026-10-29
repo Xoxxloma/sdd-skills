@@ -59,7 +59,7 @@ def docs_by_path(data):
 
 def fixture_checks(base):
     root = fixture_repo(base)
-    data = collect.collect("coddoc/", root, team="Команда А", repo="pss", today=TODAY)
+    data = collect.collect("coddoc/", root, repo="pss", today=TODAY)
     rows, docs = rows_by_folder(data), docs_by_path(data)
     check("фикстура: строк", len(rows) == 11, sorted(rows))
     check("фикстура: документов", len(docs) == 17, len(docs))
@@ -94,8 +94,9 @@ def fixture_checks(base):
           rows["coddoc/PSS-2214"]["feature"])
     check("фикстура: название по спеке, если БТ нет", rows["coddoc/PSS-2215"]["feature"] == "PSS-2215 — Техническое решение",
           rows["coddoc/PSS-2215"]["feature"])
-    check("фикстура: итог и работа", data["output"].endswith(f"specs-quality-{TODAY}.json") and data["work"].endswith(f"specs-quality-{TODAY}.work"),
-          (data["output"], data["work"]))
+    check("фикстура: работа в корне, итог — рядом с документом", data["work"] == os.path.join(root, f"specs-quality-{TODAY}.work") and
+          all(d["output"] == d["path"][:-len(".md")] + ".quality.json" for d in data["documents"]),
+          (data["work"], [d["output"] for d in data["documents"]][:2]))
     tasks = sorted(f for f in os.listdir(data["work"]) if f.endswith(".task.txt"))
     check("фикстура: задание на документ", len(tasks) == 17, len(tasks))
     spec_task = next(d for d in data["documents"] if d["path"].endswith("PSS-2215/technical_specification.md"))["task"]
@@ -105,26 +106,30 @@ def fixture_checks(base):
           "Источник требований: нет документа сверху." in text and "только JSON" in text, text)
     with open(os.path.join(data["work"], "collect.json"), encoding="utf-8") as handle:
         saved = json.load(handle)
-    check("фикстура: collect.json", saved["team"] == "Команда А" and saved["repo"] == "pss" and len(saved["documents"]) == 17, "")
+    check("фикстура: collect.json", saved["repo"] == "pss" and "team" not in saved and len(saved["documents"]) == 17, "")
     check("фикстура: documents_dir — папка поиска от корня", saved["documents_dir"] == "coddoc", saved["documents_dir"])
     check("фикстура: в coddoc ничего не создано", sorted(os.listdir(os.path.join(root, "coddoc"))) == sorted(os.listdir(specs_cases.FIXTURE)), "")
 
     again = collect.collect("coddoc/", root, today=TODAY)
-    check("повтор: суффикс -2", again["output"].endswith(f"specs-quality-{TODAY}-2.json") and again["work"].endswith(f"-{TODAY}-2.work"),
-          again["output"])
+    check("повтор: суффикс -2", again["work"].endswith(f"specs-quality-{TODAY}-2.work"), again["work"])
 
     by_root = collect.collect(root, base, today="2026-10-29")
     check("вход корнем репо", len(by_root["rows"]) == 11 and by_root["documents_dir"] == "." and
-          by_root["output"] == os.path.join(root, "specs-quality-2026-10-29.json"), (len(by_root["rows"]), by_root["documents_dir"]))
+          by_root["work"] == os.path.join(root, "specs-quality-2026-10-29.work"), (len(by_root["rows"]), by_root["documents_dir"]))
     feature = collect.collect(os.path.join(root, "coddoc", "ARS-100"), base, today="2026-10-30")
     check("вход папкой эпика — с детьми и фундаментом", sorted(rows_by_folder(feature)) ==
           ["coddoc/ARS-100", "coddoc/ARS-100/ARS-101", "coddoc/ARS-100/_foundation"], sorted(rows_by_folder(feature)))
     single = collect.collect(os.path.join(root, "coddoc", "PSS-2210", "business_requirements.md"), base, today="2026-10-31")
-    check("вход файлом — его папка", sorted(rows_by_folder(single)) == ["coddoc/PSS-2210"] and len(single["documents"]) == 2 and
-          single["documents_dir"] == "coddoc/PSS-2210", (sorted(rows_by_folder(single)), single["documents_dir"]))
+    check("вход файлом — только он", sorted(rows_by_folder(single)) == ["coddoc/PSS-2210"] and
+          [d["path"] for d in single["documents"]] == ["coddoc/PSS-2210/business_requirements.md"] and
+          single["documents_dir"] == "coddoc/PSS-2210", ([d["path"] for d in single["documents"]], single["documents_dir"]))
+    spec_only = collect.collect(os.path.join(root, "coddoc", "PSS-2210", "technical_specification.md"), base, today="2026-11-02")
+    check("вход файлом спеки — БТ рядом остаётся источником", [d["path"] for d in spec_only["documents"]] ==
+          ["coddoc/PSS-2210/technical_specification.md"] and spec_only["documents"][0]["source"] ==
+          {"kind": "bt", "path": "coddoc/PSS-2210/business_requirements.md"}, spec_only["documents"])
     keyed = collect.collect("ARS-101", root, today="2026-11-01")
     check("вход ключом ребёнка эпика", sorted(rows_by_folder(keyed)) == ["coddoc/ARS-100/ARS-101"], sorted(rows_by_folder(keyed)))
-    check("вход папкой фичи — итог в корне репо", feature["output"] == os.path.join(root, "specs-quality-2026-10-30.json"), feature["output"])
+    check("вход папкой фичи — работа в корне репо", feature["work"] == os.path.join(root, "specs-quality-2026-10-30.work"), feature["work"])
 
 
 def any_folder_checks(base):
@@ -136,16 +141,16 @@ def any_folder_checks(base):
     data = collect.collect("specs", repo, today="2026-10-28")
     check("любая папка: документы найдены", sorted(rows_by_folder(data)) == ["specs/PSS-2210"] and len(data["documents"]) == 2,
           sorted(rows_by_folder(data)))
-    check("любая папка: итог в корне репо", data["output"] == os.path.join(repo, "specs-quality-2026-10-28.json") and
-          data["documents_dir"] == "specs", (data["output"], data["documents_dir"]))
+    check("любая папка: работа в корне репо", data["work"] == os.path.join(repo, "specs-quality-2026-10-28.work") and
+          data["documents_dir"] == "specs", (data["work"], data["documents_dir"]))
     whole = collect.collect(repo, base, today="2026-10-29")
     check("скрытая папка с копией не сканируется", sorted(rows_by_folder(whole)) == ["specs/PSS-2210"], sorted(rows_by_folder(whole)))
 
     loose = os.path.join(base, "no-git", "docs")
     shutil.copytree(os.path.join(specs_cases.FIXTURE, "ARS-312"), os.path.join(loose, "ARS-312"))
     alone = collect.collect(loose, base, today="2026-10-28")
-    check("без git: итог рядом с папкой входа, не внутри", alone["output"] == os.path.join(base, "no-git", "specs-quality-2026-10-28.json") and
-          sorted(rows_by_folder(alone)) == ["docs/ARS-312"], (alone["output"], sorted(rows_by_folder(alone))))
+    check("без git: работа рядом с папкой входа, не внутри", alone["work"] == os.path.join(base, "no-git", "specs-quality-2026-10-28.work") and
+          sorted(rows_by_folder(alone)) == ["docs/ARS-312"], (alone["work"], sorted(rows_by_folder(alone))))
 
 
 def synthetic_checks(base):
@@ -180,7 +185,8 @@ def synthetic_checks(base):
 
     for name, raw, piece in (("ссылка", "https://git.example/repo", "нужен путь к локальному клону"),
                              ("пусто", "  ", "Не передан путь"), ("нет пути", "coddoc/NOPE/x.md", "Нет такого пути"),
-                             ("чужой файл", "coddoc/SYN-1/notes.txt", "не БТ"), ("ключа нет", "SYN-9", "Папки SYN-9")):
+                             ("чужой файл", "coddoc/SYN-1/notes.txt", "не БТ"), ("ключа нет", "SYN-9", "Папки SYN-9"),
+                             ("баг-репорт файлом", "coddoc/SYN-1/bug_report.md", "не БТ и не спека")):
         if name == "чужой файл":
             write(root, "coddoc/SYN-1/notes.txt", "x")
         try:

@@ -7,8 +7,8 @@
 Рабочая папка: моки (mocks.build) в sessions/user-01, скилл — в .claude/skills/session-quality. Ведущий запускается
 через `claude -p "/session-quality sessions/user-01 --parallel N"` в обычном режиме разрешений и только с теми
 инструментами, что нужны скиллу: чтение и запись файлов, поиск файлов, субагенты и `python` в терминале — остальное
-запрещено. Оценка — после завершения прогона, по файлам: JSON и отчёт есть и проходят contract.py; ответов субагентов
-столько же, сколько сессий; заложенное найдено (как в grade_brief); одновременно работало не больше N субагентов;
+запрещено. Оценка — после завершения прогона, по файлам: рядом с каждой сессией <id>.quality.json и .md, каждый JSON
+проходит contract.py, рабочая папка .quality-work убрана; ответов субагентов столько же, сколько сессий; заложенное найдено (как в grade_brief); одновременно работало не больше N субагентов;
 ведущий не читал журналы сам. Стоимость — total_cost_usd. Всё — в product/ (вне Git): в моках рабочие диалоги.
 """
 
@@ -55,8 +55,8 @@ def read_stream(path):
 
 def grade(run_dir, parallel):
     ws = os.path.join(run_dir, "ws")
-    quality = os.path.join(ws, "sessions", "user-01-quality")
-    work = os.path.join(quality, "work")
+    sessions = os.path.join(ws, "sessions", "user-01")
+    work = os.path.join(sessions, collect.WORK_DIR)
     expected = grade_brief.load_expected(os.path.join(run_dir, "expected.json"))
     events = read_stream(os.path.join(run_dir, "stream.jsonl"))
     lines, problems = [], []
@@ -89,17 +89,24 @@ def grade(run_dir, parallel):
     if reads:
         problems.append(f"ведущий сам читал журналы: {len(reads)} раз")
 
-    reports = glob.glob(os.path.join(quality, "user-01-*.json"))
-    if not reports or not glob.glob(os.path.join(quality, "user-01-*.md")):
-        problems.append("нет итогового JSON или отчёта")
-    else:
-        with open(reports[0], encoding="utf-8") as handle:
+    with open(os.path.join(SKILL, "reference", "session-quality.schema.json"), encoding="utf-8") as handle:
+        out_schema = json.load(handle)
+    for session_id in sorted(expected):
+        base = os.path.join(sessions, f"{session_id}.quality")
+        if not os.path.exists(base + ".json") or not os.path.exists(base + ".md"):
+            problems.append(f"{session_id}: нет итога рядом с сессией (.quality.json и .quality.md)")
+            continue
+        with open(base + ".json", encoding="utf-8") as handle:
             doc = json.load(handle)
-        with open(os.path.join(SKILL, "reference", "session-quality.schema.json"), encoding="utf-8") as handle:
-            errors = contract.check_document(doc, json.load(handle))
+        errors = contract.check_document(doc, out_schema)
         if errors:
-            problems.append(f"выход не проходит contract.py: {errors[:3]}")
-        lines.append(f"скор: {doc['score']['value']} ({doc['score']['status']}), сигналов фрода: {len(doc['fraud']['signals'])}")
+            problems.append(f"{session_id}: выход не проходит contract.py: {errors[:3]}")
+        completion = next((item for item in doc.get("metrics", []) if item["id"] == "completion"), {})
+        lines.append(f"{session_id}: оценена {'да' if doc['session']['scored'] else 'нет'}, сигналов фрода: {len(doc['fraud']['signals'])}"
+                     + (", обрыв в конце сессии" if completion.get("end_break") else ""))
+    strays = glob.glob(os.path.join(ws, "sessions", "*-quality"))
+    if strays:
+        problems.append(f"итог в отдельной папке вместо места рядом с сессиями: {strays}")
 
     if os.path.isdir(work):
         problems.append("рабочая папка не убрана после отчёта")
@@ -107,7 +114,7 @@ def grade(run_dir, parallel):
         schema = json.load(handle)
     journals = tempfile.mkdtemp(prefix="sq-skill-journals-")  # те же журналы, что видели субагенты
     with contextlib.redirect_stdout(io.StringIO()):
-        collect.main(["--sessions", os.path.join(ws, "sessions", "user-01"), "--out", journals])
+        collect.main(["--sessions", sessions, "--out", journals])
     planted_ok = 0
     for session_id in sorted(expected):
         if session_id not in written:

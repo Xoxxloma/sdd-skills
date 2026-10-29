@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """collect — первый шаг оценки: выгрузки сессий → сжатые журналы для модели и факты для merge.
 
-    python3 collect.py --sessions <папка с *.json> --out <рабочая папка> [--user имя] [--context-window N]
+    python3 collect.py --sessions <id>.json | <папка с *.json> [--out <рабочая папка>] [--user имя] [--context-window N]
                        [--params <файл параметров>]
 
 Один файл `<id>.json` — одна сессия, выгрузка событий хуков агента (SessionFile: массив events с eventName
 START_SESSION, USER_PROMPT, ASSISTANT_ANSWER, ASK_USER_QUESTION, SKILL_USE, STOP_FAILURE). Вызовов инструментов и
-промежуточных реплик агента в выгрузке нет: агент виден последним сообщением за ход. В --out пишет:
+промежуточных реплик агента в выгрузке нет: агент виден последним сообщением за ход. Вход — одна выгрузка или папка;
+итоги прошлого запуска <id>.quality.json в папке — не сессии. В --out (по умолчанию .quality-work рядом с сессиями) пишет:
   <id>.journal.txt — сжатый журнал: одна строка на событие, [N] — номер события в выгрузке;
   <id>.facts.json  — числа и кандидаты по сессии для merge;
   collect.json     — список сессий, пропущенные файлы и сверка полей журнала.
@@ -187,6 +188,8 @@ def read_export(path):
 
 
 WORK_SUFFIXES = (".journal.txt", ".facts.json", ".findings.txt")
+WORK_DIR = ".quality-work"  # рабочая папка по умолчанию — рядом с сессиями; merge убирает её после записи итогов
+OUTPUT_SUFFIXES = (".quality.json", ".quality.md", ".quality.log.txt")  # итоги merge рядом с выгрузкой — не сессии
 WORK_NAMES = ("collect.json", "merge-log.txt")
 
 
@@ -566,8 +569,8 @@ def collect_session(path, session_id, out_dir, context_window):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Выгрузки сессий → сжатые журналы и факты для merge.")
-    parser.add_argument("--sessions", required=True, help="папка с выгрузками сессий одного пользователя (*.json)")
-    parser.add_argument("--out", required=True, help="рабочая папка вне репозитория")
+    parser.add_argument("--sessions", required=True, help="выгрузка одной сессии (<id>.json) или папка с выгрузками (*.json)")
+    parser.add_argument("--out", default=None, help="рабочая папка; по умолчанию — .quality-work рядом с сессиями")
     parser.add_argument("--user", default=None, help="имя пользователя (по умолчанию — login из выгрузки или имя папки)")
     parser.add_argument("--context-window", type=int, default=None, help="окно модели в токенах вместо context_window")
     parser.add_argument("--params", default=None, help="файл параметров (по умолчанию reference/params.json)")
@@ -582,18 +585,27 @@ def main(argv=None):
         print(f"Параметры не годятся: {error}", file=sys.stderr)
         return 2
 
-    if not os.path.isdir(cfg.sessions):
-        print(f"Нет папки с сессиями: {cfg.sessions}", file=sys.stderr)
+    source = os.path.abspath(cfg.sessions)
+    if os.path.isfile(source):
+        if not source.endswith(".json") or source.endswith(OUTPUT_SUFFIXES):
+            print(f"Не выгрузка сессии: {cfg.sessions}", file=sys.stderr)
+            return 2
+        folder, names = os.path.dirname(source), [os.path.basename(source)]
+    elif os.path.isdir(source):
+        folder, names = source, sorted(os.listdir(source))
+    else:
+        print(f"Нет такой сессии или папки: {cfg.sessions}", file=sys.stderr)
         return 2
+    cfg.out = cfg.out or os.path.join(folder, WORK_DIR)
     os.makedirs(cfg.out, exist_ok=True)
     stale = clean_work(cfg.out)
     window = cfg.context_window or CONTEXT_WINDOW
 
     sessions, skipped = [], []
     totals = {}
-    for name in sorted(os.listdir(cfg.sessions)):
-        path = os.path.join(cfg.sessions, name)
-        if not os.path.isfile(path):
+    for name in names:
+        path = os.path.join(folder, name)
+        if not os.path.isfile(path) or name.endswith(OUTPUT_SUFFIXES):  # итоги прошлого запуска — не сессии
             continue
         if not name.endswith(".json"):
             skipped.append({"file": name, "reason": "не выгрузка сессии"})
@@ -606,18 +618,20 @@ def main(argv=None):
         for key, value in facts["hits"].items():
             totals[key] = totals.get(key, 0) + value
 
-    logins = sorted({login for facts in sessions for login in facts["logins"]})
-    user = cfg.user or (logins[0] if len(logins) == 1 else os.path.basename(os.path.normpath(cfg.sessions)))
     sessions.sort(key=lambda facts: (facts["start"], facts["session"]))
+
+    def user_of(facts):  # пользователь — у каждой сессии свой: логин из выгрузки, иначе --user, иначе имя папки
+        return cfg.user or (facts["logins"][0] if len(facts["logins"]) == 1 else os.path.basename(folder))
+
     summary = {
-        "user": user,
         "sessions_dir": cfg.sessions,
         "generated_at": iso(datetime.now(timezone.utc)),
         "params": {"file": cfg.params or params.DEFAULT_PATH, "min_user_turns": MIN_USER_TURNS,
                    "decision_min_chars": DECISION_MIN, "reading_speed": READING_SPEED, "human_speed": HUMAN_SPEED,
                    "journal_limit": JOURNAL_LIMIT, "context_window": window},
-        "sessions": [{"session": facts["session"], "scored": facts["scored"], "facts": f"{facts['session']}.facts.json",
-                      "journal": facts["journal"]["file"]} for facts in sessions],
+        "sessions": [{"session": facts["session"], "user": user_of(facts), "scored": facts["scored"],
+                      "facts": f"{facts['session']}.facts.json", "journal": facts["journal"]["file"],
+                      "output": os.path.join(folder, facts["session"] + ".quality")} for facts in sessions],
         "skipped_files": skipped,
         "hits": totals,
     }
@@ -630,7 +644,7 @@ def main(argv=None):
     if stale:
         print(f"Убрано файлов прошлого запуска: {stale}")
     print(f"Сжатых журналов длиннее {JOURNAL_LIMIT} симв.: {sum(1 for f in sessions if f['journal']['oversize'])}")
-    print(f"Куда записано: {cfg.out}")
+    print(f"Работа: {cfg.out}")
     events = sum(facts["events"] for facts in sessions)
     bad = sum(facts["bad_events"] for facts in sessions)
     print(f"Сверка событий (годных: {events}, битых: {bad}):")

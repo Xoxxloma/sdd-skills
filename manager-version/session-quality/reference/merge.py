@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""merge — последний шаг оценки: факты collect + находки модели → session-quality/5 и отчёт.
+"""merge — последний шаг оценки: факты collect + находки модели → session-quality/6 рядом с каждой сессией.
 
-    python3 merge.py --work <папка collect> --out <папка отчёта> [--date ГГГГ-ММ-ДД] [--params <файл>] [--keep-work]
+    python3 merge.py --work <папка collect> [--params <файл>] [--keep-work]
 
 В --work лежат collect.json, <id>.facts.json, <id>.journal.txt (их пишет collect) и <id>.findings.txt — ответ
-модели на brief.md как есть. Пишет в --out <user>-<дата>.json (проверен contract.py) и <user>-<дата>.md,
-в --work — merge-log.txt: что из ответов модели отброшено и почему.
+модели на brief.md как есть. Пишет рядом с выгрузкой каждой сессии <id>.quality.json (проверен contract.py),
+<id>.quality.md — отчёт со справочным скором сессии — и <id>.quality.log.txt: что из ответа модели отброшено и вердикты.
+Хоть один выход не прошёл contract — не пишется ни один, рабочая папка остаётся для разбора.
 
 Модель ничего не считает: доли, скоры и статусы считаются здесь, пороги и веса — из params.json (или --params).
 Находка модели без подтверждённой цитаты выпадает; у посторонней темы пересказ вырезается; битая находка
@@ -19,7 +20,7 @@ import json
 import os
 import re
 import sys
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 
 import collect
 import contract
@@ -43,7 +44,7 @@ CHECK_RE = re.compile(r"^- (\w+) \[(\d+)\]:")
 # ---------------------------------------------------------------- журнал и ответ модели
 
 
-VERDICTS_HEADER = "Вердикты (сессия [ход] проверка: вердикт):"
+VERDICTS_HEADER = "Вердикты ([ход] проверка: вердикт):"
 
 
 def parse_journal(text):
@@ -212,90 +213,61 @@ def apply_verification(work, session_id, found, log):
 # ---------------------------------------------------------------- метрики
 
 
-def parse_time(text):
-    return contract.parse_time(text)
-
-
 def share(part, whole):
     return round(part / whole, 3) if whole else None
 
 
-def worse(value, good, bad):
-    """Значение хуже нормы — с учётом направления метрики («больше — лучше» или наоборот)."""
-    return value is not None and (value > good if bad > good else value < good)
-
-
-def compute_metrics(scored, model, events, p, all_facts=None):
-    """scored — факты оценённых сессий; model — {id сессии: находки модели} по разобранным ответам;
-    events — события журналов, из них скрипт берёт цитаты для своих доказательств; all_facts — все сессии,
-    по ним видно продолжение работы в следующей сессии."""
-    all_facts = scored if all_facts is None else all_facts
+def compute_metrics(facts, found, events, p):
+    """Метрики одной оценённой сессии. found — находки модели (None — ответа нет или он не разобрался); events — события
+    её журнала, из них скрипт берёт цитаты для своих доказательств. hits — числитель доли, events — знаменатель:
+    за период дашборд складывает их по сессиям."""
     min_events, limit = params.value(p, "min_events"), params.value(p, "evidence_limit")
     threshold, reading = params.value(p, "loaded_context_share"), params.value(p, "reading_speed")
-    hours = params.value(p, "continuation_hours")
 
-    def metric(metric_id, value, count, per_session, evidence, reason):
+    def metric(metric_id, hits, count, evidence, reason, **extra):
         good, bad, weight = params.metric(p, metric_id)
+        value = share(hits, count) if hits is not None else None
         measured = value is not None and count >= min_events
         if value is not None and not measured:
             reason = f"мало событий: {count}, нужно от {min_events:g}"
-        item = {"id": metric_id, "status": "measured" if measured else "not_measured",
-                "value": value if measured else None,
-                "score": contract.metric_score(value, good, bad) if measured else None,
-                "good": good, "bad": bad, "weight": weight, "source": SOURCES[metric_id], "events": count,
-                "sessions_hit": sum(1 for value_ in per_session if worse(value_, good, bad)),
-                "evidence": evidence[:limit] if measured else []}
+        item = {"id": metric_id, "status": "measured" if measured else "not_measured", "value": value if measured else None,
+                "hits": hits or 0, "events": count, "good": good, "bad": bad, "weight": weight, "source": SOURCES[metric_id],
+                **extra, "evidence": evidence[:limit] if measured else []}
         if not measured:
             item["reason"] = reason
         return item
 
-    with_model = [facts for facts in scored if facts["session"] in model]
-    no_model = "нет разобранных ответов модели"
     out = {}
-
     # Места решения: вердикт модели делит их на «включился», «согласился», «отдал агенту», «ответил не на вопрос».
     # Выбор готового варианта — только в «не читая»: остальные три меряют ответы текстом, иначе меряли бы набор скиллов.
-    places, typed_places, picked = 0, 0, {kind: [] for kind in ("engaged", "blind", "delegated", "ignored")}
-    per_session = {kind: [] for kind in picked}
-    for facts in with_model:
-        verdicts = model[facts["session"]]["checks"]
+    if found is None:
+        for metric_id in ("active_review", "blind_confirms", "delegated", "ignored"):
+            out[metric_id] = metric(metric_id, None, 0, [], "нет разобранного ответа модели")
+    else:
+        verdicts = found["checks"]
         mine = [(item, verdicts[("decision", item["turn"])]) for item in facts["decisions"]
                 if verdicts.get(("decision", item["turn"])) not in (None, "no")]
         typed = [(item, verdict) for item, verdict in mine if not item.get("option")]
-        places += len(mine)
-        typed_places += len(typed)
-        session_picked = {
+        picked = {
             "engaged": [item for item, verdict in typed if verdict == "engaged"],
-            "blind": [item for item, verdict in mine if verdict == "accepted" and item["speed"] is not None
-                      and item["speed"] > reading],
+            "blind": [item for item, verdict in mine if verdict == "accepted" and item["speed"] is not None and item["speed"] > reading],
             "delegated": [item for item, verdict in typed if verdict == "delegated"],
             "ignored": [item for item, verdict in typed if verdict == "ignored"],
         }
-        for kind, items in session_picked.items():
-            picked[kind] += [(facts, item) for item in items]
-            per_session[kind].append(share(len(items), len(mine) if kind == "blind" else len(typed)))
-    notes = {"engaged": lambda item: "включился по существу",
-             "blind": lambda item: f"согласие через {item['seconds']:g} с на {item['agent_chars']} симв. текста агента",
-             "delegated": lambda item: "решение отдано агенту",
-             "ignored": lambda item: "ответ не на вопрос или предупреждение агента"}
-    for metric_id, kind in (("active_review", "engaged"), ("blind_confirms", "blind"), ("delegated", "delegated"),
-                            ("ignored", "ignored")):
-        whole = places if kind == "blind" else typed_places
-        out[metric_id] = metric(metric_id, share(len(picked[kind]), whole) if with_model else None, whole, per_session[kind],
-                                [{"session": facts["session"], "turn": item["turn"],
-                                  "quote": line_quote(events[facts["session"]], item["turn"]), "note": notes[kind](item)}
-                                 for facts, item in picked[kind]],
-                                no_model if not with_model else
-                                "не было мест решения" if kind == "blind" else "не было мест решения с ответом текстом")
+        notes = {"engaged": lambda item: "включился по существу",
+                 "blind": lambda item: f"согласие через {item['seconds']:g} с на {item['agent_chars']} симв. текста агента",
+                 "delegated": lambda item: "решение отдано агенту",
+                 "ignored": lambda item: "ответ не на вопрос или предупреждение агента"}
+        for metric_id, kind in (("active_review", "engaged"), ("blind_confirms", "blind"), ("delegated", "delegated"),
+                                ("ignored", "ignored")):
+            whole = len(mine) if kind == "blind" else len(typed)
+            out[metric_id] = metric(metric_id, len(picked[kind]), whole,
+                                    [{"turn": item["turn"], "quote": line_quote(events, item["turn"]), "note": notes[kind](item)}
+                                     for item in picked[kind]],
+                                    "не было мест решения" if kind == "blind" else "не было мест решения с ответом текстом")
 
     # Доведение до результата: запуск, кончившийся ошибкой, не в счёт; спорная концовка без вердикта модели — тоже.
-    order = sorted(all_facts, key=lambda facts: facts["start"])
-    next_start = {current["session"]: following["start"] for current, following in zip(order, order[1:])}
-
-    def continued(facts):
-        following = next_start.get(facts["session"])
-        return following is not None and (parse_time(following) - parse_time(facts["end"])).total_seconds() <= hours * 3600
-
+    # Последний запуск, брошенный в конце сессии, — обрыв с пометкой end_break: продолжение в следующей сессии видит дашборд.
     def run_break(run, verdicts):
         question = run["question"]
         if not run["replied"]:
@@ -308,62 +280,44 @@ def compute_metrics(scored, model, events, p, all_facts=None):
                 return "висит вопрос агента — без ответа работа не закончена"
         return None
 
-    units, done_total, broken, per_session_done = 0, 0, [], []
-    for facts in scored:
-        verdicts = model.get(facts["session"], {}).get("checks", {})
-        counted = done = 0
-        for index, run in enumerate(facts["runs"]):
-            if run["error_end"]:
-                continue
-            reason = run_break(run, verdicts)
-            if reason == UNDECIDED:
-                continue
-            if reason and index == len(facts["runs"]) - 1 and run["ended_by"] == "session_end" and continued(facts):
-                reason = None
-            counted += 1
-            if reason:
-                broken.append((facts, run, reason))
-            else:
-                done += 1
-        units += counted
-        done_total += done
-        per_session_done.append(share(done, counted))
+    verdicts = found["checks"] if found else {}
+    counted, done, broken, end_break = 0, 0, [], False
+    for index, run in enumerate(facts["runs"]):
+        if run["error_end"]:
+            continue
+        reason = run_break(run, verdicts)
+        if reason == UNDECIDED:
+            continue
+        counted += 1
+        if not reason:
+            done += 1
+            continue
+        at_end = index == len(facts["runs"]) - 1 and run["ended_by"] == "session_end"
+        end_break = end_break or at_end
+        broken.append((run, reason + ("; в конце сессии" if at_end else "")))
     out["completion"] = metric(
-        "completion", share(done_total, units), units, per_session_done,
-        [{"session": facts["session"], "turn": run["question"]["turn"] if run["question"] else run["turn"],
-          "quote": run["question"]["text"] if run["question"]
-          else event_quote(events[facts["session"]], run["turn"], ("СКИЛЛ",)),
-          "note": f"запуск {run['skill']}: {reason}"} for facts, run, reason in broken],
-        "не было запусков скиллов")
+        "completion", done, counted,
+        [{"turn": run["question"]["turn"] if run["question"] else run["turn"],
+          "quote": run["question"]["text"] if run["question"] else event_quote(events, run["turn"], ("СКИЛЛ",)),
+          "note": f"запуск {run['skill']}: {reason}"} for run, reason in broken],
+        "не было запусков скиллов", end_break=end_break)
 
     # Нагруженный контекст: новая работа в той же сессии — вызов скилла.
-    moments, per_session_loaded = [], []
-    for facts in scored:
-        session_id = facts["session"]
-        mine = [(run["turn"], run["context_share_before"], run["after_compression"],
-                 event_quote(events[session_id], run["turn"], ("СКИЛЛ",)), "вызов скилла") for run in facts["runs"]]
-        heavy = [moment for moment in mine if moment[2] or (moment[1] is not None and moment[1] > threshold)]
-        moments += [(session_id, moment, moment in heavy) for moment in mine]
-        per_session_loaded.append(share(len(heavy), len(mine)))
+    heavy = [run for run in facts["runs"]
+             if run["after_compression"] or (run["context_share_before"] is not None and run["context_share_before"] > threshold)]
 
-    def loaded_note(moment):
-        _turn, context, compressed, _quote, kind = moment
-        parts = ([f"контекст {round(context * 100)} % окна"] if context is not None else []) + \
-                (["после сжатия"] if compressed else [])
-        return f"{kind}: {', '.join(parts)}"
+    def loaded_note(run):
+        parts = ([f"контекст {round(run['context_share_before'] * 100)} % окна"] if run["context_share_before"] is not None else []) + \
+                (["после сжатия"] if run["after_compression"] else [])
+        return f"вызов скилла: {', '.join(parts)}"
 
-    heavy_all = [(session_id, moment) for session_id, moment, is_heavy in moments if is_heavy]
     out["loaded_context"] = metric(
-        "loaded_context", share(len(heavy_all), len(moments)), len(moments), per_session_loaded,
-        [{"session": session_id, "turn": moment[0], "quote": moment[3], "note": loaded_note(moment)}
-         for session_id, moment in sorted(heavy_all, key=lambda item: (item[0], item[1][0]))],
+        "loaded_context", len(heavy), len(facts["runs"]),
+        [{"turn": run["turn"], "quote": event_quote(events, run["turn"], ("СКИЛЛ",)), "note": loaded_note(run)} for run in heavy],
         "не было начал новой работы")
 
-    turns = sum(facts["user_turns"] for facts in scored)
-    inside = sum(run["user_turns"] for facts in scored for run in facts["runs"])
-    out["skill_share"] = metric("skill_share", share(inside, turns), turns,
-                                [share(sum(run["user_turns"] for run in facts["runs"]), facts["user_turns"]) for facts in scored],
-                                [], "нет реплик пользователя")
+    inside = sum(run["user_turns"] for run in facts["runs"])
+    out["skill_share"] = metric("skill_share", inside, facts["user_turns"], [], "нет реплик пользователя")
 
     assert set(out) == set(params.IMPLEMENTED_METRICS)
     return [out[metric_id] for metric_id in params.IMPLEMENTED_METRICS]
@@ -372,131 +326,97 @@ def compute_metrics(scored, model, events, p, all_facts=None):
 # ---------------------------------------------------------------- вне скора
 
 
-def fraud_signals(all_facts, model, events, p):
+def fraud_signals(facts, found, events, p):
     limit = params.value(p, "evidence_limit")
     repeat_min, fast_min = params.value(p, "autoinput_repeat_min"), params.value(p, "autoinput_fast_min")
     signals = []
     for kind in ("deception", "bypass"):
-        entries = []
-        for found in model.values():
-            entries += list(found[kind].values()) if kind == "bypass" else found[kind]
+        entries = (list(found[kind].values()) if kind == "bypass" else found[kind]) if found else []
         if entries:
             signals.append({"kind": kind, "status": "to_review", "count": len(entries),
-                            "sessions": sorted({entry["session"] for entry in entries}),
-                            "evidence": [{key: entry[key] for key in ("session", "turn", "quote")} for entry in entries[:limit]]})
+                            "evidence": [{key: entry[key] for key in ("turn", "quote")} for entry in entries[:limit]]})
 
-    places = []  # автоввод — только внутри одной сессии
-    for facts in all_facts:
-        streaks = [item for item in facts["repeat_streaks"] if item["count"] >= repeat_min]
-        fast = facts["fast"] if len(facts["fast"]) >= fast_min else []
-        places += [(facts["session"], item["turn"], f"одинаковая реплика {item['count']} раз подряд") for item in streaks]
-        places += [(facts["session"], item["turn"], f"ответ через {item['seconds']:g} с") for item in fast]
+    streaks = [item for item in facts["repeat_streaks"] if item["count"] >= repeat_min]
+    fast = facts["fast"] if len(facts["fast"]) >= fast_min else []
+    places = [(item["turn"], f"одинаковая реплика {item['count']} раз подряд") for item in streaks] + \
+             [(item["turn"], f"ответ через {item['seconds']:g} с") for item in fast]
     if places:
         signals.append({"kind": "autoinput", "status": "to_review", "count": len(places),
-                        "sessions": sorted({session for session, _turn, _note in places}),
-                        "evidence": [{"session": session, "turn": turn, "quote": line_quote(events[session], turn), "note": note}
-                                     for session, turn, note in places[:limit]]})
+                        "evidence": [{"turn": turn, "quote": line_quote(events, turn), "note": note} for turn, note in places[:limit]]})
     return signals
 
 
-def discipline(all_facts, model, p):
+def discipline(found, p):
     limit = params.value(p, "evidence_limit")
-    blocks = [block for facts in all_facts if facts["session"] in model for block in model[facts["session"]]["off_topic"]]
-    topic = {"status": "measured" if model else "not_measured", "cases": len(blocks),
+    blocks = found["off_topic"] if found else []
+    topic = {"status": "measured" if found is not None else "not_measured", "cases": len(blocks),
              "replies": sum(len(block["covered"]) for block in blocks),
-             "sessions": sorted({block["session"] for block in blocks}),
-             "evidence": [{key: block[key] for key in ("session", "turn", "category", "turns")} for block in blocks[:limit]]}
-    if not model:
-        topic["reason"] = "нет разобранных ответов модели"
+             "evidence": [{key: block[key] for key in ("turn", "category", "turns")} for block in blocks[:limit]]}
+    if found is None:
+        topic["reason"] = "нет разобранного ответа модели"
     return {"off_topic": topic}
 
 
-def environment(all_facts):
-    def env(values, missing):
-        values = [value for value in values if value is not None]
-        if not values:
+def environment(facts):
+    def env(value, missing):
+        if value is None:
             return {"status": "not_measured", "value": None, "reason": missing}
-        return {"status": "measured", "value": sum(values)}
+        return {"status": "measured", "value": value}
 
     return {
-        "tool_errors": env([facts["environment"]["tool_errors"] for facts in all_facts], "в выгрузке нет вызовов инструментов"),
-        "api_errors": env([facts["environment"]["api_errors"] for facts in all_facts], "в журнале нет записей об ошибках API"),
-        "compressions": env([len(facts["compressions"]) for facts in all_facts], "нет данных"),
+        "tool_errors": env(facts["environment"]["tool_errors"], "в выгрузке нет вызовов инструментов"),
+        "api_errors": env(facts["environment"]["api_errors"], "в журнале нет записей об ошибках API"),
+        "compressions": env(len(facts["compressions"]), "нет данных"),
     }
 
 
 # ---------------------------------------------------------------- сборка
 
 
-def build(work, p, params_file, generated_at=None):
+def build(work, p, generated_at=None):
+    """→ [{session, base, doc, log, verdicts}] — по выходу на сессию; base — путь выхода без расширения."""
     with open(os.path.join(work, "collect.json"), encoding="utf-8") as handle:
         summary = json.load(handle)
     with open(FINDINGS_SCHEMA_PATH, encoding="utf-8") as handle:
         findings_schema = json.load(handle)
-    log_lines = []
-    all_facts, model, journals = [], {}, {}
+    stamp = generated_at or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    results = []
     for item in summary["sessions"]:
         with open(os.path.join(work, item["facts"]), encoding="utf-8") as handle:
             facts = json.load(handle)
         with open(os.path.join(work, item["journal"]), encoding="utf-8") as handle:
             events, users, candidates = parse_journal(handle.read())
-        journals[facts["session"]] = events
-        raw_path = os.path.join(work, f"{facts['session']}.findings.txt")
+        session_id, log_lines = facts["session"], []
+        raw_path = os.path.join(work, f"{session_id}.findings.txt")
         raw = open(raw_path, encoding="utf-8").read() if os.path.exists(raw_path) else None
-        found = model_findings(facts["session"], raw, events, users, candidates, findings_schema, log_lines.append,
+        found = model_findings(session_id, raw, events, users, candidates, findings_schema, log_lines.append,
                                set(facts.get("hidden_turns", [])))
         if found is not None:
-            apply_verification(work, facts["session"], found, log_lines.append)
-            model[facts["session"]] = found
-        all_facts.append(facts)
+            apply_verification(work, session_id, found, log_lines.append)
 
-    scored = [facts for facts in all_facts if facts["scored"]]
-    metrics = compute_metrics(scored, model, journals, p, all_facts)
-    signals = fraud_signals(all_facts, model, journals, p)
-    fraud = {"status": "to_review" if signals else "none", "signals": signals}
-    min_weight = params.value(p, "min_measured_weight")
-    weight = round(contract.measured_weight(metrics), 2)
-    status = contract.score_status(weight, fraud["status"], min_weight)
-    if status == "insufficient":
-        reason = f"измерено {weight:g} % веса — меньше {min_weight:g}"
-    elif status == "hold":
-        reason = f"фрод: сигналов к проверке — {len(signals)}"
-    else:
-        reason = None
-
-    doc = {
-        "schema": "session-quality/5",
-        "generated_at": generated_at or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "subject": {
-            "user": summary["user"],
-            "sessions_dir": summary["sessions_dir"],
-            "period": {"from": min(f["start"] for f in all_facts), "to": max(f["end"] for f in all_facts)} if all_facts else None,
-            "sessions_total": len(all_facts),
-            "sessions_scored": len(scored),
-        },
-        "params": {"file": params_file, "min_events": params.value(p, "min_events"), "min_measured_weight": min_weight},
-        "score": {"value": contract.total_score(metrics) if status != "insufficient" else None, "status": status,
-                  "reason": reason, "measured_weight": weight},
-        "metrics": metrics,
-        "fraud": fraud,
-        "discipline": discipline(all_facts, model, p),
-        "environment": environment(all_facts),
-        "sessions": [],
-    }
-    for facts in all_facts:
-        item = {"id": facts["session"], "start": facts["start"], "end": facts["end"], "duration_sec": facts["duration_sec"],
-                "user_turns": facts["user_turns"], "skills": facts["skills"], "context_peak": facts["context"]["peak_share"],
-                "scored": facts["scored"]}
+        session = {"id": session_id, "user": item["user"], "start": facts["start"], "end": facts["end"],
+                   "duration_sec": facts["duration_sec"], "user_turns": facts["user_turns"], "skills": facts["skills"],
+                   "context_peak": facts["context"]["peak_share"], "scored": facts["scored"]}
         if not facts["scored"]:
-            item["skip_reason"] = facts["skip_reason"]
-        doc["sessions"].append(item)
-    # Вердикты модели по каждой проверке — без цитат: по ним перепроверяют метрики, когда рабочей папки уже нет.
-    options = {(facts["session"], item["turn"]) for facts in all_facts for item in facts["decisions"] if item.get("option")}
-    verdict_lines = [f"{session_id} [{turn}] {check}: {verdict}"
-                     + (" (выбор варианта)" if check == "decision" and (session_id, turn) in options else "")
-                     for session_id, found in model.items()
-                     for (check, turn), verdict in sorted(found["checks"].items(), key=lambda pair: (pair[0][1], pair[0][0]))]
-    return doc, log_lines, verdict_lines
+            session["skip_reason"] = facts["skip_reason"]
+        signals = fraud_signals(facts, found, events, p)
+        doc = {"schema": contract.FORMAT, "generated_at": stamp,
+               "params": {"min_events": params.value(p, "min_events"), "min_measured_weight": params.value(p, "min_measured_weight"),
+                          "continuation_hours": params.value(p, "continuation_hours")},
+               "session": session}
+        if facts["scored"]:
+            doc["metrics"] = compute_metrics(facts, found, events, p)
+        doc["fraud"] = {"status": "to_review" if signals else "none", "signals": signals}
+        if facts["scored"]:
+            doc["discipline"] = discipline(found, p)
+        doc["environment"] = environment(facts)
+        # Вердикты модели по каждой проверке — без цитат: по ним перепроверяют метрики, когда рабочей папки уже нет.
+        options = {decision["turn"] for decision in facts["decisions"] if decision.get("option")}
+        verdict_lines = [f"[{turn}] {check}: {verdict}" + (" (выбор варианта)" if check == "decision" and turn in options else "")
+                         for (check, turn), verdict in sorted((found or {"checks": {}})["checks"].items(),
+                                                              key=lambda pair: (pair[0][1], pair[0][0]))]
+        results.append({"session": session_id, "base": item["output"], "doc": doc, "log": log_lines, "verdicts": verdict_lines})
+    return results
 
 
 # ---------------------------------------------------------------- отчёт
@@ -521,66 +441,84 @@ def fmt_duration(seconds):
     return f"{hours} ч {rest // 60:02d} мин" if hours else f"{rest // 60} мин"
 
 
+def session_score(doc):
+    """Скор сессии — только для отчёта, справочно: между сессиями его не складывают, за период дашборд считает по суммам
+    hits и events. → (значение | None, статус, измеренный вес %, {метрика: скор})."""
+    metrics = [dict(item, score=contract.metric_score(item["value"], item["good"], item["bad"]) if item["status"] == "measured" else None)
+               for item in doc["metrics"]]
+    weight = round(contract.measured_weight(metrics), 2)
+    status = contract.score_status(weight, doc["fraud"]["status"], doc["params"]["min_measured_weight"])
+    value = contract.total_score(metrics) if status != "insufficient" else None
+    return value, status, weight, {item["id"]: item["score"] for item in metrics}
+
+
 def render(doc, p):
     def name(metric_id):
         label = p["metrics"][metric_id].get("label", metric_id)
         return label[:1].upper() + label[1:]
 
-    subject, score = doc["subject"], doc["score"]
-    period = subject["period"]
-    lines = [f"# Оценка сессий · {subject['user']}", ""]
-    if period:
-        lines += [f"Период: {period['from'][:10]} — {period['to'][:10]} · сессий: {subject['sessions_total']}, "
-                  f"оценено: {subject['sessions_scored']}", ""]
-    if score["status"] == "insufficient":
-        lines.append(f"**Скор не посчитан:** {score['reason']}.")
-    elif score["status"] == "hold":
-        lines.append(f"**Скор: {score['value']} из 100 — не окончательный:** {score['reason']}. Сначала посмотрите сигналы ниже.")
+    session = doc["session"]
+    peak = f"{round(session['context_peak'] * 100):g} %" if session["context_peak"] is not None else "—"
+    lines = [f"# Оценка сессии {session['id']} · {session['user']}", "",
+             f"Начало: {session['start'][:16].replace('T', ' ')} · длительность {fmt_duration(session['duration_sec'])} · "
+             f"реплик пользователя: {session['user_turns']} · скиллы: {', '.join(session['skills']) or '—'} · пик контекста: {peak}", ""]
+    if not session["scored"]:
+        lines.append(f"**Сессия не оценена:** {session['skip_reason']}.")
     else:
-        lines.append(f"**Скор: {score['value']} из 100.**")
-    if score["measured_weight"] < 100:
-        lines.append(f"Измерено {score['measured_weight']:g} % веса метрик.")
-    lines += ["", "## Метрики", "", "| Метрика | Значение | Норма → плохо | Скор | Вес | Событий | Сессий хуже нормы |",
-              "|---|---|---|---|---|---|---|"]
-    for item in doc["metrics"]:
-        if item["status"] == "measured":
-            lines.append(f"| {name(item['id'])} | {fmt_value(item)} | {fmt_threshold(item)} | {item['score']} | "
-                         f"{item['weight']:g} | {item['events']} | {item['sessions_hit']} |")
-    skipped = [item for item in doc["metrics"] if item["status"] != "measured"]
-    if skipped:
-        lines += ["", "Не измерено: " + "; ".join(f"{name(item['id'])} — {item['reason']}" for item in skipped) + "."]
+        value, status, weight, scores = session_score(doc)
+        note = "справочно: скоры сессий не складывают, за период его считают по суммам событий"
+        if status == "insufficient":
+            lines.append(f"**Скор сессии не посчитан:** измерено {weight:g} % веса — меньше {doc['params']['min_measured_weight']:g}.")
+        elif status == "hold":
+            lines.append(f"**Скор сессии: {value} из 100 — не окончательный:** есть сигналы фрода, сначала посмотрите их ниже; {note}.")
+        else:
+            lines.append(f"**Скор сессии: {value} из 100** — {note}.")
+        if weight < 100 and status != "insufficient":
+            lines.append(f"Измерено {weight:g} % веса метрик.")
+        lines += ["", "## Метрики", "", "| Метрика | Значение | Событий | Норма → плохо | Скор | Вес |", "|---|---|---|---|---|---|"]
+        for item in doc["metrics"]:
+            if item["status"] == "measured":
+                lines.append(f"| {name(item['id'])} | {fmt_value(item)} | {item['hits']} из {item['events']} | {fmt_threshold(item)} | "
+                             f"{scores[item['id']]} | {item['weight']:g} |")
+        skipped = [item for item in doc["metrics"] if item["status"] != "measured"]
+        if skipped:
+            lines += ["", "Не измерено: " + "; ".join(f"{name(item['id'])} — {item['reason']}" for item in skipped) + "."]
+        if any(item.get("end_break") for item in doc["metrics"]):
+            lines += ["", f"Последний запуск брошен в конце сессии. Если следующая сессия началась в пределах "
+                          f"{doc['params']['continuation_hours']:g} ч — это продолжение работы, а не обрыв."]
 
     lines += ["", "## Фрод — к проверке", ""]
     if not doc["fraud"]["signals"]:
         lines.append("Сигналов нет.")
     for signal in doc["fraud"]["signals"]:
-        lines.append(f"- **{FRAUD_NAMES[signal['kind']]}** — {times(signal['count'])}, сессий: {len(signal['sessions'])}")
+        lines.append(f"- **{FRAUD_NAMES[signal['kind']]}** — {times(signal['count'])}")
         for item in signal["evidence"]:
             tail = f" — {item['note']}" if item.get("note") else ""
-            lines.append(f"  - сессия {item['session']}, ход {item['turn']}: «{item['quote']}»{tail}")
+            lines.append(f"  - ход {item['turn']}: «{item['quote']}»{tail}")
 
-    topic = doc["discipline"]["off_topic"]
-    lines += ["", "## Дисциплина — в скор не входит", ""]
-    if topic["status"] != "measured":
-        lines.append(f"Посторонние темы: не измерено ({topic['reason']}).")
-    elif not topic["cases"]:
-        lines.append("Посторонних тем нет.")
-    else:
-        lines.append(f"Посторонние темы: {times(topic['cases'])}, реплик — {topic['replies']}, сессий — {len(topic['sessions'])}.")
-        for item in topic["evidence"]:
-            kind = "личное" if item["category"] == "personal" else "нерабочее"
-            lines.append(f"- сессия {item['session']}, ход {item['turn']}: {kind}, реплик — {item['turns']}")
+    if session["scored"]:
+        topic = doc["discipline"]["off_topic"]
+        lines += ["", "## Дисциплина — в скор не входит", ""]
+        if topic["status"] != "measured":
+            lines.append(f"Посторонние темы: не измерено ({topic['reason']}).")
+        elif not topic["cases"]:
+            lines.append("Посторонних тем нет.")
+        else:
+            lines.append(f"Посторонние темы: {times(topic['cases'])}, реплик — {topic['replies']}.")
+            for item in topic["evidence"]:
+                kind = "личное" if item["category"] == "personal" else "нерабочее"
+                lines.append(f"- ход {item['turn']}: {kind}, реплик — {item['turns']}")
 
-    examples = [item for item in doc["metrics"] if item["evidence"]]
-    if examples:
-        lines += ["", "## Примеры по метрикам", ""]
-        for item in examples:
-            lines.append(f"**{name(item['id'])}**")
-            for proof in item["evidence"]:
-                tail = f" — {proof['note']}" if proof.get("note") else ""
-                lines.append(f"- сессия {proof['session']}, ход {proof['turn']}: «{proof['quote']}»{tail}")
-            lines.append("")
-        lines.pop()
+        examples = [item for item in doc["metrics"] if item["evidence"]]
+        if examples:
+            lines += ["", "## Примеры по метрикам", ""]
+            for item in examples:
+                lines.append(f"**{name(item['id'])}**")
+                for proof in item["evidence"]:
+                    tail = f" — {proof['note']}" if proof.get("note") else ""
+                    lines.append(f"- ход {proof['turn']}: «{proof['quote']}»{tail}")
+                lines.append("")
+            lines.pop()
 
     environment_ = doc["environment"]
 
@@ -590,14 +528,7 @@ def render(doc, p):
 
     lines += ["", "## Окружение — в скор не входит", "",
               "; ".join([env("tool_errors", "ошибки инструментов"), env("api_errors", "ошибки API"),
-                         env("compressions", "сжатия контекста")]) + ".", "",
-              "## Сессии", "",
-              "| Сессия | Начало | Длительность | Реплик | Скиллы | Пик контекста | Оценена |", "|---|---|---|---|---|---|---|"]
-    for item in doc["sessions"]:
-        peak = f"{round(item['context_peak'] * 100):g} %" if item["context_peak"] is not None else "—"
-        mark = "да" if item["scored"] else f"нет — {item['skip_reason']}"
-        lines.append(f"| {item['id']} | {item['start'][:16].replace('T', ' ')} | {fmt_duration(item['duration_sec'])} | "
-                     f"{item['user_turns']} | {', '.join(item['skills']) or '—'} | {peak} | {mark} |")
+                         env("compressions", "сжатия контекста")]) + "."]
     return "\n".join(lines) + "\n"
 
 
@@ -605,12 +536,10 @@ def render(doc, p):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Факты collect + находки модели → session-quality/5 и отчёт.")
-    parser.add_argument("--work", required=True, help="папка collect с ответами модели <id>.findings.txt")
-    parser.add_argument("--out", required=True, help="куда положить JSON и отчёт")
-    parser.add_argument("--date", default=date.today().isoformat())
+    parser = argparse.ArgumentParser(description="Факты collect + находки модели → session-quality/6 рядом с каждой сессией.")
+    parser.add_argument("--work", required=True, help="рабочая папка collect с ответами модели <id>.findings.txt")
     parser.add_argument("--params", default=None, help="файл параметров (по умолчанию reference/params.json)")
-    parser.add_argument("--keep-work", action="store_true", help="не убирать рабочую папку после отчёта (для разбора)")
+    parser.add_argument("--keep-work", action="store_true", help="не убирать рабочую папку после записи (для разбора)")
     cfg = parser.parse_args(argv)
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -622,39 +551,48 @@ def main(argv=None):
         print(f"Параметры не годятся: {error}")
         return 2
 
-    doc, log_lines, verdict_lines = build(cfg.work, p, cfg.params or params.DEFAULT_PATH)
+    results = build(cfg.work, p)
     with open(SCHEMA_PATH, encoding="utf-8") as handle:
         schema = json.load(handle)
-    errors = contract.check_document(doc, schema)
+    errors = [f"{result['session']}: {error}" for result in results for error in contract.check_document(result["doc"], schema)]
+    log_lines = [line for result in results for line in result["log"]]  # строки уже начинаются с id сессии
     with open(os.path.join(cfg.work, "merge-log.txt"), "w", encoding="utf-8") as handle:
         handle.write("\n".join(log_lines) + ("\n" if log_lines else ""))
     if errors:
-        print("Выход не прошёл contract.py — файл не записан:")
+        print("Выход не прошёл contract.py — файлы не записаны, рабочая папка оставлена:")
         print("\n".join(errors))
         return 1
-    os.makedirs(cfg.out, exist_ok=True)
-    base = os.path.join(cfg.out, f"{doc['subject']['user']}-{cfg.date}")
-    with open(base + ".json", "w", encoding="utf-8") as handle:
-        json.dump(doc, handle, ensure_ascii=False, indent=2)
-    with open(base + ".md", "w", encoding="utf-8") as handle:
-        handle.write(render(doc, p))
-    if log_lines or verdict_lines:  # что отброшено и вердикты — рядом с отчётом, рабочая папка дальше не нужна
-        with open(base + ".log.txt", "w", encoding="utf-8") as handle:
-            verdict_block = [VERDICTS_HEADER] + verdict_lines if verdict_lines else []
-            handle.write("\n".join(log_lines + ([""] if log_lines and verdict_block else []) + verdict_block) + "\n")
+    for result in results:
+        base, doc = result["base"], result["doc"]
+        with open(base + ".json", "w", encoding="utf-8") as handle:
+            json.dump(doc, handle, ensure_ascii=False, indent=2)
+        with open(base + ".md", "w", encoding="utf-8") as handle:
+            handle.write(render(doc, p))
+        if result["log"] or result["verdicts"]:  # что отброшено и вердикты — рядом с отчётом, рабочая папка дальше не нужна
+            verdict_block = [VERDICTS_HEADER] + result["verdicts"] if result["verdicts"] else []
+            with open(base + ".log.txt", "w", encoding="utf-8") as handle:
+                handle.write("\n".join(result["log"] + ([""] if result["log"] and verdict_block else []) + verdict_block) + "\n")
     if not cfg.keep_work:
         collect.clean_work(cfg.work)
         try:
             os.rmdir(cfg.work)
         except OSError:
             pass  # в папке есть чужие файлы — их не трогаем
-    score = doc["score"]
-    print(f"Скор: {score['value'] if score['value'] is not None else '—'} ({score['status']})")
-    print(f"Сессий: {doc['subject']['sessions_total']}, оценено: {doc['subject']['sessions_scored']}")
-    print(f"Сигналов фрода: {len(doc['fraud']['signals'])}")
-    print(f"Записей об отброшенном: {len(log_lines)}, вердиктов: {len(verdict_lines)}"
-          + (f" — {base}.log.txt" if log_lines or verdict_lines else ""))
-    print(f"Куда записано: {base}.json, {base}.md")
+
+    scored = sum(1 for result in results if result["doc"]["session"]["scored"])
+    print(f"Сессий: {len(results)}, оценено: {scored}, с сигналами фрода: "
+          f"{sum(1 for result in results if result['doc']['fraud']['signals'])}")
+    print(f"Записей об отброшенном: {sum(len(result['log']) for result in results)}, "
+          f"вердиктов: {sum(len(result['verdicts']) for result in results)}")
+    print("Итоги — рядом с каждой сессией: <id>.quality.json, <id>.quality.md, <id>.quality.log.txt (если есть что записать):")
+    for result in results:
+        doc = result["doc"]
+        if doc["session"]["scored"]:
+            value, status, _weight, _scores = session_score(doc)
+            mark = f"скор сессии {value if value is not None else '—'} ({status}, справочно)"
+        else:
+            mark = f"не оценена — {doc['session']['skip_reason']}"
+        print(f"- {result['session']}: {mark}; фрод: {len(doc['fraud']['signals'])} — {result['base']}.json")
     print("Рабочая папка " + ("оставлена" if cfg.keep_work or os.path.isdir(cfg.work) else "убрана") + f": {cfg.work}")
     return 0
 
