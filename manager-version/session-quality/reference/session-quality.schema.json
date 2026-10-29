@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "session-quality/6",
+  "$id": "session-quality/7",
   "title": "Оценка качества работы пользователя в одной сессии",
-  "description": "Одна сессия — один файл <id>.quality.json рядом с её выгрузкой. Числа ставит скрипт merge; модель только находит смысловое с цитатой. Скора в выходе нет: за период его считает дашборд по суммам hits и events метрик всех сессий пользователя и по good / bad / weight. Правила, которые схемой не выразить (доля = hits / events, минимум событий, end_break), проверяет contract.py.",
+  "description": "Одна сессия — один файл <id>.quality.json рядом с её выгрузкой. Числа, скоры и статусы ставит скрипт merge; модель только находит смысловое с цитатой. Правила, которые схемой не выразить (доля = hits / events, формула скора, статус, минимум событий, end_break), проверяет contract.py.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "generated_at", "params", "session", "fraud", "environment"],
   "properties": {
-    "schema": {"const": "session-quality/6"},
+    "schema": {"const": "session-quality/7"},
     "generated_at": {"type": "string", "format": "date-time"},
     "params": {"$ref": "#/$defs/params"},
     "session": {"$ref": "#/$defs/session"},
@@ -33,13 +33,13 @@
     "quote": {"description": "Цитата из журнала, не длиннее строки; секреты и цифры замаскированы.", "type": "string", "minLength": 1, "maxLength": 200},
 
     "params": {
-      "description": "Параметры, с которыми посчитана сессия (из params.json или --params), — те, что нужны дашборду для периода.",
+      "description": "Параметры, с которыми посчитана сессия (из params.json или --params).",
       "type": "object",
       "additionalProperties": false,
       "required": ["min_events", "min_measured_weight", "continuation_hours"],
       "properties": {
-        "min_events": {"description": "Метрика считается от стольких событий за период.", "type": "number", "minimum": 0},
-        "min_measured_weight": {"description": "Скор за период ставится, если измерено не меньше этого % веса метрик.", "type": "number", "minimum": 0, "maximum": 100},
+        "min_events": {"description": "Метрика считается от стольких событий.", "type": "number", "minimum": 0},
+        "min_measured_weight": {"description": "Скор ставится, если измерено не меньше этого % веса метрик.", "type": "number", "minimum": 0, "maximum": 100},
         "continuation_hours": {"description": "Окно продолжения: следующая сессия началась в пределах — обрыв end_break снимается.", "type": "number", "minimum": 0}
       }
     },
@@ -57,37 +57,43 @@
         "user_turns": {"$ref": "#/$defs/count"},
         "skills": {"description": "Скиллы по порядку вызова.", "type": "array", "items": {"type": "string", "minLength": 1}},
         "context_peak": {"description": "Наибольшая доля окна модели; null — нет поля в журнале.", "type": ["number", "null"], "minimum": 0, "maximum": 1},
-        "scored": {"description": "false — сессия короче params min_user_turns реплик: метрик и посторонних тем нет, фрод и окружение есть.", "type": "boolean"},
-        "skip_reason": {"type": "string", "minLength": 1}
+        "scored": {"description": "false — сессия короче params min_user_turns реплик: скора, метрик и посторонних тем нет, фрод и окружение есть.", "type": "boolean"},
+        "skip_reason": {"type": "string", "minLength": 1},
+        "pct": {"description": "Скор сессии: sum / max × 100 с округлением до целого; измерено меньше params.min_measured_weight % веса метрик — null. Есть сигнал фрода (fraud.status to_review) — скор не окончательный.",
+                "type": ["integer", "null"], "minimum": 0, "maximum": 100},
+        "sum": {"description": "Σ weight × score / 100 по измеренным метрикам.", "type": "number", "minimum": 0},
+        "max": {"description": "Σ weight измеренных метрик.", "type": "number", "minimum": 0}
       },
       "allOf": [
-        {"if": {"properties": {"scored": {"const": false}}}, "then": {"required": ["skip_reason"]}},
-        {"if": {"properties": {"scored": {"const": true}}}, "then": {"not": {"required": ["skip_reason"]}}}
+        {"if": {"properties": {"scored": {"const": false}}},
+         "then": {"required": ["skip_reason"], "allOf": [{"not": {"required": ["pct"]}}, {"not": {"required": ["sum"]}}, {"not": {"required": ["max"]}}]}},
+        {"if": {"properties": {"scored": {"const": true}}}, "then": {"required": ["pct", "sum", "max"], "not": {"required": ["skip_reason"]}}}
       ]
     },
 
     "metric": {
-      "description": "value = hits / events с округлением до трёх знаков; events — знаменатель доли, hits — числитель (у метрик «чем больше, тем лучше» — хорошие события, у остальных — плохие). Меньше params.min_events событий — метрика не измерена. Скор метрики = clamp((value − bad) / (good − bad), 0, 1) × 100 — его считает дашборд по суммам за период.",
+      "description": "value = hits / events с округлением до трёх знаков; events — знаменатель доли, hits — числитель (у метрик «чем больше, тем лучше» — хорошие события, у остальных — плохие). Меньше params.min_events событий — метрика не измерена. score = округление clamp((value − bad) / (good − bad), 0, 1) × 100.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "status", "value", "hits", "events", "good", "bad", "weight", "source", "evidence"],
+      "required": ["id", "status", "value", "score", "hits", "events", "good", "bad", "weight", "source", "evidence"],
       "properties": {
         "id": {"enum": ["active_review", "blind_confirms", "delegated", "ignored", "completion", "loaded_context", "skill_share"]},
         "status": {"enum": ["measured", "not_measured"]},
         "reason": {"type": "string", "minLength": 1},
         "value": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "score": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
         "hits": {"$ref": "#/$defs/count"},
         "events": {"$ref": "#/$defs/count"},
         "good": {"type": "number"},
         "bad": {"type": "number"},
         "weight": {"type": "number", "exclusiveMinimum": 0},
         "source": {"enum": ["script", "model", "script+model"]},
-        "end_break": {"description": "Только у completion: последний запуск брошен в конце сессии. Следующая сессия пользователя началась в пределах params.continuation_hours после session.end — это продолжение: дашборд прибавляет его к hits.", "type": "boolean"},
+        "end_break": {"description": "Только у completion: последний запуск брошен в конце сессии — в hits и score он обрыв. Следующая сессия пользователя началась в пределах params.continuation_hours после session.end — это продолжение работы.", "type": "boolean"},
         "evidence": {"type": "array", "items": {"$ref": "#/$defs/quote_evidence"}}
       },
       "allOf": [
-        {"if": {"properties": {"status": {"const": "measured"}}}, "then": {"properties": {"value": {"type": "number"}}}},
-        {"if": {"properties": {"status": {"const": "not_measured"}}}, "then": {"required": ["reason"], "properties": {"value": {"type": "null"}}}},
+        {"if": {"properties": {"status": {"const": "measured"}}}, "then": {"properties": {"value": {"type": "number"}, "score": {"type": "integer"}}}},
+        {"if": {"properties": {"status": {"const": "not_measured"}}}, "then": {"required": ["reason"], "properties": {"value": {"type": "null"}, "score": {"type": "null"}}}},
         {"if": {"properties": {"id": {"const": "completion"}}}, "then": {"required": ["end_break"]}, "else": {"not": {"required": ["end_break"]}}}
       ]
     },
@@ -115,7 +121,7 @@
     },
 
     "fraud": {
-      "description": "В скор не входит; to_review — скор за период «не окончательный».",
+      "description": "В скор не входит; to_review — скор сессии не окончательный, сначала смотрят сигналы.",
       "type": "object",
       "additionalProperties": false,
       "required": ["status", "signals"],

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""merge — последний шаг оценки: факты collect + находки модели → session-quality/6 рядом с каждой сессией.
+"""merge — последний шаг оценки: факты collect + находки модели → session-quality/7 рядом с каждой сессией.
 
     python3 merge.py --work <папка collect> [--params <файл>] [--keep-work]
 
 В --work лежат collect.json, <id>.facts.json, <id>.journal.txt (их пишет collect) и <id>.findings.txt — ответ
-модели на brief.md как есть. Пишет рядом с выгрузкой каждой сессии <id>.quality.json (проверен contract.py),
-<id>.quality.md — отчёт со справочным скором сессии — и <id>.quality.log.txt: что из ответа модели отброшено и вердикты.
+модели на brief.md как есть. Пишет рядом с выгрузкой каждой сессии <id>.quality.json (проверен contract.py; скор сессии —
+session.pct / sum / max), отчёт <id>.quality.md и <id>.quality.log.txt: что из ответа модели отброшено и вердикты.
 Хоть один выход не прошёл contract — не пишется ни один, рабочая папка остаётся для разбора.
 
 Модель ничего не считает: доли, скоры и статусы считаются здесь, пороги и веса — из params.json (или --params).
@@ -219,8 +219,7 @@ def share(part, whole):
 
 def compute_metrics(facts, found, events, p):
     """Метрики одной оценённой сессии. found — находки модели (None — ответа нет или он не разобрался); events — события
-    её журнала, из них скрипт берёт цитаты для своих доказательств. hits — числитель доли, events — знаменатель:
-    за период дашборд складывает их по сессиям."""
+    её журнала, из них скрипт берёт цитаты для своих доказательств. hits — числитель доли, events — знаменатель."""
     min_events, limit = params.value(p, "min_events"), params.value(p, "evidence_limit")
     threshold, reading = params.value(p, "loaded_context_share"), params.value(p, "reading_speed")
 
@@ -231,7 +230,7 @@ def compute_metrics(facts, found, events, p):
         if value is not None and not measured:
             reason = f"мало событий: {count}, нужно от {min_events:g}"
         item = {"id": metric_id, "status": "measured" if measured else "not_measured", "value": value if measured else None,
-                "hits": hits or 0, "events": count, "good": good, "bad": bad, "weight": weight, "source": SOURCES[metric_id],
+                "score": contract.metric_score(value, good, bad) if measured else None, "hits": hits or 0, "events": count, "good": good, "bad": bad, "weight": weight, "source": SOURCES[metric_id],
                 **extra, "evidence": evidence[:limit] if measured else []}
         if not measured:
             item["reason"] = reason
@@ -267,7 +266,7 @@ def compute_metrics(facts, found, events, p):
                                     "не было мест решения" if kind == "blind" else "не было мест решения с ответом текстом")
 
     # Доведение до результата: запуск, кончившийся ошибкой, не в счёт; спорная концовка без вердикта модели — тоже.
-    # Последний запуск, брошенный в конце сессии, — обрыв с пометкой end_break: продолжение в следующей сессии видит дашборд.
+    # Последний запуск, брошенный в конце сессии, — обрыв с пометкой end_break.
     def run_break(run, verdicts):
         question = run["question"]
         if not run["replied"]:
@@ -406,6 +405,7 @@ def build(work, p, generated_at=None):
                "session": session}
         if facts["scored"]:
             doc["metrics"] = compute_metrics(facts, found, events, p)
+            session.update(contract.session_score(doc["metrics"], params.value(p, "min_measured_weight")))
         doc["fraud"] = {"status": "to_review" if signals else "none", "signals": signals}
         if facts["scored"]:
             doc["discipline"] = discipline(found, p)
@@ -441,17 +441,6 @@ def fmt_duration(seconds):
     return f"{hours} ч {rest // 60:02d} мин" if hours else f"{rest // 60} мин"
 
 
-def session_score(doc):
-    """Скор сессии — только для отчёта, справочно: между сессиями его не складывают, за период дашборд считает по суммам
-    hits и events. → (значение | None, статус, измеренный вес %, {метрика: скор})."""
-    metrics = [dict(item, score=contract.metric_score(item["value"], item["good"], item["bad"]) if item["status"] == "measured" else None)
-               for item in doc["metrics"]]
-    weight = round(contract.measured_weight(metrics), 2)
-    status = contract.score_status(weight, doc["fraud"]["status"], doc["params"]["min_measured_weight"])
-    value = contract.total_score(metrics) if status != "insufficient" else None
-    return value, status, weight, {item["id"]: item["score"] for item in metrics}
-
-
 def render(doc, p):
     def name(metric_id):
         label = p["metrics"][metric_id].get("label", metric_id)
@@ -465,21 +454,22 @@ def render(doc, p):
     if not session["scored"]:
         lines.append(f"**Сессия не оценена:** {session['skip_reason']}.")
     else:
-        value, status, weight, scores = session_score(doc)
-        note = "справочно: скоры сессий не складывают, за период его считают по суммам событий"
-        if status == "insufficient":
-            lines.append(f"**Скор сессии не посчитан:** измерено {weight:g} % веса — меньше {doc['params']['min_measured_weight']:g}.")
-        elif status == "hold":
-            lines.append(f"**Скор сессии: {value} из 100 — не окончательный:** есть сигналы фрода, сначала посмотрите их ниже; {note}.")
+        total = sum(item["weight"] for item in doc["metrics"])
+        tail = f"{session['sum']:g} из {session['max']:g}"
+        if session["pct"] is None:
+            lines.append(f"**Скор сессии не посчитан:** измерено {session['max']:g} из {total:g} веса метрик — меньше "
+                         f"{doc['params']['min_measured_weight']:g} %.")
+        elif doc["fraud"]["signals"]:
+            lines.append(f"**Скор сессии: {session['pct']} % ({tail}) — не окончательный:** есть сигналы фрода, сначала посмотрите их ниже.")
         else:
-            lines.append(f"**Скор сессии: {value} из 100** — {note}.")
-        if weight < 100 and status != "insufficient":
-            lines.append(f"Измерено {weight:g} % веса метрик.")
+            lines.append(f"**Скор сессии: {session['pct']} % ({tail}).**")
+        if session["pct"] is not None and session["max"] < total:
+            lines.append(f"Измерено {session['max']:g} из {total:g} веса метрик.")
         lines += ["", "## Метрики", "", "| Метрика | Значение | Событий | Норма → плохо | Скор | Вес |", "|---|---|---|---|---|---|"]
         for item in doc["metrics"]:
             if item["status"] == "measured":
                 lines.append(f"| {name(item['id'])} | {fmt_value(item)} | {item['hits']} из {item['events']} | {fmt_threshold(item)} | "
-                             f"{scores[item['id']]} | {item['weight']:g} |")
+                             f"{item['score']} | {item['weight']:g} |")
         skipped = [item for item in doc["metrics"] if item["status"] != "measured"]
         if skipped:
             lines += ["", "Не измерено: " + "; ".join(f"{name(item['id'])} — {item['reason']}" for item in skipped) + "."]
@@ -536,7 +526,7 @@ def render(doc, p):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Факты collect + находки модели → session-quality/6 рядом с каждой сессией.")
+    parser = argparse.ArgumentParser(description="Факты collect + находки модели → session-quality/7 рядом с каждой сессией.")
     parser.add_argument("--work", required=True, help="рабочая папка collect с ответами модели <id>.findings.txt")
     parser.add_argument("--params", default=None, help="файл параметров (по умолчанию reference/params.json)")
     parser.add_argument("--keep-work", action="store_true", help="не убирать рабочую папку после записи (для разбора)")
@@ -587,9 +577,10 @@ def main(argv=None):
     print("Итоги — рядом с каждой сессией: <id>.quality.json, <id>.quality.md, <id>.quality.log.txt (если есть что записать):")
     for result in results:
         doc = result["doc"]
-        if doc["session"]["scored"]:
-            value, status, _weight, _scores = session_score(doc)
-            mark = f"скор сессии {value if value is not None else '—'} ({status}, справочно)"
+        session = doc["session"]
+        if session["scored"]:
+            pct = f"{session['pct']} %" if session["pct"] is not None else "не посчитан"
+            mark = f"скор {pct} ({session['sum']:g} из {session['max']:g})" + (", не окончательный" if doc["fraud"]["signals"] else "")
         else:
             mark = f"не оценена — {doc['session']['skip_reason']}"
         print(f"- {result['session']}: {mark}; фрод: {len(doc['fraud']['signals'])} — {result['base']}.json")

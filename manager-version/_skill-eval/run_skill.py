@@ -102,7 +102,8 @@ def grade(run_dir, parallel):
         if errors:
             problems.append(f"{session_id}: выход не проходит contract.py: {errors[:3]}")
         completion = next((item for item in doc.get("metrics", []) if item["id"] == "completion"), {})
-        lines.append(f"{session_id}: оценена {'да' if doc['session']['scored'] else 'нет'}, сигналов фрода: {len(doc['fraud']['signals'])}"
+        lines.append(f"{session_id}: оценена {'да' if doc['session']['scored'] else 'нет'}, скор {doc['session'].get('pct')}, "
+                     f"сигналов фрода: {len(doc['fraud']['signals'])}"
                      + (", обрыв в конце сессии" if completion.get("end_break") else ""))
     strays = glob.glob(os.path.join(ws, "sessions", "*-quality"))
     if strays:

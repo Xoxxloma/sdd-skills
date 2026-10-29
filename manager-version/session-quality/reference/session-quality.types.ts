@@ -1,44 +1,41 @@
 /**
- * Типизация выхода session-quality: формат session-quality/6.
+ * Типизация выхода session-quality: формат session-quality/7.
  * Итог: <id>.quality.json рядом с выгрузкой сессии <id>.json — одна сессия.
  * Источник правды — session-quality.schema.json и contract.py; этот файл — их описание для чтения.
- *
- * Скор за период собирает дашборд из файлов сессий пользователя — суммами, а не средними:
- *   метрика: value = Σ hits / Σ events по оценённым сессиям; events < params.min_events — не измерена;
- *   балл метрики = округление(clamp((value − bad) / (good − bad), 0, 1) × 100);
- *   скор = округление(Σ вес × балл / Σ вес) по измеренным метрикам; измерено меньше min_measured_weight % веса — скора нет;
- *   есть сигнал фрода хотя бы в одной сессии — скор «не окончательный».
- *   completion: у сессии с end_break = true, если следующая сессия того же пользователя началась не позже
- *   params.continuation_hours после session.end, — к Σ hits прибавить 1 (работу продолжили, это не обрыв).
- * Скоры сессий между собой не усредняют: в сессии бывает 2–5 мест решения.
+ * Скор сессии — session.pct / sum / max, как у документа в specs-quality: всё посчитано, складывать ничего не нужно.
  */
 
 /** Корень выхода. */
 export type SessionQualityResult = ScoredResult | SkippedResult;
 
 export interface ResultBase {
-  schema: "session-quality/6";      // версия формата
+  schema: "session-quality/7";      // версия формата
   generated_at: string;             // когда собран, ISO 8601 с поясом: "2026-10-27T15:00:00Z"
-  params: Params;                   // пороги, нужные дашборду для периода
-  fraud: Fraud;                     // признаки нечестной работы: в скор не входят, но «замораживают» его
+  params: Params;                   // пороги, с которыми посчитана сессия
+  fraud: Fraud;                     // признаки нечестной работы: в скор не входят, но делают его не окончательным
   environment: Environment;         // сбои среды, не вина пользователя: справочно
 }
 
-/** Оценённая сессия: метрики и посторонние темы есть. */
+/** Оценённая сессия: скор, метрики и посторонние темы есть. */
 export interface ScoredResult extends ResultBase {
-  session: Session & { scored: true };
+  session: Session & {
+    scored: true;
+    pct: number | null;             // скор сессии: sum / max × 100, целое; измерено меньше min_measured_weight % веса — null
+    sum: number;                    // Σ вес × score / 100 по измеренным метрикам: 34.9
+    max: number;                    // Σ весов измеренных метрик: 65 — все 7 метрик
+  };
   metrics: Metric[];                // ровно 7 метрик (см. MetricId)
   discipline: Discipline;           // посторонние темы: справочно, в скор не входят
 }
 
-/** Сессия короче params min_user_turns реплик: метрик и посторонних тем нет, фрод и окружение есть. */
+/** Сессия короче params min_user_turns реплик: скора, метрик и посторонних тем нет, фрод и окружение есть. */
 export interface SkippedResult extends ResultBase {
   session: Session & { scored: false; skip_reason: string };  // skip_reason: «меньше 3 реплик пользователя»
 }
 
 export interface Params {
-  min_events: number;               // метрика считается, если событий в знаменателе за период не меньше этого
-  min_measured_weight: number;      // скор за период ставится, если измерено не меньше этого % веса метрик
+  min_events: number;               // метрика считается, если событий в знаменателе не меньше этого
+  min_measured_weight: number;      // скор ставится, если измерено не меньше этого % веса метрик
   continuation_hours: number;       // окно продолжения для end_break, часов
 }
 
@@ -69,18 +66,21 @@ export interface MetricBase {
     | "script"                      // посчитал скрипт по журналу
     | "model"                       // нашла модель по смыслу, с цитатой
     | "script+model";               // скрипт по вердиктам модели
-  end_break?: boolean;              // только у completion: последний запуск брошен в конце сессии (см. шапку)
+  end_break?: boolean;              // только у completion: последний запуск брошен в конце сессии; если следующая сессия
+                                    //   началась в пределах continuation_hours — это продолжение работы, а не обрыв
   evidence: QuoteEvidence[];        // примеры из журнала сессии
 }
 
 export interface MeasuredMetric extends MetricBase {
   status: "measured";
   value: number;                    // hits / events, 0–1 (0.2 = 20 %), три знака
+  score: number;                    // балл 0–100 = округление(clamp((value − bad) / (good − bad), 0, 1) × 100)
 }
 
 export interface UnmeasuredMetric extends MetricBase {
   status: "not_measured";           // событий меньше min_events или нет ответа модели
   value: null;
+  score: null;
   reason: string;                   // почему не измерена
 }
 
@@ -114,7 +114,7 @@ export interface QuoteEvidence {
 /** Фрод — есть сигналы или нет, различать по status. */
 export type Fraud =
   | { status: "none"; signals: [] }                    // сигналов нет
-  | { status: "to_review"; signals: FraudSignal[] };   // хотя бы один сигнал — скор за период «не окончательный»
+  | { status: "to_review"; signals: FraudSignal[] };   // хотя бы один сигнал — скор сессии «не окончательный»
 
 export interface FraudSignal {
   kind:

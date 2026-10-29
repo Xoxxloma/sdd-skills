@@ -14,9 +14,10 @@
   loaded_context: у каждой 0/1 — скилл вызван в первом ходе, контекста ещё нет
   skill_share: 6/7, 6/7, 6/7, 4/5
   суммы по сессиям — прежний счёт за период: active_review 2/3, blind_confirms 1/3, completion 3/4, skill_share 22/26
-  справочный скор сессии (только в отчёте): bq-1 — (10 · (100 + 0 + 100 + 100 + 100 + 100) + 5 · 100) / 65 = 85, без
-  фрода; bq-2 — 85, «не окончательный» (неподтверждённое как подтверждённое, второе на том же ходе отброшено); bq-3 —
-  измерено 25 из 65 веса (38.46 %) — не посчитан; фрод bq-3 — обход. С минимумом событий 5 у каждой сессии измерена только
+  скор сессии — session.pct / sum / max, как у документа: sum = Σ вес × скор метрики / 100 по измеренным, max = Σ их весов.
+  bq-1: 10 + 0 + 10 + 10 + 10 + 10 + 5 = 55 из 65 → 85 %, без фрода; bq-2: 55 из 65 → 85 %, «не окончательный»
+  (неподтверждённое как подтверждённое, второе на том же ходе отброшено); bq-3 и bq-4: измерено 25 из 65 веса
+  (38.46 % < 50) — pct null, sum 25, max 25; фрод bq-3 — обход. С минимумом событий 5 у каждой сессии измерена только
   работа через скиллы. Находки убранных видов (ухудшение агента, нечёткая постановка, переход к задаче, поздние вводные)
   отбрасываются.
 
@@ -193,8 +194,14 @@ def main():
     expect(all([item["id"] for item in doc["metrics"]] == list(params.IMPLEMENTED_METRICS) for doc in docs.values()), "порядок метрик")
     expect(all(doc["params"] == {"min_events": 1, "min_measured_weight": 50, "continuation_hours": 12} for doc in docs.values()),
            f"параметры в выходе: {docs['bq-1']['params']}")
+    scores = {sid: tuple(docs[sid]["session"][key] for key in ("pct", "sum", "max")) for sid in SESSIONS}
+    expect(scores == {"bq-1": (85, 55, 65), "bq-2": (85, 55, 65), "bq-3": (None, 25, 25), "bq-4": (None, 25, 25)},
+           f"скор сессии — pct / sum / max в JSON: {scores}")
+    expect(metrics["bq-1"]["blind_confirms"]["score"] == 0 and metrics["bq-2"]["completion"]["score"] == 0 and
+           metrics["bq-1"]["skill_share"]["score"] == 100 and metrics["bq-3"]["active_review"]["score"] is None,
+           "скор метрики — в JSON, у неизмеренной null")
     expect(all(doc["session"]["user"] == "user-01" and "score" not in doc for doc in docs.values()),
-           f"пользователь — у сессии, скора в выходе нет: {docs['bq-1']['session']}")
+           f"пользователь — у сессии, отдельного блока score нет: {docs['bq-1']['session']}")
 
     signals = {sid: {signal["kind"]: signal for signal in doc["fraud"]["signals"]} for sid, doc in docs.items()}
     expect({sid: sorted(kinds) for sid, kinds in signals.items()} == {"bq-1": [], "bq-2": ["deception"], "bq-3": ["bypass"], "bq-4": []},
@@ -212,10 +219,10 @@ def main():
     expect(log.count("находка отброшена — $.type") == 5, "убранные виды находок отброшены все пять")
     expect("bq-4: bq-4:" not in log, "id сессии в строке лога один раз")
 
-    expect("**Скор сессии: 85 из 100** — справочно" in reports["bq-1"], "отчёт bq-1: скор 85, справочно")
-    expect("**Скор сессии: 85 из 100 — не окончательный:**" in reports["bq-2"] and "Неподтверждённое выдаётся за подтверждённое" in reports["bq-2"],
+    expect("**Скор сессии: 85 % (55 из 65).**" in reports["bq-1"], "отчёт bq-1: скор 85 % (55 из 65)")
+    expect("**Скор сессии: 85 % (55 из 65) — не окончательный:**" in reports["bq-2"] and "Неподтверждённое выдаётся за подтверждённое" in reports["bq-2"],
            "отчёт bq-2: не окончательный — фрод")
-    expect("**Скор сессии не посчитан:** измерено 38.46 % веса — меньше 50." in reports["bq-3"] and "Обход правил и проверок" in reports["bq-3"],
+    expect("**Скор сессии не посчитан:** измерено 25 из 65 веса метрик — меньше 50 %." in reports["bq-3"] and "Обход правил и проверок" in reports["bq-3"],
            "отчёт bq-3: мало веса — скора нет; фрод — обход")
     expect("Последний запуск брошен в конце сессии" in reports["bq-2"] and "Последний запуск брошен" not in reports["bq-1"],
            "отчёт: про обрыв в конце сессии — только у bq-2")
@@ -267,8 +274,8 @@ def main():
            "без --keep-work рабочая папка убрана, журнал отброшенного — рядом с отчётом сессии")
     expect(merge.VERDICTS_HEADER in read(side_log) and f"[{bq2_end}] ending: yes" in read(side_log),
            "в журнале рядом с отчётом — вердикты по проверкам этой сессии")
-    expect(all(f"{sid}.quality.json" in screen for sid in SESSIONS) and "справочно" in screen,
-           f"на экран — строка на сессию со справочным скором и путём: {screen}")
+    expect(all(f"{sid}.quality.json" in screen for sid in SESSIONS) and "bq-1: скор 85 % (55 из 65)" in screen,
+           f"на экран — строка на сессию со скором и путём: {screen}")
 
     # Провал контракта — не пишется ни один выход, рабочая папка остаётся.
     fail_sessions, fail_work = os.path.join(root, "sessions", "user-03"), os.path.join(root, "work-fail")
