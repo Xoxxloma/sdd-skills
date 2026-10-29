@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "session-quality/4",
+  "$id": "session-quality/5",
   "title": "Оценка качества работы пользователя по его сессиям",
   "description": "Один документ — один пользователь за период. Числа, скоры и статусы ставит скрипт merge; модель только находит смысловое с цитатой. Правила, которые схемой не выразить (формула скора, статус, минимум событий, ссылки на сессии), проверяет contract.py.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "generated_at", "subject", "params", "score", "metrics", "fraud", "discipline", "environment", "sessions"],
   "properties": {
-    "schema": {"const": "session-quality/4"},
+    "schema": {"const": "session-quality/5"},
     "generated_at": {"type": "string", "format": "date-time"},
     "subject": {"$ref": "#/$defs/subject"},
     "params": {"$ref": "#/$defs/params"},
@@ -94,7 +94,7 @@
       "additionalProperties": false,
       "required": ["id", "status", "value", "score", "good", "bad", "weight", "source", "events", "sessions_hit", "evidence"],
       "properties": {
-        "id": {"enum": ["active_review", "blind_confirms", "delegated", "ignored", "completion", "task_setup", "loaded_context", "skill_share"]},
+        "id": {"enum": ["active_review", "blind_confirms", "delegated", "ignored", "completion", "loaded_context", "skill_share"]},
         "status": {"enum": ["measured", "not_measured"]},
         "reason": {"type": "string", "minLength": 1},
         "value": {"type": ["number", "null"], "minimum": 0},

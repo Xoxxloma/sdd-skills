@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""merge — последний шаг оценки: факты collect + находки модели → session-quality/4 и отчёт.
+"""merge — последний шаг оценки: факты collect + находки модели → session-quality/5 и отчёт.
 
     python3 merge.py --work <папка collect> --out <папка отчёта> [--date ГГГГ-ММ-ДД] [--params <файл>] [--keep-work]
 
@@ -9,7 +9,7 @@
 
 Модель ничего не считает: доли, скоры и статусы считаются здесь, пороги и веса — из params.json (или --params).
 Находка модели без подтверждённой цитаты выпадает; у посторонней темы пересказ вырезается; битая находка
-отбрасывается одна, а не весь ответ; поздние вводные — одна находка на ход.
+отбрасывается одна, а не весь ответ; находка одного вида — одна на ход.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ SCHEMA_PATH = os.path.join(HERE, "session-quality.schema.json")
 FINDINGS_SCHEMA_PATH = os.path.join(HERE, "findings.schema.json")
 
 SOURCES = {"active_review": "script+model", "blind_confirms": "script+model", "delegated": "script+model",
-           "ignored": "script+model", "completion": "script+model", "task_setup": "model",
+           "ignored": "script+model", "completion": "script+model",
            "loaded_context": "script", "skill_share": "script"}
 UNDECIDED = "?"  # спорная концовка запуска без вердикта модели
 FRAUD_NAMES = {"deception": "Неподтверждённое выдаётся за подтверждённое", "bypass": "Обход правил и проверок",
@@ -135,7 +135,7 @@ def model_findings(session_id, raw, events, users, candidates, schema, log, hidd
         log(f"{session_id}: ответ модели не разобран — {error or 'нет findings или checks'}")
         return None
     defs = schema["$defs"]
-    result = {"late_requirement": [], "deception": [], "bypass": {}, "off_topic": [], "checks": {}}
+    result = {"deception": [], "bypass": {}, "off_topic": [], "checks": {}}
     for item in answer["findings"]:
         if not isinstance(item, dict):
             log(f"{session_id}: находка не объект — отброшена")
@@ -336,23 +336,6 @@ def compute_metrics(scored, model, events, p, all_facts=None):
           "note": f"запуск {run['skill']}: {reason}"} for facts, run, reason in broken],
         "не было запусков скиллов")
 
-    # Поздние вводные: задачи — запуски скиллов; сессия без них — одна задача.
-    tasks_total, bad_total, setup, per_session_setup = 0, 0, [], []
-    for facts in with_model:
-        found = model[facts["session"]]
-        tasks = max(1, len(facts["runs"]))
-        # Находка — в задачу своего запуска (до первого запуска — в первую); задача с поздними вводными одна, пример — первый.
-        by_task = {}
-        for entry in sorted(found["late_requirement"], key=lambda entry: entry["turn"]):
-            task = sum(1 for run in facts["runs"][1:] if run["turn"] <= entry["turn"])
-            by_task.setdefault(task, dict(entry, note="вводные задним числом"))
-        tasks_total += tasks
-        bad_total += len(by_task)
-        per_session_setup.append(share(len(by_task), tasks))
-        setup += sorted(by_task.values(), key=lambda entry: entry["turn"])
-    out["task_setup"] = metric("task_setup", share(bad_total, tasks_total) if with_model else None, tasks_total,
-                               per_session_setup, setup, no_model)
-
     # Нагруженный контекст: новая работа в той же сессии — вызов скилла.
     moments, per_session_loaded = [], []
     for facts in scored:
@@ -482,7 +465,7 @@ def build(work, p, params_file, generated_at=None):
         reason = None
 
     doc = {
-        "schema": "session-quality/4",
+        "schema": "session-quality/5",
         "generated_at": generated_at or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "subject": {
             "user": summary["user"],
@@ -622,7 +605,7 @@ def render(doc, p):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Факты collect + находки модели → session-quality/4 и отчёт.")
+    parser = argparse.ArgumentParser(description="Факты collect + находки модели → session-quality/5 и отчёт.")
     parser.add_argument("--work", required=True, help="папка collect с ответами модели <id>.findings.txt")
     parser.add_argument("--out", required=True, help="куда положить JSON и отчёт")
     parser.add_argument("--date", default=date.today().isoformat())

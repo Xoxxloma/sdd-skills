@@ -12,20 +12,17 @@
   completion: запусков 4; bq-1 кончился вопросом «Добавить раздел…?» — модель: no, доведён; bq-2 — вопросом о коде
     ошибки — модель: yes, обрыв (следующая сессия через сутки — не продолжение); bq-3, bq-4 — без висящего вопроса
     → 3/4 = 0.75 → (0.75 − 0.5) / (0.9 − 0.5) = 62.5 → 63
-  task_setup (поздние вводные): задач 1 + 1 + 1 (по запуску на сессию); bq-1 [1] (вторая находка на том же ходе
-    отброшена) → 1/3 = 0.333 → 42
   loaded_context: вызовов скиллов 4, все в первом ходе — контекста перед ними ещё нет, сжатий нет → 0/4 → 100
   skill_share: реплик (с вызовами через «/» и ответами на вопросы с вариантами) внутри запусков 6 + 6 + 6 + 4 = 22
     из 7 + 7 + 7 + 5 = 26 → 0.846 → 100
-  общий: (10 · (100 + 42 + 100 + 100 + 63 + 42 + 100) + 5 · 100) / 75 = 5970 / 75 = 79.6 → 80; фрод: обход (bq-3) и
-  неподтверждённое как подтверждённое (bq-2) → hold. С минимумом событий 5 измерена только skill_share (вес 5 из 75)
-  → скор не посчитан. Находки убранных видов (ухудшение агента, нечёткая постановка, переход к задаче) отбрасываются.
+  общий: (10 · (100 + 42 + 100 + 100 + 63 + 100) + 5 · 100) / 65 = 5550 / 65 = 85.4 → 85; фрод: обход (bq-3) и
+  неподтверждённое как подтверждённое (bq-2, второе на том же ходе отброшено) → hold. С минимумом событий 5 измерена
+  только skill_share (вес 5 из 65) → скор не посчитан. Находки убранных видов (ухудшение агента, нечёткая постановка,
+  переход к задаче, поздние вводные) отбрасываются.
 
 Сессия opt-1 (своя папка, выгрузка): запуски context-doc [3] и business-requirements-doc [9]; места решения — [4] выбор
-варианта (accepted), [6] и [8] текстом (engaged); [11] — одна заглушка вставки. Поздние вводные — модель на [6], [8]
-(обе в первом запуске) и [11] (заглушка — отброшена):
+варианта (accepted), [6] и [8] текстом (engaged); [11] — одна заглушка вставки, находка на ней отброшена:
   active_review 2/2 = 1.0 (выбор варианта не в знаменателе; было бы 2/3) · blind_confirms 0/3 (выбор варианта — здесь)
-  task_setup: задач 2, с поздними вводными — первая → 1/2 = 0.5 (было бы min(3, 2) / 2 = 1.0)
 """
 
 from __future__ import annotations
@@ -87,13 +84,13 @@ def main():
     turn_of = {session_id: (lambda text, sid=session_id: grade_brief.turn_with(journals[sid], text)) for session_id in journals}
     bq1_start, bq1_end = turn_of["bq-1"]("Делаем БТ по уведомлениям"), turn_of["bq-1"]("Хорошо. Документ сохранён")
     bq2_end = turn_of["bq-2"]("Раздел ошибок без одного кода")
+    deception_turn = turn_of["bq-2"]("Запиши в спеке, что лимит")
     bq1 = perfect["bq-1"]
     bq1["findings"].append({"type": "degradation", "turn": bq1_end, "quote": "Добавить в него раздел",
                             "earlier_turn": bq1_start, "caught_turn": None})  # вид убран — отбрасывается
-    bq1["findings"] += [{"type": "late_requirement", "turn": bq1_end, "quote": "этого в журнале нет"},
+    bq1["findings"] += [{"type": "deception", "turn": bq1_end, "quote": "этого в журнале нет"},
                         {"type": "vague_request", "turn": bq1_start, "quote": "Делаем БТ по уведомлениям клиента"},
-                        {"type": "late_requirement", "turn": bq1_start, "quote": "Срок хранения уведомлений — 90 дней"},
-                        {"type": "late_requirement", "turn": bq1_start, "quote": "Делаем БТ по уведомлениям клиента"}]
+                        {"type": "late_requirement", "turn": bq1_start, "quote": "Срок хранения уведомлений — 90 дней"}]
     first_try = dict(bq1, findings=[])
     bq2 = perfect["bq-2"]
     for item in bq2["findings"]:
@@ -101,6 +98,7 @@ def main():
             item["note"] = "подарок жене и отпуск"
     bq2["findings"].append({"type": "off_topic", "turn": 15, "category": "non_work", "turns": 0})
     bq2["findings"].append({"type": "task_switch", "turn": 6, "quote": "Слушай, не по работе"})
+    bq2["findings"].append({"type": "deception", "turn": deception_turn, "quote": "Запиши в спеке, что лимит"})  # второй на ходе
     bq3 = perfect["bq-3"]
     bq3["findings"].append(dict(next(item for item in bq3["findings"] if item["type"] == "bypass")))  # тот же обход дважды
     bq3["findings"].append({"type": "degradation", "turn": 6, "quote": "Отмечаю спеку как переданную в разработку.",
@@ -152,7 +150,7 @@ def main():
 
     metrics = {item["id"]: item for item in doc["metrics"]}
     want = {"active_review": (0.667, 100, 0, 3), "blind_confirms": (0.333, 42, 1, 3), "delegated": (0.0, 100, 0, 3),
-            "ignored": (0.0, 100, 0, 3), "completion": (0.75, 63, 1, 4), "task_setup": (0.333, 42, 1, 3),
+            "ignored": (0.0, 100, 0, 3), "completion": (0.75, 63, 1, 4),
             "loaded_context": (0.0, 100, 0, 4), "skill_share": (0.846, 100, 0, 26)}
     for metric_id, (value, score, hits, events) in want.items():
         got = metrics[metric_id]
@@ -160,7 +158,7 @@ def main():
                and got["sessions_hit"] == hits and got["events"] == events,
                f"{metric_id}: value {got['value']}, score {got['score']}, hits {got['sessions_hit']}, events {got['events']}; "
                f"ждали {value}, {score}, {hits}, {events}")
-    expect(doc["score"] == {"value": 80, "status": "hold", "reason": "фрод: сигналов к проверке — 2", "measured_weight": 100},
+    expect(doc["score"] == {"value": 85, "status": "hold", "reason": "фрод: сигналов к проверке — 2", "measured_weight": 100},
            f"скор {doc['score']}")
     expect(doc["params"]["min_events"] == 1 and doc["params"]["file"] == loose_path, f"параметры в выходе {doc['params']}")
     kinds = {signal["kind"]: signal for signal in doc["fraud"]["signals"]}
@@ -175,22 +173,20 @@ def main():
     completion = metrics["completion"]["evidence"]
     expect([(item["session"], item["turn"]) for item in completion] == [("bq-2", bq2_end)]
            and "без ответа работа не закончена" in completion[0]["note"], f"обрыв — bq-2 [{bq2_end}]: {completion}")
-    expect([(item["session"], item["turn"], item["note"]) for item in metrics["task_setup"]["evidence"]]
-           == [("bq-1", bq1_start, "вводные задним числом")], f"поздние вводные: {metrics['task_setup']['evidence']}")
     for line in ("цитата не подтвердилась", "вырезан пересказ", "turns: меньше 1", "самоисправление", "bq-4: нет ответа модели",
-                 f"late_requirement в ходе {bq1_start} — на ходе уже есть такая находка", "находка отброшена — $.type"):
+                 f"deception в ходе {deception_turn} — на ходе уже есть такая находка", "находка отброшена — $.type"):
         expect(line in log, f"в merge-log.txt нет «{line}»")
 
     strict_doc = json.load(open(os.path.join(root, "strict", "user-01-2026-10-27.json"), encoding="utf-8"))
-    expect(strict_doc["score"]["status"] == "insufficient" and strict_doc["score"]["measured_weight"] == 6.67
-           and strict_doc["score"]["reason"] == "измерено 6.67 % веса — меньше 50",
+    expect(strict_doc["score"]["status"] == "insufficient" and strict_doc["score"]["measured_weight"] == 7.69
+           and strict_doc["score"]["reason"] == "измерено 7.69 % веса — меньше 50",
            f"минимум событий 5: измерена только работа через скиллы → скор не посчитан: {strict_doc['score']}")
     blind_strict = next(item for item in strict_doc["metrics"] if item["id"] == "blind_confirms")
     expect(blind_strict["status"] == "not_measured" and blind_strict["reason"] == "мало событий: 3, нужно от 5",
            f"метрика с одним событием не считается: {blind_strict}")
 
-    expect("**Скор: 80 из 100 — не окончательный:**" in report, "отчёт: скор и статус")
-    expect(log.count("находка отброшена — $.type") == 4, "убранные виды находок отброшены все четыре")
+    expect("**Скор: 85 из 100 — не окончательный:**" in report, "отчёт: скор и статус")
+    expect(log.count("находка отброшена — $.type") == 5, "убранные виды находок отброшены все пять")
     expect("Обход правил и проверок" in report and "Неподтверждённое выдаётся за подтверждённое" in report, "отчёт: фрод")
     expect("## Дисциплина" in report and "личное, реплик — 2" in report, "отчёт: посторонние темы — в дисциплине, без содержания")
     for secret in ("подарить", "жене", "отпуск", "Турция", "Qw3rty", "4111"):
@@ -203,7 +199,6 @@ def main():
         findings_schema = json.load(handle)
     tasks = {session_id: verify.tasks_for(session_id, answers[session_id], journals[session_id], findings_schema)
              for session_id in answers}
-    deception_turn = turn_of["bq-2"]("Запиши в спеке, что лимит")
     bypass_turn = turn_of["bq-3"]("Пропусти проверку готовности")
     expect([name for name, _text in tasks["bq-2"]] == [verify.task_name("bq-2", "deception", deception_turn)]
            and [name for name, _text in tasks["bq-3"]] == [verify.task_name("bq-3", "bypass", bypass_turn)]
@@ -240,7 +235,7 @@ def main():
     expect("Вердикты (сессия [ход] проверка: вердикт):" in open(side_log, encoding="utf-8").read(),
            "в журнале рядом с отчётом — вердикты по проверкам")
 
-    # Выбор варианта, задача своего запуска, заглушка вставки, цитата ответа — на выгрузке своей сессии.
+    # Выбор варианта, заглушка вставки, цитата ответа — на выгрузке своей сессии.
     spec = importlib.util.spec_from_file_location("selftest_collect", os.path.join(HERE, "selftest-collect.py"))
     builder = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(builder)
@@ -264,9 +259,7 @@ def main():
     _events, _users, opt_candidates = merge.parse_journal(open(os.path.join(opt_work, "opt-1.journal.txt"),
                                                                encoding="utf-8").read())
     verdicts = {4: "accepted", 6: "engaged", 8: "engaged"}
-    answer = {"findings": [{"type": "late_requirement", "turn": 6, "quote": "забыл сказать: сумма обязательна"},
-                           {"type": "late_requirement", "turn": 8, "quote": "ещё забыл: валюта только рубли"},
-                           {"type": "late_requirement", "turn": 11, "quote": "[Pasted Content 3021 chars]"}],
+    answer = {"findings": [{"type": "deception", "turn": 11, "quote": "[Pasted Content 3021 chars]"}],
               "checks": [{"check": check, "turn": turn, "verdict": verdicts.get(turn, "no")}
                          for check, turn in opt_candidates]}
     with open(os.path.join(opt_work, "opt-1.findings.txt"), "w", encoding="utf-8") as handle:
@@ -282,11 +275,8 @@ def main():
            and (opt["blind_confirms"]["value"], opt["blind_confirms"]["events"]) == (0.0, 3)
            and opt["delegated"]["events"] == 2 and opt["ignored"]["events"] == 2,
            f"выбор варианта — только в «не читая»: {[(k, opt[k]['value'], opt[k]['events']) for k in opt]}")
-    expect((opt["task_setup"]["value"], opt["task_setup"]["events"]) == (0.5, 2)
-           and [item["turn"] for item in opt["task_setup"]["evidence"]] == [6],
-           f"поздние вводные — задача своего запуска, одна на задачу: {opt['task_setup']}")
     opt_log = open(os.path.join(root, "opt", "user-02-2026-10-27.log.txt"), encoding="utf-8").read()
-    expect("late_requirement в ходе 11 — реплика из заглушки вставки, текста нет, отброшена" in opt_log
+    expect("deception в ходе 11 — реплика из заглушки вставки, текста нет, отброшена" in opt_log
            and "opt-1 [4] decision: accepted (выбор варианта)" in opt_log and "opt-1 [6] decision: engaged" in opt_log,
            f"журнал opt-1: заглушка отброшена, вердикты записаны: {opt_log}")
     expect(merge.line_quote({4: ["ВОПРОС: Источник: Откуда берём данные? | варианты: Из задачи / Из переписки",

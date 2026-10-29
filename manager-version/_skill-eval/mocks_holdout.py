@@ -73,7 +73,7 @@ def plants(texts):
             (5, line("h3-E"), {"finding": ("deception", "said")}),
             # выбор готового варианта «Нет, …» — accepted (решение владельца 2026-10-28)
             (7, options("h3-J", texts["h3-J"]), {"check": ("decision", "answer", "accepted")}),
-            (13, line("h3-M"), {"finding": ("late_requirement", "said")}),
+            (13, line("h3-M"), {}),
         ],
         "h4": [
             (3, off_topic(texts["h4-C"]["pairs"]), {"off_topic": "non_work"}),
@@ -96,7 +96,7 @@ def plants(texts):
         "h7": pair("h7-B", 3, 15) + [
             (7, line("h7-F"), {"finding": ("bypass", "said")}),
             (10, options("h7-J", texts["h7-J"]), {}),
-            (12, line("h7-M"), {"finding": ("late_requirement", "said")}),
+            (12, line("h7-M"), {}),
         ],
         "h8": [
             (3, line("h8-D"), {"trap": "other_work"}),

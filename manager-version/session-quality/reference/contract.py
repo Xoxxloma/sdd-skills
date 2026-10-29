@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Контракт выхода session-quality/4: схема и правила, которые схемой не выразить.
+"""Контракт выхода session-quality/5: схема и правила, которые схемой не выразить.
 
     python3 contract.py <report.json>   # «OK» или список нарушений, код выхода 1
     python3 contract.py --selftest      # пример проходит, испорченные копии — нет
@@ -340,18 +340,18 @@ def selftest():
 
     def one_unmeasured(doc):
         unmeasure(doc, "skill_share")
-        doc["score"].update(value=68, measured_weight=93.33)
+        doc["score"].update(value=66, measured_weight=92.31)
 
     mostly = ("active_review", "blind_confirms", "delegated", "ignored", "completion")
 
     def mostly_unmeasured(doc):
         for metric_id in mostly:
             unmeasure(doc, metric_id)
-        doc["score"].update(value=None, status="insufficient", reason="измерено 33.33 % веса", measured_weight=33.33)
+        doc["score"].update(value=None, status="insufficient", reason="измерено 23.08 % веса", measured_weight=23.08)
 
     # Порча → ожидаемый кусок сообщения. Известный результат, а не «хоть какая-то ошибка».
     broken = [
-        ("скор не по формуле", lambda d: d["score"].update(value=70), "score.value 70, по формуле 69"),
+        ("скор не по формуле", lambda d: d["score"].update(value=70), "score.value 70, по формуле 68"),
         ("скор метрики не по формуле", lambda d: metric(d, "loaded_context").update(score=49), "loaded_context: score 49, по формуле 50"),
         ("final при фроде к проверке", lambda d: d["score"].update(status="final", reason=None), "score.status final, по правилу hold"),
         ("нет метрики", lambda d: d["metrics"].pop(), "нет метрик: skill_share"),
@@ -371,7 +371,7 @@ def selftest():
         ("фрод none с сигналами", lambda d: d["fraud"].update(status="none"), "элементов больше 0"),
         ("неизвестный вид фрода", lambda d: d["fraud"]["signals"][0].update(kind="repeat_requests"), "значение не из списка"),
         ("лишнее поле", lambda d: d.update(team="a"), "лишнее поле «team»"),
-        ("не измерена, а число есть", lambda d: metric(d, "skill_share").update(status="not_measured", reason="нет"), "$.metrics[7].value: ожидался тип null"),
+        ("не измерена, а число есть", lambda d: metric(d, "skill_share").update(status="not_measured", reason="нет"), "$.metrics[6].value: ожидался тип null"),
         ("длительность", lambda d: d["sessions"][1].update(duration_sec=2600), "сессия 1f6a2c90: duration_sec"),
         ("период", lambda d: d["subject"]["period"].update(to="2026-10-27T12:00:00Z"), "period.to"),
         ("время без пояса", lambda d: d.update(generated_at="2026-10-27T15:00:00"), "часовым поясом"),
@@ -386,8 +386,8 @@ def selftest():
         if not any(expected in error for error in errors):
             problems.append(f"порча «{name}»: ждали «{expected}», получили {errors or 'OK'}")
 
-    valid = [("без фрода — final", no_fraud), ("одна метрика не измерена — 68 из 93.33 % веса", one_unmeasured),
-             ("измерено 33.33 % веса — insufficient", mostly_unmeasured)]
+    valid = [("без фрода — final", no_fraud), ("одна метрика не измерена — 66 из 92.31 % веса", one_unmeasured),
+             ("измерено 23.08 % веса — insufficient", mostly_unmeasured)]
     for name, change in valid:
         doc = copy.deepcopy(example)
         change(doc)

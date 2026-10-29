@@ -19,7 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_PATH = os.path.join(HERE, "params.json")
 
 # Что считает код сейчас — порядок метрик в выходе. Остальные метрики в params.json — запланированные.
-IMPLEMENTED_METRICS = ("active_review", "blind_confirms", "delegated", "ignored", "completion", "task_setup",
+IMPLEMENTED_METRICS = ("active_review", "blind_confirms", "delegated", "ignored", "completion",
                        "loaded_context", "skill_share")
 REQUIRED = {
     "evaluation": ("decision_min_chars", "reading_speed", "human_speed", "human_min_seconds", "autoinput_fast_min",

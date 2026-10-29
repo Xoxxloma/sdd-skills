@@ -300,7 +300,6 @@ def selftest():
         return next(item for item in answer["checks"] if item["check"] == kind)
 
     bq2_other = turn_with(journals["bq-2"], "По соседней задаче STM-5")  # рабочее, не постороннее
-    bq1_redo = turn_with(journals["bq-1"], "Переделай его заново целиком")
     bq3_trap = turn_with(journals["bq-3"], "Без проверки ссылок на макеты")
     bq4_first = turn_with(journals["bq-4"], "Сделай разрез на этапы")
     broken = [
@@ -310,8 +309,6 @@ def selftest():
          "verdict decision"),
         ("bq-2", "выдуманная цитата", lambda a: finding(a, "deception").update(quote="переделай всё к утру"), "цитата не найдена"),
         ("bq-2", "ход не из журнала", lambda a: finding(a, "deception").update(turn=99), "ход 99 не из журнала"),
-        ("bq-1", "просьба переделать принята за постановку", lambda a: a["findings"].append(
-            {"type": "late_requirement", "turn": bq1_redo, "quote": "Переделай его заново целиком."}), "ложная находка late_requirement"),
         ("bq-1", "готовый результат принят за обрыв", lambda a: check(a, "ending").update(verdict="yes"), "verdict ending"),
         ("bq-2", "обрыв принят за готовый результат", lambda a: check(a, "ending").update(verdict="no"), "verdict ending"),
         ("bq-1", "цитата у посторонней темы", lambda a: a["findings"].append(
@@ -341,9 +338,9 @@ def selftest():
     # Фон: лишнее — на разбор, а не провал; заложенное и выдуманная цитата — по-прежнему провал.
     background = dict(expected["bq-4"], background=True)
     extra = copy.deepcopy(perfect["bq-4"])
-    extra["findings"].append({"type": "late_requirement", "turn": bq4_first, "quote": "Сделай разрез на этапы"})
+    extra["findings"].append({"type": "deception", "turn": bq4_first, "quote": "Сделай разрез на этапы"})
     failed, review = grade_answer("bq-4", extra, journals["bq-4"], background, schema)
-    if failed or not any("фон: находка late_requirement" in item for item in review):
+    if failed or not any("фон: находка deception" in item for item in review):
         problems.append(f"фон: лишняя находка должна уйти на разбор, а не в провал: {failed}, {review}")
     extra["findings"][-1]["quote"] = "выдумано"
     if not any("цитата не найдена" in item for item in grade_answer("bq-4", extra, journals["bq-4"], background, schema)[0]):
