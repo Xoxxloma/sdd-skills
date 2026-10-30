@@ -37,7 +37,14 @@ node_modules/
 **/_skill-eval/runs/_killed-*/
 **/_skill-eval/runs/_dry-*/
 
+# Прогоны стенда manager-version (session-quality, specs-quality): ответы модели, потоки ведущего,
+# снимки скилла — десятки мегабайт, в репозиторий не идут; числа записаны в планах.
+manager-version/_skill-eval/runs/
+
 # Полевые логи и карточки с прода, присланные для разбора: лежат в корне и в oldlogs/,
 # в репозиторий не идут (внутренний код заказчика).
 /oldlogs/
 /*.txt
+
+# Кэш Python от скриптов скиллов и стенда
+__pycache__/

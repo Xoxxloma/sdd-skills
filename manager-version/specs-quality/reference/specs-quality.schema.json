@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "specs-quality/5",
+  "title": "Оценка качества одного документа: бизнес-требований или тех-спеки",
+  "description": "Один документ — один файл <имя документа>.quality.json рядом с ним. Баллы и находки с цитатами даёт модель по рубрике; суммы, проценты, подсветку и происхождение считает скрипт merge. Правила, которые схемой не выразить (суммы, шкала балла, причины подсветки, находки ровно у сниженных критериев, веса того же вида), проверяет contract.py. Сводку по автору собирает дашборд: Σ sum / Σ max, разделы формы — по form_missing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "generated_at", "params", "document"],
+  "properties": {
+    "schema": {"const": "specs-quality/5"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "params": {"$ref": "#/$defs/params"},
+    "document": {"$ref": "#/$defs/document"}
+  },
+  "$defs": {
+    "path": {"description": "Путь от корня, через «/».", "type": "string", "minLength": 1},
+    "text": {"type": "string", "minLength": 1, "maxLength": 1000},
+    "nullable_text": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/text"}]},
+    "nullable_string": {"oneOf": [{"type": "null"}, {"type": "string", "minLength": 1}]},
+    "weight": {"type": "number", "exclusiveMinimum": 0},
+    "score": {"description": "Балл с весом: 0, половина веса или вес; null — не применимо («н/п»), причина — в findings этого критерия.", "type": ["number", "null"], "minimum": 0},
+
+    "params": {
+      "description": "Параметры, с которыми посчитан документ, — для его вида (из params.json или --params).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["below_pct", "form_min_missing", "weights"],
+      "properties": {
+        "below_pct": {"type": "number", "minimum": 0, "maximum": 100},
+        "form_min_missing": {"description": "С какого числа пропущенных разделов шаблона документ «не по форме»: у БТ из 16, у спеки из 23.",
+                             "type": "integer", "minimum": 1, "maximum": 23},
+        "weights": {"description": "Вес каждого критерия рубрики этого вида.", "oneOf": [{"$ref": "#/$defs/weights_bt"}, {"$ref": "#/$defs/weights_spec"}]}
+      }
+    },
+    "weights_bt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["goal", "entities", "functional", "acceptance", "roles"],
+      "properties": {"goal": {"$ref": "#/$defs/weight"}, "entities": {"$ref": "#/$defs/weight"}, "functional": {"$ref": "#/$defs/weight"},
+                     "acceptance": {"$ref": "#/$defs/weight"}, "roles": {"$ref": "#/$defs/weight"}}
+    },
+    "weights_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_logic", "data_model", "access", "services", "contracts"],
+      "properties": {"source_logic": {"$ref": "#/$defs/weight"}, "data_model": {"$ref": "#/$defs/weight"}, "access": {"$ref": "#/$defs/weight"},
+                     "services": {"$ref": "#/$defs/weight"}, "contracts": {"$ref": "#/$defs/weight"}}
+    },
+
+    "criteria_bt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["goal", "entities", "functional", "acceptance", "roles"],
+      "properties": {"goal": {"$ref": "#/$defs/score"}, "entities": {"$ref": "#/$defs/score"}, "functional": {"$ref": "#/$defs/score"},
+                     "acceptance": {"$ref": "#/$defs/score"}, "roles": {"$ref": "#/$defs/score"}}
+    },
+    "criteria_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_logic", "data_model", "access", "services", "contracts"],
+      "properties": {"source_logic": {"$ref": "#/$defs/score"}, "data_model": {"$ref": "#/$defs/score"}, "access": {"$ref": "#/$defs/score"},
+                     "services": {"$ref": "#/$defs/score"}, "contracts": {"$ref": "#/$defs/score"}}
+    },
+
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "repo", "kind", "key", "feature", "author", "source", "scored"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "repo": {"description": "Репозиторий, если передали при запуске; нет — null.", "$ref": "#/$defs/nullable_string"},
+        "kind": {"enum": ["bt", "spec"]},
+        "key": {"description": "Ключ задачи из шапки; нет — имя папки, у узла-фундамента — имя папки эпика.", "type": "string", "minLength": 1},
+        "feature": {"$ref": "#/$defs/nullable_string"},
+        "author": {"description": "Строка «Автор» из шапки; нет — null.", "$ref": "#/$defs/nullable_string"},
+        "source": {"description": "У спеки — документ сверху (БТ, баг-репорт, запрос на правку); нет или узел-фундамент — null. У БТ — null.", "oneOf": [{"type": "null"}, {"$ref": "#/$defs/path"}]},
+        "scored": {"description": "false — оценка не состоялась.", "type": "boolean"},
+        "skip_reason": {"$ref": "#/$defs/text"},
+        "pct": {"description": "sum / max × 100 с округлением до целого; max = 0 — null.", "type": ["integer", "null"], "minimum": 0, "maximum": 100},
+        "sum": {"type": "number", "minimum": 0},
+        "max": {"description": "Сумма весов критериев без «н/п».", "type": "number", "minimum": 0},
+        "criteria": {"description": "Критерий → балл, по порядку рубрики.", "oneOf": [{"$ref": "#/$defs/criteria_bt"}, {"$ref": "#/$defs/criteria_spec"}]},
+        "attention": {"description": "Причины «требует внимания»; пусто — не требует.", "type": "array",
+                      "items": {"enum": ["below_pct", "zero", "template", "off_form"]}},
+        "template": {"description": "Заполнено шаблонно.", "type": "boolean"},
+        "form_missing": {"description": "Номера разделов списка «Форма» рубрики без своего заголовка; null — модель форму не вернула.",
+                         "oneOf": [{"type": "null"}, {"type": "array", "items": {"type": "integer", "minimum": 1}}]},
+        "form_pct": {"description": "Доля разделов шаблона на месте; форма не проверена — null.", "type": ["integer", "null"], "minimum": 0, "maximum": 100},
+        "origin": {"description": "Только у спеки: by_code — по готовому коду (два разных признака кода, среди них «уже сделано»: 1, 3 или 6), skill — скиллом, skill_edited — скиллом и руками, outside — мимо фреймворка.",
+                   "oneOf": [{"type": "null"}, {"enum": ["by_code", "skill", "skill_edited", "outside"]}]},
+        "code_signs": {"description": "Только у спеки, у БТ — null: признаки кода, что выписал оценщик, — доказательства для origin. «По коду» — два разных номера, среди них 1, 3 или 6.",
+                       "oneOf": [{"type": "null"}, {"type": "array", "items": {"$ref": "#/$defs/code_sign"}}]},
+        "findings": {"description": "По строке на сниженный или «н/п» критерий рубрики, по её порядку.",
+                     "type": "array", "items": {"$ref": "#/$defs/finding"}}
+      },
+      "allOf": [
+        {"if": {"properties": {"scored": {"const": false}}},
+         "then": {"required": ["skip_reason"],
+                  "allOf": [{"not": {"required": ["criteria"]}}, {"not": {"required": ["pct"]}}, {"not": {"required": ["findings"]}},
+                            {"not": {"required": ["attention"]}}]}},
+        {"if": {"properties": {"scored": {"const": true}}},
+         "then": {"required": ["pct", "sum", "max", "criteria", "attention", "template", "form_missing", "form_pct", "origin", "code_signs", "findings"],
+                  "not": {"required": ["skip_reason"]}}}
+      ]
+    },
+
+    "code_sign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["n", "kind", "quote"],
+      "properties": {
+        "n": {"description": "Номер признака из списка рубрики спеки.", "type": "integer", "minimum": 1, "maximum": 6},
+        "kind": {"enum": ["сделано в коде", "путь к исходнику", "объём правки в строках", "рефакторинг или тесты", "миграция или changelog", "закрытое изменение источником"]},
+        "quote": {"$ref": "#/$defs/text"},
+        "quote_found": {"description": "Есть только если цитаты нет в тексте документа.", "const": false}
+      }
+    },
+
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criterion", "comment", "fix", "quote"],
+      "properties": {
+        "criterion": {"description": "Критерий рубрики.", "type": "string", "minLength": 1},
+        "comment": {"description": "Что не так, или причина «н/п»; где искал — в скобках.", "$ref": "#/$defs/nullable_text"},
+        "fix": {"description": "Что подняло бы балл.", "$ref": "#/$defs/nullable_text"},
+        "quote": {"description": "Раздел и цитата: «§3.2: «…»».", "$ref": "#/$defs/nullable_text"},
+        "quote_found": {"description": "Есть только если цитаты нет в тексте документа; балл от этого не меняется.", "const": false}
+      }
+    }
+  }
+}
