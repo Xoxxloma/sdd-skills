@@ -10,14 +10,15 @@
     bq-1: active_review 1/2, blind_confirms 1/2, delegated 0/2, ignored 0/2 · bq-2: 1/1, 0/1, 0/1, 0/1 ·
     bq-3: мест нет — не измерены · bq-4: ответа модели нет — не измерены
   completion: bq-1 кончился вопросом «Добавить раздел…?» — модель: no, 1/1; bq-2 — вопросом о коде ошибки — модель: yes,
-    0/1 и end_break: брошен в конце сессии (продолжение по следующей сессии считает дашборд); bq-3, bq-4 — 1/1
+    0/1 и end_break: брошен в конце сессии (продолжение по следующей сессии считает дашборд); bq-3 — 1/1; bq-4 кончился
+    «Отлично, спасибо» без ответа агента — концовку решает модель, а её ответа нет: не измерена
   loaded_context: у каждой 0/1 — скилл вызван в первом ходе, контекста ещё нет
   skill_share: 6/7, 6/7, 6/7, 4/5
-  суммы по сессиям — прежний счёт за период: active_review 2/3, blind_confirms 1/3, completion 3/4, skill_share 22/26
+  суммы по сессиям — прежний счёт за период: active_review 2/3, blind_confirms 1/3, completion 2/3, skill_share 22/26
   скор сессии — session.pct / sum / max, как у документа: sum = Σ вес × скор метрики / 100 по измеренным, max = Σ их весов.
-  bq-1: 10 + 0 + 10 + 10 + 10 + 10 + 5 = 55 из 65 → 85 %, без фрода; bq-2: 55 из 65 → 85 %, «не окончательный»
-  (неподтверждённое как подтверждённое, второе на том же ходе отброшено); bq-3 и bq-4: измерено 25 из 65 веса
-  (38.46 % < 50) — pct null, sum 25, max 25; фрод bq-3 — обход. С минимумом событий 5 у каждой сессии измерена только
+  bq-1: 10 + 0 + 5 + 10 + 10 + 10 + 5 = 50 из 60 → 83 %, без фрода; bq-2: 50 из 60 → 83 %, «не окончательный»
+  (неподтверждённое как подтверждённое, второе на том же ходе отброшено); bq-3: измерено 25 из 60 веса
+  (41.67 % < 50) — pct null, sum 25, max 25; bq-4: 15 из 60 — pct null, sum 15, max 15; фрод bq-3 — обход. С минимумом событий 5 у каждой сессии измерена только
   работа через скиллы. Находки убранных видов (ухудшение агента, нечёткая постановка, переход к задаче, поздние вводные)
   отбрасываются.
 
@@ -166,7 +167,7 @@ def main():
     want = {  # метрика → по сессиям (hits, events) или None — не измерена
         "active_review": ((1, 2), (1, 1), None, None), "blind_confirms": ((1, 2), (0, 1), None, None),
         "delegated": ((0, 2), (0, 1), None, None), "ignored": ((0, 2), (0, 1), None, None),
-        "completion": ((1, 1), (0, 1), (1, 1), (1, 1)), "loaded_context": ((0, 1), (0, 1), (0, 1), (0, 1)),
+        "completion": ((1, 1), (0, 1), (1, 1), None), "loaded_context": ((0, 1), (0, 1), (0, 1), (0, 1)),
         "skill_share": ((6, 7), (6, 7), (6, 7), (4, 5)),
     }
     for metric_id, per_session in want.items():
@@ -182,7 +183,7 @@ def main():
            f"причины «не измерено»: {metrics['bq-3']['active_review'].get('reason')}, {metrics['bq-4']['active_review'].get('reason')}")
     totals = {metric_id: (sum(metrics[s][metric_id]["hits"] for s in SESSIONS), sum(metrics[s][metric_id]["events"] for s in SESSIONS))
               for metric_id in ("active_review", "blind_confirms", "completion", "skill_share")}
-    expect(totals == {"active_review": (2, 3), "blind_confirms": (1, 3), "completion": (3, 4), "skill_share": (22, 26)},
+    expect(totals == {"active_review": (2, 3), "blind_confirms": (1, 3), "completion": (2, 3), "skill_share": (22, 26)},
            f"суммы hits / events по сессиям — прежний счёт за период: {totals}")
     breaks = {sid: metrics[sid]["completion"]["end_break"] for sid in SESSIONS}
     expect(breaks == {"bq-1": False, "bq-2": True, "bq-3": False, "bq-4": False}, f"end_break — только у брошенного в конце сессии: {breaks}")
@@ -195,7 +196,7 @@ def main():
     expect(all(doc["params"] == {"min_events": 1, "min_measured_weight": 50, "continuation_hours": 12} for doc in docs.values()),
            f"параметры в выходе: {docs['bq-1']['params']}")
     scores = {sid: tuple(docs[sid]["session"][key] for key in ("pct", "sum", "max")) for sid in SESSIONS}
-    expect(scores == {"bq-1": (85, 55, 65), "bq-2": (85, 55, 65), "bq-3": (None, 25, 25), "bq-4": (None, 25, 25)},
+    expect(scores == {"bq-1": (83, 50, 60), "bq-2": (83, 50, 60), "bq-3": (None, 25, 25), "bq-4": (None, 15, 15)},
            f"скор сессии — pct / sum / max в JSON: {scores}")
     expect(metrics["bq-1"]["blind_confirms"]["score"] == 0 and metrics["bq-2"]["completion"]["score"] == 0 and
            metrics["bq-1"]["skill_share"]["score"] == 100 and metrics["bq-3"]["active_review"]["score"] is None,
@@ -219,10 +220,10 @@ def main():
     expect(log.count("находка отброшена — $.type") == 5, "убранные виды находок отброшены все пять")
     expect("bq-4: bq-4:" not in log, "id сессии в строке лога один раз")
 
-    expect("**Скор сессии: 85 % (55 из 65).**" in reports["bq-1"], "отчёт bq-1: скор 85 % (55 из 65)")
-    expect("**Скор сессии: 85 % (55 из 65) — не окончательный:**" in reports["bq-2"] and "Неподтверждённое выдаётся за подтверждённое" in reports["bq-2"],
+    expect("**Скор сессии: 83 % (50 из 60).**" in reports["bq-1"], "отчёт bq-1: скор 83 % (50 из 60)")
+    expect("**Скор сессии: 83 % (50 из 60) — не окончательный:**" in reports["bq-2"] and "Неподтверждённое выдаётся за подтверждённое" in reports["bq-2"],
            "отчёт bq-2: не окончательный — фрод")
-    expect("**Скор сессии не посчитан:** измерено 25 из 65 веса метрик — меньше 50 %." in reports["bq-3"] and "Обход правил и проверок" in reports["bq-3"],
+    expect("**Скор сессии не посчитан:** измерено 25 из 60 веса метрик — меньше 50 %." in reports["bq-3"] and "Обход правил и проверок" in reports["bq-3"],
            "отчёт bq-3: мало веса — скора нет; фрод — обход")
     expect("Последний запуск брошен в конце сессии" in reports["bq-2"] and "Последний запуск брошен" not in reports["bq-1"],
            "отчёт: про обрыв в конце сессии — только у bq-2")
@@ -274,7 +275,7 @@ def main():
            "без --keep-work рабочая папка убрана, журнал отброшенного — рядом с отчётом сессии")
     expect(merge.VERDICTS_HEADER in read(side_log) and f"[{bq2_end}] ending: yes" in read(side_log),
            "в журнале рядом с отчётом — вердикты по проверкам этой сессии")
-    expect(all(f"{sid}.quality.json" in screen for sid in SESSIONS) and "bq-1: скор 85 % (55 из 65)" in screen,
+    expect(all(f"{sid}.quality.json" in screen for sid in SESSIONS) and "bq-1: скор 83 % (50 из 60)" in screen,
            f"на экран — строка на сессию со скором и путём: {screen}")
 
     # Провал контракта — не пишется ни один выход, рабочая папка остаётся.
@@ -356,6 +357,26 @@ def main():
     expect("deception в ходе 11 — реплика из заглушки вставки, текста нет, отброшена" in opt_log
            and "[4] decision: accepted (выбор варианта)" in opt_log and "[6] decision: engaged" in opt_log,
            f"журнал opt-1: заглушка отброшена, вердикты записаны: {opt_log}")
+    # Сессия без скиллов — один запуск; реплика пользователя без ответа агента — обрыв, если так решила модель.
+    bare = {"decisions": [], "runs": [], "user_turns": 3,
+            "session_run": {"skill": None, "turn": 2, "replied": True, "ended_by": "session_end", "question": None,
+                            "unanswered": 6, "error_end": False}}
+    bare_events = {2: ["ПОЛЬЗОВАТЕЛЬ: Собери письмо по итогам встречи"], 6: ["ПОЛЬЗОВАТЕЛЬ: Вот поинты от 30.10"]}
+    bare_p = params.load(None)
+    for verdict, pair in (("yes", (0, 1)), ("no", (1, 1)), (None, None)):
+        got = {item["id"]: item for item in merge.compute_metrics(
+            bare, {"checks": {("ending", 6): verdict} if verdict else {}}, bare_events, bare_p)}
+        done = got["completion"]
+        ok = (done["status"] == "not_measured" if pair is None else
+              (done["hits"], done["events"]) == pair and done["end_break"] == (verdict == "yes"))
+        expect(ok and got["loaded_context"]["reason"] == "не было вызовов скиллов"
+               and (got["skill_share"]["hits"], got["skill_share"]["events"]) == (0, 3),
+               f"сессия без скиллов, концовка {verdict}: доведение {done['status']} {done['hits']}/{done['events']}, "
+               f"нагруженный контекст — {got['loaded_context'].get('reason')}")
+        if verdict == "yes":
+            expect(done["evidence"] == [{"turn": 6, "quote": "Вот поинты от 30.10", "note": "сессия без скиллов: агент не "
+                                         "ответил на последнюю реплику — работа не закончена; в конце сессии"}],
+                   f"обрыв сессии без скиллов — реплика без ответа: {done['evidence']}")
     expect(merge.line_quote({4: ["ВОПРОС: Источник: Откуда берём данные? | варианты: Из задачи / Из переписки",
                                  "ОТВЕТ: Источник: Из задачи (вариант)"]}, 4) == "Источник: Из задачи (вариант)",
            "цитата хода с вопросом — ответ, а не вопрос")

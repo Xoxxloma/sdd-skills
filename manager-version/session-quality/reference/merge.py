@@ -266,22 +266,37 @@ def compute_metrics(facts, found, events, p):
                                     "не было мест решения" if kind == "blind" else "не было мест решения с ответом текстом")
 
     # Доведение до результата: запуск, кончившийся ошибкой, не в счёт; спорная концовка без вердикта модели — тоже.
-    # Последний запуск, брошенный в конце сессии, — обрыв с пометкой end_break.
+    # Сессия без скиллов — сама один запуск. Последний запуск, брошенный в конце сессии, — обрыв с пометкой end_break.
+    def ending(run):
+        """(ход, цитата, причина обрыва) — чем кончился запуск, если ответа не дождались; None — ответ был."""
+        if run["question"]:
+            return run["question"]["turn"], run["question"]["text"], "висит вопрос агента — без ответа работа не закончена"
+        if run.get("unanswered") is not None:
+            return run["unanswered"], line_quote(events, run["unanswered"]), "агент не ответил на последнюю реплику — работа не закончена"
+        return None
+
     def run_break(run, verdicts):
-        question = run["question"]
         if not run["replied"]:
             return "агент после запуска ничего не ответил"
-        if question:
-            verdict = verdicts.get(("ending", question["turn"]))
+        end = ending(run)
+        if end:
+            verdict = verdicts.get(("ending", end[0]))
             if verdict is None:
                 return UNDECIDED
             if verdict == "yes":
-                return "висит вопрос агента — без ответа работа не закончена"
+                return end[2]
         return None
 
+    def run_proof(run, reason):
+        end = ending(run) if run["replied"] else None
+        where = f"запуск {run['skill']}" if run["skill"] else "сессия без скиллов"
+        return {"turn": end[0] if end else run["turn"],
+                "quote": end[1] if end else event_quote(events, run["turn"], ("СКИЛЛ",)), "note": f"{where}: {reason}"}
+
     verdicts = found["checks"] if found else {}
+    runs = facts["runs"] or ([facts["session_run"]] if facts.get("session_run") else [])
     counted, done, broken, end_break = 0, 0, [], False
-    for index, run in enumerate(facts["runs"]):
+    for index, run in enumerate(runs):
         if run["error_end"]:
             continue
         reason = run_break(run, verdicts)
@@ -291,17 +306,14 @@ def compute_metrics(facts, found, events, p):
         if not reason:
             done += 1
             continue
-        at_end = index == len(facts["runs"]) - 1 and run["ended_by"] == "session_end"
+        at_end = index == len(runs) - 1 and run["ended_by"] == "session_end"
         end_break = end_break or at_end
         broken.append((run, reason + ("; в конце сессии" if at_end else "")))
     out["completion"] = metric(
-        "completion", done, counted,
-        [{"turn": run["question"]["turn"] if run["question"] else run["turn"],
-          "quote": run["question"]["text"] if run["question"] else event_quote(events, run["turn"], ("СКИЛЛ",)),
-          "note": f"запуск {run['skill']}: {reason}"} for run, reason in broken],
+        "completion", done, counted, [run_proof(run, reason) for run, reason in broken],
         "не было запусков скиллов", end_break=end_break)
 
-    # Нагруженный контекст: новая работа в той же сессии — вызов скилла.
+    # Нагруженный контекст: шаг работы в той же сессии — вызов скилла, пользователем или агентом.
     heavy = [run for run in facts["runs"]
              if run["after_compression"] or (run["context_share_before"] is not None and run["context_share_before"] > threshold)]
 
@@ -313,7 +325,7 @@ def compute_metrics(facts, found, events, p):
     out["loaded_context"] = metric(
         "loaded_context", len(heavy), len(facts["runs"]),
         [{"turn": run["turn"], "quote": event_quote(events, run["turn"], ("СКИЛЛ",)), "note": loaded_note(run)} for run in heavy],
-        "не было начал новой работы")
+        "не было вызовов скиллов")
 
     inside = sum(run["user_turns"] for run in facts["runs"])
     out["skill_share"] = metric("skill_share", inside, facts["user_turns"], [], "нет реплик пользователя")

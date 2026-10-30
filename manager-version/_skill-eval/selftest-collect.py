@@ -219,11 +219,13 @@ def main():
     expect(len(runs) == 2, f"A: запусков {len(runs)}")
     expect(first.get("turn") == 3 and first.get("via") == "user" and first.get("user_turns") == 4 and first.get("replied") is True
            and first.get("ended_by") == "next_skill" and first.get("question") is None and first.get("error_end") is False
+           and first.get("unanswered") is None
            and first.get("context_share_before") == 0.0 and first.get("after_compression") is False,
-           f"A: первый запуск {first}")
+           f"A: первый запуск — реплика [10] отвечена вызовом скилла агентом: {first}")
     expect(second.get("turn") == 11 and second.get("via") == "agent" and second.get("user_turns") == 2
            and second.get("ended_by") == "session_end"
            and second.get("question") == {"turn": 15, "text": "Какой формат ответа у ручки?"} and second.get("error_end") is False
+           and second.get("unanswered") is None
            and second.get("context_share_before") == 0.763 and second.get("after_compression") is True,
            f"A: второй запуск — контекст с конца прошлого хода (200000 / 262000), после сжатия, концовка вопросом: {second}")
     expect(a["context"] == {"peak_share": 0.763, "peak_tokens": 200000, "turn": 8}, f"A: пик контекста {a['context']}")
@@ -268,7 +270,8 @@ def main():
            f"B: короткая сессия {b['user_turns']}, {b['skip_reason']}")
     expect(b["context"] == {"peak_share": 1.0, "peak_tokens": 300000, "turn": 4} and b["hits"]["over_window"] == 1,
            f"B: токенов больше окна — доля 1.0 и отметка в сверке {b['context']}")
-    expect(load("sess-b.journal.txt").rstrip().endswith(collect.CHECKS_HEADER + "\n- нет"), "журнал B: проверять нечего")
+    expect(load("sess-b.journal.txt").rstrip().endswith(collect.CHECKS_HEADER + "\n- нет") and b["session_run"] is None,
+           "журнал B: проверять нечего — короткая сессия не оценивается, концовку не проверяем")
     session = collect.Session("sess-b", 10000)
     for turn, event in collect.read_export(os.path.join(sessions, "sess-b.json"))[0]:
         session.feed(turn, event)
@@ -277,6 +280,10 @@ def main():
     c = load("sess-c.facts.json")
     expect(c["user_turns"] == 5 and c["scored"] is True and c["skills"] == [] and c["runs"] == [],
            f"C: реплик 3 + ответов на вопросы 2 (без ответа и битый — нет) = 5: {c['user_turns']}")
+    expect(c["session_run"] == {"skill": None, "turn": 2, "replied": True, "ended_by": "session_end", "question": None,
+                                "unanswered": None, "error_end": False}
+           and not [item for item in c["checks"] if item["check"] == "ending"],
+           f"C: сессия без скиллов — один запуск; ответ [8] отвечен вопросом агента [9], концовку проверять нечего: {c['session_run']}")
     expect(c["answers"]["total"] == 5 and c["answers"]["verdicts"] == {"вариант": 2, "Другое": 1, "нет ответа": 2},
            f"C: ответы {c['answers']['verdicts']}")
     expect([(item["turn"], item["kind"]) for item in c["decisions"]] == [(3, "question"), (8, "question")],
@@ -302,6 +309,11 @@ def main():
     ee = load("sess-e.facts.json")
     expect([(run["skill"], run["replied"]) for run in ee["runs"]] == [("context-doc", True), ("business-requirements-doc", True)],
            f"E: запуск, где агент только спросил вариантами (ASSISTANT_ANSWER нет), — агент ответил: {ee['runs']}")
+    expect([run["unanswered"] for run in ee["runs"]] == [None, 7] and ee["session_run"] is None
+           and [(item["check"], item["turn"]) for item in ee["checks"]] == [("decision", 4), ("ending", 7)]
+           and "- ending [7]: запуск business-requirements-doc кончился репликой пользователя без ответа агента"
+           in load("sess-e.journal.txt"),
+           f"E: ответ [4] отвечен вызовом скилла [5]; реплика [7] без ответа агента — концовка к проверке: {ee['checks']}")
     expect([(item["turn"], item["option"]) for item in ee["decisions"]] == [(4, True)] and ee["hidden_turns"] == [7]
            and ee["fast"] == [] and ee["user_turns"] == 3,
            f"E: выбор варианта помечен; реплика из одной заглушки вставки — не место решения: {ee['decisions']}, "

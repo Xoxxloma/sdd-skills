@@ -241,6 +241,9 @@ class Session:
         self.agent_chars = 0          # непрочитанный текст агента — с последнего ответа пользователя
         self.agent_first_ts = None    # время первого непрочитанного куска
         self.question = None          # вопрос агента обычным текстом, на который ещё не ответили
+        self.unanswered = None        # ход реплики пользователя, на которую агент ещё не ответил
+        self.first_user_turn = None   # сессия без скиллов для «доведения до результата» — сама один запуск
+        self.agent_replied = False    # агент ответил после первой реплики пользователя
         self.answers_total = 0
         self.verdicts = {"вариант": 0, "Другое": 0, "нет ответа": 0}
         self.decisions = []           # кандидаты «место решения»: ответ на вопрос агента или на длинный текст
@@ -280,6 +283,8 @@ class Session:
         pending = self.question
         if pending and pending["turn"] >= self.run["turn"]:
             self.run["question"] = dict(pending)
+        unanswered = self.unanswered
+        self.run["unanswered"] = unanswered if unanswered is not None and unanswered >= self.run["turn"] else None
         self.run["error_end"] = self.last_error
         self.runs.append(self.run)
         self.run = None
@@ -336,6 +341,8 @@ class Session:
         command = flat[1:].split(maxsplit=1)[0] if flat.startswith("/") and len(flat) > 1 else None
         self.user_turns += 1
         self.last_error = False
+        if self.first_user_turn is None:
+            self.first_user_turn = turn
         if self.run and not command:
             self.run["user_turns"] += 1
         if len(raw) > INSERT_LIMIT:
@@ -358,6 +365,7 @@ class Session:
             self.run["user_turns"] += 1  # команда — первая реплика запуска
             self.event(turn, f"СКИЛЛ: {command} (вызов пользователем)")
         self.command = command
+        self.unanswered = turn
 
     def answer(self, event, turn, stamp):
         tokens = event.get("inputTokens")
@@ -373,6 +381,8 @@ class Session:
             return
         self.event(turn, f"АГЕНТ: {clip_agent(mask(text))}")
         self.last_error = False
+        self.unanswered = None
+        self.agent_replied = self.agent_replied or self.first_user_turn is not None
         if self.run:
             self.run["replied"] = True
         self.agent_chars += len(text)
@@ -388,6 +398,8 @@ class Session:
     def ask(self, event, turn, stamp):
         if self.run:
             self.run["replied"] = True  # ход с вопросом агента ASSISTANT_ANSWER не пишет — вопрос и есть ответ агента
+        self.unanswered = None
+        self.agent_replied = self.agent_replied or self.first_user_turn is not None
         payload = event.get("askUserQuestion")
         if isinstance(payload, str):  # по типизации — строка с JSON; готовый объект тоже принимаем
             try:
@@ -424,6 +436,9 @@ class Session:
         # Ответ на вопрос — реплика пользователя: в петле скиллов человек работает именно так.
         self.user_turns += 1
         self.last_error = False
+        self.unanswered = turn
+        if self.first_user_turn is None:
+            self.first_user_turn = turn
         if self.run:
             self.run["user_turns"] += 1
         # Время показа вопроса не выгружается (событие приходит с ответом): читать начали не раньше прошлого события.
@@ -439,6 +454,7 @@ class Session:
         command, self.command = self.command, None
         if command and self.run and self.run["via"] == "user" and command.split(":")[-1] == name.split(":")[-1]:
             return  # этот запуск уже открыл слэш-вызов
+        self.unanswered = None  # вызов скилла агентом — ответ на реплику пользователя
         self.start_run(name, turn, "agent")
         self.event(turn, f"СКИЛЛ: {name}")
 
@@ -485,8 +501,9 @@ class Session:
         self.prev_stamp = stamp
 
 
-def candidate_checks(session):
-    """Кандидаты скрипта, по которым модель выносит вердикт: один на (вид, ход)."""
+def candidate_checks(session, runs):
+    """Кандидаты скрипта, по которым модель выносит вердикт: один на (вид, ход). runs — запуски для «доведения до
+    результата»: запуски скиллов или вся сессия без скиллов."""
     checks = []
     for item in session.decisions:
         if item["kind"] == "question":
@@ -496,10 +513,16 @@ def candidate_checks(session):
         else:
             detail = f"ответ на длинный текст агента, {item['agent_chars']} симв."
         checks.append({"check": "decision", "turn": item["turn"], "detail": detail})
-    for run in session.runs:
-        if run["question"] and not run["error_end"]:
+    for run in runs:
+        if run["error_end"]:
+            continue
+        where = f"запуск {run['skill']} кончился" if run["skill"] else "сессия без скиллов кончилась"
+        if run["question"]:
             checks.append({"check": "ending", "turn": run["question"]["turn"],
-                           "detail": f"запуск {run['skill']} кончился вопросом агента без ответа"})
+                           "detail": f"{where} вопросом агента без ответа"})
+        elif run["replied"] and run["unanswered"] is not None:
+            checks.append({"check": "ending", "turn": run["unanswered"],
+                           "detail": f"{where} репликой пользователя без ответа агента"})
     unique = {(item["check"], item["turn"]): item for item in checks}
     return sorted(unique.values(), key=lambda item: (item["turn"], item["check"]))
 
@@ -513,6 +536,11 @@ def collect_session(path, session_id, out_dir, context_window):
         session.feed(turn, event)
     session.close_run("session_end")
     session.flush_streak()
+    whole = None  # оцениваемая сессия без скиллов — для «доведения до результата» она сама один запуск
+    if not session.runs and session.first_user_turn is not None and session.user_turns >= MIN_USER_TURNS:
+        whole = {"skill": None, "turn": session.first_user_turn, "replied": session.agent_replied,
+                 "ended_by": "session_end", "question": dict(session.question) if session.question else None,
+                 "unanswered": session.unanswered, "error_end": session.last_error}
     for run in session.runs:
         if context_window:  # до первого запроса к модели контекст пуст
             run["context_share_before"] = share_of(run["context_tokens_before"] or 0, context_window)
@@ -522,7 +550,7 @@ def collect_session(path, session_id, out_dir, context_window):
     start, end = min(stamps).replace(microsecond=0), max(stamps).replace(microsecond=0)
     head = (f"# Сессия {session_id} · начало {iso(start)} · длительность {round((end - start).total_seconds())} с"
             f" · событий {len(events)} · реплик пользователя {session.user_turns}")
-    checks = candidate_checks(session)
+    checks = candidate_checks(session, session.runs or ([whole] if whole else []))
     check_lines = [f"- {item['check']} [{item['turn']}]: {item['detail']}" for item in checks] or ["- нет"]
     journal = "\n".join([head] + [f"[{turn}] {text}" for turn, text in session.events]
                         + ["", CHECKS_HEADER] + check_lines) + "\n"
@@ -547,6 +575,7 @@ def collect_session(path, session_id, out_dir, context_window):
         "skip_reason": None if scored else f"меньше {MIN_USER_TURNS} реплик пользователя",
         "context": {"peak_share": share, "peak_tokens": tokens, "turn": peak_turn},
         "runs": session.runs,
+        "session_run": whole,
         "answers": {"total": session.answers_total, "verdicts": session.verdicts},
         "decisions": session.decisions,
         "hidden_turns": session.hidden,

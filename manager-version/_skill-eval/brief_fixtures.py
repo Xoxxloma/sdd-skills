@@ -182,12 +182,13 @@ def build_bq4(folder):
     b.agent(180, text="Да, запись не прошла: не было прав на файл. Записал заново в ту же папку.",
             calls=[call("write_file", {"file_path": "coddoc/PAY-9/stages.md", "content": "…"}, "w2")], tokens=62000)
     b.result(181, "write_file", "w2", output="ok")
-    b.user(200, "Отлично, спасибо")
+    t13 = b.user(200, "Отлично, спасибо")
     mapping = b.write(folder)
     return remap(mapping=mapping, expected={
         "findings": [],
         "off_topic": {},
-        "checks": {("decision", t5): "engaged", ("decision", t7): "no"},  # t10 — ложный успех: больше не проверяется
+        # t10 — ложный успех: больше не проверяется; t13 — благодарность без ответа агента: работа закончена
+        "checks": {("decision", t5): "engaged", ("decision", t7): "no", ("ending", t13): "no"},
     })
 
 
