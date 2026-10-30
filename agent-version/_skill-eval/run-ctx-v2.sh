@@ -322,6 +322,8 @@ case "$PROBE" in
   # ней не видны; здесь спеки в форме шаблона, БТ с именами ролей, фронтовая спека без контрактов и
   # индекс этапов «не применимо». Состав и ожидания — `fixtures/RV-AUDIT/README.md`.
   rv-bt-clean)  FIXTURE=RV-AUDIT; PROMPT_FILE=bt-clean-prompt.txt;  SKILL=spec-review ;;
+  # Тот же чистый БТ со строками «Редакция» и «Версия скилла»: имя скилла похоже на имя сервиса.
+  rv-bt-hdr)    FIXTURE=HDR-RV;   PROMPT_FILE=bt-clean-prompt.txt;  SKILL=spec-review ;;
   rv-bt-dirty)  FIXTURE=RV-AUDIT; PROMPT_FILE=bt-dirty-prompt.txt;  SKILL=spec-review ;;
   # п.2 PLAN-FROM-POCOCK, шаг 4: счётная строка «порог без примера на границе» — не нарушение. grade-rv-lim.mjs --case=…
   rv-lim-clean)   FIXTURE=RV-LIM; PROMPT_FILE=bt-clean-prompt.txt; SKILL=spec-review ;;
@@ -512,6 +514,7 @@ case "$PROBE" in
   # вердикт и то, что файла нет. `cr-notsmall-q` — мягкий стоп (вопрос «правка или БТ», не отказ),
   # `cr-idea-q` и `cr-bug-q` — жёсткие (файла нет, назван другой маршрут).
   cr-btn-w)      FIXTURE=CR-SMALL; PROMPT_FILE=btn-w-prompt.txt;      SKILL=change-request-doc ;;
+  cr-rework-w)   FIXTURE=HDR-CR;   PROMPT_FILE=rework-w-prompt.txt;   SKILL=change-request-doc ;;
   cr-btn-q)      FIXTURE=CR-SMALL; PROMPT_FILE=btn-q-prompt.txt;      SKILL=change-request-doc ;;
   cr-api-w)      FIXTURE=CR-SMALL; PROMPT_FILE=api-w-prompt.txt;      SKILL=change-request-doc ;;
   cr-notsmall-q) FIXTURE=CR-SMALL; PROMPT_FILE=notsmall-q-prompt.txt; SKILL=change-request-doc ;;
@@ -635,6 +638,8 @@ case "$PROBE" in
   # верный исход — свой файл правится на месте там, где хватает данных, вопросы только по находкам,
   # ключ не переспрошен, нового файла нет. Читается по файлу и `answer.md` вручную.
   bg-rework-q) FIXTURE=RV-BUG; PROMPT_FILE=rework-q-prompt.txt; SKILL=bug-report-doc ;;
+  # Доработка с ответами: файл обязан быть записан, грейдится шапка (`grade-header.mjs`).
+  bg-rework-w) FIXTURE=HDR-BUG; PROMPT_FILE=rework-w-prompt.txt; SKILL=bug-report-doc ;;
   # Спека на багфикс рядом с баг-репортом: источником обязан уйти РЕПОРТ, а пункт 3 обязан найти
   # FR-1 в его «Ожидаемом результате» и НЕ покраснеть за «требование без контракта» — §2 у багфикса
   # законно «не применимо». Два разных провала, различимы в одном отчёте: приёмка называет пути

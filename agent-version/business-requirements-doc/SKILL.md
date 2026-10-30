@@ -1,6 +1,6 @@
 ---
 name: business-requirements-doc
-version: 1.5.0
+version: 1.6.0
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
 description: 'Gathers business requirements and writes ONE Markdown spec (BRD→SRS) in Russian. It MAY read the repo as evidence, but nothing enters the spec on your own authority: before writing, every gate is either stated by the user themselves or put to the user and answered, and only what the user explicitly leaves open becomes TBD. The mandatory first question is the linked Jira/SberTrack task key (SMSEC-1234); without it the spec is not written. Before writing it also decides the business cut (§4.5) — several separate deliveries (поставки) → it proposes the split into parts (части); one delivery → it says so explicitly («не применимо: причина») — and puts that proposal to the user in the handoff. Use whenever someone wants to write a ТЗ / BRD / SRS, formalize a request, or describe a task, feature, change, or integration for developers.'
@@ -589,6 +589,8 @@ Save it as one new Markdown file in a **task-scoped folder under `coddoc/`**:
   пиши в `docs/dev/…` или в папку соседнего скилла, не создавай других файлов.
   Исключение одно — **файл, который ты сам только что записал**: править его по замечанию
   аналитика в хендоффе разрешено (Step 6), это твой файл, а не чужой.
+- **Доработка готового файла** — в той же правке обнови в шапке «Редакцию», «Автора» и «Версию скилла»
+  по правилам шаблона; простановка статуса при первой записи доработкой не считается.
 
 **«Статус готовности» ставится последним, а не первым. Порядок действий:**
 
@@ -641,6 +643,7 @@ Save it as one new Markdown file in a **task-scoped folder under `coddoc/`**:
    источник есть — открой и сличи имя посимвольно. Критерий — не «правдоподобно ли», а «нашёл
    ли я его там сейчас». Не совпало — предъяви оба имени вопросом и поправь §5.3 по ответу;
    источника нет — имя пользователя дословно.
+   **Строка шапки «Версия скилла» — исключение:** имя скилла в ней ставит шаблон, а не пользователь.
 3. Реестр Step 3.5 в момент записи не содержал **ни одного ❓**; каждый обязательный гейт —
    ✅ либо ⏭️. Ни один бизнес-гейт (заказчик, стейкхолдер, приоритет, сроки,
    ценность, риски) не заполнен выдуманным или «правдоподобным» значением — каждый
@@ -838,6 +841,8 @@ Only confirmed content is filled; gates the user explicitly deferred (⏭️) ar
 
 > **Задача Jira/SberTrack:** [SMSEC-1234] — обязательно, задаётся первым вопросом (Gate 0).
 > **Автор:** [логин того, кто пишет этот файл: вывод `whoami` (Linux, macOS, Windows); у `ДОМЕН\логин` — часть после `\`; команда не сработала — `—`. Файл уже был — список сохрани: твоего логина в нём нет (регистр не важен) — допиши через `, `; стоял `—` — замени]
+> **Редакция:** [N (ГГГГ-ММ-ДД): первая запись 1, доработка +1, строки не было — 2; дата этой записи — из окружения сессии или `date +%F`, не по памяти; не узнать — без скобок]
+> **Версия скилла:** [business-requirements-doc 1.6.0; файл уже был — строку сохрани, этой версии в ней нет — допиши через `, `]
 >
 > **Статус готовности:** [Готово к оценке | Требуются уточнения (N)]
 > — **Заполняется последним** (Step 4). В момент записи файла здесь стоит
