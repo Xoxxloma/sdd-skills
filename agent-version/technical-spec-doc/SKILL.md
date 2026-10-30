@@ -1,6 +1,6 @@
 ---
 name: technical-spec-doc
-version: 1.7.0
+version: 1.8.0
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion, Agent
 description: 'Turns a confirmed business-requirements doc (БТ/BRD/SRS) into ONE Russian Markdown technical spec (technical_specification.md, saved next to the БТ), organized around INTERACTIONS — the new and changed contracts crossing service or FE/BE boundaries — so a frontend agent and a backend agent code against the same contracts and meet without after-the-fact stitching. You read no code yourself: NEW things are designed fully (path, schema, JSON example); anything about an EXISTING service is written only as the analyst confirmed it — inventing an endpoint of a service you cannot see is the worst failure of this skill. Requires a ready БТ (or, by orchestrator flag, a bug report, a change request or an epic-БТ for foundation node #0): given only a brief or an idea it refuses and asks for the business requirements. Use when the БТ is ready and a dev spec is needed.'
@@ -670,7 +670,7 @@ a 🟡 assumption, or resolve a ❓ fork):
   because the document now "looks" nearly complete. The cardinal sin applies on every
   pass.
 - After editing, **re-run Step 3.5 (ledger), Step 5 (self-review), set or bump «Редакция», update
-  «Автор» by the template rule and recompute «Статус готовности»** — if «Открытые вопросы» is now empty, flip it to «Готово к разработке»;
+  «Автор» and «Версия скилла» by the template rule and recompute «Статус готовности»** — if «Открытые вопросы» is now empty, flip it to «Готово к разработке»;
   otherwise keep «Требуются уточнения (N)» with the recomputed N and the shrunken list. Re-show the updated spec and
   its path.
 - При доработке проверь оформление неприменимого **во всей спеке**, включая старые строки без
@@ -745,7 +745,8 @@ Provenance markers (🟢 / 🔵 / 🟡 / ❓, plus ⚠️ for vague) appear inli
 > **Задача:** [номер задачи — напр. ARS-123]
 > **Автор:** [логин того, кто пишет этот файл: вывод `whoami` (Linux, macOS, Windows); у `ДОМЕН\логин` — часть после `\`; команда не сработала — `—`. Файл уже был — список сохрани: твоего логина в нём нет (регистр не важен) — допиши через `, `; стоял `—` — замени]
 > **Источник (БТ):** [файл/название бизнес-требований, на которых основана спека]
-> **Редакция:** [N — первая запись 1, доработка +1; дата — только если известна из окружения]
+> **Редакция:** [N (ГГГГ-ММ-ДД): первая запись 1, доработка +1, строки не было — 2; дата этой записи — из окружения сессии или `date +%F`, не по памяти; не узнать — без скобок]
+> **Версия скилла:** [technical-spec-doc 1.8.0; файл уже был — строку сохрани, этой версии в ней нет — допиши через `, `]
 >
 > **Статус готовности:** [Готово к разработке | Требуются уточнения (N)]
 > — **Заполняется последним** (Step 4). В момент записи файла здесь стоит `<ПРОСТАВЛЯЕТСЯ ПОСЛЕ ЗАПИСИ>`; значение подставляется, когда весь текст ниже уже написан и его можно перечитать. Механически, без суждения: в готовом тексте есть хоть один открытый ТЕХНИЧЕСКИЙ пункт (TBD / 🟡 к валидации / ⚠️)? → «Требуются уточнения». Ноль таких пунктов → «Готово к разработке». 🟡 к валидации ВСЕГДА даёт «Требуются уточнения» — не рассуждай, что он «не блокирует начало работ». (Два исключения, которые статус НЕ меняют: унаследованные из БТ бизнес-пробелы в §8 — они закрываются на стороне БТ; и 🔵 depends-on #0 — этот контракт уже подтверждён на стороне узла-фундамента, он не открытый пункт.) 🔵 никогда не даёт «Требуются уточнения».
