@@ -69,6 +69,8 @@ def build_s1():
     b._record(190, "weird")                                                                         # 23
     b._record(191, "tool_result", message={"role": "user", "parts": [{"functionResponse": {
         "id": "x", "name": "web_fetch", "response": {"output": "", "answers": {"Какой срок хранения?": "30"}}}}]})  # 24
+    b._record(191, "assistant", model="deepseek-v4-pro", message={"role": "model", "parts": [
+        {"text": "The user hasn't sent a new message yet.", "thought": True}, {"text": "Видимый ответ."}]})  # 25
     return b.lines
 
 
@@ -113,8 +115,8 @@ def main():
 
     expect(chat["session"] == "s1" and chat["cwd"] == "/work/ai-sdd" and chat["start"] == "2026-10-20T09:00:00Z"
            and chat["end"] == "2026-10-20T09:03:11Z", f"сводка сессии: {chat['session']}, {chat['cwd']}, {chat['start']}, {chat['end']}")
-    expect(chat["records"] == 23 and chat["bad_lines"] == 1 and chat["unknown_types"] == {"weird": 1},
-           f"записей 23, битая строка 1, незнакомый тип 1: {chat['records']}, {chat['bad_lines']}, {chat['unknown_types']}")
+    expect(chat["records"] == 24 and chat["bad_lines"] == 1 and chat["unknown_types"] == {"weird": 1},
+           f"записей 24, битая строка 1, незнакомый тип 1: {chat['records']}, {chat['bad_lines']}, {chat['unknown_types']}")
     expect(one(1, "user").get("text") == "Делаем БТ по задаче PAY-1, пароль qwerty123" and one(1, "user").get("attached") is False,
            f"[1] реплика: {one(1, 'user')}")
     expect(one(2, "slash") == {"n": 2, "ts": "2026-10-20T09:00:05.000Z", "kind": "slash", "command": "/analyst-workspace",
@@ -141,6 +143,7 @@ def main():
            f"[18] модель у ответа: {one(18, 'agent')}, модели {chat['models']}")
     expect(one(20, "result").get("answers", {}).get("declined") is True, f"[20] отказ отвечать: {one(20, 'result')}")
     expect(one(21, "slash").get("command") == "/clear", f"[21] /clear: {one(21, 'slash')}")
+    expect(one(25, "agent").get("text") == "Видимый ответ.", f"[25] рассуждение модели (thought) — не текст агента: {one(25, 'agent')}")
     dumped = json.dumps(events, ensure_ascii=False)
     expect("секретный текст" not in dumped and "содержимое файла" not in dumped and "карточка сервиса" not in dumped,
            "в события не попадает содержимое записанных и прочитанных файлов и вложений")
