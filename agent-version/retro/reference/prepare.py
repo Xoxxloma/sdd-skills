@@ -189,7 +189,8 @@ def render(chat, p):
         facts["tool_errors"] += errors
 
     def speed_note(n, stamp, extra_chars=0, start=None):
-        """Ответ быстрее чтения: символы непрочитанного текста агента ÷ секунды с первого непрочитанного куска."""
+        """Ответ быстрее чтения: символы последнего сообщения агента (и вопроса) ÷ секунды с его появления. Промежуточные
+        сообщения о ходе работы до ответа читать не обязательно — в счёт не идут."""
         chars = state["unread"] + extra_chars
         first = start or state["first"]
         moment = journal.parse_ts(stamp)
@@ -231,9 +232,7 @@ def render(chat, p):
                 state["share"] = round(tokens / state["window"], 3) if state["window"] else None
             if event["text"].strip():
                 line(n, "АГЕНТ: " + mask(clip_middle(event["text"], p["agent_head"], p["agent_tail"])))
-                state["unread"] += len(one_line(event["text"]))
-                if state["first"] is None:
-                    state["first"] = journal.parse_ts(event["ts"])
+                state["unread"], state["first"] = len(one_line(event["text"])), journal.parse_ts(event["ts"])
         elif kind == "call" and event["name"] == "skill":
             facts["skills"].append({"n": n, "skill": event.get("skill"), "via": "agent", "share": state["share"]})
             if state["share"] is not None and state["share"] > threshold:

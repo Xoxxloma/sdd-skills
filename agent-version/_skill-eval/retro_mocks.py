@@ -27,6 +27,7 @@ HYPOTHESES = (
     "Отдельно: по Г2 и Г5 возможен конфликт — справка за 6 месяцев хранится меньше, чем её могут запросить повторно. "
     "Подтверждаешь гипотезы Г1–Г10?"
 )
+THOUGHT = "The user hasn't answered yet, so I should wait and check the previous step again. " * 40
 FINAL = option("Проверить спеку", "Доработать спеку", "Разбить на этапы", "Начать другую задачу")
 
 
@@ -53,9 +54,12 @@ class Session:
     def agent(self, text=None, calls=(), tokens=None, wait=20):
         self.tokens = tokens or self.tokens + 3000
         number = self.b.agent(self.tick(wait), text=text, calls=calls, tokens=self.tokens)
+        record = json.loads(self.b.lines[-1])
         if self.model:
-            record = json.loads(self.b.lines[-1])
-            self.b.lines[-1] = json.dumps(dict(record, model=self.model), ensure_ascii=False)
+            record["model"] = self.model
+        if text:  # модель с рассуждением: перед ответом — часть thought, её пользователь не видит
+            record["message"]["parts"].insert(0, {"text": THOUGHT, "thought": True})
+        self.b.lines[-1] = json.dumps(record, ensure_ascii=False)
         return number
 
     def skill(self, name, tokens=None):
@@ -182,6 +186,8 @@ def p6():
     s.asked("Что дальше", "Что дальше со спекой?", [item["label"] for item in FINAL], "Разбить на этапы", wait=80)
     s.skill("stage-breakdown-doc")
     s.agent("Этапы записаны: coddoc/PAY-6/stages.md. Здесь можно `/clear`.")
+    s.raw_slash("/interaction-diagram coddoc/PAY-6/technical_spec.md", wait=40)  # ручной скилл — не обход оркестратора
+    s.agent("Схема записана рядом со спекой.")
     s.raw_slash("/clear", wait=30)
     return s, {"must": [("order", "helps")],
                "must_not": [("hypotheses", "hurts"), ("decisions", "hurts"), ("correction_loop", "hurts"),

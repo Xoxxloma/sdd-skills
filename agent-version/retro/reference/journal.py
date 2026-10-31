@@ -186,7 +186,9 @@ def parse_chat(path):
             usage = record.get("usageMetadata") if isinstance(record.get("usageMetadata"), dict) else {}
             tokens = usage.get("promptTokenCount")
             window = record.get("contextWindowSize")
-            text = "\n".join(part["text"] for part in parts if isinstance(part.get("text"), str) and part["text"].strip())
+            # Часть с thought: true — рассуждение модели: пользователь его не видит, в текст агента не идёт.
+            text = "\n".join(part["text"] for part in parts if isinstance(part.get("text"), str) and part["text"].strip()
+                             and part.get("thought") is not True)
             add(number, record, "agent", text=text, model=model,
                 tokens=tokens if isinstance(tokens, int) and not isinstance(tokens, bool) else None,
                 window=window if isinstance(window, int) and not isinstance(window, bool) and window > 0 else None)

@@ -196,6 +196,16 @@ def main():
     expect("[3] КОМАНДА: /analyst-workspace" in clear_lines and not clear_facts["loaded"] and not clear_facts["suspected"],
            f"после /clear прежняя загрузка окна не переносится: {clear_lines}, {clear_facts['loaded']}, {clear_facts['suspected']}")
 
+    def fast_of(gap_text, last_text, answer_after):
+        events = [{"n": 1, "ts": "2026-10-20T09:00:00Z", "kind": "agent", "text": gap_text, "model": "m", "tokens": 1000, "window": 262144},
+                  {"n": 2, "ts": "2026-10-20T09:05:00Z", "kind": "agent", "text": last_text, "model": "m", "tokens": 1000, "window": 262144},
+                  {"n": 3, "ts": f"2026-10-20T09:05:{answer_after:02d}Z", "kind": "user", "text": "да", "chars": 2, "attached": False}]
+        return prepare.render({"events": events, "cwd": None}, prepare.load_params())[1]["fast"]
+    expect(fast_of("Ход работы. " * 4000, "Готово, проверь.", 3) == [],
+           "длинный ход работы до короткого итога — не «быстрее чтения»: считается последнее сообщение")
+    expect([item["chars"] for item in fast_of("Ход работы.", "Гипотезы. " * 80, 3)] == [799],
+           "длинный итог и ответ через 3 с — «быстрее чтения» по последнему сообщению")
+
     small = params_file("small.json", journal_limit=1500, part_overlap=2)
     code, _ = run("--out", out, "--params", small)
     manifest = read("retro.json")
