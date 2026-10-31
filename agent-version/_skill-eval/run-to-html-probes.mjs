@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { png } from './to-html-fixtures.mjs';
+import { modelId } from './model-id.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const skillSrc = resolve(here, '..', 'to-html');
@@ -134,7 +135,7 @@ async function main() {
   if (process.argv[2] === '--selftest') process.exit(selftest() ? 1 : 0);
   const round = process.argv[2];
   const n = Number(process.argv[3] ?? 1);
-  const model = process.argv[4] ?? 'sonnet';
+  const model = modelId(process.argv[4] ?? 'claude-sonnet-5');
   // Пятый аргумент — пробы через запятую (по умолчанию все).
   const only = process.argv[5] ? process.argv[5].split(',') : null;
   if (!round) throw new Error('нужно имя раунда');

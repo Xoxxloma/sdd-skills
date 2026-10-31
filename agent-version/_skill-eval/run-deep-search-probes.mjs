@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { modelId } from './model-id.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const skillSrc = resolve(here, '..', 'deep-search');
@@ -310,7 +311,8 @@ function grade(probe, lines, ws, changed, firstLines = null) {
   let cost = Number(result.total_cost_usd ?? 0);
   if (probe.second) {
     const t1 = firstTurn(firstLines ?? []);
-    cost += t1.cost;
+    // Ход 2 идёт `--resume`, его `total_cost_usd` накопительный и уже включает ход 1: сумма завышала цену.
+    cost = Math.max(cost, t1.cost);
     marks['ход 1: вопрос с tool-catalog'] = t1.asks.includes('tool-catalog') || (t1.answer.includes('tool-catalog') && /\?|посмотри в/i.test(t1.answer));
     const relaunch = main.filter((u) => ['Agent', 'Task'].includes(u.name)).map((u) => String(u.input?.prompt ?? ''));
     marks['ход 2: разведчик с Репа на tool-catalog'] = relaunch.some((p) => /Репа:[^\n]*tool-catalog/.test(p));
@@ -447,7 +449,7 @@ async function main() {
   if (process.argv[2] === '--regrade') return regrade(process.argv[3]);
   const round = process.argv[2];
   const n = Number(process.argv[3] ?? 1);
-  const model = process.argv[4] ?? 'sonnet';
+  const model = modelId(process.argv[4] ?? 'claude-sonnet-5');
   const only = process.argv[5] ? process.argv[5].split(',') : null;
   if (!round) throw new Error('нужно имя раунда');
   if (selftest()) throw new Error('оценщик не прошёл самопроверку — прогоны не запускаю');

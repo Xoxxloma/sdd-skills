@@ -755,8 +755,12 @@ if [ -n "$TWIN_CARD" ]; then
   export RT_TWIN="$HERE/fixtures/$FIXTURE/$TWIN_CARD" RT_TWIN_PROMPT="$HERE/${TWIN_PROMPT:-twin-analyst.md}"
 fi
 if [ -n "$MEET_ENV" ]; then
-  export RUN_TIMEOUT="${RUN_TIMEOUT:-3600}" SM_MODEL="${SM_MODEL:-sonnet}" CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0
+  export RUN_TIMEOUT="${RUN_TIMEOUT:-3600}" SM_MODEL="${SM_MODEL:-claude-sonnet-5}" CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0
 fi
+. "$HERE/model-id.sh"
+SM_MODEL="$(model_id "${SM_MODEL:-}" claude-sonnet-5)" || exit 2
+RT_TWIN_MODEL="$(model_id "${RT_TWIN_MODEL:-}" claude-sonnet-5-5)" || exit 2
+export SM_MODEL RT_TWIN_MODEL
 
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
 [ -f "$POOL" ]  || { echo "нет раннера: $POOL"; exit 1; }
@@ -786,9 +790,12 @@ fi
 # `reference/stage-*.md` через `cat` не открыл ни один прогон.
 # `cygpath -m` даёт `C:/Users/…/Temp` — тот же каталог вне репозитория, но в форме, которую `Read`
 # принимает. Нет `cygpath` (не Windows) — прежний `/tmp`.
+# СНИМОК — СВОЙ НА КАЖДОЕ ПЛЕЧО: проба и PID в имени. Был один на раунд (`<раунд>-skills`), а конец
+# плеча его сносит (ниже) — две пробы одного раунда параллельно, и соседняя теряла скилл посреди
+# прогонов (2026-10-22: 13 из 30; 2026-10-30 — снова). Теперь каждое плечо сносит только своё.
 SEED_TMP="/tmp"
 command -v cygpath >/dev/null 2>&1 && SEED_TMP="$(cygpath -m /tmp)"
-SNAP_ROOT="${SKILL_EVAL_SEED_ROOT:-$SEED_TMP/skill-eval-seed}/$(basename "$ROUND")-skills"
+SNAP_ROOT="${SKILL_EVAL_SEED_ROOT:-$SEED_TMP/skill-eval-seed}/$(basename "$ROUND")-$PROBE-$$-skills"
 mkdir -p "$SNAP_ROOT/$SKILL"
 SNAP="$SNAP_ROOT/$SKILL/SKILL.md"
 cp "$SNAP_KEEP" "$SNAP"
@@ -987,3 +994,7 @@ if [ -n "${SNAP_ROOT:-}" ] && [ -d "$SNAP_ROOT" ]; then
   rm -rf "$SNAP_ROOT"
   echo "снимок из /tmp снесён: $SNAP_ROOT (журнальная копия осталась в $ROUND/_skills/)"
 fi
+
+# Цена плеча — этой строкой, не суммой руками: при `--resume` `total_cost_usd` накопительный, и
+# сложенные ходы завышали цену в 3.5–5 раз (2026-10-15, повторилось 2026-10-18).
+bash "$HERE/cost-runs.sh" "$ROUND/$PROBE"

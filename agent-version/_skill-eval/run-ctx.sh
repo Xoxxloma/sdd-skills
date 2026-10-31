@@ -296,6 +296,9 @@ esac
 
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
 [ -f "$POOL" ]  || { echo "нет раннера: $POOL"; exit 1; }
+. "$HERE/model-id.sh"
+SM_MODEL="$(model_id "${SM_MODEL:-}" claude-sonnet-5)" || exit 2
+export SM_MODEL
 
 FIXTURE_DIR="$HERE/fixtures/$FIXTURE"
 PROMPT="$FIXTURE_DIR/$PROMPT_FILE"
@@ -322,9 +325,11 @@ fi
 # `reference/stage-*.md` через `cat` не открыл ни один прогон.
 # `cygpath -m` даёт `C:/Users/…/Temp` — тот же каталог вне репозитория, но в форме, которую `Read`
 # принимает. Нет `cygpath` (не Windows) — прежний `/tmp`.
+# Снимок — свой на каждое плечо (проба и PID в имени): общий на раунд сносился концом соседнего плеча.
+# Подробно — у того же места в `run-ctx-v2.sh`.
 SEED_TMP="/tmp"
 command -v cygpath >/dev/null 2>&1 && SEED_TMP="$(cygpath -m /tmp)"
-SNAP_ROOT="${SKILL_EVAL_SEED_ROOT:-$SEED_TMP/skill-eval-seed}/$(basename "$ROUND")-skills"
+SNAP_ROOT="${SKILL_EVAL_SEED_ROOT:-$SEED_TMP/skill-eval-seed}/$(basename "$ROUND")-$PROBE-$$-skills"
 mkdir -p "$SNAP_ROOT/$SKILL"
 SNAP="$SNAP_ROOT/$SKILL/SKILL.md"
 cp "$SNAP_KEEP" "$SNAP"
@@ -468,3 +473,6 @@ if [ -n "${SNAP_ROOT:-}" ] && [ -d "$SNAP_ROOT" ]; then
   rm -rf "$SNAP_ROOT"
   echo "снимок из /tmp снесён: $SNAP_ROOT (журнальная копия осталась в $ROUND/_skills/)"
 fi
+
+# Цена плеча — этой строкой, не суммой руками (при `--resume` цена накопительная).
+bash "$HERE/cost-runs.sh" "$ROUND/$PROBE"
