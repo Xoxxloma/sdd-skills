@@ -296,6 +296,10 @@ esac
 
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
 [ -f "$POOL" ]  || { echo "нет раннера: $POOL"; exit 1; }
+. "$HERE/model-id.sh"
+. "$HERE/copy-once.sh"
+SM_MODEL="$(model_id "${SM_MODEL:-}" claude-sonnet-5)" || exit 2
+export SM_MODEL
 
 FIXTURE_DIR="$HERE/fixtures/$FIXTURE"
 PROMPT="$FIXTURE_DIR/$PROMPT_FILE"
@@ -306,7 +310,7 @@ SNAP_KEEP="$ROUND/_skills/$SKILL.SKILL.md"
 if [ -f "$SNAP_KEEP" ]; then
   echo "снимок скилла уже есть — прогон читает ЕГО: $SNAP_KEEP"
 else
-  cp "$HERE/../$SKILL/SKILL.md" "$SNAP_KEEP"
+  copy_once "$HERE/../$SKILL/SKILL.md" "$SNAP_KEEP"
   echo "снимок скилла: $SNAP_KEEP"
 fi
 # ПРОГОН ЧИТАЕТ КОПИЮ СНИМКА ВНЕ РЕПОЗИТОРИЯ. Единственный путь, который прогон получает внутрь
@@ -322,9 +326,11 @@ fi
 # `reference/stage-*.md` через `cat` не открыл ни один прогон.
 # `cygpath -m` даёт `C:/Users/…/Temp` — тот же каталог вне репозитория, но в форме, которую `Read`
 # принимает. Нет `cygpath` (не Windows) — прежний `/tmp`.
+# Снимок — свой на каждое плечо (проба и PID в имени): общий на раунд сносился концом соседнего плеча.
+# Подробно — у того же места в `run-ctx-v2.sh`.
 SEED_TMP="/tmp"
 command -v cygpath >/dev/null 2>&1 && SEED_TMP="$(cygpath -m /tmp)"
-SNAP_ROOT="${SKILL_EVAL_SEED_ROOT:-$SEED_TMP/skill-eval-seed}/$(basename "$ROUND")-skills"
+SNAP_ROOT="${SKILL_EVAL_SEED_ROOT:-$SEED_TMP/skill-eval-seed}/$(basename "$ROUND")-$PROBE-$$-skills"
 mkdir -p "$SNAP_ROOT/$SKILL"
 SNAP="$SNAP_ROOT/$SKILL/SKILL.md"
 cp "$SNAP_KEEP" "$SNAP"
@@ -335,9 +341,7 @@ cp "$SNAP_KEEP" "$SNAP"
 # по построению. Кладётся рядом со снимком, поэтому относительный путь `reference/…` из скилла
 # ведёт в снимок, а не в репозиторий.
 if [ -d "$HERE/../$SKILL/reference" ]; then
-  if [ ! -d "$ROUND/_skills/$SKILL.reference" ]; then
-    cp -r "$HERE/../$SKILL/reference" "$ROUND/_skills/$SKILL.reference"
-  fi
+  copy_once "$HERE/../$SKILL/reference" "$ROUND/_skills/$SKILL.reference"
   rm -rf "$SNAP_ROOT/$SKILL/reference"
   cp -r "$ROUND/_skills/$SKILL.reference" "$SNAP_ROOT/$SKILL/reference"
 fi
@@ -468,3 +472,6 @@ if [ -n "${SNAP_ROOT:-}" ] && [ -d "$SNAP_ROOT" ]; then
   rm -rf "$SNAP_ROOT"
   echo "снимок из /tmp снесён: $SNAP_ROOT (журнальная копия осталась в $ROUND/_skills/)"
 fi
+
+# Цена плеча — этой строкой, не суммой руками (при `--resume` цена накопительная).
+bash "$HERE/cost-runs.sh" "$ROUND/$PROBE"

@@ -17,6 +17,7 @@ import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { modelId } from './model-id.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const skillSrc = resolve(here, '..', 'deep-search');
@@ -194,7 +195,7 @@ async function main() {
   }
   const round = process.argv[2];
   const n = Number(process.argv[3] ?? 3);
-  const model = process.argv[4] ?? 'sonnet';
+  const model = modelId(process.argv[4] ?? 'claude-sonnet-5');
   const only = process.argv[5] ? process.argv[5].split(',') : null;
   if (!round) throw new Error('нужно имя раунда');
   if (selftest()) throw new Error('оценщик не прошёл самопроверку — прогоны не запускаю');

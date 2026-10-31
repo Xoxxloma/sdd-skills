@@ -31,6 +31,10 @@ set -u
 # без `answer.md`, и всё плечо выглядит «не измеренным». Та же подмена стоит в раннере SM-REAL.
 command -v timeout > /dev/null || timeout() { local s="$1"; shift; perl -e 'alarm shift; exec @ARGV' "$s" "$@"; }
 
+# Модель — полным именем (`model-id.sh`): пул зовут и в обход раннера.
+. "$(dirname "${BASH_SOURCE[0]}")/model-id.sh"
+SM_MODEL="$(model_id "${SM_MODEL:-}" claude-sonnet-5)" || exit 2
+
 # ПУТИ В ПРОМПТ — В ФОРМЕ, КОТОРУЮ ЧИТАЕТ `Read` ПРОГОНА. Голый `pwd` в git-bash отдаёт `/tmp/…`,
 # а виндовый `Read` на нём отвечает «File does not exist» — прогон либо выкручивался `find`+`cat`,
 # либо (2026-09-22, `rt-gate-pilot2`: 0/2, `pilot3`: 1/3) не читал скилл вовсе и шёл к заглушкам по

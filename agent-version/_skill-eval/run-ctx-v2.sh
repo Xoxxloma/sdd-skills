@@ -357,6 +357,8 @@ case "$PROBE" in
   fnd-rv-dirty) FIXTURE=FND-EPIC; PROMPT_FILE=rv-dirty-prompt.txt; SKILL=spec-review;         SEED_SUB=seed-done ;;
   fnd-rv-zero)  FIXTURE=FND-EPIC; PROMPT_FILE=rv-zero-prompt.txt;  SKILL=spec-review;         SEED_SUB=seed-done ;;
   fnd-sb-kid)   FIXTURE=FND-EPIC; PROMPT_FILE=sb-kid-prompt.txt;   SKILL=stage-breakdown-doc; SEED_SUB=seed-done; TURN2_FILE=go-turn2.txt; TURNS_CAP=2 ;;
+  # Эпик со спекой #0 после очистки контекста: дети-наследники — из «наследуют:» в INT-0 (2026-10-31).
+  fnd-resume)   FIXTURE=FND-RESUME; PROMPT_FILE=resume-prompt.txt; SKILL=analyst-workspace; STUBS_SUB=stubs ;;
   # шаг 3 п.2б PLAN-FROM-POCOCK: разрез после 2б — изменение существующего во владении этапа, потребление извне. grade-sb-blue.mjs
   sb-blue-yes) FIXTURE=SB-BLUE; PROMPT_FILE=yes-prompt.txt; SKILL=stage-breakdown-doc; TURN2_FILE=go-turn2.txt; TURNS_CAP=2 ;;
   sb-blue-idk) FIXTURE=SB-BLUE; PROMPT_FILE=idk-prompt.txt; SKILL=stage-breakdown-doc; TURN2_FILE=go-turn2.txt; TURNS_CAP=2 ;;
@@ -741,7 +743,7 @@ case "$PROBE" in
   nb-pts-roles)   FIXTURE=NB-PTS-ROLES;   PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=3; IDLE_MAX=3; DONE_GREP='исходник: coddoc/_inbox/meeting-2026-10-18'; MEET_ENV=1 ;;
   nb-late-event)  FIXTURE=NB-LATE-EVENT;  PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_GREP='исходник: coddoc/_inbox/meeting-2026-10-12'; MEET_ENV=1 ;;
   nb-no-goal)     FIXTURE=NB-NO-GOAL;     PROMPT_FILE=w-prompt.txt; SKILL=analyst-notebook; SEED_SUB=seed; TURN2_FILE=w-turn2.txt; TURNS_CAP=5; IDLE_MAX=5; DONE_RE='/notes/[^/]+/notebook\.md$'; MEET_ENV=1 ;;
-  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-vac-lim ts-blue-yes ts-blue-idk ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd id-blue det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk bt-uf-mmd bt-uf-puml bt-uf-idk bt-uf-y pt-sh-mmd pt-sh-idk pt-sh-no pt-uf-puml pt-uf-idk pt-raw pt-nb tx-sh-mmd tx-sh-idk tx-uf-puml pt-junk pt-prose ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sb-blue-yes sb-blue-idk sb-blue-cr sb-blue-new sb-blue-na fnd-zero fnd-kid fnd-rv-kid fnd-rv-dirty fnd-rv-zero fnd-sb-kid sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-lim-clean rv-lim-dirty rv-crlim-clean rv-crlim-dirty rv-blue-yes rv-blue-idk rv-blue-dirty rv-blue-was rv-blue-cr rv-stage-blue-idk rv-stage-blue-cr rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-lim-q br-lim-w br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup scx-cr-nob scx-cr-own scx-cr-api-q scx-cr-ver-q scx-ts-doc scx-ts-dep scx-ts-fld scx-rv-doc scx-rv-dep scx-rv-dirty scx-sb-doc scx-sb-dep sr-gap sr-blue-yes sr-blue-idk sr-blue-cr sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec bfx-doc bfx-card rv-bfx-clean rv-bfx-nomark rv-bfx-was rv-bfx-nosrc sb-bfx rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-count-bt rt-count-cr rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q cr-lim-q cr-lim-w sq-audit meet-vac meet-acc meet-long meet-new meet-rew meet-chg meet-cr jm-br-vac jm-br-long jm-br-new jm-ts-acc jm-ts-rew rec-new rec-chg rec-inline nb-new nb-thought nb-contra nb-noauth nb-file nb-view-api nb-view-chat nb-dispute nb-answer nb-ask nb-long nb-view-part meet-out ni-vac ni-acc ni-new ni-chg ni-cr ni-rew ni-mr-new ni-mr-chg ni-nb-in ni-nb-ans ni-nb-pick nb-pts-in nb-pts-new nb-pts-rec nb-export nb-export-since nb-route nb-desc-one nb-desc-two nb-auto nb-ans-repl nb-stale nb-prefix nb-reingest nb-handedit nb-chain-export nb-chain-ask nb-huge-export nb-fix-author nb-fix-drop nb-fix-wrong nb-fix-inplace nb-fix-noref nb-pts-plain nb-pts-spor nb-spor-side nb-same-stem nb-fact-upd nb-ans-subj nb-scope nb-pts-roles nb-late-event nb-no-goal"; exit 1 ;;
+  *) echo "неизвестная проба: '$PROBE'"; echo "есть: bfg-scroll bfg-role ts-live ts-conv ts-conv2 ts-gaps ts-gaps-q ts-vac ts-vac-q ts-vac-lim ts-blue-yes ts-blue-idk ts-acc ts-acc-q id-mmd id-puml id-ask ring-mmd ring-puml dir-mmd dir-puml rep-mmd rep-puml chain-mmd chain-puml det-mmd det-puml rep-det-mmd chain-q-mmd chain-q-idk ring-q-one ring-q-two rep-q-mmd det-q-mmd det-q-puml det-q-alt id-q-mmd id-blue det-short-mmd det-o-one det-o-two det-t-short det-s-mmd det-s-puml det-s-alt det-s-idk det-y-short det-y-scen rep-s-mmd chb-s-mmd chb-s-idk bt-uf-mmd bt-uf-puml bt-uf-idk bt-uf-y pt-sh-mmd pt-sh-idk pt-sh-no pt-uf-puml pt-uf-idk pt-raw pt-nb tx-sh-mmd tx-sh-idk tx-uf-puml pt-junk pt-prose ts-ctx ts-fix ts-nodesc ts-noctx br-ctx br-real br-rework br-rework-q sb-ctx sb-ctx2 sb-blue-yes sb-blue-idk sb-blue-cr sb-blue-new sb-blue-na fnd-zero fnd-kid fnd-rv-kid fnd-rv-dirty fnd-rv-zero fnd-sb-kid fnd-resume sm-graph2 rv-conv rv-clean rv-bt-clean rv-bt-dirty rv-lim-clean rv-lim-dirty rv-crlim-clean rv-crlim-dirty rv-blue-yes rv-blue-idk rv-blue-dirty rv-blue-was rv-blue-cr rv-stage-blue-idk rv-stage-blue-cr rv-fe rv-tpl-clean rv-tpl-dirty rv-tpl-count rv-stage-na rv-bt-empty rv-bt-no43 br-roles-w br-roles-q br-var br-half br-nocrit br-yes br-lim-q br-lim-w br-cut br-data-obj br-data-dlt0 br-data-dlt1 br-asis-card br-data-none br-asis-new br-data-file br-deps-yes br-deps-no td-ru-w cdoc-xlsx cdoc-txt cdoc-txt-q cdoc-docx cdoc-fix cdoc-dup scx-cr-nob scx-cr-own scx-cr-api-q scx-cr-ver-q scx-ts-doc scx-ts-dep scx-ts-fld scx-rv-doc scx-rv-dep scx-rv-dirty scx-sb-doc scx-sb-dep sr-gap sr-blue-yes sr-blue-idk sr-blue-cr sr-verify rv-bug-clean rv-bug-dirty rv-bug-spec rv-bug-src bf-spec bfx-doc bfx-card rv-bfx-clean rv-bfx-nomark rv-bfx-was rv-bfx-nosrc sb-bfx rt-bug rt-feature rt-menu rt-nokey rt-noreview rt-check rt-count-bt rt-count-cr rt-fix rt-other rt-open rt-epic rt-srgap rt-cont bg-flick-w bg-flick-q bg-form-w bg-role-w bg-data-q bg-notbug-q cr-btn-w cr-btn-q cr-api-w cr-notsmall-q cr-idea-q cr-bug-q cr-lim-q cr-lim-w sq-audit meet-vac meet-acc meet-long meet-new meet-rew meet-chg meet-cr jm-br-vac jm-br-long jm-br-new jm-ts-acc jm-ts-rew rec-new rec-chg rec-inline nb-new nb-thought nb-contra nb-noauth nb-file nb-view-api nb-view-chat nb-dispute nb-answer nb-ask nb-long nb-view-part meet-out ni-vac ni-acc ni-new ni-chg ni-cr ni-rew ni-mr-new ni-mr-chg ni-nb-in ni-nb-ans ni-nb-pick nb-pts-in nb-pts-new nb-pts-rec nb-export nb-export-since nb-route nb-desc-one nb-desc-two nb-auto nb-ans-repl nb-stale nb-prefix nb-reingest nb-handedit nb-chain-export nb-chain-ask nb-huge-export nb-fix-author nb-fix-drop nb-fix-wrong nb-fix-inplace nb-fix-noref nb-pts-plain nb-pts-spor nb-spor-side nb-same-stem nb-fact-upd nb-ans-subj nb-scope nb-pts-roles nb-late-event nb-no-goal"; exit 1 ;;
 esac
 
 SKILL_DIR="${SKILL_DIR:-$HERE/../$SKILL}"
@@ -755,8 +757,13 @@ if [ -n "$TWIN_CARD" ]; then
   export RT_TWIN="$HERE/fixtures/$FIXTURE/$TWIN_CARD" RT_TWIN_PROMPT="$HERE/${TWIN_PROMPT:-twin-analyst.md}"
 fi
 if [ -n "$MEET_ENV" ]; then
-  export RUN_TIMEOUT="${RUN_TIMEOUT:-3600}" SM_MODEL="${SM_MODEL:-sonnet}" CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0
+  export RUN_TIMEOUT="${RUN_TIMEOUT:-3600}" SM_MODEL="${SM_MODEL:-claude-sonnet-5}" CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0
 fi
+. "$HERE/model-id.sh"
+. "$HERE/copy-once.sh"
+SM_MODEL="$(model_id "${SM_MODEL:-}" claude-sonnet-5)" || exit 2
+RT_TWIN_MODEL="$(model_id "${RT_TWIN_MODEL:-}" claude-sonnet-5-5)" || exit 2
+export SM_MODEL RT_TWIN_MODEL
 
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
 [ -f "$POOL" ]  || { echo "нет раннера: $POOL"; exit 1; }
@@ -770,7 +777,7 @@ SNAP_KEEP="$ROUND/_skills/$SKILL.SKILL.md"
 if [ -f "$SNAP_KEEP" ]; then
   echo "снимок скилла уже есть — прогон читает ЕГО: $SNAP_KEEP"
 else
-  cp "$SKILL_DIR/SKILL.md" "$SNAP_KEEP"
+  copy_once "$SKILL_DIR/SKILL.md" "$SNAP_KEEP"
   echo "снимок скилла: $SNAP_KEEP"
 fi
 # ПРОГОН ЧИТАЕТ КОПИЮ СНИМКА ВНЕ РЕПОЗИТОРИЯ. Единственный путь, который прогон получает внутрь
@@ -786,9 +793,12 @@ fi
 # `reference/stage-*.md` через `cat` не открыл ни один прогон.
 # `cygpath -m` даёт `C:/Users/…/Temp` — тот же каталог вне репозитория, но в форме, которую `Read`
 # принимает. Нет `cygpath` (не Windows) — прежний `/tmp`.
+# СНИМОК — СВОЙ НА КАЖДОЕ ПЛЕЧО: проба и PID в имени. Был один на раунд (`<раунд>-skills`), а конец
+# плеча его сносит (ниже) — две пробы одного раунда параллельно, и соседняя теряла скилл посреди
+# прогонов (2026-10-22: 13 из 30; 2026-10-30 — снова). Теперь каждое плечо сносит только своё.
 SEED_TMP="/tmp"
 command -v cygpath >/dev/null 2>&1 && SEED_TMP="$(cygpath -m /tmp)"
-SNAP_ROOT="${SKILL_EVAL_SEED_ROOT:-$SEED_TMP/skill-eval-seed}/$(basename "$ROUND")-skills"
+SNAP_ROOT="${SKILL_EVAL_SEED_ROOT:-$SEED_TMP/skill-eval-seed}/$(basename "$ROUND")-$PROBE-$$-skills"
 mkdir -p "$SNAP_ROOT/$SKILL"
 SNAP="$SNAP_ROOT/$SKILL/SKILL.md"
 cp "$SNAP_KEEP" "$SNAP"
@@ -799,16 +809,14 @@ cp "$SNAP_KEEP" "$SNAP"
 # по построению. Кладётся рядом со снимком, поэтому относительный путь `reference/…` из скилла
 # ведёт в снимок, а не в репозиторий.
 if [ -d "$SKILL_DIR/reference" ]; then
-  if [ ! -d "$ROUND/_skills/$SKILL.reference" ]; then
-    cp -r "$SKILL_DIR/reference" "$ROUND/_skills/$SKILL.reference"
-  fi
+  copy_once "$SKILL_DIR/reference" "$ROUND/_skills/$SKILL.reference"
   rm -rf "$SNAP_ROOT/$SKILL/reference"
   cp -r "$ROUND/_skills/$SKILL.reference" "$SNAP_ROOT/$SKILL/reference"
 fi
 # Скиллы-соседи снимка, по именам через пробел (пусто → как было). `technical-spec-doc` с 1.6.0 читает
 # `../deep-search/reference/from-spec.md` от своего SKILL.md — регресс спеки с `deep-search` рядом, как на проде.
 for s in ${EXTRA_SKILLS:-}; do
-  [ -d "$ROUND/_skills/$s" ] || cp -r "$HERE/../$s" "$ROUND/_skills/$s"
+  copy_once "$HERE/../$s" "$ROUND/_skills/$s"
   rm -rf "$SNAP_ROOT/$s"; cp -r "$ROUND/_skills/$s" "$SNAP_ROOT/$s"
   echo "сосед снимка: $s → $SNAP_ROOT/$s"
 done
@@ -987,3 +995,7 @@ if [ -n "${SNAP_ROOT:-}" ] && [ -d "$SNAP_ROOT" ]; then
   rm -rf "$SNAP_ROOT"
   echo "снимок из /tmp снесён: $SNAP_ROOT (журнальная копия осталась в $ROUND/_skills/)"
 fi
+
+# Цена плеча — этой строкой, не суммой руками: при `--resume` `total_cost_usd` накопительный, и
+# сложенные ходы завышали цену в 3.5–5 раз (2026-10-15, повторилось 2026-10-18).
+bash "$HERE/cost-runs.sh" "$ROUND/$PROBE"

@@ -1,6 +1,6 @@
 ---
 name: task-decomposition-doc
-version: 1.2.1
+version: 1.2.2
 user-invocable: false
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion
 description: 'Splits ONE confirmed epic-level business-requirements doc (the output of business-requirements-doc) into several separately-shippable child parts (части), each a coherent GROUP of its FR-*, and writes a self-contained child БТ per part into its OWN Jira/SberTrack sub-task folder (coddoc/<EPIC-KEY>/<CHILD-KEY>/business_requirements.md) so technical-spec-doc can run on each child unchanged. It PARTITIONS already-confirmed content and INVENTS NOTHING: every child FR and its acceptance criterion is copied verbatim from the parent epic-БТ; it never creates, splits the meaning of, or adds a requirement or scope the parent lacks. It reads only the epic-БТ, proposes a split, and writes files only after the user confirms the parts, the real child task keys, and the build order. Requires a confirmed epic-БТ already written to a file and takes its path — pasted БТ text is not an input, since the child folders are derived from the epic file’s own folder; given a brief, an idea, or pasted text it STOPS and points to business-requirements-doc first. Use whenever someone wants to break down / decompose / split / разбить an epic or large task into sub-tasks, parts, child stories, or shippable increments before writing tech specs.'
@@ -334,9 +334,8 @@ split, не пиши файлы.** Ответ — ровно: декомпози
 
 ### Step 6 — Handoff
 
-Коротко: путь индекса, список детских папок с ключами, порядок сборки, и следующий шаг —
-«по каждой папке `coddoc/<EPIC-KEY>/<CHILD-KEY>/` запусти `technical-spec-doc`». Если в эпик-БТ были
-унаследованные TBD/⚠️ — назови, в какие части они попали, и предложи закрыть их на стороне
+Коротко: путь индекса, список детских папок с ключами, порядок сборки. Следующий шаг не называй.
+Если в эпик-БТ были унаследованные TBD/⚠️ — назови, в какие части они попали, и предложи закрыть их на стороне
 эпика через `business-requirements-doc`.
 
 В хендофф не идут: имена полей файла (`owned_fr`, `shared_fr`, `parent:`, `slice:`, `SHARED`),
@@ -408,10 +407,6 @@ children:
 ## Порядок сборки
 1. <CHILD-KEY-1> ([A]) — базовая часть.
 2. <CHILD-KEY-2> ([B]) — после <CHILD-KEY-1> (зависимость).
-
-## Следующий шаг
-По каждой папке `coddoc/<EPIC-KEY>/<CHILD-KEY>/` запусти `technical-spec-doc` — он читает детский БТ,
-берёт номер задачи из имени папки и пишет `technical_specification.md` рядом.
 ````
 
 ### 2) Дочерний БТ — `<EPIC-DIR>/<CHILD-KEY>/business_requirements.md`
@@ -425,7 +420,7 @@ children:
 | шапка `> Задача Jira/SberTrack:` | sliced | `<CHILD-KEY>` этой части, НЕ эпика. |
 | шапка `> Автор:` | copy | из эпика дословно |
 | шапка `> Редакция:` | новое | `1 (ГГГГ-ММ-ДД)`: дата нарезки — из окружения сессии или `date +%F`, не по памяти |
-| шапка `> Версия скилла:` | новое | `task-decomposition-doc 1.2.1` |
+| шапка `> Версия скилла:` | новое | `task-decomposition-doc 1.2.2` |
 | Статус готовности + Открытые вопросы | computed | Механически: собери в «Открытые вопросы» унаследованные из эпика TBD/⚠️, попавшие в ЭТУ часть, посчитай их — это N. N ≥ 1 → «Требуются уточнения (N)», N = 0 → «Готово к оценке». Оформление то же, что у эпика, но **N считается по ЭТОЙ части — число эпика не копируется**: у эпика их пять, а в часть попал один. Никакого суждения. |
 | §1.0 Тип | copy | из эпика дословно |
 | §1.1 Проблема | copy | из эпика дословно |

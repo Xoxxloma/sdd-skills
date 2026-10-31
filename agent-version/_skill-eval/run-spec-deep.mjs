@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { modelId } from './model-id.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SKILLS = ['technical-spec-doc', 'deep-search'];
@@ -402,7 +403,7 @@ async function main() {
   if (process.argv[2] === '--regrade') return regrade(process.argv[3]);
   const round = process.argv[2];
   const n = Number(process.argv[3] ?? 1);
-  const model = process.argv[4] ?? 'sonnet';
+  const model = modelId(process.argv[4] ?? 'claude-sonnet-5');
   const only = process.argv[5] ? process.argv[5].split(',') : null;
   if (!round) throw new Error('нужно имя раунда');
   if (selftest()) throw new Error('оценщик не прошёл самопроверку — прогоны не запускаю');
@@ -472,7 +473,8 @@ function writeReport(roundDir, head, probes) {
       });
       const spec = existsSync(join(out, 'spec.md')) ? readFileSync(join(out, 'spec.md'), 'utf8') : '';
       const g = grade(probe, turns, spec, meta.specAfter, meta.changed);
-      const c = g.t.reduce((s, x) => s + x.cost, 0);
+      // Ходы идут `--resume`, `total_cost_usd` накопительный: цена прогона — максимум, не сумма ходов.
+      const c = Math.max(0, ...g.t.map((x) => x.cost));
       cost += c;
       const bad = Object.entries(g.marks).filter(([, v]) => !v).map(([k]) => k);
       report.push(`${run}: ${bad.length ? '✗ ' + bad.join(', ') : '✓ всё'} · $${c.toFixed(3)} · ходов ${turns.length} · разведчиков ${g.t.reduce((s, x) => s + x.agents.length, 0)} · ${Math.round(meta.ms / 1000)} с`);

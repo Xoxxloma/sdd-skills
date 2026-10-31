@@ -18,6 +18,8 @@ N="${3:-5}"
 CONC="${4:-5}"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$HERE/model-id.sh"
+SM_MODEL="$(model_id "${SM_MODEL:-}" claude-sonnet-5)" || exit 2
 SKILLROOT="$(cd "$HERE/.." && pwd)"
 FIX="$HERE/fixtures/$FIX_NAME"
 [ -d "$FIX" ] || { echo "нет фикстуры: $FIX"; exit 1; }
@@ -63,7 +65,7 @@ run_one() {
   local task
   task="$(awk 'FNR==NR{t=t $0 ORS; next} /^TASKTEXT$/{printf "%s", t; next} {print}' "$FIX/task.txt" "$TPL" \
         | sed -e "s|WORKDIR|$abs|g" -e "s|SKILLDIR|$SNAP_WIN|g")"
-  ( cd "$sb/w" && timeout 1800 claude -p "$task" --model "${SM_MODEL:-haiku}" --permission-mode bypassPermissions ) \
+  ( cd "$sb/w" && timeout 1800 claude -p "$task" --model "$SM_MODEL" --permission-mode bypassPermissions ) \
       > "$sb/answer.md" 2> "$sb/_stderr.log"
   local rc=$?
   if grep -qiE "API Error|Please run /login|Credit balance|rate limit|session limit|usage limit" "$sb/answer.md" 2>/dev/null; then
@@ -80,9 +82,9 @@ run_one() {
   if [ $rc -ne 0 ] || [ ! -s "$dst/answer.md" ]; then echo "  run-$i — ОТКАЗ (rc=$rc)"; else echo "  run-$i — готов"; fi
 }
 
-# Модель — как у run-ctx-v2.sh: `SM_MODEL=sonnet ./run-gui.sh …`; пусто → haiku, как было.
-echo "модель: ${SM_MODEL:-haiku}" > "$OUT/_settings.txt"
-echo "фикстура: $FIX_NAME   прогонов: $N   скилл: $SKILL_SRC   модель: ${SM_MODEL:-haiku}"
+# Модель — как у run-ctx-v2.sh: `SM_MODEL=claude-haiku-5-5 ./run-gui.sh …`; пусто → claude-sonnet-5 (модель стенда, INDEX.md); псевдоним — отказ (model-id.sh).
+echo "модель: $SM_MODEL" > "$OUT/_settings.txt"
+echo "фикстура: $FIX_NAME   прогонов: $N   скилл: $SKILL_SRC   модель: $SM_MODEL"
 r=0; for i in $(seq -w 1 "$N"); do run_one "$i" & r=$((r+1)); [ "$r" -ge "$CONC" ] && { wait -n 2>/dev/null || wait; r=$((r-1)); }; done; wait
 echo "ГОТОВО: $(find "$OUT" -maxdepth 2 -name answer.md -size +0 | wc -l) из $N"
 rm -rf "$SNAP"
