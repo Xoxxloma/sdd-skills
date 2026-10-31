@@ -760,6 +760,7 @@ if [ -n "$MEET_ENV" ]; then
   export RUN_TIMEOUT="${RUN_TIMEOUT:-3600}" SM_MODEL="${SM_MODEL:-claude-sonnet-5}" CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0
 fi
 . "$HERE/model-id.sh"
+. "$HERE/copy-once.sh"
 SM_MODEL="$(model_id "${SM_MODEL:-}" claude-sonnet-5)" || exit 2
 RT_TWIN_MODEL="$(model_id "${RT_TWIN_MODEL:-}" claude-sonnet-5-5)" || exit 2
 export SM_MODEL RT_TWIN_MODEL
@@ -776,7 +777,7 @@ SNAP_KEEP="$ROUND/_skills/$SKILL.SKILL.md"
 if [ -f "$SNAP_KEEP" ]; then
   echo "снимок скилла уже есть — прогон читает ЕГО: $SNAP_KEEP"
 else
-  cp "$SKILL_DIR/SKILL.md" "$SNAP_KEEP"
+  copy_once "$SKILL_DIR/SKILL.md" "$SNAP_KEEP"
   echo "снимок скилла: $SNAP_KEEP"
 fi
 # ПРОГОН ЧИТАЕТ КОПИЮ СНИМКА ВНЕ РЕПОЗИТОРИЯ. Единственный путь, который прогон получает внутрь
@@ -808,16 +809,14 @@ cp "$SNAP_KEEP" "$SNAP"
 # по построению. Кладётся рядом со снимком, поэтому относительный путь `reference/…` из скилла
 # ведёт в снимок, а не в репозиторий.
 if [ -d "$SKILL_DIR/reference" ]; then
-  if [ ! -d "$ROUND/_skills/$SKILL.reference" ]; then
-    cp -r "$SKILL_DIR/reference" "$ROUND/_skills/$SKILL.reference"
-  fi
+  copy_once "$SKILL_DIR/reference" "$ROUND/_skills/$SKILL.reference"
   rm -rf "$SNAP_ROOT/$SKILL/reference"
   cp -r "$ROUND/_skills/$SKILL.reference" "$SNAP_ROOT/$SKILL/reference"
 fi
 # Скиллы-соседи снимка, по именам через пробел (пусто → как было). `technical-spec-doc` с 1.6.0 читает
 # `../deep-search/reference/from-spec.md` от своего SKILL.md — регресс спеки с `deep-search` рядом, как на проде.
 for s in ${EXTRA_SKILLS:-}; do
-  [ -d "$ROUND/_skills/$s" ] || cp -r "$HERE/../$s" "$ROUND/_skills/$s"
+  copy_once "$HERE/../$s" "$ROUND/_skills/$s"
   rm -rf "$SNAP_ROOT/$s"; cp -r "$ROUND/_skills/$s" "$SNAP_ROOT/$s"
   echo "сосед снимка: $s → $SNAP_ROOT/$s"
 done

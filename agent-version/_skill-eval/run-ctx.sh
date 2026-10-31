@@ -297,6 +297,7 @@ esac
 [ -n "$ROUND" ] || { echo "usage: ./run-ctx.sh <проба> <папка-раунда> <N> [параллельность]"; exit 1; }
 [ -f "$POOL" ]  || { echo "нет раннера: $POOL"; exit 1; }
 . "$HERE/model-id.sh"
+. "$HERE/copy-once.sh"
 SM_MODEL="$(model_id "${SM_MODEL:-}" claude-sonnet-5)" || exit 2
 export SM_MODEL
 
@@ -309,7 +310,7 @@ SNAP_KEEP="$ROUND/_skills/$SKILL.SKILL.md"
 if [ -f "$SNAP_KEEP" ]; then
   echo "снимок скилла уже есть — прогон читает ЕГО: $SNAP_KEEP"
 else
-  cp "$HERE/../$SKILL/SKILL.md" "$SNAP_KEEP"
+  copy_once "$HERE/../$SKILL/SKILL.md" "$SNAP_KEEP"
   echo "снимок скилла: $SNAP_KEEP"
 fi
 # ПРОГОН ЧИТАЕТ КОПИЮ СНИМКА ВНЕ РЕПОЗИТОРИЯ. Единственный путь, который прогон получает внутрь
@@ -340,9 +341,7 @@ cp "$SNAP_KEEP" "$SNAP"
 # по построению. Кладётся рядом со снимком, поэтому относительный путь `reference/…` из скилла
 # ведёт в снимок, а не в репозиторий.
 if [ -d "$HERE/../$SKILL/reference" ]; then
-  if [ ! -d "$ROUND/_skills/$SKILL.reference" ]; then
-    cp -r "$HERE/../$SKILL/reference" "$ROUND/_skills/$SKILL.reference"
-  fi
+  copy_once "$HERE/../$SKILL/reference" "$ROUND/_skills/$SKILL.reference"
   rm -rf "$SNAP_ROOT/$SKILL/reference"
   cp -r "$ROUND/_skills/$SKILL.reference" "$SNAP_ROOT/$SKILL/reference"
 fi

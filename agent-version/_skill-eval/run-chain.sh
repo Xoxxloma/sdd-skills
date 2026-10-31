@@ -43,6 +43,7 @@ FIX="$HERE/fixtures/$FIXTURE"
 
 export RUN_TIMEOUT="${RUN_TIMEOUT:-3600}" SM_MODEL="${SM_MODEL:-claude-sonnet-5}" CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0
 . "$HERE/model-id.sh"
+. "$HERE/copy-once.sh"
 SM_MODEL="$(model_id "$SM_MODEL" claude-sonnet-5)" || exit 2
 RT_TWIN_MODEL="$(model_id "${RT_TWIN_MODEL:-}" claude-sonnet-5-5)" || exit 2
 export RT_TWIN_MODEL
@@ -70,10 +71,8 @@ command -v cygpath >/dev/null 2>&1 && SEED_TMP="$(cygpath -m /tmp)"
 SNAP_ROOT="${SKILL_EVAL_SEED_ROOT:-$SEED_TMP/skill-eval-seed}/$(basename "$ROUND")-$PROBE-$$-skills"
 snap() {
   local s="$1"
-  [ -f "$ROUND/_skills/$s.SKILL.md" ] || cp "$HERE/../$s/SKILL.md" "$ROUND/_skills/$s.SKILL.md"
-  if [ -d "$HERE/../$s/reference" ] && [ ! -d "$ROUND/_skills/$s.reference" ]; then
-    cp -r "$HERE/../$s/reference" "$ROUND/_skills/$s.reference"
-  fi
+  copy_once "$HERE/../$s/SKILL.md" "$ROUND/_skills/$s.SKILL.md"
+  [ -d "$HERE/../$s/reference" ] && copy_once "$HERE/../$s/reference" "$ROUND/_skills/$s.reference"
   mkdir -p "$SNAP_ROOT/$s"
   cp "$ROUND/_skills/$s.SKILL.md" "$SNAP_ROOT/$s/SKILL.md"
   rm -rf "$SNAP_ROOT/$s/reference"
